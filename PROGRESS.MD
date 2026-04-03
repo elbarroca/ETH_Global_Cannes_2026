@@ -436,10 +436,12 @@ curl http://localhost:3000/api/fund/info
 
 ## NEXT STEPS (Priority Order)
 
-1. **Dev B builds** specialist servers + x402 payments + Telegram bot
-2. **Build HTS** (`src/hedera/hts.ts` + `scripts/setup-token.ts`) — unlocks Tokenization $2.5K + No Solidity $2K
-3. **Build OpenClaw** workspaces — unlocks 0G OpenClaw $7K
-4. **Replace stubs** when Dev B delivers x402-client and telegram/bot
-5. **Build dashboard** — 3-column debate view for demo
-6. **Full end-to-end cycle** with real specialists + real payments
-7. **Demo rehearsal** — 3-minute script hitting all 7 bounties
+1. **Build x402 payments** (`x402-server.ts`, `x402-client.ts`) — unlocks Arc $6K, replaces main-agent stub
+2. **Build specialist servers** (`specialist-server.ts`) — 3 Express apps on :4001-:4003 with real inference
+3. **Build HTS** (`src/hedera/hts.ts` + `scripts/setup-token.ts`) — unlocks Tokenization $2.5K + No Solidity $2K
+4. **Wire real payments into main-agent** — replace `createPaymentFetch` stub
+5. **Fix 0G provider** — re-run `setup-og-account.ts` to find live provider (current one returns `unsupported addressable value`)
+6. **Build 0G Storage** (`src/og/storage.ts`) — agent memory persistence
+7. **Build OpenClaw** workspaces — unlocks 0G OpenClaw $7K
+8. **Full end-to-end cycle** with real specialists + real payments + real inference
+9. **Demo rehearsal** — Telegram /run → dashboard updates → Hashscan proof
