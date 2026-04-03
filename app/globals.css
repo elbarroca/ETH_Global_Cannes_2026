@@ -1,23 +1,36 @@
 @import "tailwindcss";
 
+/* Force light mode — disable OS dark mode entirely */
+@variant dark (&:is(.dark *));
+
 @theme {
-  --color-vault-primary: #6366f1;
-  --color-vault-dark: #0f172a;
-  --color-vault-card: #1e293b;
-  --color-vault-border: #334155;
-  --color-vault-accent: #22d3ee;
-  --color-vault-green: #10b981;
-  --color-vault-red: #ef4444;
-  --color-vault-yellow: #f59e0b;
+  --color-purple-600: #9333ea;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 }
 
 :root {
-  --background: #0f172a;
-  --foreground: #f1f5f9;
+  color-scheme: light;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, sans-serif;
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  background: #f9fafb !important;
+  color: #111827 !important;
+}
+
+/* Streaming text cursor */
+.streaming::after {
+  content: "▋";
+  animation: blink 1s step-end infinite;
+  color: #9333ea;
+  font-size: 0.75em;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
