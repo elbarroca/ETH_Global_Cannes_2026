@@ -1,13 +1,8 @@
 import { getActiveUsers } from "../store/user-store.js";
 import { runCycle } from "./main-agent.js";
-import type { UserRecord, CycleResult } from "../types/index.js";
+import { notifyUser } from "../telegram/bot.js";
 
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-
-// STUB — replace when Dev B delivers telegram/bot.ts
-function notifyUser(user: UserRecord, result: CycleResult): void {
-  console.log(`[NOTIFY STUB] User ${user.id}: cycle ${result.cycleId} — ${result.hashscanUrl}`);
-}
 
 export async function runHeartbeat(): Promise<void> {
   const users = getActiveUsers();

@@ -2,6 +2,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { loadStore } from "./store/user-store.js";
+import { startBot } from "./telegram/bot.js";
+import { startApiServer } from "./api/server.js";
 import { startHeartbeatLoop } from "./agents/heartbeat.js";
 
 const REQUIRED_ENV = [
@@ -31,6 +33,12 @@ async function main(): Promise<void> {
   // Load user store from disk
   loadStore();
   console.log("User store loaded.");
+
+  // Start Telegram bot
+  startBot();
+
+  // Start Express API server
+  startApiServer();
 
   // Start heartbeat cycle loop
   startHeartbeatLoop();
