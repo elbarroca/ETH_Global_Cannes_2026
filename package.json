@@ -41,7 +41,7 @@
     "@x402/fetch": "*",
     "crypto-js": "4.2.0",
     "dotenv": "*",
-    "ethers": "^6",
+    "ethers": "6.13.1",
     "express": "^4",
     "next": "16.2.2",
     "node-telegram-bot-api": "*",
@@ -83,5 +83,8 @@
     "tsx": "*",
     "typechain": "^8.3.2",
     "typescript": "^5"
+  },
+  "overrides": {
+    "ethers": "6.13.1"
   }
 }
