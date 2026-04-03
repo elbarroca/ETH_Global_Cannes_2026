@@ -1,0 +1,49 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockOracle",
+  "sourceName": "contracts/MockOracle.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "name": "verifyOwnership",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "name": "verifyProof",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608060405234801561000f575f80fd5b5060f88061001c5f395ff3fe6080604052348015600e575f80fd5b50600436106030575f3560e01c806355c265fe146034578063fbf8f606146034575b5f80fd5b6047603f366004605b565b600192915050565b604051901515815260200160405180910390f35b5f8060208385031215606b575f80fd5b823567ffffffffffffffff808211156081575f80fd5b818501915085601f8301126093575f80fd5b81358181111560a0575f80fd5b86602082850101111560b0575f80fd5b6020929092019691955090935050505056fea2646970667358221220a03bc2d8a84baae8df66a88442cac58ea772c9d20f00137ef10c9efd69d32df064736f6c63430008180033",
+  "deployedBytecode": "0x6080604052348015600e575f80fd5b50600436106030575f3560e01c806355c265fe146034578063fbf8f606146034575b5f80fd5b6047603f366004605b565b600192915050565b604051901515815260200160405180910390f35b5f8060208385031215606b575f80fd5b823567ffffffffffffffff808211156081575f80fd5b818501915085601f8301126093575f80fd5b81358181111560a0575f80fd5b86602082850101111560b0575f80fd5b6020929092019691955090935050505056fea2646970667358221220a03bc2d8a84baae8df66a88442cac58ea772c9d20f00137ef10c9efd69d32df064736f6c63430008180033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

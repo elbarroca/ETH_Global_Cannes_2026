@@ -4,6 +4,7 @@ import { updateUser } from "../store/user-store.js";
 import { runAdversarialDebate } from "./adversarial.js";
 import { logCycle } from "../hedera/hcs.js";
 import { storeMemory } from "../og/storage.js";
+import { updateAgentMetadata } from "../og/inft.js";
 import type {
   UserRecord,
   SpecialistResult,
@@ -127,11 +128,21 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   console.log(`[cycle] Logged to HCS: seq=${seqNum} ${hashscanUrl}`);
 
   // 4b. Store cycle result to 0G decentralized storage (non-fatal)
+  let storageHash: string | undefined;
   try {
-    const storageHash = await storeMemory(user.id, record);
+    storageHash = await storeMemory(user.id, record);
     console.log(`[cycle] Stored to 0G: ${storageHash}`);
   } catch (err) {
     console.warn("[cycle] 0G storage failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
+
+  // 4c. Update iNFT metadata on 0G Chain (non-fatal)
+  if (user.inftTokenId && storageHash) {
+    try {
+      await updateAgentMetadata(user.inftTokenId, storageHash);
+    } catch (err) {
+      console.warn("[cycle] iNFT update failed (non-fatal):", err instanceof Error ? err.message : String(err));
+    }
   }
 
   // 5. Update user (NAV unchanged — real P&L requires trade execution, not yet wired)
