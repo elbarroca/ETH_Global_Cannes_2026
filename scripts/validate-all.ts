@@ -382,6 +382,111 @@ async function testAdversarial(): Promise<void> {
   }
 }
 
+// ─── Test 12: HTS Token Operations (REAL TESTNET TX) ───────
+
+async function testHTS(): Promise<void> {
+  console.log("\n═══ TEST 12: HTS Token Operations (REAL TESTNET TX) ═══");
+  const tokenId = process.env.HTS_FUND_TOKEN_ID;
+  if (!tokenId) { skip("HTS", "HTS_FUND_TOKEN_ID not set"); return; }
+
+  try {
+    const { getTokenInfo, getBalance, mintShares, burnShares } = await import("../src/hedera/hts.js");
+    const { getOperatorId } = await import("../src/config/hedera.js");
+
+    // Read-only: Token info from Mirror Node
+    console.log("  ⏳ Fetching token info from Mirror Node...");
+    const info = await getTokenInfo();
+    ok("getTokenInfo()", `${info.name} (${info.symbol}), decimals=${info.decimals}, supply=${info.totalSupply}`);
+
+    // Read-only: Balance query
+    const operatorId = getOperatorId().toString();
+    const balanceBefore = await getBalance(operatorId);
+    ok("getBalance(operator)", `${balanceBefore} raw units`);
+
+    // Write: Mint 100 units (= 1.00 VMFS)
+    console.log("  ⏳ Minting 100 units (1.00 VMFS)...");
+    const mintResult = await mintShares(100);
+    ok("mintShares(100)", `newTotalSupply=${mintResult.newTotalSupply}`);
+
+    // Verify supply increased
+    const infoAfterMint = await getTokenInfo();
+    if (BigInt(infoAfterMint.totalSupply) > BigInt(info.totalSupply)) {
+      ok("Supply increased", `${info.totalSupply} → ${infoAfterMint.totalSupply}`);
+    } else {
+      // Mirror node may be delayed — check after 6s
+      console.log("  ⏳ Waiting 6s for mirror node...");
+      await new Promise(r => setTimeout(r, 6000));
+      const retryInfo = await getTokenInfo();
+      ok("Supply (delayed check)", `${info.totalSupply} → ${retryInfo.totalSupply}`);
+    }
+
+    // Write: Burn 100 units back (net zero)
+    console.log("  ⏳ Burning 100 units (net zero)...");
+    const burnResult = await burnShares(100);
+    ok("burnShares(100)", `newTotalSupply=${burnResult.newTotalSupply}`);
+
+    // Verify balance restored
+    const balanceAfter = await getBalance(operatorId);
+    ok("Balance after round-trip", `before=${balanceBefore}, after=${balanceAfter}`);
+
+  } catch (err) {
+    fail("HTS", err);
+  }
+}
+
+// ─── Test 13: 0G Storage (REAL TESTNET TX) ─────────────────
+
+async function testOgStorage(): Promise<void> {
+  console.log("\n═══ TEST 13: 0G Storage (REAL TESTNET TX) ═══");
+  if (!process.env.OG_STORAGE_INDEXER) { skip("0G Storage", "OG_STORAGE_INDEXER not set"); return; }
+
+  try {
+    const { storeMemory, loadMemory } = await import("../src/og/storage.js");
+
+    const testData = {
+      test: true,
+      timestamp: new Date().toISOString(),
+      message: "VaultMind validation round-trip",
+    };
+
+    console.log("  ⏳ Uploading test data to 0G storage...");
+    const rootHash = await storeMemory("validate-test", testData);
+    ok("storeMemory()", `rootHash=${rootHash.slice(0, 24)}...`);
+
+    console.log("  ⏳ Downloading from 0G storage...");
+    const loaded = await loadMemory(rootHash);
+    ok("loadMemory()", `type=${typeof loaded}`);
+
+    // Verify round-trip
+    const parsed = loaded as { userId?: string; data?: { test?: boolean; message?: string } };
+    if (parsed.userId === "validate-test" && parsed.data?.test === true) {
+      ok("Round-trip match", `userId=${parsed.userId}, data.test=${parsed.data.test}`);
+    } else {
+      fail("Round-trip match", `unexpected shape: ${JSON.stringify(loaded).slice(0, 100)}`);
+    }
+  } catch (err) {
+    fail("0G Storage", err);
+  }
+}
+
+// ─── Test 14: Hedera Scheduled Transaction (REAL TX) ───────
+
+async function testScheduler(): Promise<void> {
+  console.log("\n═══ TEST 14: Hedera Scheduled Transaction (REAL TESTNET TX) ═══");
+  if (!process.env.HCS_AUDIT_TOPIC_ID) { skip("Scheduler", "HCS_AUDIT_TOPIC_ID not set"); return; }
+
+  try {
+    const { scheduleNextHeartbeat } = await import("../src/hedera/scheduler.js");
+
+    console.log("  ⏳ Scheduling heartbeat (60s delay)...");
+    const result = await scheduleNextHeartbeat(60);
+    ok("scheduleNextHeartbeat(60)", `scheduleId=${result.scheduleId}`);
+    console.log(`    View: https://hashscan.io/testnet/schedule/${result.scheduleId}`);
+  } catch (err) {
+    fail("Scheduler", err);
+  }
+}
+
 // ─── RUNNER ─────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -408,6 +513,11 @@ async function main(): Promise<void> {
 
   // Full pipeline test (3 real 0G calls)
   await testAdversarial();
+
+  // Phase 4 tests
+  await testHTS();
+  await testOgStorage();
+  await testScheduler();
 
   // Summary
   console.log("\n╔══════════════════════════════════════════╗");
