@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(Number(searchParams.get("limit") ?? "25"), 100);
+  const raw = Number(searchParams.get("limit") ?? "25");
+  const limit = Number.isFinite(raw) && raw > 0 ? Math.min(raw, 100) : 25;
 
   try {
     const res = await fetch(

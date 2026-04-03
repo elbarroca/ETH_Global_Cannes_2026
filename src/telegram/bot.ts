@@ -88,6 +88,7 @@ export function notifyUser(user: UserRecord, result: CycleResult): void {
 
   // Respect notification preference
   if (pref === "trades_only" && action === "HOLD") return;
+  if (pref === "daily") return; // daily digest not yet implemented — suppress per-cycle
 
   const msg = [
     `📊 *Cycle #${result.cycleId} Complete*`,
@@ -114,17 +115,21 @@ function registerCommands(telegramBot: TelegramBot): void {
     if (linkCode) {
       const userId = redeemLinkCode(linkCode);
       if (userId) {
-        updateUser(userId, {
-          telegram: {
-            chatId,
-            username: msg.from?.username ?? null,
-            verified: true,
-          },
-        });
-        await telegramBot.sendMessage(msg.chat.id,
-          "✅ *Wallet linked!* Your VaultMind agent is now connected.\n\nUse /status to check your agent.",
-          { parse_mode: "Markdown" },
-        );
+        try {
+          updateUser(userId, {
+            telegram: {
+              chatId,
+              username: msg.from?.username ?? null,
+              verified: true,
+            },
+          });
+          await telegramBot.sendMessage(msg.chat.id,
+            "✅ *Wallet linked!* Your VaultMind agent is now connected.\n\nUse /status to check your agent.",
+            { parse_mode: "Markdown" },
+          );
+        } catch {
+          await telegramBot.sendMessage(msg.chat.id, "❌ Link code expired or user not found. Try again.");
+        }
         return;
       }
     }
@@ -193,7 +198,7 @@ function registerCommands(telegramBot: TelegramBot): void {
     }
 
     await telegramBot.sendMessage(msg.chat.id, "⏳ Fetching last cycle...");
-    const history = await fetchHistory(10);
+    const history = await fetchHistory(30);
     const userCycles = history.filter((r) => r.u === user.id);
 
     if (userCycles.length === 0) {

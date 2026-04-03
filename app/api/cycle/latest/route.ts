@@ -36,7 +36,7 @@ export async function GET() {
         hashscanUrl: `https://hashscan.io/testnet/topic/${topicId}/message/${msg.sequence_number}`,
       });
     } catch {
-      return NextResponse.json({ cycle: null, raw: decoded });
+      return NextResponse.json({ cycle: null });
     }
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

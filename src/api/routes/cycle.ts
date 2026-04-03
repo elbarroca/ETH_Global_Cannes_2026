@@ -3,7 +3,9 @@ import { getUserById } from "../../store/user-store.js";
 import { getHistoryForUser } from "../../hedera/hcs.js";
 import { runCycle } from "../../agents/main-agent.js";
 
-const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID ?? "";
+function getTopicId(): string {
+  return process.env.HCS_AUDIT_TOPIC_ID ?? "";
+}
 
 export function cycleRoutes(): Router {
   const router = Router();
@@ -17,12 +19,13 @@ export function cycleRoutes(): Router {
         return;
       }
 
-      if (!TOPIC_ID) {
+      const topicId = getTopicId();
+      if (!topicId) {
         res.status(500).json({ error: "HCS_AUDIT_TOPIC_ID not configured", code: 500 });
         return;
       }
 
-      const history = await getHistoryForUser(TOPIC_ID, user.id, 1);
+      const history = await getHistoryForUser(topicId, user.id, 1);
       if (history.length === 0) {
         res.json({ cycle: null, message: "No cycles found for this user" });
         return;
@@ -43,13 +46,14 @@ export function cycleRoutes(): Router {
         return;
       }
 
-      if (!TOPIC_ID) {
+      const topicId = getTopicId();
+      if (!topicId) {
         res.status(500).json({ error: "HCS_AUDIT_TOPIC_ID not configured", code: 500 });
         return;
       }
 
       const limit = Math.min(Number(req.query.limit ?? 10), 100);
-      const history = await getHistoryForUser(TOPIC_ID, user.id, limit);
+      const history = await getHistoryForUser(topicId, user.id, limit);
 
       res.json({ cycles: history, total: history.length });
     } catch (err) {
