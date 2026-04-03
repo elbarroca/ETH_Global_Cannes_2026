@@ -41,9 +41,12 @@ function buildCompactRecord(
   specialists: SpecialistResult[],
   debate: DebateResult,
 ): CompactCycleRecord {
-  const alphaParsed = debate.alpha.parsed as { action?: string; allocationPercent?: number };
-  const riskParsed = debate.risk.parsed as { objection?: string; maxSafeAllocation?: number };
-  const execParsed = debate.executor.parsed as { action?: string; allocationPercent?: number; stopLossPercent?: number };
+  // Field names aligned with CONTEXT.MD prompt schemas (pct, max_pct, stop_loss)
+  const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number };
+  const riskParsed = debate.risk.parsed as { challenge?: string; max_pct?: number };
+  const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
+
+  const stopLoss = parseFloat(String(execParsed.stop_loss ?? "-5").replace("%", "").replace("-", ""));
 
   return {
     c: cycleId,
@@ -59,25 +62,25 @@ function buildCompactRecord(
     adv: {
       a: {
         act: String(alphaParsed.action ?? "HOLD"),
-        pct: Number(alphaParsed.allocationPercent ?? 0),
+        pct: Number(alphaParsed.pct ?? 0),
         att: debate.alpha.attestationHash.slice(0, 16),
       },
       r: {
-        obj: String(riskParsed.objection ?? "none").slice(0, 40),
-        max: Number(riskParsed.maxSafeAllocation ?? 0),
+        obj: String(riskParsed.challenge ?? "none").slice(0, 40),
+        max: Number(riskParsed.max_pct ?? 0),
         att: debate.risk.attestationHash.slice(0, 16),
       },
       e: {
         act: String(execParsed.action ?? "HOLD"),
-        pct: Number(execParsed.allocationPercent ?? 0),
-        sl: Number(execParsed.stopLossPercent ?? 5),
+        pct: Number(execParsed.pct ?? 0),
+        sl: stopLoss,
         att: debate.executor.attestationHash.slice(0, 16),
       },
     },
     d: {
       act: String(execParsed.action ?? "HOLD"),
       asset: "ETH",
-      pct: Number(execParsed.allocationPercent ?? 0),
+      pct: Number(execParsed.pct ?? 0),
     },
     nav: user.fund.currentNav,
   };
@@ -122,18 +125,11 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   const { seqNum, hashscanUrl } = await logCycle(TOPIC_ID, record);
   console.log(`[cycle] Logged to HCS: seq=${seqNum} ${hashscanUrl}`);
 
-  // 5. Update user
-  const execParsed = debate.executor.parsed as { allocationPercent?: number };
-  const navDelta = (Number(execParsed.allocationPercent ?? 0) / 100) * user.fund.currentNav;
+  // 5. Update user (NAV unchanged — real P&L requires trade execution, not yet wired)
   updateUser(user.id, {
     agent: {
-      ...user.agent,
       lastCycleId: cycleId,
       lastCycleAt: new Date().toISOString(),
-    },
-    fund: {
-      ...user.fund,
-      currentNav: user.fund.currentNav + navDelta,
     },
   });
 

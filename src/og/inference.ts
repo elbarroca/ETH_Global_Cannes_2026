@@ -38,22 +38,27 @@ export async function sealedInference(
   const data = (await response.json()) as {
     id: string;
     choices: Array<{ message: { content: string } }>;
+    usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
   };
 
   const content = data.choices?.[0]?.message?.content ?? "";
-  const chatID = data.id;
 
-  // Extract attestation hash from response headers
+  // Attestation hash: prefer ZG-Res-Key header, fallback to data.id
   const attestationHash =
     response.headers.get("ZG-Res-Key") ??
     response.headers.get("zg-res-key") ??
+    data.id ??
     "";
 
   // TEE verification — non-fatal
+  // processResponse(provider, chatID, usageContent) — v0.7.4 signature
+  // chatID = ZG-Res-Key for TEE sig verification
+  // usageContent = JSON with token counts for fee caching (NOT the response text)
   let teeVerified = false;
-  if (chatID) {
+  if (attestationHash) {
     try {
-      teeVerified = (await broker.inference.processResponse(providerAddress, chatID, content)) ?? false;
+      const usageContent = JSON.stringify(data.usage ?? {});
+      teeVerified = (await broker.inference.processResponse(providerAddress, attestationHash, usageContent)) ?? false;
     } catch (err) {
       console.warn("[0G] TEE verification failed (non-fatal):", err);
     }

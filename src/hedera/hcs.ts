@@ -19,20 +19,25 @@ export async function logCycle(
     throw new Error(`HCS payload too large: ${payloadBytes} bytes (max ${MAX_PAYLOAD_BYTES})`);
   }
 
-  const tx = await new TopicMessageSubmitTransaction()
-    .setTopicId(TopicId.fromString(topicId))
-    .setMessage(payload)
-    .freezeWith(getHederaClient())
-    .sign(getOperatorKey());
+  try {
+    const client = getHederaClient();
+    const tx = await new TopicMessageSubmitTransaction()
+      .setTopicId(TopicId.fromString(topicId))
+      .setMessage(payload)
+      .freezeWith(client)
+      .sign(getOperatorKey());
 
-  const response = await tx.execute(getHederaClient());
-  const receipt = await response.getReceipt(getHederaClient());
-  const seqNum = receipt.topicSequenceNumber?.toNumber() ?? 0;
+    const response = await tx.execute(client);
+    const receipt = await response.getReceipt(client);
+    const seqNum = receipt.topicSequenceNumber?.toNumber() ?? 0;
 
-  return {
-    seqNum,
-    hashscanUrl: `${HASHSCAN_BASE}/${topicId}`,
-  };
+    return {
+      seqNum,
+      hashscanUrl: `${HASHSCAN_BASE}/${topicId}`,
+    };
+  } catch (err) {
+    throw new Error(`HCS logCycle failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 export async function getHistory(

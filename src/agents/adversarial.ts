@@ -5,9 +5,9 @@ import type { SpecialistResult, DebateResult } from "../types/index.js";
 const PROVIDER = process.env.OG_PROVIDER_ADDRESS!;
 const DELAY_MS = 2000;
 
-const ALPHA_FALLBACK = { action: "HOLD", asset: "ETH", allocationPercent: 0, reasoning: "Parse failed — defaulting to HOLD", conviction: 0 };
-const RISK_FALLBACK = { objection: "Parse failed", maxSafeAllocation: 0, riskLevel: "extreme" as const, reasoning: "Parse failed — blocking trade" };
-const EXECUTOR_FALLBACK = { action: "HOLD", asset: "ETH", allocationPercent: 0, stopLossPercent: 5, reasoning: "Parse failed — defaulting to HOLD" };
+const ALPHA_FALLBACK = { action: "HOLD", asset: "ETH", pct: 0, argument: "Parse failed — defaulting to HOLD" };
+const RISK_FALLBACK = { max_pct: 0, risks: ["parse failure"], challenge: "Parse failed — blocking trade" };
+const EXECUTOR_FALLBACK = { action: "HOLD", asset: "ETH", pct: 0, stop_loss: "-5%", reasoning: "Parse failed — defaulting to HOLD" };
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -19,16 +19,22 @@ function buildSpecialistContext(specialists: SpecialistResult[]): string {
     .join("\n");
 }
 
+function isEmptyParse(obj: Record<string, unknown>): boolean {
+  return Object.keys(obj).length === 0;
+}
+
 async function inferWithRetry(
   systemPrompt: string,
   userMessage: string,
   fallback: Record<string, unknown>,
 ): Promise<{ content: string; parsed: Record<string, unknown>; attestationHash: string; teeVerified: boolean }> {
   const result = await sealedInference(PROVIDER, systemPrompt, userMessage);
-  let parsed = safeJsonParse<Record<string, unknown>>(result.content, null as unknown as Record<string, unknown>);
+  const EMPTY: Record<string, unknown> = {};
+  let parsed = safeJsonParse<Record<string, unknown>>(result.content, EMPTY);
 
-  // Retry once with emphasis if parse failed
-  if (!parsed) {
+  // Retry once with emphasis if parse returned empty fallback
+  if (isEmptyParse(parsed)) {
+    await delay(DELAY_MS); // Rate-limit protection before retry
     const emphasisMsg = `${userMessage}\n\nIMPORTANT: Return ONLY valid JSON. No explanations.`;
     const retry = await sealedInference(PROVIDER, systemPrompt, emphasisMsg);
     parsed = safeJsonParse<Record<string, unknown>>(retry.content, fallback);

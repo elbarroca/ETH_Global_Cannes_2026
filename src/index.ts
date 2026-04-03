@@ -4,12 +4,29 @@ dotenv.config();
 import { loadStore } from "./store/user-store.js";
 import { startHeartbeatLoop } from "./agents/heartbeat.js";
 
+const REQUIRED_ENV = [
+  "OPERATOR_ID",
+  "OPERATOR_KEY",
+  "HCS_AUDIT_TOPIC_ID",
+  "OG_PRIVATE_KEY",
+  "OG_PROVIDER_ADDRESS",
+  "SERVER_ENCRYPTION_KEY",
+] as const;
+
+function validateEnv(): void {
+  const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required env vars: ${missing.join(", ")}`);
+  }
+}
+
 async function main(): Promise<void> {
   console.log("=== VaultMind booting... ===");
   console.log(`Node ${process.version}`);
-  console.log(`Operator: ${process.env.OPERATOR_ID ?? "NOT SET"}`);
-  console.log(`HCS Topic: ${process.env.HCS_AUDIT_TOPIC_ID ?? "NOT SET"}`);
-  console.log(`0G Provider: ${process.env.OG_PROVIDER_ADDRESS ?? "NOT SET"}`);
+  validateEnv();
+  console.log(`Operator: ${process.env.OPERATOR_ID}`);
+  console.log(`HCS Topic: ${process.env.HCS_AUDIT_TOPIC_ID}`);
+  console.log(`0G Provider: ${process.env.OG_PROVIDER_ADDRESS}`);
 
   // Load user store from disk
   loadStore();
