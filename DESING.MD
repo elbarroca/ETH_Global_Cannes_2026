@@ -1,1197 +1,898 @@
-# VaultMind — Design System
+# AlphaDawg — Design System & Complete UI Specification
 
-> Brutalist terminal aesthetic. Monospace everything. Teal is the only color that matters.
-> If it doesn't serve the data, it doesn't exist.
-
----
-
-## Table of Contents
-
-1. [Design Philosophy](#1-design-philosophy)
-2. [Design Tokens](#2-design-tokens)
-3. [Typography](#3-typography)
-4. [Color System](#4-color-system)
-5. [Spacing & Layout Grid](#5-spacing--layout-grid)
-6. [Borders & Surfaces](#6-borders--surfaces)
-7. [Motion System](#7-motion-system)
-8. [Icon & Symbol Language](#8-icon--symbol-language)
-9. [Navigation & Shell](#9-navigation--shell)
-10. [Component Library](#10-component-library)
-11. [Page Layouts](#11-page-layouts)
-12. [Timeline Waterfall — The Debate View](#12-timeline-waterfall)
-13. [Onboarding Flow](#13-onboarding-flow)
-14. [Marketplace View](#14-marketplace-view)
-15. [Responsive Strategy](#15-responsive-strategy)
-16. [Tailwind v4 Configuration](#16-tailwind-v4-configuration)
-17. [Implementation Notes](#17-implementation-notes)
+> **Design philosophy:** Dark, bold, alive. A trading war room that feels like the cockpit of something powerful. Not a fintech dashboard — a weapon. The kind of interface where you feel smarter just looking at it.
 
 ---
 
-## 1. Design Philosophy
+## Brand Identity
 
-### The Rules
+### Name
+**AlphaDawg** — Your AI pack hunts alpha.
 
-1. **No decoration.** Every pixel serves the data or the interaction. No gradients, no shadows, no rounded corners, no illustrations.
-2. **Monospace is the voice.** JetBrains Mono everywhere. The interface speaks like a terminal because VaultMind IS a terminal into your agent swarm.
-3. **Teal is the signal.** `#06B6D4` (cyan-500) is the only chromatic accent. It means "alive," "active," "verified," or "actionable." Everything else is grayscale.
-4. **High contrast, low noise.** Pure white text on near-black backgrounds. No mid-grays for primary content. If the user needs to read it, it's white. If it's secondary, it's `#71717A` (zinc-500). Nothing in between.
-5. **Borders define space.** No shadows, no elevation, no blur. 1px solid borders in `#27272A` (zinc-800) separate content. That's the only spatial tool.
-6. **Data is the hero.** Numbers are larger than labels. Hashes are displayed proudly. JSON is shown raw. The system does not apologize for being technical.
+### Logo
+Abstract geometric wolf face. Two-layer red silhouette on near-black background with gold/amber eyes with dark pupils and gold nose mark.
 
-### The Feeling
+**Logo SVG (copy directly into your app):**
+```svg
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="4" width="112" height="112" rx="28" fill="#0C0A09"/>
+  <path d="M28 92 L42 28 L60 48 L78 28 L92 92 Z" fill="#7F1D1D"/>
+  <path d="M34 92 L46 36 L60 52 L74 36 L86 92 Z" fill="#DC2626"/>
+  <circle cx="50" cy="54" r="4.5" fill="#FBBF24"/>
+  <circle cx="70" cy="54" r="4.5" fill="#FBBF24"/>
+  <circle cx="50" cy="54" r="2" fill="#0C0A09"/>
+  <circle cx="70" cy="54" r="2" fill="#0C0A09"/>
+  <path d="M55 69 L60 73 L65 69" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round"/>
+</svg>
+```
 
-When a judge opens VaultMind, it should feel like opening a mission control terminal for an autonomous financial system. Not a consumer app. Not a crypto dashboard. A **control interface** for AI agents managing real money with cryptographic proof.
+**Telegram avatar (circular):**
+```svg
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="60" cy="60" r="56" fill="#0C0A09"/>
+  <path d="M30 88 L42 30 L60 48 L78 30 L90 88 Z" fill="#7F1D1D"/>
+  <path d="M36 88 L46 38 L60 52 L74 38 L84 88 Z" fill="#DC2626"/>
+  <circle cx="50" cy="54" r="4.5" fill="#FBBF24"/>
+  <circle cx="70" cy="54" r="4.5" fill="#FBBF24"/>
+  <circle cx="50" cy="54" r="2" fill="#0C0A09"/>
+  <circle cx="70" cy="54" r="2" fill="#0C0A09"/>
+  <path d="M55 68 L60 72 L65 68" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round"/>
+</svg>
+```
 
-The closest references (for mood, not to copy): Bloomberg Terminal, Stripe's developer dashboard, Linear's density, a military radar screen.
-
-### What We Never Do
-
-- Round corners (everything is `rounded-none` or `rounded-sm` at most for inputs)
-- Box shadows
-- Gradient backgrounds
-- Colored backgrounds on containers (only borders)
-- Emoji in the UI (text labels only)
-- Placeholder illustrations or decorative SVGs
-- Loading spinners (use pulsing text: `Loading...` with opacity animation)
-- Marketing language in the dashboard (save it for the landing page)
+### Voice & Personality
+- Confident, not arrogant
+- Sharp, not jargon-heavy
+- The friend who's genuinely good at trading and explains what they're doing
+- Use "hunt" language: "Your pack hunted 3 specialists" not "Your agent queried 3 APIs"
 
 ---
 
-## 2. Design Tokens
+## Color System
 
-### Tailwind v4 CSS Custom Properties
+### Primary Palette
 
-```css
-@theme {
-  /* ── BACKGROUNDS ── */
-  --color-bg-primary: #09090B;      /* zinc-950 — main background */
-  --color-bg-secondary: #18181B;    /* zinc-900 — panels, cards */
-  --color-bg-tertiary: #27272A;     /* zinc-800 — hover states, active items */
-  --color-bg-input: #09090B;        /* same as primary — inputs are invisible until focused */
+```
+BLOOD RED (primary action, wolf body, CTAs)
+  50:  #FEF2F2   — backgrounds, subtle tints
+  100: #FEE2E2   — hover states, light fills
+  200: #FECACA   — secondary text on dark
+  300: #FCA5A5   — descriptions, subtitles on dark
+  400: #F87171   — secondary elements
+  500: #EF4444   — inner wolf layer, secondary actions
+  600: #DC2626   — PRIMARY — main wolf, buttons, active states
+  700: #B91C1C   — hover on primary buttons
+  800: #991B1B   — pressed states
+  900: #7F1D1D   — outer wolf layer, deep accents
 
-  /* ── BORDERS ── */
-  --color-border-default: #27272A;  /* zinc-800 — standard borders */
-  --color-border-hover: #3F3F46;    /* zinc-700 — hover/focus borders */
-  --color-border-active: #06B6D4;   /* cyan-500 — active/selected state */
+GOLD (eyes, highlights, important data, profits)
+  50:  #FFFBEB   — subtle glow backgrounds
+  100: #FEF3C7   — light accent fills
+  200: #FDE68A   — eye glow, attention-grabbing text
+  300: #FCD34D   — secondary gold
+  400: #FBBF24   — PRIMARY — eyes, nose, key metrics, profit numbers
+  500: #F59E0B   — hover on gold elements
+  600: #D97706   — pressed gold
+  700: #B45309   — dark gold accents
 
-  /* ── TEXT ── */
-  --color-text-primary: #FAFAFA;    /* zinc-50 — primary content */
-  --color-text-secondary: #A1A1AA;  /* zinc-400 — labels, descriptions */
-  --color-text-tertiary: #71717A;   /* zinc-500 — timestamps, metadata */
-  --color-text-disabled: #52525B;   /* zinc-600 — disabled/inactive */
-  --color-text-accent: #06B6D4;     /* cyan-500 — links, active items */
+VOID (backgrounds, surfaces, depth)
+  950: #0C0A09   — page background, deepest layer
+  900: #1C1917   — card backgrounds, logo bg, navbar
+  850: #1F1E1B   — elevated cards, modals
+  800: #292524   — borders, dividers, subtle lines
+  700: #44403C   — secondary borders, hover borders
+  600: #57534E   — disabled text, hints
+  500: #78716C   — tertiary text
+  400: #A8A29E   — secondary text, descriptions
+  300: #D6D3D1   — primary text (headings on dark)
+  200: #E7E5E4   — bright text, numbers
+  100: #F5F5F4   — white-equivalent text
+```
 
-  /* ── ACCENT (TEAL/CYAN) ── */
-  --color-accent-50: #ECFEFF;
-  --color-accent-100: #CFFAFE;
-  --color-accent-200: #A5F3FC;
-  --color-accent-300: #67E8F9;
-  --color-accent-400: #22D3EE;
-  --color-accent-500: #06B6D4;      /* PRIMARY — the accent */
-  --color-accent-600: #0891B2;
-  --color-accent-700: #0E7490;
-  --color-accent-900: #164E63;
+### Semantic Colors
 
-  /* ── SEMANTIC ── */
-  --color-success: #22C55E;         /* green-500 — verified, profit, Alpha */
-  --color-danger: #EF4444;          /* red-500 — error, loss, Risk */
-  --color-warning: #EAB308;         /* yellow-500 — Executor, pending */
-  --color-info: #06B6D4;            /* cyan-500 — same as accent */
+```
+PROFIT / SUCCESS
+  bg:     #052E16 (dark green tint)
+  text:   #4ADE80 (bright green)
+  accent: #22C55E (green for +% numbers)
 
-  /* ── AGENT COLORS (used ONLY in debate view) ── */
-  --color-agent-alpha: #22C55E;     /* green-500 */
-  --color-agent-risk: #EF4444;      /* red-500 */
-  --color-agent-executor: #EAB308;  /* yellow-500 */
-  --color-agent-specialist: #06B6D4;/* cyan-500 */
+LOSS / DANGER
+  bg:     #450A0A (dark red tint — same family as brand red)
+  text:   #FCA5A5 (soft red)
+  accent: #EF4444 (matches brand)
 
-  /* ── TYPOGRAPHY ── */
-  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', ui-monospace, monospace;
+WARNING / PENDING
+  bg:     #451A03 (dark amber tint)
+  text:   #FCD34D (gold-amber)
+  accent: #F59E0B
 
-  /* ── SPACING SCALE ── */
-  --space-px: 1px;
-  --space-1: 0.25rem;   /* 4px */
-  --space-2: 0.5rem;    /* 8px */
-  --space-3: 0.75rem;   /* 12px */
-  --space-4: 1rem;      /* 16px */
-  --space-6: 1.5rem;    /* 24px */
-  --space-8: 2rem;      /* 32px */
-  --space-12: 3rem;     /* 48px */
-  --space-16: 4rem;     /* 64px */
-  --space-24: 6rem;     /* 96px */
+INFO / LINKS
+  bg:     #0C1222 (dark blue tint)
+  text:   #93C5FD (soft blue)
+  accent: #3B82F6
 
-  /* ── TRANSITIONS ── */
-  --duration-fast: 100ms;
-  --duration-default: 150ms;
-  --duration-slow: 300ms;
-  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+0G / SEALED (special — used for all 0G-related badges)
+  bg:     #2E1065 (dark purple tint)
+  text:   #C4B5FD (soft purple)
+  accent: #8B5CF6
+
+HEDERA (special — used for audit-related elements)
+  bg:     #042F2E (dark teal tint)
+  text:   #5EEAD4 (bright teal)
+  accent: #14B8A6
+
+ARC (special — used for payment-related elements)
+  bg:     #172554 (dark blue tint)
+  text:   #93C5FD (soft blue)
+  accent: #3B82F6
+```
+
+### Tailwind Config Extension
+
+```javascript
+// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        void: {
+          950: '#0C0A09',
+          900: '#1C1917',
+          850: '#1F1E1B',
+          800: '#292524',
+          700: '#44403C',
+          600: '#57534E',
+          500: '#78716C',
+          400: '#A8A29E',
+          300: '#D6D3D1',
+          200: '#E7E5E4',
+          100: '#F5F5F4',
+        },
+        blood: {
+          50: '#FEF2F2',
+          100: '#FEE2E2',
+          200: '#FECACA',
+          300: '#FCA5A5',
+          400: '#F87171',
+          500: '#EF4444',
+          600: '#DC2626',
+          700: '#B91C1C',
+          800: '#991B1B',
+          900: '#7F1D1D',
+        },
+        gold: {
+          50: '#FFFBEB',
+          100: '#FEF3C7',
+          200: '#FDE68A',
+          300: '#FCD34D',
+          400: '#FBBF24',
+          500: '#F59E0B',
+          600: '#D97706',
+          700: '#B45309',
+        },
+      },
+    },
+  },
 }
 ```
 
 ---
 
-## 3. Typography
+## Typography
 
-### Font
+### Font Stack
+```css
+--font-primary: 'Inter', system-ui, -apple-system, sans-serif;
+--font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+```
 
-**JetBrains Mono** — Primary and only font. Load weights 400 (regular), 500 (medium), and 700 (bold).
+Use Inter for everything. JetBrains Mono for all data: prices, hashes, attestations, wallet addresses, agent outputs, code blocks.
 
+### Scale
+```
+Hero title:      32px, font-weight 800, letter-spacing -1px, text-void-100
+Page title:      22px, font-weight 700, letter-spacing -0.5px, text-void-200
+Section title:   16px, font-weight 600, text-void-300
+Card title:      14px, font-weight 600, text-void-200
+Body:            14px, font-weight 400, text-void-400
+Small:           12px, font-weight 400, text-void-500
+Tiny:            11px, font-weight 500, uppercase, letter-spacing 1.5px, text-void-600 (labels)
+Mono data:       13px, font-mono, font-weight 500, text-void-200
+Mono secondary:  12px, font-mono, font-weight 400, text-void-500
+```
+
+### Special Text Styles
+```
+Profit numbers:  font-mono, font-weight 600, text-green-400 (#4ADE80)
+Loss numbers:    font-mono, font-weight 600, text-blood-300 (#FCA5A5)
+Gold highlights: font-mono, font-weight 600, text-gold-400 (#FBBF24)
+Agent names:     font-weight 600, text-void-200
+Attestation IDs: font-mono, text-xs, text-void-600, truncated with ...
+```
+
+---
+
+## Component Library
+
+### Cards
+
+**Standard card (most content):**
+```
+bg-void-900
+border: 1px solid void-800
+border-radius: 16px (rounded-2xl)
+No shadow. Ever.
+```
+
+**Elevated card (modals, popovers, important content):**
+```
+bg-void-850
+border: 1px solid void-700
+border-radius: 16px
+```
+
+**Stat card (metric cards at top of dashboard):**
+```
+bg-void-900
+border: 1px solid void-800
+border-radius: 12px (rounded-xl)
+padding: 14px 16px
+Label: 11px uppercase tracking-wider text-void-600
+Value: 22px font-weight 700 text-void-100
+Subtext: 12px text-green-400 or text-blood-300
+```
+
+**Agent card (marketplace):**
+```
+bg-void-900
+border: 1px solid void-800
+border-radius: 16px
+padding: 16px
+Hover: border-color transitions to void-700, subtle bg shift to void-850
+```
+
+### Badges
+
+**Sealed badge (most important — 0G proof):**
 ```html
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<span class="inline-flex items-center gap-1.5 text-xs font-mono
+  bg-purple-950/50 text-purple-300 px-2 py-0.5 rounded-md
+  border border-purple-800/30">
+  <span class="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></span>
+  sealed
+</span>
 ```
 
-Fallback stack: `'IBM Plex Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace`
+**Live badge:**
+```html
+<span class="inline-flex items-center gap-1.5 text-xs font-mono
+  bg-blood-900/50 text-blood-300 px-2 py-0.5 rounded-md
+  border border-blood-800/30">
+  <span class="w-1.5 h-1.5 bg-blood-500 rounded-full animate-pulse"></span>
+  live
+</span>
+```
 
-### Type Scale
+**Status badges:**
+```
+Active/Win:   bg-emerald-950/50 text-emerald-400 border-emerald-800/30
+Loss:         bg-blood-900/50 text-blood-300 border-blood-800/30
+Hired:        bg-gold-400/10 text-gold-400 border-gold-400/20
+0G iNFT:      bg-purple-950/50 text-purple-300 border-purple-800/30
+Hedera:       bg-teal-950/50 text-teal-300 border-teal-800/30
+Arc:          bg-blue-950/50 text-blue-300 border-blue-800/30
+```
 
-All sizes in `rem`. Monospace runs wider than sans-serif, so sizes are slightly smaller than typical scales.
+### Buttons
 
-| Token | Size | Weight | Line Height | Usage |
-|-------|------|--------|-------------|-------|
-| `text-display` | 2rem (32px) | 700 | 1.1 | Landing page hero, page titles (rare) |
-| `text-heading` | 1.25rem (20px) | 700 | 1.3 | Section headers, panel titles |
-| `text-subhead` | 1rem (16px) | 500 | 1.4 | Subsection headers, nav items |
-| `text-body` | 0.875rem (14px) | 400 | 1.5 | Primary body text, form labels |
-| `text-small` | 0.75rem (12px) | 400 | 1.5 | Metadata, timestamps, secondary info |
-| `text-micro` | 0.6875rem (11px) | 400 | 1.4 | Badges, tags, footnotes |
+**Primary (hunt, deposit, main CTAs):**
+```
+bg-blood-600 hover:bg-blood-700 active:bg-blood-800
+text-white font-semibold
+rounded-xl
+px-5 py-3
+transition-colors duration-150
+```
 
-### Type Rules
+**Secondary:**
+```
+bg-void-800 hover:bg-void-700 active:bg-void-600
+text-void-200
+border: 1px solid void-700
+rounded-xl
+px-4 py-2.5
+```
 
-- **Numbers are always `tabular-nums`.** Financial data must column-align. Set `font-variant-numeric: tabular-nums` globally on monospace.
-- **Hashes and addresses truncate in the middle.** Display as `0x7f2a...e41b` — never at the end.
-- **ALL CAPS for labels only.** Status badges, column headers, section labels. Never for body text.
-- **Letter-spacing: `0.02em` on ALL CAPS text.** Monospace needs breathing room when capitalized.
-- **No italics.** Brutalist rule. Emphasis = bold or teal color, never italic.
+**Ghost (links, minor actions):**
+```
+bg-transparent hover:bg-void-800
+text-void-400 hover:text-void-200
+rounded-lg
+px-3 py-1.5
+```
+
+**Gold accent (special actions like "Deploy Agent"):**
+```
+bg-gold-400/10 hover:bg-gold-400/20
+text-gold-400
+border: 1px solid gold-400/20
+rounded-xl
+px-4 py-2.5
+```
+
+### Code Blocks (agent output, reasoning)
+
+```
+bg-void-950
+border: 1px solid void-800
+border-radius: 10px
+padding: 12px 14px
+font-mono text-xs leading-relaxed
+text-void-400
+```
+
+Important text within code blocks (recommendations, decisions):
+```
+Alpha rec:    text-green-400 font-semibold
+Risk rec:     text-blood-300 font-semibold
+Executor rec: text-gold-400 font-semibold
+```
+
+### Dividers
+```
+border-top: 1px solid void-800
+OR for subtle sections:
+border-top: 1px solid void-800/50
+```
+
+### Status Dots
+```
+Active/connected:  w-2 h-2 bg-emerald-500 rounded-full
+Live/pulsing:      w-2 h-2 bg-blood-500 rounded-full animate-pulse
+Warning:           w-2 h-2 bg-gold-400 rounded-full
+Offline:           w-2 h-2 bg-void-600 rounded-full
+0G computing:      w-2 h-2 bg-purple-500 rounded-full animate-pulse
+```
 
 ---
 
-## 4. Color System
+## Layout System
 
-### The Palette
-
-The entire UI uses exactly 3 hues: **gray** (zinc), **teal** (cyan-500), and **semantic colors** (red/green/yellow for the debate view only).
-
+### Page Structure
 ```
-BACKGROUNDS          BORDERS              TEXT
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ #09090B     │     │ #27272A     │     │ #FAFAFA     │  primary
-│ zinc-950    │     │ zinc-800    │     │ zinc-50     │
-├─────────────┤     ├─────────────┤     ├─────────────┤
-│ #18181B     │     │ #3F3F46     │     │ #A1A1AA     │  secondary
-│ zinc-900    │     │ zinc-700    │     │ zinc-400    │
-├─────────────┤     └─────────────┘     ├─────────────┤
-│ #27272A     │                         │ #71717A     │  tertiary
-│ zinc-800    │     ACCENT              │ zinc-500    │
-└─────────────┘     ┌─────────────┐     └─────────────┘
-                    │ #06B6D4     │
-                    │ cyan-500    │     ACCENT TEXT
-                    └─────────────┘     ┌─────────────┐
-                                        │ #06B6D4     │
-                                        │ cyan-500    │
-                                        └─────────────┘
+<body class="bg-void-950 text-void-300 font-sans">
+  <nav>  — sticky top, bg-void-900, border-b border-void-800 </nav>
+  <main class="max-w-7xl mx-auto px-5 py-6"> — content </main>
+</body>
 ```
 
-### When Teal Appears
+Note: max-w-7xl (wider than before) to give the dashboard room to breathe.
 
-Teal (#06B6D4) is used **only** for:
-
-- Active navigation item (left border + text)
-- Focused input border
-- Primary CTA button background
-- Links (text only, no underline until hover)
-- "Verified" / "Live" / "Active" status indicators
-- Timeline waterfall — the active step's left border
-- The pulsing dot on live cycle indicator
-
-Teal never appears as a background fill on large surfaces. It is always a border, text color, or small indicator.
-
-### Semantic Colors (Debate View Only)
-
-These appear exclusively inside the timeline waterfall and debate-related components:
-
-| Color | Hex | Agent | Usage |
-|-------|-----|-------|-------|
-| Green | `#22C55E` | Alpha | Alpha's argument card left-border, "FOR" label |
-| Red | `#EF4444` | Risk | Risk's argument card left-border, "AGAINST" label |
-| Yellow | `#EAB308` | Executor | Executor's card left-border, "DECISION" label |
-| Teal | `#06B6D4` | Specialists | Specialist report cards, "ANALYSIS" label |
-
-Outside the debate view, **none of these colors appear** except in standard success/error states.
+### Grid Gaps
+```
+Metric cards:    gap-3 (12px)
+Main columns:    gap-4 (16px)
+Marketplace:     gap-4 (16px)
+Stacked cards:   gap-3 (12px)
+```
 
 ---
 
-## 5. Spacing & Layout Grid
-
-### Spacing Scale
-
-Use Tailwind's default scale. Primary spacings: `4`, `6`, `8`, `12`, `16`.
-
-### Shell Layout
+## Navigation Bar
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ TOPBAR (h-12, border-b)                                 │
-│ Logo · Nav breadcrumb · Status indicator · Wallet       │
-├────────┬────────────────────────────────────────────────┤
-│        │                                                │
-│ SIDE   │  MAIN CONTENT                                  │
-│ NAV    │                                                │
-│        │  Focused panel view                            │
-│ w-56   │  max-w-5xl mx-auto                             │
-│        │  px-8 py-6                                     │
-│ border │                                                │
-│ -r     │                                                │
-│        │                                                │
-│        │                                                │
-│        │                                                │
-├────────┴────────────────────────────────────────────────┤
-│ STATUSBAR (h-8, border-t)                               │
-│ Cycle #48 · Last: 2m ago · Next: 3m · 3 specialists    │
-└─────────────────────────────────────────────────────────┘
+Height: 56px
+Background: bg-void-900
+Border: border-b border-void-800
+Padding: px-5
+
+LEFT:
+  - Logo SVG (32x32)
+  - "AlphaDawg" text-void-100 font-bold text-base tracking-tight
+  - Live badge (blood variant)
+
+CENTER:
+  - Nav tabs: Dashboard, Pack, History, Deposit, Verify
+  - Active: bg-void-800 text-void-100 font-medium rounded-lg px-3 py-1.5
+  - Inactive: text-void-500 hover:text-void-300 transition
+  - Note: "Marketplace" is now called "Pack" (fits the brand)
+
+RIGHT:
+  - 0G iNFT badge: "iNFT #0846" in purple badge style
+  - Wallet: "0x7a3f...8b2c" in font-mono text-void-500
+  - Avatar: 28x28 rounded-full, bg-gradient-to-br from-blood-600 to-gold-500
 ```
-
-### Grid Rules
-
-- **Sidebar:** Fixed `w-56` (224px). Collapsed to icon-only `w-14` on smaller screens.
-- **Main content:** `max-w-5xl` (1024px) centered with `mx-auto`. Generous `px-8 py-6` padding.
-- **Panels inside main:** Full width of the content area. Stack vertically. Separated by `space-y-6`.
-- **No multi-column grid inside panels** (except the marketplace table). Data flows top to bottom.
 
 ---
 
-## 6. Borders & Surfaces
+## Page 1: Dashboard
 
-### Border Rules
-
-- **All containers:** `border border-zinc-800` (1px solid #27272A)
-- **Hover:** `border-zinc-700` (lighten one step)
-- **Active/Selected:** `border-cyan-500` (teal accent)
-- **Dividers inside panels:** `border-t border-zinc-800` — horizontal only, never vertical inside a panel
-- **No rounded corners** on containers. Use `rounded-none` explicitly. Exception: input fields get `rounded-sm` (2px) for usability.
-
-### Surface Hierarchy
+### Top Row: Metrics (5 columns)
 
 ```
-Layer 0 — Page background:    bg-zinc-950  (#09090B)
-Layer 1 — Panels/cards:       bg-zinc-900  (#18181B) + border-zinc-800
-Layer 2 — Hover/active:       bg-zinc-800  (#27272A)
-Layer 3 — Input focused:      bg-zinc-950 + border-cyan-500
+┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
+│ 💰 FUND NAV │ │ 🔄 HUNTS    │ │ 💸 PACK     │ │ 🎯 WIN RATE │ │ 🧠 0G SEALED│
+│ $1,247.83  │ │ 48         │ │ SPEND      │ │ 76%        │ │ INFERENCES │
+│ +4.2%      │ │ All sealed │ │ $0.58      │ │ Verified   │ │ 288        │
+└────────────┘ └────────────┘ └────────────┘ └────────────┘ └────────────┘
 ```
 
-**No shadows. No blur. No elevation.** Depth is communicated through border contrast and background shade only.
+Card style: bg-void-900, border void-800, rounded-xl, p-3.5
+- Label: 11px uppercase tracking-wider text-void-600
+- Value: 22px font-bold text-void-100
+- Sub: 12px text-green-400 (profit) or text-void-500 (neutral)
+
+### "Hunt" Button
+Centered above the three columns. This is the star of the demo.
+```
+bg-blood-600 hover:bg-blood-700
+text-white font-bold text-sm
+rounded-xl px-6 py-3
+With wolf icon on the left and pulsing dot when active
+
+"🐺 Hunt"  →  when clicked, changes to  "🔴 Hunting..."  with spinner
+```
+
+### Three-Column Layout
+
+#### Column 1: Pack Intelligence (specialists)
+
+**Card header:**
+```
+px-4 py-3 border-b border-void-800
+Left: emerald dot + "ETH pack" text-void-200 font-semibold text-sm
+Right: "3 hired" gold badge
+```
+
+**Each specialist block:**
+```
+Agent row:
+  Left: emoji (text-base) + name (text-xs font-semibold text-void-200) + "0G iNFT" purple badge
+  Right: "$0.001" text-xs font-mono text-void-500
+
+Analysis block:
+  bg-void-950 rounded-lg p-3
+  font-mono text-xs leading-relaxed text-void-400
+
+Below analysis:
+  Left: sealed badge (clickable → goes to Verify page)
+  Right: attestation hash truncated, text-xs font-mono text-void-600
+```
+
+#### Column 2: The Challenge (adversarial debate)
+
+**Card header:**
+```
+Left: blood-500 pulsing dot + "The challenge" text-void-200 font-semibold
+Right: "live" blood badge with pulse
+```
+
+**Each agent block:**
+```
+Header row:
+  Left: colored emoji + name (font-semibold text-void-200)
+  Right: sealed badge
+
+Analysis block:
+  bg-void-950 rounded-lg p-3
+  font-mono text-xs leading-relaxed text-void-400
+  Recommendation at end:
+    Alpha:    text-green-400 font-semibold
+    Risk:     text-blood-300 font-semibold
+    Executor: text-gold-400 font-semibold
+
+Footer:
+  "0G: glm-5-chat" text-xs text-purple-400
+  "·" separator
+  attestation hash text-xs font-mono text-void-600
+```
+
+**Agent color mapping:**
+```
+Alpha:    🟢 or custom green circle, recommendations in green-400
+Risk:     🔴 or custom blood circle, recommendations in blood-300
+Executor: 🟡 or custom gold circle, recommendations in gold-400
+```
+
+#### Column 3: Intel + Audit (stacked)
+
+**Card 3a: Arc Payments**
+```
+Header: blue dot + "Arc payments" + blue "USDC" badge
+Body: rows of from → to with mono prices
+Divider
+Total row: bold
+Footer: "Circle Nanopayments · Gas-free" text-blue-400
+```
+
+**Card 3b: Hedera Audit**
+```
+Header: teal dot + "Hedera audit"
+Body: bg-void-950 code block
+  Topic ID, sequence, timestamp in mono text-void-500
+  "6 attestations · 3 payments · 1 decision" text-void-600
+  "Verify on Hashscan →" text-teal-400 hover:underline
+```
+
+**Card 3c: Pack Memory (0G Storage)**
+```
+Header: purple dot + "Pack memory" + "0G Storage" purple badge
+Body: list of memory items
+  Cycle ref: text-purple-400 font-mono
+  Memory text: text-void-500
+```
+
+### Bottom Bar
+```
+bg-void-900 rounded-2xl p-3 border border-void-800
+Left: 📱 + "Telegram: Connected" + green dot
+Right: Three chain badges in a row
+  "0G Sealed" purple badge
+  "Hedera HCS" teal badge
+  "Arc Nano" blue badge
+```
 
 ---
 
-## 7. Motion System
+## Page 2: Pack (Marketplace)
 
-### Philosophy
+### Section 1: "Your pack"
+```
+Header left: "Your pack" text-lg font-bold text-void-100
+             "Specialists your Lead Dawg currently hires" text-void-500
+Header right: "Lead Dawg: iNFT #0846" purple badge
 
-Motion exists to confirm state changes, not to entertain. Every transition is 150ms. Nothing bounces. Nothing overshoots. Nothing delays.
+Grid: 3 columns
+```
 
-### Transition Tokens
+**Active specialist card:**
+```
+bg-void-900 border border-void-800 rounded-2xl p-4
+Hover: border-void-700 bg-void-850
 
+Top-right corner: "0G iNFT" purple badge + "active" green badge (stacked or row)
+
+Content:
+  Large emoji (text-2xl) with subtle gold glow: 
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.1) on the emoji container
+  Name: font-semibold text-sm text-void-200
+  Skill: text-xs text-void-500
+  "iNFT #0847 · 0G Chain" text-xs font-mono text-purple-400
+  Stats row: "82% accuracy" text-green-400 + "445 hires" text-void-500
+  "Model: glm-5-chat via 0G Sealed" text-xs text-void-600, model in text-purple-400
+
+Bottom section (border-t border-void-800):
+  Left: "$0.001/query" font-mono font-semibold text-void-200
+  Right: "Paid via Arc USDC" text-xs text-blue-400
+```
+
+### Section 2: "Marketplace"
+```
+Header left: "Marketplace" text-lg font-bold text-void-100
+             "Community-built specialists — minted as iNFTs on 0G" text-void-500
+Header right: "Deploy your agent" gold accent button
+
+Grid: 4 columns
+```
+
+**Community agent card:**
+```
+bg-void-900 border border-void-800 rounded-2xl p-3.5
+Hover: border-blood-800/50 (subtle red glow on hover — this is the marketplace, things are for sale)
+
+Top row: emoji left, "0G iNFT" badge right
+Name: font-semibold text-sm text-void-200
+Skill: text-xs text-void-500
+"iNFT #1201" text-xs font-mono text-purple-400
+"by 0x7a3f..." text-xs text-void-600
+Stats: accuracy in green + hires in void-500
+
+Bottom (border-t border-void-800):
+  Left: "$0.002" font-mono font-semibold text-gold-400
+  Right: "Hire" button — bg-blood-600 text-white text-xs rounded-lg px-3 py-1
+```
+
+---
+
+## Page 3: History (Audit Trail)
+
+```
+Header: "Hunt log" text-lg font-bold text-void-100
+        "All hunts recorded on Hedera HCS + 0G Sealed Inference" text-void-500
+```
+
+**Collapsed row:**
+```
+bg-void-900 border border-void-800 rounded-2xl
+px-4 py-3 cursor-pointer
+hover: bg-void-850
+
+Left: 
+  "#48" font-mono text-void-600
+  "14:32" text-void-500
+  "BUY 12% ETH" font-semibold text-void-200
+
+Right:
+  "+$6.14" font-mono font-semibold text-green-400
+  "win" green badge
+  "▼" text-void-600
+```
+
+**Expanded state (below divider):**
+```
+Three debate rows:
+  🟢 Alpha: text in void-400
+  🔴 Risk: text in void-400
+  🟡 Executor: text in void-400
+
+Footer row:
+  sealed badge (purple)
+  "6 × 0G Sealed" purple badge
+  "Verify on Hashscan →" teal link
+  "Verify on 0G →" purple link
+  "HCS #48" font-mono text-void-600
+```
+
+---
+
+## Page 4: Deposit
+
+Centered, max-w-md.
+
+**Main card:**
+```
+bg-void-900 border border-void-800 rounded-2xl p-6
+
+Tab switcher: two buttons
+  Active: bg-blood-600 text-white
+  Inactive: bg-void-800 text-void-500
+
+Amount input:
+  bg-void-950 border border-void-800 rounded-xl
+  text-xl font-mono font-bold text-void-100
+  placeholder text-void-700
+  focus: ring-2 ring-blood-600 border-transparent
+  "USDC" label inside right side, text-void-500
+
+Quick amounts: $1, $10, $50, $100
+  bg-void-800 hover:bg-void-700 text-void-300 rounded-lg
+
+Submit: full-width bg-blood-600 button
+Footer: "Gas-free via Circle Nanopayments on Arc" text-void-600
+```
+
+**Position card:**
+```
+bg-void-900 border border-void-800 rounded-2xl p-4
+Key-value rows:
+  Labels: text-void-500
+  Values: font-semibold text-void-200
+  Profit values: text-green-400
+  Fund shares: font-mono text-void-200
+```
+
+---
+
+## Page 5: Verify (0G Explorer)
+
+```
+Header: "0G verification — hunt #48" text-lg font-bold text-void-100
+        "Every inference sealed inside TEE hardware on 0G Compute" text-void-500
+Right: "6 sealed inference calls" purple badge
+```
+
+**Agent selector grid (6 buttons in a row):**
+```
+Each button:
+  bg-void-900 border border-void-800 rounded-xl p-3 text-center
+  Hover: border-void-700
+  Selected: bg-purple-950/50 border-2 border-purple-500
+
+  Emoji (text-lg)
+  Name (text-xs font-semibold text-void-200)
+  Type (text-xs text-void-500)
+```
+
+**Proof detail card:**
+```
+bg-void-900 border border-void-800 rounded-2xl p-5
+
+Header: large emoji + name + type + sealed badge
+
+Two columns:
+  Left — Agent details:
+    4 stacked items, each:
+      Label: 11px uppercase tracking-wider text-void-600
+      Value: 14px font-mono text-void-200
+    
+    "Execution environment" row gets special treatment:
+      "Intel TDX + NVIDIA H100 TEE" text-void-200
+      + "Hardware isolated" green badge
+
+  Right — TEE Attestation:
+    bg-void-950 rounded-lg p-4
+    Attestation hash in text-purple-400 font-mono
+    Details in text-void-600 font-mono
+    Divider
+    "Verify on 0G Explorer →" text-purple-400
+
+Explanation block (below columns):
+  bg-purple-950/30 border border-purple-800/20 rounded-xl p-4
+  text-xs leading-relaxed text-purple-200/80
+```
+
+**Memory card:**
+```
+Same as dashboard memory card
+"Pack memory from 0G Storage"
+Purple cycle refs + void-500 text
+"View full memory on 0G Storage →" text-purple-400
+```
+
+---
+
+## Animations & Micro-interactions
+
+### Streaming Text (agent debate)
 ```css
-/* Standard transition for all interactive elements */
-.vm-transition {
-  transition-property: color, background-color, border-color, opacity;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+/* Text appears character by character */
+.streaming-text {
+  overflow: hidden;
+  border-right: 2px solid #FBBF24; /* gold cursor */
+  animation: blink 0.8s step-end infinite;
 }
-
-/* Content appearing (panels, timeline steps) */
-.vm-fade-in {
-  animation: vmFadeIn 150ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-@keyframes vmFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Timeline step activation (the waterfall moment) */
-.vm-step-activate {
-  animation: vmStepActivate 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-@keyframes vmStepActivate {
-  from { opacity: 0.3; border-left-color: #27272A; }
-  to { opacity: 1; border-left-color: var(--step-color); }
-}
-
-/* Pulsing live indicator */
-.vm-pulse {
-  animation: vmPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes vmPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+@keyframes blink {
+  50% { border-color: transparent; }
 }
 ```
 
-### Where Motion Happens
-
-| Element | Trigger | Animation |
-|---------|---------|-----------|
-| Nav items | Hover / active | 150ms color + border-left-color |
-| Panel content | Page load | 150ms fade-in with 4px translateY |
-| Timeline steps | Cycle progresses | 300ms step-activate (opacity + border-color) |
-| Live indicator dot | Always running | 2s pulse (opacity) |
-| Buttons | Hover | 150ms background-color |
-| Status badges | State change | 150ms background-color + text-color |
-| Toast notifications | Appear/dismiss | 150ms opacity |
-
-### Where Motion Does Not Happen
-
-- Page transitions (instant, no route animations)
-- Sidebar open/close (instant on breakpoint, no slide)
-- Modals (instant appear with backdrop, no scale)
-- Data table sorting (instant re-render)
-- Number updates (instant, no count-up animations)
-
----
-
-## 8. Icon & Symbol Language
-
-No icon library. VaultMind uses **text symbols and ASCII** as icons, consistent with the terminal aesthetic.
-
-| Concept | Symbol | Context |
-|---------|--------|---------|
-| Verified / TEE | `[✓]` | Attestation verified badge |
-| Unverified | `[✗]` | TEE check failed |
-| Pending | `[…]` | Awaiting result |
-| Active/Live | `●` | Pulsing teal dot, 6px |
-| Inactive | `○` | Static gray dot, 6px |
-| Cycle running | `▶` | In statusbar |
-| Cycle paused | `‖` | In statusbar |
-| Arrow right | `→` | Breadcrumbs, flow indicators |
-| Arrow down | `↓` | Timeline progression |
-| Separator | `·` | Inline metadata separation |
-| Expand | `[+]` | Expandable sections |
-| Collapse | `[-]` | Collapsible sections |
-| External link | `↗` | Hashscan links |
-
-### Hash Display
-
-Always truncate to first 6 + last 4 characters:
-```
-0x7f2a8b...e41b
-```
-Full hash available on hover (tooltip) or click (copy to clipboard with `Copied.` confirmation).
-
----
-
-## 9. Navigation & Shell
-
-### Topbar (h-12)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  VAULTMIND          Dashboard → Cycle #48     ● LIVE    │
-│                                          0x7f2a...e41b  │
-└─────────────────────────────────────────────────────────┘
-```
-
-- **Left:** `VAULTMIND` in `text-subhead font-bold tracking-widest uppercase text-zinc-50`
-- **Center:** Breadcrumb path in `text-small text-zinc-500`. Active segment in `text-zinc-50`.
-- **Right:** Live indicator (pulsing teal `●` + "LIVE" label), wallet address (truncated, click to copy)
-
-### Sidebar (w-56)
-
-```
-┌──────────┐
-│           │
-│  ▸ DASHBOARD  ← active (teal left border + teal text)
-│    HISTORY
-│    MARKETPLACE
-│    INVEST
-│           │
-│  ──────── │  ← divider (border-t border-zinc-800)
-│           │
-│    SETTINGS
-│           │
-│  ──────── │
-│           │
-│  CYCLE #48│  ← mini status block
-│  ● LIVE   │
-│  NAV $512 │
-│  3m next  │
-│           │
-└──────────┘
-```
-
-**Active item:** `border-l-2 border-cyan-500 text-cyan-500 bg-zinc-900`
-**Inactive item:** `border-l-2 border-transparent text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800/50`
-**Text style:** `text-small font-medium uppercase tracking-wider`
-
-### Statusbar (h-8)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ ▶ CYCLE #48 · LAST: 2M AGO · NEXT: 3M · HIRED: 3      │
-│                                          $0.003 SPENT   │
-└─────────────────────────────────────────────────────────┘
-```
-
-Monospace, `text-micro`, all uppercase, `text-zinc-500`. Active values in `text-zinc-50`. "LIVE" status in `text-cyan-500`.
-
----
-
-## 10. Component Library
-
-### 10.1 — Button
-
-**Primary (teal)**
-```
-┌─────────────────┐
-│  CONNECT WALLET  │  bg-cyan-500 text-zinc-950 font-bold
-└─────────────────┘    hover:bg-cyan-400 active:bg-cyan-600
-                       uppercase text-small tracking-wider
-                       px-4 py-2 rounded-none border-none
-```
-
-**Secondary (outline)**
-```
-┌─────────────────┐
-│  VIEW ON HASHSCAN│  bg-transparent text-zinc-50 border border-zinc-700
-└─────────────────┘    hover:border-zinc-500 hover:text-white
-                       uppercase text-small tracking-wider
-                       px-4 py-2 rounded-none
-```
-
-**Ghost (text only)**
-```
-│  CANCEL          │  bg-transparent text-zinc-500
-                      hover:text-zinc-50
-                      uppercase text-small tracking-wider
-                      px-4 py-2
-```
-
-### 10.2 — Data Panel
-
-The fundamental container for all dashboard content.
-
-```
-┌─────────────────────────────────────────────┐
-│ PANEL TITLE                          [+]    │  ← header: border-b border-zinc-800
-│                                             │     px-4 py-3, text-small uppercase
-├─────────────────────────────────────────────┤     tracking-wider text-zinc-500
-│                                             │
-│  Content area                               │  ← body: px-4 py-4
-│  bg-zinc-900 border border-zinc-800         │
-│                                             │
-└─────────────────────────────────────────────┘
-```
-
-No rounded corners. No shadow. Header and body separated by `border-b`.
-
-### 10.3 — Key-Value Row
-
-For displaying labeled data points:
-
-```
-DEPOSIT AMOUNT              $50.00 USDC
-NET ASSET VALUE                $512.34
-FUND SHARES                    102.47
-CYCLE COUNT                        48
-```
-
-- Left: `text-small text-zinc-500 uppercase tracking-wider`
-- Right: `text-body text-zinc-50 font-medium tabular-nums text-right`
-- Row: `flex justify-between items-center py-2 border-b border-zinc-800/50`
-
-### 10.4 — Status Badge
-
-```
-[✓] TEE VERIFIED     → text-micro uppercase, text-green-500, bg-green-500/10, px-2 py-0.5
-[…] PENDING          → text-micro uppercase, text-yellow-500, bg-yellow-500/10
-[✗] FAILED           → text-micro uppercase, text-red-500, bg-red-500/10
-● LIVE               → text-micro uppercase, text-cyan-500 (dot pulses)
-○ INACTIVE           → text-micro uppercase, text-zinc-600
-```
-
-No rounded corners on badges. `rounded-none`. Border: `border border-{color}/20`.
-
-### 10.5 — Input Field
-
-```
-┌─────────────────────────────────────────────┐
-│ DEPOSIT AMOUNT                              │  label: text-micro uppercase
-├─────────────────────────────────────────────┤         tracking-wider text-zinc-500
-│ 50.00                                       │         mb-1
-├─────────────────────────────────────────────┤  input: bg-zinc-950 border border-zinc-800
-│ USDC available: 1,240.00                    │         text-body text-zinc-50
-└─────────────────────────────────────────────┘         focus:border-cyan-500
-                                                        focus:outline-none
-                                                        px-3 py-2 rounded-sm
-                                                 hint:  text-micro text-zinc-600 mt-1
-```
-
-### 10.6 — Table
-
-```
-SPECIALIST        REPUTATION    ACCURACY    HIRED     COST
-─────────────────────────────────────────────────────────
-Sentiment Pro         782        0.73       142    $0.001
-Whale Watcher v2      650        0.61        98    $0.001
-Momentum Scan         420        0.44        67    $0.001
-─────────────────────────────────────────────────────────
-```
-
-- Header: `text-micro uppercase tracking-wider text-zinc-500 border-b border-zinc-700 pb-2`
-- Rows: `text-small text-zinc-50 py-2 border-b border-zinc-800/50`
-- Hover row: `hover:bg-zinc-800/30`
-- Numbers: `tabular-nums text-right`
-- Reputation > 700: `text-cyan-500`
-- Reputation < 300: `text-red-500`
-
-### 10.7 — Toast / Notification
-
-Appears top-right, stacks downward. No animation on appear (instant opacity toggle).
-
-```
-┌─────────────────────────────────────────────┐
-│ CYCLE #48 COMPLETE · BUY 12% ETH · SL -4%  │
-│ hashscan.io/testnet/topic/0.0.5934 ↗       │
-└─────────────────────────────────────────────┘
-```
-
-`bg-zinc-900 border border-zinc-700 px-4 py-3 text-small`
-Auto-dismiss after 8 seconds. Click to dismiss immediately.
-
----
-
-## 11. Page Layouts
-
-### 11.1 — Landing Page (`/`)
-
-The landing page is the ONLY place where marketing language appears. It is a single screen, no scroll, designed to convert a visitor into a connected user.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                                                         │
-│                                                         │
-│                                                         │
-│       VAULTMIND                                         │
-│                                                         │
-│       A multi-agent adversarial investment               │
-│       system with cryptographic proof                    │
-│       of reasoning.                                     │
-│                                                         │
-│       Your agent hires specialists.                      │
-│       Debates every trade.                               │
-│       Proves every decision on-chain.                    │
-│                                                         │
-│                                                         │
-│       ┌──────────────────────┐                          │
-│       │   CONNECT WALLET     │  ← Primary CTA           │
-│       └──────────────────────┘     bg-cyan-500           │
-│                                                         │
-│                                                         │
-│       3 CHAINS · 7 AGENTS · EVERY DECISION PROVEN       │
-│                                                         │
-│                                                         │
-│ ──────────────────────────────────────────────────────  │
-│ ARC: $0.001 PAYMENTS    0G: TEE VERIFIED    HEDERA: HCS │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-- Background: `bg-zinc-950`
-- Title: `text-display font-bold text-zinc-50`
-- Subtitle: `text-body text-zinc-400` with line breaks per sentence
-- CTA: Primary button, centered
-- Bottom bar: `text-micro text-zinc-600 uppercase tracking-widest`
-- No images. No gradients. No animations. Text and a button.
-
-### 11.2 — Onboard Page (`/onboard`)
-
-Three-step progress displayed as a vertical sequence:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ ONBOARDING                                              │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌──┐                                                   │
-│  │01│  CONNECT WALLET                                   │
-│  └──┘  Status: COMPLETED                     [✓]        │
-│   │                                                     │
-│   │    Connected: 0x7f2a...e41b                          │
-│   │                                                     │
-│  ┌──┐                                                   │
-│  │02│  CONNECT TELEGRAM                      ← ACTIVE   │
-│  └──┘                                                   │
-│   │                                                     │
-│   │    Click to open Telegram and link your account.     │
-│   │    ┌──────────────────────────────────┐              │
-│   │    │  OPEN TELEGRAM ↗                 │              │
-│   │    └──────────────────────────────────┘              │
-│   │                                                     │
-│  ┌──┐                                                   │
-│  │03│  DEPOSIT USDC                          ○ PENDING   │
-│  └──┘                                                   │
-│                                                         │
-│        Locked until Telegram is connected.               │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-- Step numbers: `text-heading font-bold text-zinc-700` (inactive), `text-cyan-500` (active), `text-zinc-50` (completed)
-- Vertical connector: `border-l-2 border-zinc-800` between steps, `border-cyan-500` for completed path
-- Active step has a white title + full content
-- Pending steps are dimmed: `text-zinc-600`, content hidden
-
-### 11.3 — Dashboard Page (`/dashboard`)
-
-The primary view. Shows the **last completed cycle** and the **live cycle** (if running).
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ DASHBOARD                                               │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌─ PORTFOLIO SUMMARY ──────────────────────────────┐   │
-│  │ NAV            $512.34    SHARES     102.47       │   │
-│  │ DEPOSIT        $500.00    P&L        +$12.34      │   │
-│  │ CYCLES              48    LAST       2m ago       │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌─ CURRENT CYCLE #48 ─────────────── ● LIVE ───────┐   │
-│  │                                                   │   │
-│  │  [TIMELINE WATERFALL — see section 12]            │   │
-│  │                                                   │   │
-│  └───────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌─ PROOF ──────────────────────────────────────────┐   │
-│  │ HCS SEQUENCE     #48                              │   │
-│  │ TOPIC            0.0.5934                         │   │
-│  │ HASHSCAN         hashscan.io/testnet/... ↗        │   │
-│  │ TIMESTAMP        2026-04-03T14:32:07Z             │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-Three panels stacked vertically: Summary (key-value rows), Current Cycle (timeline waterfall), Proof (links + metadata).
-
-### 11.4 — History Page (`/history`)
-
-Reverse-chronological list of past cycles, pulled from Mirror Node.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ HISTORY                                                 │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  CYCLE   TIMESTAMP              ACTION    NAV    PROOF  │
-│  ─────────────────────────────────────────────────────  │
-│  #48     2026-04-03T14:32:07Z   BUY 12%  $512   ↗      │
-│  #47     2026-04-03T14:27:03Z   HOLD     $508   ↗      │
-│  #46     2026-04-03T14:22:01Z   BUY 8%   $508   ↗      │
-│  #45     2026-04-03T14:17:00Z   SELL 5%  $503   ↗      │
-│  ...                                                    │
-│                                                         │
-│  Showing 25 of 48 · LOAD MORE                           │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-Click any row to expand inline and show the full cycle record (specialists + debate + proof hashes).
-
-### 11.5 — Marketplace Page (`/marketplace`)
-
-Specialist leaderboard with reputation data.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ MARKETPLACE                                             │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  RANK  SPECIALIST        REP   ACC    CYCLES  STATUS    │
-│  ─────────────────────────────────────────────────────  │
-│  01    Sentiment Pro      782  0.73   142     ● ACTIVE  │
-│  02    Whale Watcher v2   650  0.61    98     ● ACTIVE  │
-│  03    OnChain Flows      590  0.58    76     ○ IDLE    │
-│  04    Momentum Scan      420  0.44    67     ● ACTIVE  │
-│  05    RSI Bot            280  0.31    45     ○ IDLE    │
-│  ─────────────────────────────────────────────────────  │
-│                                                         │
-│  5 SPECIALISTS REGISTERED · 3 HIRED THIS CYCLE          │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-Reputation color coding: `> 700 → text-cyan-500`, `300-700 → text-zinc-50`, `< 300 → text-red-500`
-
-### 11.6 — Invest Page (`/invest`)
-
-Deposit and withdraw interface.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ INVEST                                                  │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌─ DEPOSIT ────────────────────────────────────────┐   │
-│  │                                                   │   │
-│  │  AMOUNT                                           │   │
-│  │  ┌─────────────────────────────────────────────┐  │   │
-│  │  │ 50.00                                       │  │   │
-│  │  └─────────────────────────────────────────────┘  │   │
-│  │  USDC AVAILABLE: 1,240.00                         │   │
-│  │                                                   │   │
-│  │  ┌──────────────────────┐                         │   │
-│  │  │  DEPOSIT USDC        │                         │   │
-│  │  └──────────────────────┘                         │   │
-│  │                                                   │   │
-│  └───────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌─ POSITION ───────────────────────────────────────┐   │
-│  │ DEPOSITED          $500.00                        │   │
-│  │ CURRENT NAV        $512.34                        │   │
-│  │ FUND SHARES        102.47 VMFS                    │   │
-│  │ P&L                +$12.34 (+2.47%)               │   │
-│  │                                                   │   │
-│  │  ┌──────────────────────┐                         │   │
-│  │  │  WITHDRAW             │  ← secondary button     │   │
-│  │  └──────────────────────┘                         │   │
-│  └───────────────────────────────────────────────────┘   │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## 12. Timeline Waterfall — The Debate View
-
-This is the centerpiece of the entire product. When a cycle runs, the timeline waterfall shows each step lighting up in sequence. This is what judges watch during the demo.
-
-### Structure
-
-```
-CURRENT CYCLE #48                                    ● LIVE
-─────────────────────────────────────────────────────────
-
- ┃  14:32:01  HIRING SPECIALISTS                     [✓]
- ┃
- ┃   ┌ SENTIMENT PRO ──────────────────── REP: 782 ─┐
- ┃   │ score: 72 · class: bullish · fear_greed: 68   │
- ┃   │ [✓] TEE VERIFIED · paid $0.001 · arc_001      │
- ┃   └───────────────────────────────────────────────┘
- ┃
- ┃   ┌ WHALE WATCHER V2 ─────────────── REP: 650 ──┐
- ┃   │ net_flow: accumulating · exchange: outflow    │
- ┃   │ [✓] TEE VERIFIED · paid $0.001 · arc_002      │
- ┃   └───────────────────────────────────────────────┘
- ┃
- ┃   ┌ MOMENTUM SCAN ────────────────── REP: 420 ──┐
- ┃   │ rsi: 58 · macd: bullish · trend: up           │
- ┃   │ [✓] TEE VERIFIED · paid $0.001 · arc_003      │
- ┃   └───────────────────────────────────────────────┘
- ┃
- ┃  14:32:08  ADVERSARIAL DEBATE                     [✓]
- ┃
- ┃   ┌ ALPHA ──────────────────────────── FOR ───────┐
- ▎   │ Sentiment + Whale aligned bullish (high rep).  │
- ▎   │ BUY 20% ETH.                                  │
- ▎   │ [✓] TEE · 0x1234...abcd                        │
- ┃   └───────────────────────────────────────────────┘
- ┃
- ┃   ┌ RISK ───────────────────────────── AGAINST ───┐
- ▎   │ Momentum low rep (420). RSI nearing            │
- ▎   │ overbought. MAX 10%.                           │
- ▎   │ [✓] TEE · 0x5678...ef01                        │
- ┃   └───────────────────────────────────────────────┘
- ┃
- ┃   ┌ EXECUTOR ───────────────────────── DECISION ──┐
- ▎   │ action: BUY · asset: ETH · pct: 12             │
- ▎   │ stop_loss: -4% · reasoning: "Compromise."      │
- ▎   │ [✓] TEE · 0x9abc...2345                        │
- ┃   └───────────────────────────────────────────────┘
- ┃
- ┃  14:32:14  SETTLEMENT                              [✓]
- ┃
- ┃   Logged to HCS · Sequence #48
- ┃   hashscan.io/testnet/topic/0.0.5934 ↗
- ┃   Memory stored · 0G root: 0xdef0...6789
- ┃
- ┃  14:32:15  NOTIFIED                                [✓]
- ┃
- ┃   Telegram summary sent to user.
- ┃
- ─── CYCLE COMPLETE · NEXT IN 4:45 ──────────────────────
-```
-
-### Implementation
-
-```
-TIMELINE ANATOMY:
-
-┃  ← vertical line (border-l-2)
-┃     zinc-800 = pending
-┃     cyan-500 = active step (pulses)
-┃     zinc-600 = completed
-┃
-┃  TIMESTAMP  STEP LABEL                        STATUS
-┃             ↓
-┃   ┌─ CARD ────────────────────────────────────────┐
-▎   │  border-l-4 with agent color                   │
-▎   │  bg-zinc-900 border border-zinc-800            │
-▎   │  px-4 py-3                                     │
-┃   └────────────────────────────────────────────────┘
-```
-
-### Card Left-Border Colors
-
-| Card Type | Left Border Color | Label |
-|-----------|------------------|-------|
-| Specialist report | `border-l-cyan-500` | ANALYSIS |
-| Alpha argument | `border-l-green-500` | FOR |
-| Risk argument | `border-l-red-500` | AGAINST |
-| Executor decision | `border-l-yellow-500` | DECISION |
-
-### Activation Sequence
-
-When a cycle runs live, steps activate top-to-bottom with 300ms staggered animations:
-
-1. **HIRING** step label appears, timeline border turns `cyan-500`
-2. Specialist cards fade in one-by-one (150ms each, 200ms stagger)
-3. **DEBATE** step label appears
-4. Alpha card fades in (green left border)
-5. Risk card fades in (red left border)
-6. Executor card fades in (yellow left border)
-7. **SETTLEMENT** step appears with HCS link
-8. **NOTIFIED** step appears
-9. Timeline border transitions to `zinc-600` (completed gray)
-
-### React Component Structure
-
-```tsx
-<TimelineWaterfall cycleId={48} status="live">
-  <TimelineStep
-    time="14:32:01"
-    label="HIRING SPECIALISTS"
-    status="completed"
-  >
-    <SpecialistCard
-      name="Sentiment Pro"
-      reputation={782}
-      data={{ score: 72, class: "bullish" }}
-      teeVerified={true}
-      paymentId="arc_001"
-      cost="$0.001"
-    />
-    {/* ... more specialists */}
-  </TimelineStep>
-
-  <TimelineStep
-    time="14:32:08"
-    label="ADVERSARIAL DEBATE"
-    status="active"
-  >
-    <DebateCard agent="alpha" label="FOR" color="green">
-      {alphaContent}
-    </DebateCard>
-    <DebateCard agent="risk" label="AGAINST" color="red">
-      {riskContent}
-    </DebateCard>
-    <DebateCard agent="executor" label="DECISION" color="yellow">
-      {executorContent}
-    </DebateCard>
-  </TimelineStep>
-
-  <TimelineStep
-    time="14:32:14"
-    label="SETTLEMENT"
-    status="pending"
-  >
-    <ProofLinks hcsSequence={48} hashscanUrl="..." rootHash="..." />
-  </TimelineStep>
-
-  <TimelineStep time="14:32:15" label="NOTIFIED" status="pending" />
-</TimelineWaterfall>
-```
-
----
-
-## 13. Onboarding Flow
-
-### States
-
-```
-Step 1: CONNECT WALLET
-  → idle: "Connect your wallet to begin."
-  → connecting: "Waiting for wallet..."
-  → connected: "Connected: 0x7f2a...e41b" [✓]
-
-Step 2: CONNECT TELEGRAM
-  → locked: dimmed, "Complete step 1 first."
-  → idle: "Link your Telegram to receive cycle reports."
-  → waiting: "Waiting for Telegram confirmation..."  (poll every 2s)
-  → bound: "Telegram connected." [✓]
-
-Step 3: DEPOSIT USDC
-  → locked: dimmed, "Complete step 2 first."
-  → idle: Amount input + "DEPOSIT USDC" button
-  → confirming: "Confirm in wallet..."
-  → deposited: "Deposited $50.00 · 100 VMFS minted." [✓]
-  → redirect: auto-navigate to /dashboard after 2s
-```
-
-### Vertical Connector
-
-The vertical line between steps uses the same `border-l-2` pattern as the timeline waterfall:
-
-- Completed segment: `border-cyan-500`
-- Active segment: `border-cyan-500` (pulsing)
-- Pending segment: `border-zinc-800`
-
-This creates visual consistency between onboarding and the cycle view. The user learns the "timeline" pattern once and sees it everywhere.
-
----
-
-## 14. Marketplace View
-
-### Specialist Detail (expanded row)
-
-When a user clicks a specialist row, it expands inline:
-
-```
-─────────────────────────────────────────────────────────
-  SENTIMENT PRO                              REP: 782
-─────────────────────────────────────────────────────────
-
-  ENDPOINT        https://sent-pro.agents.xyz/analyze
-  PRICE           $0.001
-  TAGS            sentiment · social · news
-  REGISTERED      2026-04-01T09:00:00Z
-  TOTAL CYCLES    142
-  ACCURACY        0.73
-
-  LAST 10 PREDICTIONS:
-  ✓ ✓ ✗ ✓ ✓ ✓ ✗ ✓ ✓ ✓
-
-  REPUTATION HISTORY:
-  800 ┤
-  750 ┤         ╭─╮
-  700 ┤    ╭───╯  ╰──╮  ╭──
-  650 ┤───╯           ╰─╯
-  600 ┤
-      └──────────────────────
-       -30d              now
-
-─────────────────────────────────────────────────────────
-```
-
-The reputation chart is rendered as a simple SVG sparkline — monochrome (`stroke: #06B6D4`, `fill: none`), no axes labels, no grid. Just the line.
-
----
-
-## 15. Responsive Strategy
-
-### Breakpoints
-
-| Breakpoint | Width | Layout Change |
-|------------|-------|---------------|
-| `sm` | 640px | — |
-| `md` | 768px | Sidebar collapses to icon-only (`w-14`) |
-| `lg` | 1024px | Full sidebar (`w-56`) |
-| `xl` | 1280px | — |
-
-### Mobile (< 768px)
-
-- Sidebar becomes a bottom tab bar (4 tabs: Dashboard, History, Marketplace, Invest)
-- Topbar simplifies: logo + wallet button only
-- Statusbar moves to below topbar (always visible)
-- Timeline waterfall is full-width, cards stack normally
-- All panels are full-width with `px-4`
-
-### Tablet (768px - 1024px)
-
-- Sidebar collapses to icon-only (`w-14`). Hover shows tooltip with label.
-- Main content takes full remaining width
-- Timeline waterfall cards may truncate long text
-
-### Desktop (> 1024px)
-
-- Full layout as designed
-- Main content maxes at `max-w-5xl`
-
----
-
-## 16. Tailwind v4 Configuration
-
-### Global CSS (`app/globals.css`)
-
+### Sealed Badge Entrance
 ```css
-@import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
-
-@theme {
-  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
-  --color-accent: #06B6D4;
+/* Pops in when attestation arrives */
+.sealed-enter {
+  animation: sealPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
-/* Base resets for brutalist aesthetic */
-*, *::before, *::after {
-  border-radius: 0;
+@keyframes sealPop {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
-
-body {
-  font-family: var(--font-mono);
-  background-color: #09090B;
-  color: #FAFAFA;
-  font-variant-numeric: tabular-nums;
-  -webkit-font-smoothing: antialiased;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-/* Remove all default rounded corners */
-button, input, select, textarea {
-  border-radius: 2px; /* rounded-sm — only exception */
-}
-
-/* Selection color */
-::selection {
-  background-color: #06B6D4;
-  color: #09090B;
-}
-
-/* Scrollbar (brutalist thin) */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #09090B; }
-::-webkit-scrollbar-thumb { background: #27272A; }
-::-webkit-scrollbar-thumb:hover { background: #3F3F46; }
 ```
 
-### Utility Classes (add to Tailwind config)
-
+### Hunt Button Active State
 ```css
-@utility vm-transition {
-  transition: color 150ms cubic-bezier(0.4, 0, 0.2, 1),
-              background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+.hunting {
+  animation: huntPulse 1.5s ease-in-out infinite;
 }
-
-@utility vm-fade-in {
-  animation: vmFadeIn 150ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+@keyframes huntPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
 }
+```
 
-@utility vm-pulse {
-  animation: vmPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+### Card Hover
+```css
+.agent-card {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-
-@utility vm-step-activate {
-  animation: vmStepActivate 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+.agent-card:hover {
+  border-color: #44403C; /* void-700 */
+  background-color: #1F1E1B; /* void-850 */
 }
+```
 
-@keyframes vmFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+### Payment Row Entrance
+```css
+/* Rows appear one by one as payments settle */
+.payment-enter {
+  animation: slideIn 0.25s ease-out;
 }
-
-@keyframes vmPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+@keyframes slideIn {
+  from { transform: translateX(-8px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
+```
 
-@keyframes vmStepActivate {
-  from { opacity: 0.3; border-left-color: #27272A; }
-  to { opacity: 1; border-left-color: var(--step-color); }
+### Number Count-Up
+```css
+/* Fund NAV, win rate, etc. count up on load */
+/* Use JS: animate from 0 to target value over 600ms with easeOutCubic */
+```
+
+---
+
+## Special Touches That Make It Memorable
+
+### 1. Wolf Eyes Loading State
+When a hunt is running, show the logo with eyes that pulse gold:
+```css
+.wolf-eyes-loading .eye {
+  animation: eyePulse 1.2s ease-in-out infinite;
+}
+@keyframes eyePulse {
+  0%, 100% { fill: #FBBF24; }
+  50% { fill: #FDE68A; filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.6)); }
+}
+```
+
+### 2. Agent Activity Glow
+When an agent is actively computing (sealed inference running), its card border subtly glows:
+```css
+.agent-computing {
+  border-color: #7F1D1D;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.08);
+  transition: all 0.3s ease;
+}
+```
+
+### 3. Gold Profit Flash
+When a hunt results in profit, briefly flash the NAV card gold:
+```css
+.profit-flash {
+  animation: goldFlash 0.6s ease;
+}
+@keyframes goldFlash {
+  0% { background-color: #1C1917; }
+  30% { background-color: rgba(251, 191, 36, 0.08); }
+  100% { background-color: #1C1917; }
+}
+```
+
+### 4. Hashscan Link Verification Pulse
+When a user clicks "Verify on Hashscan", show a brief teal pulse confirming the action:
+```css
+.verify-pulse {
+  animation: tealPulse 0.4s ease;
+}
+@keyframes tealPulse {
+  0% { color: #5EEAD4; }
+  50% { color: #99F6E4; text-shadow: 0 0 8px rgba(94, 234, 212, 0.3); }
+  100% { color: #5EEAD4; }
 }
 ```
 
 ---
 
-## 17. Implementation Notes
+## Responsive Notes
 
-### Font Loading
+This is a hackathon — optimize for the demo screen (laptop, ~1280px-1440px wide).
 
-Load JetBrains Mono via Google Fonts in `app/layout.tsx`:
-
-```tsx
-import { JetBrains_Mono } from 'next/font/google';
-
-const mono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '700'],
-  variable: '--font-mono',
-});
-
-export default function RootLayout({ children }) {
-  return (
-    <html lang="en" className={mono.variable}>
-      <body className="font-mono bg-zinc-950 text-zinc-50 antialiased">
-        {children}
-      </body>
-    </html>
-  );
-}
-```
-
-### Component File Naming
-
-```
-src/dashboard/components/
-├── shell/
-│   ├── topbar.tsx
-│   ├── sidebar.tsx
-│   └── statusbar.tsx
-├── data/
-│   ├── data-panel.tsx
-│   ├── key-value-row.tsx
-│   ├── status-badge.tsx
-│   └── hash-display.tsx
-├── timeline/
-│   ├── timeline-waterfall.tsx
-│   ├── timeline-step.tsx
-│   ├── specialist-card.tsx
-│   └── debate-card.tsx
-├── marketplace/
-│   ├── specialist-table.tsx
-│   ├── specialist-detail.tsx
-│   └── reputation-sparkline.tsx
-├── onboard/
-│   ├── onboard-flow.tsx
-│   ├── step-wallet.tsx
-│   ├── step-telegram.tsx
-│   └── step-deposit.tsx
-└── ui/
-    ├── button.tsx
-    ├── input.tsx
-    ├── toast.tsx
-    └── tooltip.tsx
-```
-
-### Data Flow for Timeline
-
-The timeline waterfall needs real-time updates during a live cycle. Implementation approach:
-
-1. **Server-Sent Events (SSE)** from the orchestrator to the dashboard
-2. Dashboard subscribes to `/api/cycle/stream?wallet={address}`
-3. Each SSE event updates one step in the timeline
-4. React state drives which steps are `completed`, `active`, or `pending`
-
-```tsx
-// Simplified event types
-type CycleEvent =
-  | { type: 'specialist_hired'; data: SpecialistResult }
-  | { type: 'alpha_complete'; data: DebateResult }
-  | { type: 'risk_complete'; data: DebateResult }
-  | { type: 'executor_complete'; data: DebateResult }
-  | { type: 'settlement_complete'; data: ProofData }
-  | { type: 'cycle_complete' };
-```
-
-### Performance Considerations
-
-- **Mirror Node polling:** Dashboard polls every 10 seconds for history, not every render. Cache results in React state.
-- **SSE connection:** One per user session. Reconnect with exponential backoff (1s, 2s, 4s, max 30s).
-- **Timeline cards:** Virtualize if more than 20 past cycles are displayed (unlikely in normal view).
-- **Font subsetting:** JetBrains Mono is ~100KB for 3 weights. Acceptable. Use `display=swap` to prevent FOIT.
+However, keep these in mind:
+- Metric cards: 5 columns → 3+2 on tablet, 2+2+1 on mobile
+- Dashboard 3-column: → stacked vertically on mobile
+- Marketplace 4-column: → 2 columns on tablet, 1 on mobile
+- Agent selector 6-grid: → 3+3 on tablet, 2+2+2 on mobile
+- Nav: horizontal tabs → hamburger or bottom bar on mobile
 
 ---
 
-*This design system is the single source of truth for all VaultMind UI implementation. Every component, every color, every spacing value is defined here. When in doubt, refer back to Section 1: if it doesn't serve the data, it doesn't exist.*
+## Key Naming Changes from VaultMind
+
+| VaultMind | AlphaDawg |
+|---|---|
+| Dashboard | Dashboard |
+| Marketplace | **Pack** |
+| Debate cycle | **Hunt** |
+| "Run Cycle" button | **"Hunt"** button |
+| Adversarial layer | **The Challenge** |
+| Fund share tokens | **DAWG tokens** |
+| Specialist agents | **Pack members** |
+| History | **Hunt log** |
+| Your Main Agent | **Your Lead Dawg** |
+| Agent memory | **Pack memory** |
+
+---
+
+## Implementation Notes for Claude Code
+
+1. **This is a dark-mode-only app.** No light mode. The entire design system assumes dark backgrounds. This is deliberate — trading dashboards are dark.
+
+2. **Use Tailwind arbitrary values** for the custom colors: `bg-[#0C0A09]` or extend the config as shown above. The extend approach is cleaner.
+
+3. **The logo is inline SVG**, not an image file. Copy the SVG directly into a React component. This ensures it's always crisp and loads instantly.
+
+4. **Font loading:** Add Inter and JetBrains Mono via Google Fonts or next/font. JetBrains Mono is critical — all agent output must feel like a terminal.
+
+5. **No shadows anywhere.** The depth comes from border colors and background shade differences. void-950 → void-900 → void-850 creates layering without shadows.
+
+6. **The "Hunt" button is the most important interactive element.** Make it feel powerful. The pulse animation, the state change from "Hunt" to "Hunting...", the loading state with wolf eye glow — this is what judges click first.

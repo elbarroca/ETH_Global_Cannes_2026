@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── USERS (existing table — JSONB columns, managed by raw SQL user-store) ──
+
+model User {
+  id          String   @id
+  walletAddress String @unique @map("wallet_address")
+  proxyWallet Json     @map("proxy_wallet") @default("{}")
+  telegram    Json     @default(dbgenerated("'{\"chatId\": null, \"username\": null, \"verified\": false, \"notifyPreference\": \"every_cycle\"}'::jsonb"))
+  agent       Json     @default(dbgenerated("'{\"active\": false, \"lastCycleAt\": null, \"lastCycleId\": 0, \"riskProfile\": \"balanced\", \"maxTradePercent\": 10}'::jsonb"))
+  fund        Json     @default(dbgenerated("'{\"currentNav\": 0, \"depositedUsdc\": 0, \"htsShareBalance\": 0}'::jsonb"))
+  inftTokenId Int?     @map("inft_token_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  cycles  Cycle[]
+  actions AgentAction[]
+
+  @@map("users")
+}
+
+// ── CYCLES (one row per 5-min cycle execution) ──────────────
+
+model Cycle {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @map("user_id")
+  cycleNumber      Int      @map("cycle_number")
+
+  // Specialist results
+  specialists      Json     @default("[]")
+
+  // Adversarial debate
+  alphaAction      String?  @map("alpha_action")
+  alphaPct         Int?     @map("alpha_pct")
+  alphaAttestation String?  @map("alpha_attestation")
+  riskChallenge    String?  @map("risk_challenge")
+  riskMaxPct       Int?     @map("risk_max_pct")
+  riskAttestation  String?  @map("risk_attestation")
+  execAction       String?  @map("exec_action")
+  execPct          Int?     @map("exec_pct")
+  execStopLoss     String?  @map("exec_stop_loss")
+  execAttestation  String?  @map("exec_attestation")
+
+  // Decision
+  decision         String?
+  asset            String?
+  decisionPct      Int?     @map("decision_pct")
+
+  // HCS proof
+  hcsSeqNum        Int?     @map("hcs_seq_num")
+  hashscanUrl      String?  @map("hashscan_url")
+
+  // 0G storage
+  storageHash      String?  @map("storage_hash")
+
+  // Cost
+  totalCostUsd     Float?   @map("total_cost_usd")
+  navAfter         Float?   @map("nav_after")
+
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user    User          @relation(fields: [userId], references: [id])
+  actions AgentAction[]
+
+  @@index([userId, cycleNumber])
+  @@map("cycles")
+}
+
+// ── AGENT ACTIONS (granular event log) ──────────────────────
+
+model AgentAction {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @map("user_id")
+  cycleId         String?  @map("cycle_id") @db.Uuid
+
+  // What happened
+  actionType      String   @map("action_type")
+  agentName       String?  @map("agent_name")
+  status          String   @default("success")
+
+  // Flexible payload
+  payload         Json?
+
+  // TEE proof
+  attestationHash String?  @map("attestation_hash")
+  teeVerified     Boolean? @map("tee_verified")
+
+  // Payment
+  paymentAmount   String?  @map("payment_amount")
+  paymentNetwork  String?  @map("payment_network")
+  paymentTxHash   String?  @map("payment_tx_hash")
+
+  // Timing
+  durationMs      Int?     @map("duration_ms")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user  User   @relation(fields: [userId], references: [id])
+  cycle Cycle? @relation(fields: [cycleId], references: [id])
+
+  @@index([userId, actionType])
+  @@index([cycleId])
+  @@index([createdAt])
+  @@map("agent_actions")
+}
+
+// ── MARKETPLACE AGENTS (Track 7) ────────────────────────────
+
+model MarketplaceAgent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String   @unique
+  endpoint     String
+  price        String   @default("$0.001")
+  tags         String[] @default([])
+  reputation   Int      @default(500)
+  totalHires   Int      @default(0) @map("total_hires")
+  correctCalls Int      @default(0) @map("correct_calls")
+  inftTokenId  Int?     @map("inft_token_id")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("marketplace_agents")
+}

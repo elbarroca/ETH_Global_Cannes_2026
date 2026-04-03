@@ -3,6 +3,7 @@ import { loadStore } from "../store/user-store.js";
 import { onboardRoutes } from "./routes/onboard.js";
 import { cycleRoutes } from "./routes/cycle.js";
 import { fundRoutes } from "./routes/fund.js";
+import { actionRoutes, cycleDbRoutes } from "./routes/actions.js";
 
 const PORT = Number(process.env.SERVER_PORT ?? 3001);
 
@@ -23,6 +24,8 @@ export function createApiServer(): express.Express {
   app.use("/api", onboardRoutes());
   app.use("/api/cycle", cycleRoutes());
   app.use("/api", fundRoutes());
+  app.use("/api/actions", actionRoutes());
+  app.use("/api/cycles", cycleDbRoutes());
 
   // Error handler
   app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

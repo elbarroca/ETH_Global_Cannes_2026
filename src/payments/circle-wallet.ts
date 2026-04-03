@@ -187,12 +187,13 @@ async function probePool(tokenIn: string, tokenOut: string, amountIn: bigint, fe
     });
     if (!poolAddress || poolAddress === "0x0000000000000000000000000000000000000000") return { ok: false };
 
-    const [amountOut] = await publicClient.readContract({
+    const result = await publicClient.readContract({
       address: UNISWAP_QUOTER as `0x${string}`,
       abi: QUOTER_ABI,
       functionName: "quoteExactInputSingle",
       args: [{ tokenIn: tokenIn as `0x${string}`, tokenOut: tokenOut as `0x${string}`, amountIn, fee: feeTier, sqrtPriceLimitX96: 0n }],
     });
+    const amountOut = Array.isArray(result) ? result[0] : result;
     return { ok: true, feeTier, amountOut };
   } catch {
     return { ok: false };
