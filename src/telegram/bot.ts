@@ -116,7 +116,7 @@ function registerCommands(telegramBot: TelegramBot): void {
       const userId = redeemLinkCode(linkCode);
       if (userId) {
         try {
-          updateUser(userId, {
+          await updateUser(userId, {
             telegram: {
               chatId,
               username: msg.from?.username ?? null,
@@ -135,7 +135,7 @@ function registerCommands(telegramBot: TelegramBot): void {
     }
 
     // Check if already linked
-    const user = getUserByChatId(chatId);
+    const user = await getUserByChatId(chatId);
     if (user) {
       await telegramBot.sendMessage(msg.chat.id,
         `✅ Welcome back! Agent is *${user.agent.active ? "running" : "paused"}*.\n\nUse /status for details.`,
@@ -165,7 +165,7 @@ function registerCommands(telegramBot: TelegramBot): void {
   // /status — NAV, positions, agent state
   telegramBot.onText(/\/status/, async (msg) => {
     const chatId = msg.chat.id.toString();
-    const user = getUserByChatId(chatId);
+    const user = await getUserByChatId(chatId);
     if (!user) {
       await telegramBot.sendMessage(msg.chat.id, "❌ No linked wallet. Use `/start CODE` to link.", { parse_mode: "Markdown" });
       return;
@@ -191,7 +191,7 @@ function registerCommands(telegramBot: TelegramBot): void {
   // /why — Full debate from last cycle
   telegramBot.onText(/\/why/, async (msg) => {
     const chatId = msg.chat.id.toString();
-    const user = getUserByChatId(chatId);
+    const user = await getUserByChatId(chatId);
     if (!user) {
       await telegramBot.sendMessage(msg.chat.id, "❌ No linked wallet.");
       return;
@@ -212,7 +212,7 @@ function registerCommands(telegramBot: TelegramBot): void {
   // /history — Last 10 cycles
   telegramBot.onText(/\/history/, async (msg) => {
     const chatId = msg.chat.id.toString();
-    const user = getUserByChatId(chatId);
+    const user = await getUserByChatId(chatId);
     if (!user) {
       await telegramBot.sendMessage(msg.chat.id, "❌ No linked wallet.");
       return;
@@ -238,7 +238,7 @@ function registerCommands(telegramBot: TelegramBot): void {
   // /run — Trigger manual cycle
   telegramBot.onText(/\/run/, async (msg) => {
     const chatId = msg.chat.id.toString();
-    const user = getUserByChatId(chatId);
+    const user = await getUserByChatId(chatId);
     if (!user) {
       await telegramBot.sendMessage(msg.chat.id, "❌ No linked wallet.");
       return;
@@ -291,26 +291,26 @@ function registerCommands(telegramBot: TelegramBot): void {
   // /stop — Pause agent
   telegramBot.onText(/\/stop/, async (msg) => {
     const chatId = msg.chat.id.toString();
-    const user = getUserByChatId(chatId);
+    const user = await getUserByChatId(chatId);
     if (!user) {
       await telegramBot.sendMessage(msg.chat.id, "❌ No linked wallet.");
       return;
     }
 
-    updateUser(user.id, { agent: { active: false } });
+    await updateUser(user.id, { agent: { active: false } });
     await telegramBot.sendMessage(msg.chat.id, "⏸️ Agent *paused*. No more cycles until /resume.", { parse_mode: "Markdown" });
   });
 
   // /resume — Resume agent
   telegramBot.onText(/\/resume/, async (msg) => {
     const chatId = msg.chat.id.toString();
-    const user = getUserByChatId(chatId);
+    const user = await getUserByChatId(chatId);
     if (!user) {
       await telegramBot.sendMessage(msg.chat.id, "❌ No linked wallet.");
       return;
     }
 
-    updateUser(user.id, { agent: { active: true } });
+    await updateUser(user.id, { agent: { active: true } });
     await telegramBot.sendMessage(msg.chat.id, "▶️ Agent *resumed*. Cycles will run every 5 minutes.", { parse_mode: "Markdown" });
   });
 }

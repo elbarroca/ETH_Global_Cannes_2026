@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getUserById, updateUser } from "../../store/user-store.js";
 import { mintShares, burnShares, grantKyc, getTokenInfo } from "../../hedera/hts.js";
+import { agentTransfer } from "../../payments/circle-wallet.js";
 import { getOperatorId } from "../../config/hedera.js";
 
 // Cache token decimals — fetched once on first deposit/withdraw
@@ -31,7 +32,7 @@ export function fundRoutes(): Router {
         return;
       }
 
-      const user = getUserById(userId);
+      const user = await getUserById(userId);
       if (!user) {
         res.status(404).json({ error: "User not found", code: 404 });
         return;
@@ -49,7 +50,7 @@ export function fundRoutes(): Router {
       const shareUnits = Math.round(amount * Math.pow(10, decimals));
       const { newTotalSupply } = await mintShares(shareUnits);
 
-      const updated = updateUser(userId, {
+      const updated = await updateUser(userId, {
         fund: {
           depositedUsdc: user.fund.depositedUsdc + amount,
           currentNav: user.fund.currentNav + amount,
@@ -73,7 +74,7 @@ export function fundRoutes(): Router {
     }
   });
 
-  // POST /api/withdraw — Burn HTS shares, withdraw USDC
+  // POST /api/withdraw — Burn HTS shares, transfer USDC via Circle, withdraw
   router.post("/withdraw", async (req, res) => {
     try {
       const { userId, amount } = req.body as { userId?: string; amount?: number };
@@ -88,7 +89,7 @@ export function fundRoutes(): Router {
         return;
       }
 
-      const user = getUserById(userId);
+      const user = await getUserById(userId);
       if (!user) {
         res.status(404).json({ error: "User not found", code: 404 });
         return;
@@ -109,7 +110,19 @@ export function fundRoutes(): Router {
       const netWithdraw = amount - fee;
       const fullWithdrawal = newDeposit <= 0;
 
-      const updated = updateUser(userId, {
+      // Transfer USDC back to user's wallet via Circle
+      let txResult: { txId: string; state: string } | null = null;
+      try {
+        txResult = await agentTransfer(
+          user.proxyWallet.walletId,
+          user.walletAddress,
+          netWithdraw.toString(),
+        );
+      } catch (err) {
+        console.warn("[fund] Circle transfer failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      }
+
+      const updated = await updateUser(userId, {
         fund: {
           depositedUsdc: newDeposit,
           currentNav: Math.max(0, user.fund.currentNav - amount),
@@ -125,7 +138,8 @@ export function fundRoutes(): Router {
         remainingUsdc: updated.fund.depositedUsdc,
         agentActive: updated.agent.active,
         htsTotalSupply: newTotalSupply,
-        txStatus: "burned",
+        txStatus: txResult ? "transferred" : "burned_only",
+        circleTxId: txResult?.txId ?? null,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

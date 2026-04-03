@@ -1,96 +1,105 @@
-import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { getDb } from "../config/database.js";
 import type { UserRecord } from "../types/index.js";
 
-const DATA_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data");
-const FILE_PATH = path.join(DATA_DIR, "users.json");
+// ── Row ↔ UserRecord mapping ───────────────────────────────────────
 
-const users = new Map<string, UserRecord>();
+interface UserRow {
+  id: string;
+  wallet_address: string;
+  proxy_wallet: { walletId: string; address: string };
+  telegram: UserRecord["telegram"];
+  agent: UserRecord["agent"];
+  fund: UserRecord["fund"];
+  inft_token_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToUser(row: UserRow): UserRecord {
+  return {
+    id: row.id,
+    walletAddress: row.wallet_address,
+    proxyWallet: row.proxy_wallet,
+    telegram: row.telegram,
+    agent: row.agent,
+    fund: row.fund,
+    inftTokenId: row.inft_token_id,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
+// ── Exports (same signatures as before) ─────────────────────────────
 
 export function loadStore(): void {
-  users.clear();
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(FILE_PATH)) {
-    fs.writeFileSync(FILE_PATH, "[]", "utf8");
-    return;
-  }
-  try {
-    const raw = fs.readFileSync(FILE_PATH, "utf8");
-    const arr: UserRecord[] = JSON.parse(raw);
-    for (const u of arr) {
-      users.set(u.id, u);
-    }
-  } catch {
-    console.warn("[user-store] Failed to parse users.json — starting fresh");
-  }
+  // No-op — database connection is lazy via getDb()
 }
 
-function persist(): void {
-  const arr = Array.from(users.values());
-  fs.writeFileSync(FILE_PATH, JSON.stringify(arr, null, 2), "utf8");
-}
-
-export function createUser(
+export async function createUser(
   walletAddress: string,
-  proxyWallet: { address: string; encryptedKey: string },
-): UserRecord {
+  proxyWallet: { walletId: string; address: string },
+  userId?: string,
+): Promise<UserRecord> {
+  const sql = getDb();
+  const id = userId ?? crypto.randomUUID();
   const now = new Date().toISOString();
-  const user: UserRecord = {
-    id: crypto.randomUUID(),
-    walletAddress,
-    proxyWallet,
-    telegram: {
-      chatId: null,
-      username: null,
-      verified: false,
-      notifyPreference: "every_cycle",
-    },
-    agent: {
-      active: false,
-      riskProfile: "balanced",
-      maxTradePercent: 10,
-      lastCycleId: 0,
-      lastCycleAt: null,
-    },
-    fund: {
-      depositedUsdc: 0,
-      htsShareBalance: 0,
-      currentNav: 0,
-    },
-    inftTokenId: null,
-    createdAt: now,
-    updatedAt: now,
+
+  const telegram = {
+    chatId: null,
+    username: null,
+    verified: false,
+    notifyPreference: "every_cycle" as const,
   };
-  users.set(user.id, user);
-  persist();
-  return user;
+
+  const agent = {
+    active: false,
+    riskProfile: "balanced" as const,
+    maxTradePercent: 10,
+    lastCycleId: 0,
+    lastCycleAt: null,
+  };
+
+  const fund = {
+    depositedUsdc: 0,
+    htsShareBalance: 0,
+    currentNav: 0,
+  };
+
+  const rows = await sql`
+    INSERT INTO users (id, wallet_address, proxy_wallet, telegram, agent, fund, created_at, updated_at)
+    VALUES (${id}, ${walletAddress.toLowerCase()}, ${sql.json(proxyWallet)}, ${sql.json(telegram)}, ${sql.json(agent)}, ${sql.json(fund)}, ${now}, ${now})
+    RETURNING *
+  `;
+
+  return rowToUser(rows[0] as unknown as UserRow);
 }
 
-export function getUserById(id: string): UserRecord | undefined {
-  return users.get(id);
+export async function getUserById(id: string): Promise<UserRecord | undefined> {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM users WHERE id = ${id}`;
+  if (rows.length === 0) return undefined;
+  return rowToUser(rows[0] as unknown as UserRow);
 }
 
-export function getUserByWallet(walletAddress: string): UserRecord | undefined {
-  const lower = walletAddress.toLowerCase();
-  for (const u of users.values()) {
-    if (u.walletAddress.toLowerCase() === lower) return u;
-  }
-  return undefined;
+export async function getUserByWallet(walletAddress: string): Promise<UserRecord | undefined> {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM users WHERE wallet_address = ${walletAddress.toLowerCase()}`;
+  if (rows.length === 0) return undefined;
+  return rowToUser(rows[0] as unknown as UserRow);
 }
 
-export function getUserByChatId(chatId: string): UserRecord | undefined {
-  for (const u of users.values()) {
-    if (u.telegram.chatId === chatId) return u;
-  }
-  return undefined;
+export async function getUserByChatId(chatId: string): Promise<UserRecord | undefined> {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM users WHERE telegram->>'chatId' = ${chatId}`;
+  if (rows.length === 0) return undefined;
+  return rowToUser(rows[0] as unknown as UserRow);
 }
 
-export function getActiveUsers(): UserRecord[] {
-  return Array.from(users.values()).filter((u) => u.agent.active);
+export async function getActiveUsers(): Promise<UserRecord[]> {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM users WHERE (agent->>'active')::boolean = true AND (fund->>'depositedUsdc')::numeric > 0`;
+  return (rows as unknown as UserRow[]).map(rowToUser);
 }
 
 interface UserPatch {
@@ -100,22 +109,40 @@ interface UserPatch {
   inftTokenId?: number | null;
 }
 
-export function updateUser(id: string, patch: UserPatch): UserRecord {
-  const existing = users.get(id);
-  if (!existing) throw new Error(`User ${id} not found`);
-  const updated: UserRecord = {
-    ...existing,
-    telegram: patch.telegram ? { ...existing.telegram, ...patch.telegram } : existing.telegram,
-    agent: patch.agent ? { ...existing.agent, ...patch.agent } : existing.agent,
-    fund: patch.fund ? { ...existing.fund, ...patch.fund } : existing.fund,
-    inftTokenId: patch.inftTokenId !== undefined ? patch.inftTokenId : existing.inftTokenId,
-    updatedAt: new Date().toISOString(),
-  };
-  users.set(id, updated);
-  persist();
-  return updated;
+export async function updateUser(id: string, patch: UserPatch): Promise<UserRecord> {
+  const sql = getDb();
+
+  // Atomic JSONB merge in SQL — no read-then-write race condition
+  const telegramPatch = patch.telegram ? sql.json(patch.telegram) : null;
+  const agentPatch = patch.agent ? sql.json(patch.agent) : null;
+  const fundPatch = patch.fund ? sql.json(patch.fund) : null;
+  const hasInftUpdate = patch.inftTokenId !== undefined;
+
+  const rows = await sql`
+    UPDATE users
+    SET telegram = CASE WHEN ${telegramPatch}::jsonb IS NOT NULL
+                        THEN telegram || ${telegramPatch}::jsonb
+                        ELSE telegram END,
+        agent = CASE WHEN ${agentPatch}::jsonb IS NOT NULL
+                     THEN agent || ${agentPatch}::jsonb
+                     ELSE agent END,
+        fund = CASE WHEN ${fundPatch}::jsonb IS NOT NULL
+                    THEN fund || ${fundPatch}::jsonb
+                    ELSE fund END,
+        inft_token_id = CASE WHEN ${hasInftUpdate}
+                             THEN ${patch.inftTokenId ?? null}
+                             ELSE inft_token_id END,
+        updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `;
+
+  if (rows.length === 0) throw new Error(`User ${id} not found`);
+  return rowToUser(rows[0] as unknown as UserRow);
 }
 
-export function getAllUsers(): UserRecord[] {
-  return Array.from(users.values());
+export async function getAllUsers(): Promise<UserRecord[]> {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM users`;
+  return (rows as unknown as UserRow[]).map(rowToUser);
 }

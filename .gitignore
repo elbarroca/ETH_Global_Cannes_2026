@@ -42,3 +42,16 @@ next-env.d.ts
 
 # user store persistence
 data/
+
+# Circle recovery file (contains entity secret ciphertext)
+circle-recovery*
+*.dat
+
+# MCP config (contains project refs)
+.mcp.json
+
+# Agent skills (installed via `skills` CLI)
+.agents/
+.claude/skills/
+.qwen/
+.windsurf/

@@ -7,7 +7,7 @@ import {
   getAllUsers,
   getActiveUsers,
 } from "../../store/user-store.js";
-import { generateProxyWallet } from "../../store/proxy-wallet.js";
+import { createProxyWallet } from "../../payments/circle-wallet.js";
 import { generateLinkCode } from "../../store/link-codes.js";
 import { mintAgentNFT } from "../../og/inft.js";
 import type { UserRecord } from "../../types/index.js";
@@ -41,7 +41,7 @@ export function onboardRoutes(): Router {
       }
 
       // Check existing user
-      const existing = getUserByWallet(walletAddress);
+      const existing = await getUserByWallet(walletAddress);
       if (existing) {
         const linkCode = generateLinkCode(existing.id);
         res.json({
@@ -67,9 +67,18 @@ export function onboardRoutes(): Router {
         }
       }
 
-      // Generate proxy wallet and create user
-      const proxyWallet = generateProxyWallet();
-      const user = createUser(walletAddress, proxyWallet);
+      // Create Circle proxy wallet and user record
+      // Generate userId FIRST so Circle wallet refId matches the stored user ID
+      const newUserId = crypto.randomUUID();
+      let proxyWallet: { walletId: string; address: string };
+      try {
+        proxyWallet = await createProxyWallet(newUserId);
+      } catch (err) {
+        console.warn("[onboard] Circle wallet creation failed, using placeholder:", err instanceof Error ? err.message : String(err));
+        proxyWallet = { walletId: `local-${newUserId}`, address: `0x${newUserId.replace(/-/g, "").slice(0, 40)}` };
+      }
+
+      const user = await createUser(walletAddress, proxyWallet, newUserId);
       const linkCode = generateLinkCode(user.id);
 
       // Mint iNFT for the agent (non-fatal)
@@ -83,7 +92,7 @@ export function onboardRoutes(): Router {
           );
           if (tokenId > 0) {
             inftTokenId = tokenId;
-            updateUser(user.id, { inftTokenId });
+            await updateUser(user.id, { inftTokenId });
           }
         } catch (err) {
           console.warn("[onboard] iNFT mint skipped:", err instanceof Error ? err.message : String(err));
@@ -103,7 +112,7 @@ export function onboardRoutes(): Router {
   });
 
   // POST /api/configure — Set risk profile and notification preference
-  router.post("/configure", (req, res) => {
+  router.post("/configure", async (req, res) => {
     try {
       const { userId, riskProfile, notifyPreference } = req.body as {
         userId?: string;
@@ -146,7 +155,7 @@ export function onboardRoutes(): Router {
         };
       }
 
-      const updated = updateUser(userId, patch);
+      const updated = await updateUser(userId, patch);
       res.json({ success: true, user: sanitizeUser(updated) });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -156,19 +165,23 @@ export function onboardRoutes(): Router {
   });
 
   // GET /api/user/:walletAddress — Retrieve user record (sanitized)
-  router.get("/user/:walletAddress", (req, res) => {
-    const user = getUserByWallet(req.params.walletAddress);
-    if (!user) {
-      res.status(404).json({ error: "User not found", code: 404 });
-      return;
+  router.get("/user/:walletAddress", async (req, res) => {
+    try {
+      const user = await getUserByWallet(req.params.walletAddress);
+      if (!user) {
+        res.status(404).json({ error: "User not found", code: 404 });
+        return;
+      }
+      res.json(sanitizeUser(user));
+    } catch (err) {
+      res.status(500).json({ error: String(err), code: 500 });
     }
-    res.json(sanitizeUser(user));
   });
 
   // GET /api/stats — System-wide statistics
-  router.get("/stats", (_req, res) => {
-    const all = getAllUsers();
-    const active = getActiveUsers();
+  router.get("/stats", async (_req, res) => {
+    const all = await getAllUsers();
+    const active = await getActiveUsers();
     const totalCycles = all.reduce((sum, u) => sum + u.agent.lastCycleId, 0);
     const totalValue = all.reduce((sum, u) => sum + u.fund.depositedUsdc, 0);
 

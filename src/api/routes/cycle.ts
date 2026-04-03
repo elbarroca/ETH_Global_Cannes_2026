@@ -13,7 +13,7 @@ export function cycleRoutes(): Router {
   // GET /api/cycle/latest/:userId — Latest cycle for specific user
   router.get("/latest/:userId", async (req, res) => {
     try {
-      const user = getUserById(req.params.userId);
+      const user = await getUserById(req.params.userId);
       if (!user) {
         res.status(404).json({ error: "User not found", code: 404 });
         return;
@@ -40,7 +40,7 @@ export function cycleRoutes(): Router {
   // GET /api/cycle/history/:userId?limit=10 — Historical cycles for user
   router.get("/history/:userId", async (req, res) => {
     try {
-      const user = getUserById(req.params.userId);
+      const user = await getUserById(req.params.userId);
       if (!user) {
         res.status(404).json({ error: "User not found", code: 404 });
         return;
@@ -64,7 +64,7 @@ export function cycleRoutes(): Router {
   // POST /api/cycle/run/:userId — Trigger immediate cycle
   router.post("/run/:userId", async (req, res) => {
     try {
-      const user = getUserById(req.params.userId);
+      const user = await getUserById(req.params.userId);
       if (!user) {
         res.status(404).json({ error: "User not found", code: 404 });
         return;

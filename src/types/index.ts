@@ -1,7 +1,7 @@
 export interface UserRecord {
   id: string;
   walletAddress: string;
-  proxyWallet: { address: string; encryptedKey: string };
+  proxyWallet: { walletId: string; address: string };
   telegram: {
     chatId: string | null;
     username: string | null;
