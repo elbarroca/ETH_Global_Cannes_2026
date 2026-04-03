@@ -8,18 +8,24 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "VaultMind — AI Investment Agent",
-  description:
-    "Your AI agent hires specialist sub-agents via nanopayments, debates adversarially inside TEE enclaves, and logs every decision to Hedera immutably.",
+  title: "VaultMind",
+  description: "Multi-agent swarm economy for provable investment alpha. Your AI agent hires specialists, debates adversarially, and proves every decision on-chain.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
-      <body className="min-h-full bg-gray-50 text-gray-900">
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col bg-background text-foreground">
         <Providers>
           <Nav />
-          {children}
+          <main className="flex-1">{children}</main>
         </Providers>
       </body>
     </html>

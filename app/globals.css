@@ -1,36 +1,86 @@
 @import "tailwindcss";
 
-/* Force light mode — disable OS dark mode entirely */
-@variant dark (&:is(.dark *));
-
-@theme {
-  --color-purple-600: #9333ea;
-  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
-}
-
 :root {
-  color-scheme: light;
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  --vault-primary: #6366f1;
+  --vault-accent: #818cf8;
+  --vault-success: #22c55e;
+  --vault-danger: #ef4444;
+  --vault-warning: #f59e0b;
+  --vault-surface: rgba(30, 41, 59, 0.7);
+  --vault-glass: rgba(255, 255, 255, 0.05);
+  --vault-border: rgba(255, 255, 255, 0.1);
 }
 
-* {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-vault-primary: var(--vault-primary);
+  --color-vault-accent: var(--vault-accent);
+  --color-vault-success: var(--vault-success);
+  --color-vault-danger: var(--vault-danger);
+  --color-vault-warning: var(--vault-warning);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
-html, body {
-  background: #f9fafb !important;
-  color: #111827 !important;
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* Streaming text cursor */
-.streaming::after {
-  content: "▋";
-  animation: blink 1s step-end infinite;
-  color: #9333ea;
-  font-size: 0.75em;
+/* Glassmorphism card */
+.glass-card {
+  background: var(--vault-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--vault-border);
+  border-radius: 16px;
 }
 
-@keyframes blink {
+/* Gradient border effect */
+.gradient-border {
+  position: relative;
+  background: var(--vault-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+}
+
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--vault-primary), var(--vault-accent), transparent);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  pointer-events: none;
+}
+
+/* Glow effect for active states */
+.glow-primary {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3), 0 0 60px rgba(99, 102, 241, 0.1);
+}
+
+.glow-success {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+}
+
+.glow-danger {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+/* Pulse animation for live indicator */
+@keyframes pulse-dot {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
 }
