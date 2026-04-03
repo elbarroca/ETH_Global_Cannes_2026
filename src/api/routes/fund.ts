@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { getUserById, updateUser } from "../../store/user-store.js";
-
-const MIRROR_BASE = "https://testnet.mirrornode.hedera.com/api/v1";
+import { mintShares, burnShares, grantKyc, getTokenInfo } from "../../hedera/hts.js";
+import { getOperatorId } from "../../config/hedera.js";
 
 export function fundRoutes(): Router {
   const router = Router();
 
-  // POST /api/deposit — Deposit USDC, activate agent
-  router.post("/deposit", (req, res) => {
+  // POST /api/deposit — Deposit USDC, mint HTS shares, activate agent
+  router.post("/deposit", async (req, res) => {
     try {
       const { userId, amount } = req.body as { userId?: string; amount?: number };
 
@@ -27,13 +27,22 @@ export function fundRoutes(): Router {
         return;
       }
 
-      // Update fund record + activate agent
-      // HTS minting deferred to Sprint 4 — for now just update balances
+      // Grant KYC to operator treasury (first time, ignored if already granted)
+      try {
+        await grantKyc(getOperatorId().toString());
+      } catch {
+        // Non-fatal — treasury has implicit KYC
+      }
+
+      // Mint HTS shares (amount × 100 for 2-decimal token)
+      const shareUnits = Math.round(amount * 100);
+      const { newTotalSupply } = await mintShares(shareUnits);
+
       const updated = updateUser(userId, {
         fund: {
           depositedUsdc: user.fund.depositedUsdc + amount,
           currentNav: user.fund.currentNav + amount,
-          htsShareBalance: user.fund.htsShareBalance + amount, // 1:1 until HTS mint
+          htsShareBalance: user.fund.htsShareBalance + amount,
         },
         agent: { active: true },
       });
@@ -44,7 +53,8 @@ export function fundRoutes(): Router {
         htsShareBalance: updated.fund.htsShareBalance,
         currentNav: updated.fund.currentNav,
         agentActive: updated.agent.active,
-        note: "HTS share minting will be wired in Sprint 4",
+        htsTotalSupply: newTotalSupply,
+        txStatus: "minted",
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -52,8 +62,8 @@ export function fundRoutes(): Router {
     }
   });
 
-  // POST /api/withdraw — Withdraw USDC, deactivate if full withdrawal
-  router.post("/withdraw", (req, res) => {
+  // POST /api/withdraw — Burn HTS shares, withdraw USDC
+  router.post("/withdraw", async (req, res) => {
     try {
       const { userId, amount } = req.body as { userId?: string; amount?: number };
 
@@ -78,8 +88,12 @@ export function fundRoutes(): Router {
         return;
       }
 
+      // Burn HTS shares (amount × 100 for 2-decimal token)
+      const shareUnits = Math.round(amount * 100);
+      const { newTotalSupply } = await burnShares(shareUnits);
+
       const newDeposit = user.fund.depositedUsdc - amount;
-      const fee = amount * 0.01; // 1% fee
+      const fee = amount * 0.01; // 1% fee (also enforced on-chain via CustomFractionalFee)
       const netWithdraw = amount - fee;
       const fullWithdrawal = newDeposit <= 0;
 
@@ -98,7 +112,8 @@ export function fundRoutes(): Router {
         fee,
         remainingUsdc: updated.fund.depositedUsdc,
         agentActive: updated.agent.active,
-        note: "HTS share burning will be wired in Sprint 4",
+        htsTotalSupply: newTotalSupply,
+        txStatus: "burned",
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -114,26 +129,10 @@ export function fundRoutes(): Router {
 
       if (tokenId) {
         try {
-          const tokenRes = await fetch(`${MIRROR_BASE}/tokens/${tokenId}`);
-          if (tokenRes.ok) {
-            const data = (await tokenRes.json()) as {
-              name: string;
-              symbol: string;
-              decimals: string;
-              total_supply: string;
-              token_id: string;
-              custom_fees?: { fixed_fees?: unknown[]; fractional_fees?: unknown[] };
-            };
-            tokenInfo = {
-              name: data.name,
-              symbol: data.symbol,
-              decimals: Number(data.decimals),
-              totalSupply: data.total_supply,
-              tokenId: data.token_id,
-              customFees: data.custom_fees ?? null,
-            };
-          }
-        } catch { /* non-fatal */ }
+          tokenInfo = await getTokenInfo();
+        } catch {
+          // Non-fatal — token query may fail on cold start
+        }
       }
 
       res.json({

@@ -3,6 +3,7 @@ import { loadProxyWallet } from "../store/proxy-wallet.js";
 import { updateUser } from "../store/user-store.js";
 import { runAdversarialDebate } from "./adversarial.js";
 import { logCycle } from "../hedera/hcs.js";
+import { storeMemory } from "../og/storage.js";
 import type {
   UserRecord,
   SpecialistResult,
@@ -124,6 +125,14 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   const record = buildCompactRecord(cycleId, user, specialists, debate);
   const { seqNum, hashscanUrl } = await logCycle(TOPIC_ID, record);
   console.log(`[cycle] Logged to HCS: seq=${seqNum} ${hashscanUrl}`);
+
+  // 4b. Store cycle result to 0G decentralized storage (non-fatal)
+  try {
+    const storageHash = await storeMemory(user.id, record);
+    console.log(`[cycle] Stored to 0G: ${storageHash}`);
+  } catch (err) {
+    console.warn("[cycle] 0G storage failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
 
   // 5. Update user (NAV unchanged — real P&L requires trade execution, not yet wired)
   updateUser(user.id, {
