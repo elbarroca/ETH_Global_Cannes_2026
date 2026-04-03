@@ -9,6 +9,7 @@ import {
 } from "../../store/user-store.js";
 import { generateProxyWallet } from "../../store/proxy-wallet.js";
 import { generateLinkCode } from "../../store/link-codes.js";
+import { mintAgentNFT } from "../../og/inft.js";
 import type { UserRecord } from "../../types/index.js";
 
 function sanitizeUser(user: UserRecord) {
@@ -26,7 +27,7 @@ export function onboardRoutes(): Router {
   const router = Router();
 
   // POST /api/onboard — Create new user with wallet verification
-  router.post("/onboard", (req, res) => {
+  router.post("/onboard", async (req, res) => {
     try {
       const { walletAddress, signature, message } = req.body as {
         walletAddress?: string;
@@ -71,10 +72,29 @@ export function onboardRoutes(): Router {
       const user = createUser(walletAddress, proxyWallet);
       const linkCode = generateLinkCode(user.id);
 
+      // Mint iNFT for the agent (non-fatal)
+      let inftTokenId: number | null = null;
+      if (process.env.INFT_CONTRACT_ADDRESS) {
+        try {
+          const { tokenId } = await mintAgentNFT(
+            walletAddress,
+            proxyWallet.address,
+            "balanced",
+          );
+          if (tokenId > 0) {
+            inftTokenId = tokenId;
+            updateUser(user.id, { inftTokenId });
+          }
+        } catch (err) {
+          console.warn("[onboard] iNFT mint skipped:", err instanceof Error ? err.message : String(err));
+        }
+      }
+
       res.status(201).json({
         userId: user.id,
         proxyWalletAddress: proxyWallet.address,
         telegramLinkCode: linkCode,
+        inftTokenId,
         existing: false,
       });
     } catch (err) {
