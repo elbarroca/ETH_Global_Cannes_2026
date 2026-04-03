@@ -61,6 +61,7 @@ export function createUser(
       htsShareBalance: 0,
       currentNav: 0,
     },
+    inftTokenId: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -96,6 +97,7 @@ interface UserPatch {
   telegram?: Partial<UserRecord["telegram"]>;
   agent?: Partial<UserRecord["agent"]>;
   fund?: Partial<UserRecord["fund"]>;
+  inftTokenId?: number | null;
 }
 
 export function updateUser(id: string, patch: UserPatch): UserRecord {
@@ -106,6 +108,7 @@ export function updateUser(id: string, patch: UserPatch): UserRecord {
     telegram: patch.telegram ? { ...existing.telegram, ...patch.telegram } : existing.telegram,
     agent: patch.agent ? { ...existing.agent, ...patch.agent } : existing.agent,
     fund: patch.fund ? { ...existing.fund, ...patch.fund } : existing.fund,
+    inftTokenId: patch.inftTokenId !== undefined ? patch.inftTokenId : existing.inftTokenId,
     updatedAt: new Date().toISOString(),
   };
   users.set(id, updated);

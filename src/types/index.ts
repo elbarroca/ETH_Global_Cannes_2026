@@ -20,6 +20,7 @@ export interface UserRecord {
     htsShareBalance: number;
     currentNav: number;
   };
+  inftTokenId: number | null;
   createdAt: string;
   updatedAt: string;
 }
