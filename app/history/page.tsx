@@ -1,125 +1,156 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useUser } from "@/contexts/user-context";
-import { useCycleHistory } from "@/hooks/use-vaultmind";
-import { CycleView } from "@/components/cycle-view";
-import type { CycleResult } from "@/lib/api";
+import { useState } from "react";
+import { Card, CodeBlock } from "@/components/ui/card";
+import { Badge, SealedBadge, ZeroGBadge } from "@/components/ui/badge";
+import { MOCK_HISTORY } from "@/lib/mock-data";
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function TradeLabel({ action, asset, pct }: { action: string; asset: string; pct: number }) {
+  if (action === "HOLD") return <span className="font-semibold">HOLD</span>;
+  return (
+    <span className="font-semibold">
+      {action} {pct}% {asset}
+    </span>
+  );
+}
 
 export default function HistoryPage() {
-  const router = useRouter();
-  const { isOnboarded } = useUser();
-  const { history, loading, hasMore, loadMore } = useCycleHistory(25);
   const [expanded, setExpanded] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!isOnboarded) router.push("/onboard");
-  }, [isOnboarded, router]);
-
-  function formatTime(iso?: string): string {
-    if (!iso) return "–";
-    const d = new Date(iso);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  }
-
-  function getActionColor(action?: string): string {
-    if (action === "BUY") return "bg-green-500/20 text-green-400 border-green-500/30";
-    if (action === "SELL") return "bg-red-500/20 text-red-400 border-red-500/30";
-    return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-  }
+  const cycles = MOCK_HISTORY;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="text-xl font-bold text-indigo-400">⚡ VaultMind</Link>
-          <div className="hidden md:flex items-center gap-4 text-sm">
-            <Link href="/dashboard" className="text-slate-400 hover:text-white transition-colors">Dashboard</Link>
-            <Link href="/history" className="text-white font-medium">History</Link>
-            <Link href="/portfolio" className="text-slate-400 hover:text-white transition-colors">Portfolio</Link>
-          </div>
+    <main className="max-w-6xl mx-auto px-4 py-5 space-y-3">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">
+            Audit trail
+          </h1>
         </div>
-      </nav>
+        <p className="text-sm text-gray-400">
+          All cycles on Hedera HCS + 0G Sealed Inference
+        </p>
+      </div>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-4">
-        <h1 className="text-2xl font-bold">Cycle History</h1>
+      {/* Cycle list */}
+      <div className="space-y-1.5">
+        {cycles.map((cycle) => {
+          const isOpen = expanded === cycle.id;
+          const { trade, adversarial, pnl, win } = cycle;
 
-        {loading && history.length === 0 ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : history.length === 0 ? (
-          <div className="text-center py-16 text-slate-500">
-            <p>No cycles yet. Go to Dashboard and trigger your first cycle.</p>
-          </div>
-        ) : (
-          <>
-            {/* Timeline */}
-            <div className="relative space-y-2">
-              {history.map((cycle: CycleResult, i) => {
-                const exec = cycle.debate?.executor?.parsed;
-                const isOpen = expanded === i;
-
-                return (
-                  <div key={cycle.cycleId ?? i}>
-                    <button
-                      onClick={() => setExpanded(isOpen ? null : i)}
-                      className="w-full flex items-center gap-4 p-4 bg-slate-800 hover:bg-slate-750 rounded-xl border border-slate-700 hover:border-slate-600 transition-all text-left"
-                    >
-                      <span className="text-slate-500 font-mono text-sm w-16">
-                        #{cycle.cycleId}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-bold border ${getActionColor(exec?.action)}`}
-                      >
-                        {exec?.action ?? "?"}
-                      </span>
-                      {exec && (
-                        <span className="text-sm text-slate-300">
-                          {exec.pct}% {exec.asset}
-                        </span>
-                      )}
-                      <span className="ml-auto text-xs text-slate-500">
-                        {formatTime(cycle.timestamp)}
-                      </span>
-                      <a
-                        href={cycle.hashscanUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors ml-2"
-                      >
-                        Proof ↗
-                      </a>
-                      <span className="text-slate-600">{isOpen ? "▲" : "▼"}</span>
-                    </button>
-
-                    {isOpen && (
-                      <div className="mt-2 pl-2">
-                        <CycleView cycle={cycle} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {hasMore && (
-              <div className="flex justify-center pt-4">
-                <button
-                  onClick={loadMore}
-                  disabled={loading}
-                  className="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-300 disabled:opacity-50 transition-colors"
+          return (
+            <Card key={cycle.id}>
+              {/* Collapsed row */}
+              <button
+                onClick={() => setExpanded(isOpen ? null : cycle.id)}
+                className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-gray-50 rounded-2xl transition-colors"
+              >
+                <span className="font-mono text-xs text-gray-400 w-10 shrink-0">
+                  #{cycle.id}
+                </span>
+                <span className="text-xs text-gray-400 shrink-0 w-12">
+                  {formatTime(cycle.timestamp)}
+                </span>
+                <span className="text-sm text-gray-900 flex-1">
+                  <TradeLabel
+                    action={trade.action}
+                    asset={trade.asset}
+                    pct={trade.percentage}
+                  />
+                </span>
+                <span
+                  className={`text-sm font-mono font-medium ${
+                    pnl > 0
+                      ? "text-emerald-500"
+                      : pnl < 0
+                      ? "text-red-500"
+                      : "text-gray-400"
+                  }`}
                 >
-                  {loading ? "Loading…" : "Load More"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </main>
-    </div>
+                  {pnl > 0 ? "+" : ""}
+                  {pnl === 0 ? "$0.00" : `$${pnl.toFixed(2)}`}
+                </span>
+                <Badge variant={win ? "green" : "red"}>{win ? "win" : "loss"}</Badge>
+                <span className="text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
+              </button>
+
+              {/* Expanded content */}
+              {isOpen && (
+                <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
+                  <div className="pt-3 space-y-2">
+                    {/* Alpha */}
+                    <div className="flex gap-2">
+                      <span className="shrink-0">🟢</span>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-700">
+                          Alpha
+                        </span>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {adversarial.alpha.argument}
+                        </p>
+                      </div>
+                    </div>
+                    {/* Risk */}
+                    <div className="flex gap-2">
+                      <span className="shrink-0">🔴</span>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-700">
+                          Risk
+                        </span>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {adversarial.risk.argument}
+                        </p>
+                      </div>
+                    </div>
+                    {/* Executor */}
+                    <div className="flex gap-2">
+                      <span className="shrink-0">🟡</span>
+                      <div>
+                        <span className="text-xs font-semibold text-gray-700">
+                          Executor
+                        </span>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {adversarial.executor.argument}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer links */}
+                  <div className="flex items-center gap-3 pt-1 flex-wrap">
+                    <SealedBadge />
+                    <ZeroGBadge label="6 × 0G Sealed Inference" />
+                    <a
+                      href={`https://hashscan.io/testnet/topic/${cycle.hcs.topicId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-500 hover:text-blue-600 transition-colors"
+                    >
+                      Verify on Hashscan →
+                    </a>
+                    <a
+                      href="#"
+                      className="text-xs text-purple-600 hover:text-purple-700 transition-colors"
+                    >
+                      Verify on 0G →
+                    </a>
+                    <span className="text-xs font-mono text-gray-400 ml-auto">
+                      HCS #{cycle.hcs.sequenceNumber}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+    </main>
   );
 }
