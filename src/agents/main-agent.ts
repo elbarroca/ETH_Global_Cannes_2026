@@ -1,5 +1,3 @@
-import { ethers } from "ethers";
-import { loadProxyWallet } from "../store/proxy-wallet.js";
 import { updateUser } from "../store/user-store.js";
 import { runAdversarialDebate } from "./adversarial.js";
 import { logCycle } from "../hedera/hcs.js";
@@ -14,7 +12,6 @@ import type {
 } from "../types/index.js";
 
 const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
-const OG_RPC = process.env.OG_RPC_URL ?? "https://evmrpc-testnet.0g.ai";
 
 const SPECIALIST_URLS = [
   "http://localhost:4001/analyze",
@@ -43,7 +40,6 @@ function buildCompactRecord(
   specialists: SpecialistResult[],
   debate: DebateResult,
 ): CompactCycleRecord {
-  // Field names aligned with CONTEXT.MD prompt schemas (pct, max_pct, stop_loss)
   const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number };
   const riskParsed = debate.risk.parsed as { challenge?: string; max_pct?: number };
   const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
@@ -90,14 +86,10 @@ function buildCompactRecord(
 
 export async function runCycle(user: UserRecord): Promise<CycleResult> {
   console.log(`[cycle] Starting for user ${user.id} (risk: ${user.agent.riskProfile})`);
+  console.log(`[cycle] Proxy wallet: ${user.proxyWallet.address} (Circle: ${user.proxyWallet.walletId})`);
 
-  // 1. Load proxy wallet
-  const provider = new ethers.JsonRpcProvider(OG_RPC);
-  const proxyWallet = loadProxyWallet(user.proxyWallet.encryptedKey, provider);
-  console.log(`[cycle] Proxy wallet: ${proxyWallet.address}`);
-
-  // 2. Hire specialists (with payment stub)
-  const payFetch = createPaymentFetch(proxyWallet);
+  // 1. Hire specialists (with payment stub — Circle holds keys, no local wallet needed)
+  const payFetch = createPaymentFetch(null);
   let specialists: SpecialistResult[];
   try {
     specialists = await Promise.all(
@@ -113,7 +105,7 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   }
   console.log(`[cycle] Specialists: ${specialists.map((s) => `${s.name}=${s.signal}`).join(", ")}`);
 
-  // 3. Adversarial debate
+  // 2. Adversarial debate
   const debate = await runAdversarialDebate(
     specialists,
     user.agent.riskProfile,
@@ -121,13 +113,13 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   );
   console.log(`[cycle] Debate complete — executor: ${JSON.stringify(debate.executor.parsed)}`);
 
-  // 4. Log to Hedera HCS
+  // 3. Log to Hedera HCS
   const cycleId = user.agent.lastCycleId + 1;
   const record = buildCompactRecord(cycleId, user, specialists, debate);
   const { seqNum, hashscanUrl } = await logCycle(TOPIC_ID, record);
   console.log(`[cycle] Logged to HCS: seq=${seqNum} ${hashscanUrl}`);
 
-  // 4b. Store cycle result to 0G decentralized storage (non-fatal)
+  // 3b. Store cycle result to 0G decentralized storage (non-fatal)
   let storageHash: string | undefined;
   try {
     storageHash = await storeMemory(user.id, record);
@@ -136,7 +128,7 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     console.warn("[cycle] 0G storage failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 4c. Update iNFT metadata on 0G Chain (non-fatal)
+  // 3c. Update iNFT metadata on 0G Chain (non-fatal)
   if (user.inftTokenId && storageHash) {
     try {
       await updateAgentMetadata(user.inftTokenId, storageHash);
@@ -145,15 +137,15 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     }
   }
 
-  // 5. Update user (NAV unchanged — real P&L requires trade execution, not yet wired)
-  updateUser(user.id, {
+  // 4. Update user
+  await updateUser(user.id, {
     agent: {
       lastCycleId: cycleId,
       lastCycleAt: new Date().toISOString(),
     },
   });
 
-  // 6. Return result
+  // 5. Return result
   return {
     userId: user.id,
     cycleId,

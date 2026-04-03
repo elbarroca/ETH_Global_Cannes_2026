@@ -15,7 +15,9 @@
     "setup:topic": "npx tsx scripts/setup-topic.ts",
     "setup:token": "npx tsx scripts/setup-token.ts",
     "setup:og": "npx tsx scripts/setup-og-account.ts",
-    "validate": "npx tsx scripts/validate-all.ts"
+    "validate": "npx tsx scripts/validate-all.ts",
+    "migrate": "npx tsx scripts/migrate.ts",
+    "setup:circle": "npx tsx scripts/setup-circle.ts"
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.1",

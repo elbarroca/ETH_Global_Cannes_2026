@@ -5,7 +5,7 @@ import { notifyUser } from "../telegram/bot.js";
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function runHeartbeat(): Promise<void> {
-  const users = getActiveUsers();
+  const users = await getActiveUsers();
   if (users.length === 0) {
     console.log("[heartbeat] No active users — skipping");
     return;

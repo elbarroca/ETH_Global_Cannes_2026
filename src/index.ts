@@ -30,9 +30,9 @@ async function main(): Promise<void> {
   console.log(`HCS Topic: ${process.env.HCS_AUDIT_TOPIC_ID}`);
   console.log(`0G Provider: ${process.env.OG_PROVIDER_ADDRESS}`);
 
-  // Load user store from disk
+  // User store backed by Supabase — connection is lazy, no explicit load needed
   loadStore();
-  console.log("User store loaded.");
+  console.log("User store ready (Supabase).");
 
   // Start Telegram bot
   startBot();
