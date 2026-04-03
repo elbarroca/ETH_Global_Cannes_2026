@@ -4,7 +4,7 @@
 
 > Your personal AI agent hires specialists, debates every trade adversarially, and proves every decision on-chain. Zero black boxes. Full mathematical proof.
 
-**ETHGlobal Cannes 2026 &middot; 3 Chains &middot; 7 Agents &middot; 7 Bounties &middot; $17,250**
+**ETHGlobal Cannes 2026 · 3 Chains · 7 Agents · 7 Bounties · $17,250**
 
 ---
 
@@ -70,9 +70,9 @@ The Main Agent queries the Marketplace for the top 3 specialists by reputation, 
 
 | Specialist | Request | Payment | Returns |
 |:-----------|:--------|:--------|:--------|
-| Sentiment | `GET /analyze` &rarr; `402` | $0.001 via Arc | `{ analysis, attestationHash, paymentId }` |
-| Whale | `GET /analyze` &rarr; `402` | $0.001 via Arc | `{ analysis, attestationHash, paymentId }` |
-| Momentum | `GET /analyze` &rarr; `402` | $0.001 via Arc | `{ analysis, attestationHash, paymentId }` |
+| Sentiment | `GET /analyze` → `402` | $0.001 via Arc | `{ analysis, attestationHash, paymentId }` |
+| Whale | `GET /analyze` → `402` | $0.001 via Arc | `{ analysis, attestationHash, paymentId }` |
+| Momentum | `GET /analyze` → `402` | $0.001 via Arc | `{ analysis, attestationHash, paymentId }` |
 
 ### Step 2 — Adversarial Debate (TEE sealed)
 
@@ -86,11 +86,11 @@ All three specialist reports are fed into a sequential debate inside hardware en
 
 ### Step 3-4 — Execute + Log
 
-Parse Executor decision &rarr; Log cycle record to Hedera HCS (~400 bytes) &rarr; `freeze` &rarr; `sign` &rarr; `execute`
+Parse Executor decision → Log cycle record to Hedera HCS (~400 bytes) → `freeze` → `sign` → `execute`
 
 ### Step 5-6 — Remember + Notify
 
-Store memory to 0G Storage &rarr; Send summary + Hashscan proof link to Telegram
+Store memory to 0G Storage → Send summary + Hashscan proof link to Telegram
 
 ### Per Cycle Cost
 
@@ -172,8 +172,8 @@ graph TD
 
 **How it works:**
 
-1. Agent registers with endpoint, price, and tags &rarr; starts at **reputation 500**
-2. Hired each cycle &rarr; predicts bullish / bearish / neutral
+1. Agent registers with endpoint, price, and tags → starts at **reputation 500**
+2. Hired each cycle → predicts bullish / bearish / neutral
 3. After market outcome: **correct** = +15 to +25 rep, **wrong** = -20 to -25 rep
 4. Re-ranked for next cycle based on new score
 
@@ -433,7 +433,7 @@ graph TD
 | Page | What It Shows |
 |:-----|:--------------|
 | **Landing** | Connect wallet button, global stats (users, cycles, hires) |
-| **Onboard** | 3-step progress: Wallet &rarr; Telegram &rarr; Deposit |
+| **Onboard** | 3-step progress: Wallet → Telegram → Deposit |
 | **Dashboard** | 3-column live debate view (specialists / debate / proof) |
 | **Marketplace** | Specialist leaderboard, reputation scores, accuracy history |
 | **History** | Past cycles from Mirror Node REST API |

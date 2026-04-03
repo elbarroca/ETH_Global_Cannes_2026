@@ -3,6 +3,16 @@ import { getUserById, updateUser } from "../../store/user-store.js";
 import { mintShares, burnShares, grantKyc, getTokenInfo } from "../../hedera/hts.js";
 import { getOperatorId } from "../../config/hedera.js";
 
+// Cache token decimals — fetched once on first deposit/withdraw
+let cachedDecimals: number | null = null;
+async function getDecimals(): Promise<number> {
+  if (cachedDecimals === null) {
+    const info = await getTokenInfo();
+    cachedDecimals = info.decimals;
+  }
+  return cachedDecimals;
+}
+
 export function fundRoutes(): Router {
   const router = Router();
 
@@ -27,15 +37,16 @@ export function fundRoutes(): Router {
         return;
       }
 
-      // Grant KYC to operator treasury (first time, ignored if already granted)
+      // Grant KYC to operator treasury (first time — grantKyc handles "already granted" internally)
       try {
         await grantKyc(getOperatorId().toString());
-      } catch {
-        // Non-fatal — treasury has implicit KYC
+      } catch (kycErr) {
+        console.warn("[fund] KYC grant failed:", kycErr instanceof Error ? kycErr.message : String(kycErr));
       }
 
-      // Mint HTS shares (amount × 100 for 2-decimal token)
-      const shareUnits = Math.round(amount * 100);
+      // Mint HTS shares (convert USDC to smallest token unit)
+      const decimals = await getDecimals();
+      const shareUnits = Math.round(amount * Math.pow(10, decimals));
       const { newTotalSupply } = await mintShares(shareUnits);
 
       const updated = updateUser(userId, {
@@ -88,8 +99,9 @@ export function fundRoutes(): Router {
         return;
       }
 
-      // Burn HTS shares (amount × 100 for 2-decimal token)
-      const shareUnits = Math.round(amount * 100);
+      // Burn HTS shares (convert USDC to smallest token unit)
+      const decimals = await getDecimals();
+      const shareUnits = Math.round(amount * Math.pow(10, decimals));
       const { newTotalSupply } = await burnShares(shareUnits);
 
       const newDeposit = user.fund.depositedUsdc - amount;
