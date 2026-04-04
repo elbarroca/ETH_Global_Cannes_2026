@@ -28,10 +28,15 @@ interface AgentInfo {
 export class OpenClawGateway {
   private baseUrl: string;
   private token: string;
+  private _disabled = false;
 
   constructor(baseUrl?: string, token?: string) {
     this.baseUrl = baseUrl ?? GATEWAY_URL;
     this.token = token ?? GATEWAY_TOKEN;
+  }
+
+  get disabled(): boolean {
+    return this._disabled;
   }
 
   private async invoke<T>(tool: string, args: Record<string, unknown>): Promise<T> {
@@ -66,6 +71,10 @@ export class OpenClawGateway {
     message: string,
     timeoutSeconds: number = 30,
   ): Promise<SessionsSendResult> {
+    if (this._disabled) {
+      return { content: "", status: "error", error: "Gateway auto-disabled (not running)" };
+    }
+
     const sessionKey = `agent:${targetAgent}:main`;
 
     try {
@@ -89,30 +98,11 @@ export class OpenClawGateway {
         status: (result.result?.status as SessionsSendResult["status"]) ?? "ok",
       };
     } catch (err) {
-      // Retry once on connection refused (Gateway may be starting up)
+      // On connection refused, auto-disable gateway for the rest of this session
       if (err instanceof Error && (err.message.includes("ECONNREFUSED") || err.message.includes("fetch failed"))) {
-        console.warn("[openclaw] Gateway connection failed, retrying in 2s...");
-        await new Promise((r) => setTimeout(r, 2000));
-
-        try {
-          const retry = await this.invoke<{
-            ok?: boolean;
-            result?: { runId?: string; status?: string; reply?: string };
-            error?: string;
-          }>("sessions_send", { sessionKey, message, timeoutSeconds });
-
-          return {
-            content: retry.result?.reply ?? "",
-            runId: retry.result?.runId,
-            status: (retry.result?.status as SessionsSendResult["status"]) ?? "ok",
-          };
-        } catch (retryErr) {
-          return {
-            content: "",
-            status: "error",
-            error: `Gateway unreachable after retry: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`,
-          };
-        }
+        this._disabled = true;
+        console.warn("[openclaw] Gateway not running — auto-disabled for this session (using direct 0G inference)");
+        return { content: "", status: "error", error: "Gateway not running" };
       }
 
       return {

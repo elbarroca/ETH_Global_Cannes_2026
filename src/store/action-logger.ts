@@ -26,7 +26,13 @@ type ActionType =
   | "TRADE_EXECUTED"
   | "SWAP_EXECUTED"
   | "SWAP_FAILED"
-  | "DEBATE_TRANSCRIPT_LOGGED";
+  | "DEBATE_TRANSCRIPT_LOGGED"
+  | "NARYO_HCS_EVENT"
+  | "NARYO_HTS_EVENT"
+  | "NARYO_CYCLE_EVENT"
+  | "NARYO_DEPOSIT_EVENT"
+  | "NARYO_OG_EVENT"
+  | "NARYO_CORRELATION";
 
 interface LogActionInput {
   userId: string;

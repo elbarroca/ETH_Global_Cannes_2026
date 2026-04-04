@@ -208,6 +208,22 @@ export async function commitCycle(
     hashscanUrl = `https://hashscan.io/testnet/topic/${TOPIC_ID || "unconfigured"}`;
   }
 
+  // 1b. Emit CycleCompleted event on Hedera EVM for Naryo (non-fatal)
+  if (process.env.NARYO_AUDIT_CONTRACT_ADDRESS) {
+    try {
+      const { emitCycleEvent } = await import("../naryo/emit-event");
+      await emitCycleEvent(
+        user.walletAddress,
+        cycleId,
+        record.d.act ?? "HOLD",
+        record.d.asset ?? "ETH",
+        record.d.pct ?? 0,
+      );
+    } catch (err) {
+      console.warn("[cycle] Naryo event emit failed (non-fatal):", err instanceof Error ? err.message : String(err));
+    }
+  }
+
   // 2. Store cycle result to 0G decentralized storage (non-fatal)
   let storageHash: string | undefined;
   try {

@@ -524,7 +524,25 @@ export function startBot(): void {
     return;
   }
 
+  if (bot) {
+    console.warn("[telegram] Bot already running — skipping duplicate start");
+    return;
+  }
+
   bot = new TelegramBot(token, { polling: true });
+
+  // Handle 409 conflict (another instance polling) — stop gracefully
+  bot.on("polling_error", (err) => {
+    const msg = (err as Error).message ?? "";
+    if (msg.includes("409 Conflict")) {
+      console.error("[telegram] Another bot instance is polling — stopping this one to avoid conflict");
+      bot?.stopPolling();
+      bot = null;
+    } else {
+      console.error("[telegram] Polling error:", msg);
+    }
+  });
+
   registerCommands(bot);
   registerCallbacks(bot);
   console.log("[telegram] Bot started (polling mode)");

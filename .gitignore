@@ -40,8 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# user store persistence
-data/
+# user store persistence (root-level only, not src/agents/data/)
+/data/
 
 # Circle recovery file (contains entity secret ciphertext)
 circle-recovery*
