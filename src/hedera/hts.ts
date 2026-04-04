@@ -8,7 +8,7 @@ import {
   TokenId,
   AccountId,
 } from "@hashgraph/sdk";
-import { getHederaClient, getOperatorKey } from "../config/hedera.js";
+import { getHederaClient, getOperatorKey } from "../config/hedera";
 
 const MIRROR_BASE = "https://testnet.mirrornode.hedera.com/api/v1";
 

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
-import { getDb } from "../config/database.js";
-import { deriveUserAddress } from "../config/wallets.js";
-import type { UserRecord } from "../types/index.js";
+import { getDb } from "../config/database";
+import { deriveUserAddress } from "../config/wallets";
+import type { UserRecord } from "../types/index";
 
 // ── Row ↔ UserRecord mapping ───────────────────────────────────────
 

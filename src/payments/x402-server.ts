@@ -4,7 +4,7 @@ import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 
-const NETWORK = "eip155:84532" as const;
+const NETWORK = "eip155:2655" as const;
 
 export function createSpecialistServer(
   name: string,

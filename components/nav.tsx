@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount } from "wagmi";
+import { useEffect, useState } from "react";
 import { WalletConnectButton } from "./wallet-connect";
 import { LiveBadge } from "./ui/badge";
 
@@ -32,8 +33,11 @@ function WolfLogo() {
 export function Nav() {
   const pathname = usePathname();
   const { address } = useAccount();
+  const [mounted, setMounted] = useState(false);
 
-  const shortAddr = address
+  useEffect(() => { setMounted(true); }, []);
+
+  const shortAddr = mounted && address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
     : null;
 
