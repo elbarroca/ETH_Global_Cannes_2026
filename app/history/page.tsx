@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge, SealedBadge, ZeroGBadge } from "@/components/ui/badge";
 import { useCycleHistory } from "@/hooks/use-vaultmind";
-import { mapCompactRecordToCycle } from "@/lib/cycle-mapper";
+import { mapEnrichedResponseToCycle } from "@/lib/cycle-mapper";
 import type { Cycle } from "@/lib/types";
 
 function formatTime(iso: string) {
@@ -28,7 +28,7 @@ export default function HistoryPage() {
   const { history, loading, hasMore, loadMore } = useCycleHistory(20);
 
   const cycles: Array<Cycle & { pnl: number }> = history.map((record) => ({
-    ...mapCompactRecordToCycle(record),
+    ...mapEnrichedResponseToCycle(record),
     pnl: 0,
   }));
 

@@ -7,6 +7,14 @@ import { Badge, SealedBadge, ZeroGBadge } from "@/components/ui/badge";
 import { useUser } from "@/contexts/user-context";
 import { getCycleDetail } from "@/lib/api";
 import type { CycleDetail, AgentActionRecord } from "@/lib/types";
+import {
+  INFT_CONTRACT_ADDRESS,
+  HCS_TOPIC_ID,
+  ogChainAddressUrl,
+  inftTokenUrl,
+  hashscanTopicUrl,
+  hashscanMessageUrl,
+} from "@/lib/links";
 
 type AgentKey = "SentimentBot" | "WhaleEye" | "MomentumX" | "MemecoinHunter" | "TwitterAlpha" | "DeFiYield" | "NewsScanner" | "OnChainForensics" | "OptionsFlow" | "MacroCorrelator" | "Alpha" | "Risk" | "Executor";
 
@@ -29,7 +37,7 @@ const AGENT_META: Record<AgentKey, { emoji: string; type: "Specialist" | "Advers
 const AGENT_KEYS: AgentKey[] = ["SentimentBot", "WhaleEye", "MomentumX", "MemecoinHunter", "TwitterAlpha", "DeFiYield", "NewsScanner", "OnChainForensics", "OptionsFlow", "MacroCorrelator", "Alpha", "Risk", "Executor"];
 
 const PROVIDER_ADDRESS = process.env.NEXT_PUBLIC_OG_PROVIDER_ADDRESS ?? "0x9f2b...4a1c";
-const INFT_CONTRACT = process.env.NEXT_PUBLIC_INFT_CONTRACT ?? "0x73e3016D0D3Bf2985c55860cd2A51FF017c2c874";
+const INFT_CONTRACT = INFT_CONTRACT_ADDRESS;
 
 function getAttestationForAgent(
   key: AgentKey,
@@ -307,12 +315,18 @@ function VerifyContent() {
                     </a>
                   )}
                   <a
-                    href={`https://chainscan-newton.0g.ai/address/${INFT_CONTRACT}`}
+                    href={
+                      user?.inftTokenId != null
+                        ? inftTokenUrl(user.inftTokenId)
+                        : ogChainAddressUrl(INFT_CONTRACT)
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-gold-400 hover:text-void-300 transition-colors"
                   >
-                    View iNFT on 0G Explorer →
+                    {user?.inftTokenId != null
+                      ? `View iNFT #${user.inftTokenId} on 0G Chainscan →`
+                      : "View VaultMindAgent contract on 0G Chainscan →"}
                   </a>
                 </div>
               </CodeBlock>
@@ -345,17 +359,48 @@ function VerifyContent() {
           <div className="space-y-2">
             <DetailBlock label="Storage Root Hash">
               {cycle.storageHash ? (
-                <span className="font-mono text-sm text-gold-400 break-all">
-                  {cycle.storageHash}
-                </span>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(cycle.storageHash ?? "").catch(() => {});
+                    }}
+                    className="font-mono text-sm text-gold-400 hover:text-gold-300 break-all text-left transition-colors"
+                    title="Click to copy. 0G Storage roots are retrievable only via the 0G indexer API — no public browser explorer exists."
+                  >
+                    {cycle.storageHash} <span className="text-[10px] text-void-500">📋 copy</span>
+                  </button>
+                  <p className="text-[10px] text-void-600">
+                    Retrievable via 0G indexer · no public browser explorer
+                  </p>
+                </div>
               ) : (
                 <span className="text-xs text-void-600">Not stored (0G Storage was unavailable)</span>
               )}
             </DetailBlock>
             <DetailBlock label="HCS Sequence">
-              <span className="font-mono text-sm text-void-200">
-                #{cycle.hcsSeqNum ?? "—"}
-              </span>
+              {cycle.hcsSeqNum ? (
+                <a
+                  href={hashscanMessageUrl(HCS_TOPIC_ID, cycle.hcsSeqNum)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-sm text-teal-300 hover:text-teal-200 underline decoration-dotted"
+                >
+                  #{cycle.hcsSeqNum} <span className="text-[10px]">↗ on Hashscan</span>
+                </a>
+              ) : (
+                <span className="font-mono text-sm text-void-600">—</span>
+              )}
+            </DetailBlock>
+            <DetailBlock label="HCS Audit Topic">
+              <a
+                href={hashscanTopicUrl(HCS_TOPIC_ID)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-xs text-teal-300 hover:text-teal-200 underline decoration-dotted"
+              >
+                {HCS_TOPIC_ID} ↗
+              </a>
             </DetailBlock>
             <DetailBlock label="Total Cost">
               <span className="text-sm text-void-200">

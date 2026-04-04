@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardBody, MetricCard, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
-import { mapCycleResultToCycle, mapCompactRecordToCycle } from "@/lib/cycle-mapper";
+import { mapCycleResultToCycle, mapEnrichedResponseToCycle } from "@/lib/cycle-mapper";
 import type { Cycle } from "@/lib/types";
 import type { PendingCycleResponse } from "@/lib/api";
+import { arcTxUrl } from "@/lib/links";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/user-context";
 import {
@@ -23,6 +24,9 @@ import { PreconditionModal } from "@/components/precondition-modal";
 import { TelegramModal } from "@/components/telegram-modal";
 import { FundingModal } from "@/components/funding-modal";
 import { NaryoFeed } from "@/components/naryo-feed";
+import { SwarmStatusBar } from "@/components/swarm-status-bar";
+import { SwarmActivityTicker } from "@/components/swarm-activity-ticker";
+import { DebateTheater } from "@/components/debate-theater";
 
 const ANALYZE_STAGES = [
   "Hiring specialists from marketplace...",
@@ -49,6 +53,9 @@ export default function DashboardPage() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [precondition, setPrecondition] = useState<{ title: string; body: string; ctaLabel: string; ctaHref: string } | null>(null);
+  // User-authored goal text passed to analyzeCycle. Persisted to localStorage
+  // so the input survives reloads — we never want the box to feel amnesiac.
+  const [goal, setGoal] = useState("");
 
   // Compute fund stats from user state only.
   // navChange24h and winRate are NOT shown as "0" — we render "—" in the UI
@@ -64,17 +71,38 @@ export default function DashboardPage() {
 
   const cycle = liveCycle;
 
+  // Hydrate goal from localStorage once on mount
+  useEffect(() => {
+    try {
+      const saved = typeof window !== "undefined" ? window.localStorage.getItem("alphadawg.goal") : null;
+      if (saved) setGoal(saved);
+    } catch {
+      /* ignore localStorage failures — private-mode browsers, etc. */
+    }
+  }, []);
+
+  // Persist goal edits back to localStorage
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("alphadawg.goal", goal);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [goal]);
+
   // Fetch latest cycle + check for pending on mount
   useEffect(() => {
     if (!userId) return;
     getLatestCycle(userId).then((record) => {
-      if (record) setLiveCycle(mapCompactRecordToCycle(record));
+      if (record) setLiveCycle(mapEnrichedResponseToCycle(record));
     }).catch(() => {});
     getPendingCycle(userId).then((pending) => {
       if (pending) setPendingCycle(pending);
     }).catch(() => {});
     getCycleHistory(userId, 20).then((records) => {
-      setPastCycles(records.map(mapCompactRecordToCycle));
+      setPastCycles(records.map(mapEnrichedResponseToCycle));
     }).catch(() => {});
   }, [userId]);
 
@@ -105,7 +133,7 @@ export default function DashboardPage() {
     setStageIdx(0);
     setStages(ANALYZE_STAGES);
     try {
-      const result = await analyzeCycle(userId);
+      const result = await analyzeCycle(userId, goal.trim() || undefined);
       setPendingCycle(result);
     } catch (err) {
       console.warn("[dashboard] Analysis failed:", err);
@@ -125,7 +153,7 @@ export default function DashboardPage() {
       setPendingCycle(null);
       // Refresh hunt history
       getCycleHistory(userId, 20).then((records) => {
-        setPastCycles(records.map(mapCompactRecordToCycle));
+        setPastCycles(records.map(mapEnrichedResponseToCycle));
       }).catch(() => {});
     } catch (err) {
       console.warn("[dashboard] Approval failed:", err);
@@ -186,11 +214,12 @@ export default function DashboardPage() {
       },
     },
     payments: pendingCycle.specialists.map((s) => ({
-      from: "you",
+      from: s.hiredBy ?? "main-agent",
       to: s.name,
       amount: 0.001,
-      txHash: "",
-      chain: "arc",
+      txHash: s.paymentTxHash ?? "",
+      hiredBy: s.hiredBy ?? "main-agent",
+      chain: "arc" as const,
     })),
     hcs: { topicId: "", sequenceNumber: 0, timestamp: "" },
     trade: {
@@ -206,7 +235,10 @@ export default function DashboardPage() {
   const displayCycle = pendingAsCycle ?? cycle;
 
   return (
-    <main className="max-w-7xl mx-auto px-5 py-5 space-y-3">
+    <>
+      {/* Swarm Observatory — full-width health strip at the top of every dashboard load. */}
+      <SwarmStatusBar />
+      <main className="max-w-screen-2xl mx-auto px-5 py-5">
       {/* Unskippable Telegram verification modal */}
       {user && !telegramVerified && (
         <TelegramModal linkCode={linkCode} onRefresh={refreshLinkCode} />
@@ -219,6 +251,10 @@ export default function DashboardPage() {
           onNavigate={(href) => router.push(href)}
         />
       )}
+
+      {/* 2-column layout: left = dashboard content, right = sticky live activity ticker */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4">
+        <div className="min-w-0 space-y-3">
 
       {/* Degraded-cycle banner: only rendered when the last committed cycle
           had a proof failure OR a specialist ran without TEE attestation.
@@ -294,21 +330,39 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      {/* Hunt button */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-void-600 uppercase tracking-wider">
-          {pendingCycle
-            ? `Hunt #${pendingCycle.cycleNumber} \u00b7 Awaiting approval`
-            : cycle
-              ? `Hunt #${cycle.id} \u00b7 ${new Date(cycle.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`
-              : "Ready to hunt"}
-        </h2>
-        <div className="flex flex-col items-end gap-1">
+      {/* Hunt section — goal input + cycle header + trigger button */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-sm font-semibold text-void-600 uppercase tracking-wider">
+            {pendingCycle
+              ? `Hunt #${pendingCycle.cycleNumber} \u00b7 Awaiting approval`
+              : cycle
+                ? `Hunt #${cycle.id} \u00b7 ${new Date(cycle.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`
+                : "Ready to hunt"}
+          </h2>
+          {cycle?.goal && (
+            <span className="text-xs text-void-500 italic truncate max-w-xs" title={cycle.goal}>
+              &ldquo;{cycle.goal}&rdquo;
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            placeholder="What should your pack hunt for? e.g. 'Find a safe ETH entry this week'"
+            disabled={running || approving || !!pendingCycle}
+            className="flex-1 px-3 py-3 bg-void-950 border border-void-800 focus:border-dawg-500 focus:outline-none rounded-xl text-sm text-void-200 placeholder:text-void-600 transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !running && !approving && !pendingCycle) handleHunt();
+            }}
+          />
           {!pendingCycle && (
             <button
               onClick={handleHunt}
               disabled={running || approving}
-              className={`shine-sweep flex items-center gap-2 px-6 py-3 bg-dawg-500 hover:bg-dawg-400 disabled:opacity-60 text-void-950 text-sm font-bold rounded-xl transition-colors ${running ? "hunting" : ""}`}
+              className={`shine-sweep flex items-center gap-2 px-6 py-3 bg-dawg-500 hover:bg-dawg-400 disabled:opacity-60 text-void-950 text-sm font-bold rounded-xl transition-colors shrink-0 ${running ? "hunting" : ""}`}
             >
               {running ? (
                 <>
@@ -320,10 +374,10 @@ export default function DashboardPage() {
               )}
             </button>
           )}
-          {(running || approving) && (
-            <p className="text-xs text-void-500 animate-pulse">{stages[stageIdx]}</p>
-          )}
         </div>
+        {(running || approving) && (
+          <p className="text-xs text-void-500 animate-pulse">{stages[stageIdx]}</p>
+        )}
       </div>
 
       {/* Auto-Hunt Config */}
@@ -404,6 +458,16 @@ export default function DashboardPage() {
             </p>
           </CardBody>
         </Card>
+      )}
+
+      {/* Row 2.5: Debate Theater — turn-by-turn timeline of the latest committed cycle */}
+      {cycle?.dbId && userId && (
+        <DebateTheater
+          cycleUuid={cycle.dbId}
+          userId={userId}
+          cycleNumber={cycle.id}
+          isActive={running || approving}
+        />
       )}
 
       {/* Row 3: Past hunt cards */}
@@ -517,7 +581,16 @@ export default function DashboardPage() {
       {chatOpen && userId && (
         <ChatPanel userId={userId} onClose={() => setChatOpen(false)} />
       )}
+        </div>
+        {/* Right column: sticky live activity ticker (desktop only) */}
+        <aside className="hidden xl:block">
+          <div className="sticky top-4">
+            <SwarmActivityTicker />
+          </div>
+        </aside>
+      </div>
     </main>
+    </>
   );
 }
 
@@ -654,6 +727,13 @@ function ApprovalPanel({
 
 // ─── Column components ────────────────────────────────────────────────────────
 
+const HIRER_BADGE: Record<string, string> = {
+  alpha: "bg-green-500/15 text-green-400 border-green-500/30",
+  risk: "bg-blood-500/15 text-blood-300 border-blood-500/30",
+  executor: "bg-gold-400/15 text-gold-400 border-gold-400/30",
+  "main-agent": "bg-void-800 text-void-400 border-void-700",
+};
+
 function PackColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => void }) {
   return (
     <Card>
@@ -662,50 +742,81 @@ function PackColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => void })
           <span className="w-2 h-2 rounded-full bg-emerald-500" />
           ETH pack
         </div>
-        <Badge variant="amber">3 hired</Badge>
+        <Badge variant="amber">{cycle.specialists.length} hired</Badge>
       </CardHeader>
       <CardBody className="space-y-4">
-        {cycle.specialists.map((s) => (
-          <div key={s.name} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span>{s.emoji}</span>
-                <span className="text-xs font-semibold text-void-200">
-                  {s.name}
-                </span>
-                <ZeroGBadge />
+        {cycle.specialists.map((s, i) => {
+          const hiredBy = s.hiredBy ?? "main-agent";
+          const paymentUrl = s.paymentTxHash && s.paymentTxHash.startsWith("0x")
+            ? arcTxUrl(s.paymentTxHash)
+            : null;
+          return (
+            <div key={`${s.name}-${i}`} className="space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span>{s.emoji}</span>
+                  <span className="text-xs font-semibold text-void-200">{s.name}</span>
+                  <ZeroGBadge />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[9px] px-1.5 py-0.5 rounded border uppercase tracking-wider ${HIRER_BADGE[hiredBy] ?? HIRER_BADGE["main-agent"]}`}
+                  >
+                    hired by {hiredBy}
+                  </span>
+                  {paymentUrl ? (
+                    <a
+                      href={paymentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-mono text-teal-300 hover:text-teal-200 underline decoration-dotted"
+                      title={s.paymentTxHash}
+                    >
+                      ${s.price.toFixed(3)} ↗
+                    </a>
+                  ) : (
+                    <span className="text-xs font-mono text-void-500">${s.price.toFixed(3)}</span>
+                  )}
+                </div>
               </div>
-              <span className="text-xs font-mono text-void-500">${s.price.toFixed(3)}</span>
+              <CodeBlock>{s.analysis}</CodeBlock>
+              <div className="flex items-center gap-2">
+                <SealedBadge onClick={onVerify} />
+                <span className="text-xs font-mono text-void-600">{s.attestation}</span>
+              </div>
             </div>
-            <CodeBlock>{s.analysis}</CodeBlock>
-            <div className="flex items-center gap-2">
-              <SealedBadge onClick={onVerify} />
-              <span className="text-xs font-mono text-void-600">{s.attestation}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </CardBody>
     </Card>
   );
 }
 
 function ChallengeColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => void }) {
+  // Group specialists by the debate agent that hired them — this is the
+  // visible "agent hiring economy" story per tier.
+  const hiresFor = (role: "alpha" | "risk" | "executor"): string[] =>
+    cycle.specialists.filter((s) => s.hiredBy === role).map((s) => s.name);
+
   const agents = [
     {
       emoji: "🟢",
       name: "Alpha",
+      role: "alpha" as const,
       data: cycle.adversarial.alpha,
       recColor: "text-green-400",
     },
     {
       emoji: "🔴",
       name: "Risk",
+      role: "risk" as const,
       data: cycle.adversarial.risk,
       recColor: "text-blood-300",
     },
     {
       emoji: "🟡",
       name: "Executor",
+      role: "executor" as const,
       data: cycle.adversarial.executor,
       recColor: "text-gold-400",
     },
@@ -724,28 +835,39 @@ function ChallengeColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => vo
         <LiveBadge />
       </CardHeader>
       <CardBody className="space-y-4">
-        {agents.map(({ emoji, name, data, recColor }) => (
-          <div key={name} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span>{emoji}</span>
-                <span className="text-sm font-semibold text-void-200">
-                  {name}
-                </span>
+        {agents.map(({ emoji, name, role, data, recColor }) => {
+          const hires = hiresFor(role);
+          return (
+            <div key={name} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span>{emoji}</span>
+                  <span className="text-sm font-semibold text-void-200">{name}</span>
+                </div>
+                <SealedBadge onClick={onVerify} />
               </div>
-              <SealedBadge onClick={onVerify} />
+              <CodeBlock>
+                {data.argument}
+                <br />
+                <span className={`font-semibold ${recColor}`}>{data.recommendation}</span>
+              </CodeBlock>
+              {/* Specialists this debate agent autonomously paid for */}
+              <div className="text-[10px] text-void-600 font-mono">
+                {hires.length > 0 ? (
+                  <>
+                    hires: <span className={recColor}>{hires.join(", ")}</span>
+                  </>
+                ) : (
+                  <span className="italic">no specialists hired</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-void-500">0G: glm-5-chat</span>
+                <span className="text-xs font-mono text-void-600">{data.attestation}</span>
+              </div>
             </div>
-            <CodeBlock>
-              {data.argument}
-              <br />
-              <span className={`font-semibold ${recColor}`}>{data.recommendation}</span>
-            </CodeBlock>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-void-500">0G: glm-5-chat</span>
-              <span className="text-xs font-mono text-void-600">{data.attestation}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </CardBody>
     </Card>
   );

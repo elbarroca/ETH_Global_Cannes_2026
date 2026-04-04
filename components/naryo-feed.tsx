@@ -148,7 +148,8 @@ export function NaryoFeed() {
 
 function getTxUrl(chain: string, txHash: string): string {
   if (chain === "hedera") return `https://hashscan.io/testnet/transaction/${txHash}`;
-  if (chain === "0g-chain") return `https://chainscan-newton.0g.ai/tx/${txHash}`;
+  // chainscan-newton.0g.ai was retired when 0G rebranded Newton → Galileo.
+  if (chain === "0g-chain") return `https://chainscan-galileo.0g.ai/tx/${txHash}`;
   return "#";
 }
 

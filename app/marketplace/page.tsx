@@ -4,26 +4,37 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge, ZeroGBadge } from "@/components/ui/badge";
 import { getLeaderboard, getMyAgents, hireAgent, fireAgent } from "@/lib/api";
-import type { Agent } from "@/lib/types";
+import type { Agent, SwarmHealthResponse, MarketplaceEarningsResponse, SwarmHealthState } from "@/lib/types";
 import type { HiredAgent } from "@/lib/api";
 import { useUser } from "@/contexts/user-context";
-
-const NAME_MAP: Record<string, string> = {
-  sentiment: "SentimentBot",
-  whale: "WhaleEye",
-  momentum: "MomentumX",
-};
-
-const EMOJI_MAP: Record<string, string> = {
-  sentiment: "\uD83E\uDDE0",
-  whale: "\uD83D\uDC0B",
-  momentum: "\uD83D\uDCC8",
-};
+import { agentLabel, agentEmoji } from "@/lib/swarm-endpoints";
+import {
+  INFT_CONTRACT_ADDRESS,
+  arcAddressUrl,
+  inftTokenUrl,
+  ogChainAddressUrl,
+} from "@/lib/links";
 
 function truncateAddress(addr: string | null | undefined): string | null {
   if (!addr) return null;
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
+
+function relativeTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`;
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return `${Math.floor(diff / 86_400_000)}d ago`;
+}
+
+const HEALTH_DOT: Record<SwarmHealthState, string> = {
+  online: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]",
+  waking: "bg-gold-400 shadow-[0_0_6px_rgba(251,191,36,0.6)] animate-pulse",
+  offline: "bg-blood-500",
+  timeout: "bg-blood-600",
+};
 
 export default function MarketplacePage() {
   const { userId, user } = useUser();
@@ -33,6 +44,50 @@ export default function MarketplacePage() {
   const [loadingMarketplace, setLoadingMarketplace] = useState(true);
   const [hiringName, setHiringName] = useState<string | null>(null);
   const [firingName, setFiringName] = useState<string | null>(null);
+  const [health, setHealth] = useState<SwarmHealthResponse | null>(null);
+  const [earnings, setEarnings] = useState<MarketplaceEarningsResponse | null>(null);
+
+  // Poll swarm health + marketplace earnings every 15s so the cards show live
+  // online dots and cumulative USDC earned per specialist.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchSidecar = async () => {
+      try {
+        const [h, e] = await Promise.all([
+          fetch("/api/swarm/health", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+          fetch("/api/marketplace/earnings", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+        ]);
+        if (!cancelled) {
+          if (h) setHealth(h as SwarmHealthResponse);
+          if (e) setEarnings(e as MarketplaceEarningsResponse);
+        }
+      } catch {
+        /* non-fatal */
+      }
+    };
+    void fetchSidecar();
+    const id = setInterval(fetchSidecar, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const getHealth = useCallback(
+    (registryName: string | undefined): SwarmHealthState | undefined => {
+      if (!registryName) return undefined;
+      return health?.agents.find((a) => a.name === registryName)?.status;
+    },
+    [health],
+  );
+
+  const getEarnings = useCallback(
+    (registryName: string | undefined) => {
+      if (!registryName) return null;
+      return earnings?.agents[registryName] ?? null;
+    },
+    [earnings],
+  );
 
   const myAgentNames = new Set(myAgents.map((a) => a.name));
 
@@ -58,18 +113,24 @@ export default function MarketplacePage() {
     getLeaderboard()
       .then((entries) => {
         const mapped: Agent[] = entries.map((e) => ({
-          name: NAME_MAP[e.name] ?? e.name,
-          emoji: EMOJI_MAP[e.name] ?? "\uD83E\uDD16",
+          name: agentLabel(e.name),
+          registryName: e.name,
+          emoji: agentEmoji(e.name),
           skill: e.tags.join(", ") || "Analysis",
           accuracy: e.accuracy,
           timesHired: e.totalHires,
           pricePerQuery: parseFloat(e.price.replace("$", "")) || 0.001,
-          inftId: `#${String(e.totalHires).padStart(4, "0")}`,
+          // Canonical: either a real ERC-7857 token ID from marketplace_agents
+          // or `null`. Callers render "Not minted" for null. We DO NOT
+          // fabricate an ID from totalHires anymore — that was misleading.
+          inftId: e.inftTokenId != null ? `#${e.inftTokenId}` : "",
+          inftTokenId: e.inftTokenId ?? null,
           model: "glm-5-chat",
           provider: "0G Sealed TEE",
           creator: "AlphaDawg",
           isActive: e.active,
-          walletAddress: e.walletAddress,
+          walletAddress: e.walletAddress ?? undefined as string | undefined,
+          lastHireAt: e.lastHireAt,
         }));
         setAllAgents(mapped);
         setLeaderboardFailed(false);
@@ -85,35 +146,32 @@ export default function MarketplacePage() {
   // Marketplace shows ONLY real agents from the leaderboard.
   // Previously this was silently padded with MOCK_AGENTS community entries,
   // which made it impossible for judges to tell real agents from fixtures.
-  const marketplaceAgents = allAgents.filter(
-    (a) => !myAgentNames.has(a.name) && !myAgentNames.has(NAME_MAP[a.name] ?? ""),
-  );
+  const marketplaceAgents = allAgents.filter((a) => !myAgentNames.has(a.registryName ?? a.name));
 
   // Build "Your Pack" from real hired agents. No mock enrichment — the display
   // name/emoji lookups above already cover every known specialist.
-  const packCards: Agent[] = myAgents.map((h) => {
-    const displayName = NAME_MAP[h.name] ?? h.name;
-    return {
-      name: displayName,
-      emoji: EMOJI_MAP[h.name] ?? "\uD83E\uDD16",
-      skill: h.tags.join(", ") || "Analysis",
-      accuracy: h.correctCalls > 0 ? Math.round((h.correctCalls / h.totalHires) * 100) : 75,
-      timesHired: h.totalHires,
-      pricePerQuery: parseFloat(h.price.replace("$", "")) || 0.001,
-      inftId: `#${String(h.totalHires).padStart(4, "0")}`,
-      model: "glm-5-chat",
-      provider: "0G Sealed TEE",
-      creator: "AlphaDawg",
-      isActive: true,
-      walletAddress: h.walletAddress ?? undefined,
-    };
-  });
+  const packCards: Agent[] = myAgents.map((h) => ({
+    name: agentLabel(h.name),
+    registryName: h.name,
+    emoji: agentEmoji(h.name),
+    skill: h.tags.join(", ") || "Analysis",
+    accuracy: h.correctCalls > 0 ? Math.round((h.correctCalls / h.totalHires) * 100) : 75,
+    timesHired: h.totalHires,
+    pricePerQuery: parseFloat(h.price.replace("$", "")) || 0.001,
+    // my-agents endpoint doesn't surface inftTokenId yet — the pack view
+    // intentionally hides the "#XXXX" line when no real token exists.
+    inftId: "",
+    inftTokenId: null,
+    model: "glm-5-chat",
+    provider: "0G Sealed TEE",
+    creator: "AlphaDawg",
+    isActive: true,
+    walletAddress: h.walletAddress ?? undefined,
+  }));
 
-  async function handleHire(agentDisplayName: string) {
+  async function handleHire(registryName: string, displayName: string) {
     if (!userId) return;
-    // Reverse-map display name to registry name
-    const registryName = Object.entries(NAME_MAP).find(([, v]) => v === agentDisplayName)?.[0] ?? agentDisplayName;
-    setHiringName(agentDisplayName);
+    setHiringName(displayName);
     try {
       await hireAgent(userId, registryName);
       await fetchMyAgents();
@@ -124,10 +182,9 @@ export default function MarketplacePage() {
     }
   }
 
-  async function handleFire(agentDisplayName: string) {
+  async function handleFire(registryName: string, displayName: string) {
     if (!userId) return;
-    const registryName = Object.entries(NAME_MAP).find(([, v]) => v === agentDisplayName)?.[0] ?? agentDisplayName;
-    setFiringName(agentDisplayName);
+    setFiringName(displayName);
     try {
       await fireAgent(userId, registryName);
       await fetchMyAgents();
@@ -169,7 +226,10 @@ export default function MarketplacePage() {
                 key={agent.name}
                 agent={agent}
                 firing={firingName === agent.name}
-                onFire={() => handleFire(agent.name)}
+                healthStatus={getHealth(agent.registryName)}
+                earningsUsd={getEarnings(agent.registryName)?.totalUsd ?? null}
+                hireCount={getEarnings(agent.registryName)?.hires ?? null}
+                onFire={() => handleFire(agent.registryName ?? agent.name, agent.name)}
               />
             ))}
           </div>
@@ -206,9 +266,12 @@ export default function MarketplacePage() {
               <CommunityAgentCard
                 key={agent.name}
                 agent={agent}
-                hired={myAgentNames.has(agent.name) || myAgentNames.has(Object.entries(NAME_MAP).find(([, v]) => v === agent.name)?.[0] ?? "")}
+                hired={myAgentNames.has(agent.registryName ?? "")}
                 hiring={hiringName === agent.name}
-                onHire={() => handleHire(agent.name)}
+                healthStatus={getHealth(agent.registryName)}
+                earningsUsd={getEarnings(agent.registryName)?.totalUsd ?? null}
+                hireCount={getEarnings(agent.registryName)?.hires ?? null}
+                onHire={() => handleHire(agent.registryName ?? agent.name, agent.name)}
               />
             ))}
           </div>
@@ -221,13 +284,20 @@ export default function MarketplacePage() {
 function ActiveAgentCard({
   agent,
   firing,
+  healthStatus,
+  earningsUsd,
+  hireCount,
   onFire,
 }: {
   agent: Agent;
   firing: boolean;
+  healthStatus: SwarmHealthState | undefined;
+  earningsUsd: number | null;
+  hireCount: number | null;
   onFire: () => void;
 }) {
   const walletShort = truncateAddress(agent.walletAddress);
+  const lastHire = relativeTime(agent.lastHireAt);
   return (
     <Card className="agent-card">
       <CardBody className="space-y-3">
@@ -238,7 +308,15 @@ function ActiveAgentCard({
 
         <div>
           <div className="text-2xl mb-1">{agent.emoji}</div>
-          <div className="font-semibold text-sm text-void-200">{agent.name}</div>
+          <div className="flex items-center gap-2">
+            {healthStatus && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${HEALTH_DOT[healthStatus]}`}
+                title={`Fly.io status: ${healthStatus}`}
+              />
+            )}
+            <div className="font-semibold text-sm text-void-200">{agent.name}</div>
+          </div>
           <div className="text-xs text-void-500 mt-0.5">{agent.skill}</div>
         </div>
 
@@ -246,12 +324,32 @@ function ActiveAgentCard({
           iNFT {agent.inftId} · 0G Chain
         </div>
 
-        {walletShort && (
+        {walletShort && agent.walletAddress && (
           <div className="text-[11px] font-mono text-void-600">
             payTo:{" "}
-            <span className="text-void-400" title={agent.walletAddress}>
+            <a
+              href={`https://testnet.arcscan.app/address/${agent.walletAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-dawg-400 hover:underline"
+              title={agent.walletAddress}
+            >
               {walletShort}
-            </span>
+            </a>
+          </div>
+        )}
+
+        {(earningsUsd != null || lastHire) && (
+          <div className="flex items-center gap-2 text-[11px] text-void-500 font-mono">
+            {earningsUsd != null && (
+              <span className="text-emerald-300">
+                Earned ${earningsUsd.toFixed(3)}
+              </span>
+            )}
+            {hireCount != null && hireCount > 0 && (
+              <span className="text-void-600">· {hireCount} calls</span>
+            )}
+            {lastHire && <span className="text-void-600">· {lastHire}</span>}
           </div>
         )}
 
@@ -290,14 +388,21 @@ function CommunityAgentCard({
   agent,
   hired,
   hiring,
+  healthStatus,
+  earningsUsd,
+  hireCount,
   onHire,
 }: {
   agent: Agent;
   hired: boolean;
   hiring: boolean;
+  healthStatus: SwarmHealthState | undefined;
+  earningsUsd: number | null;
+  hireCount: number | null;
   onHire: () => void;
 }) {
   const walletShort = truncateAddress(agent.walletAddress);
+  const lastHire = relativeTime(agent.lastHireAt);
   return (
     <Card className="agent-card hover:border-blood-800/50">
       <CardBody className="space-y-2.5">
@@ -307,18 +412,46 @@ function CommunityAgentCard({
         </div>
 
         <div>
-          <div className="font-semibold text-sm text-void-200">{agent.name}</div>
+          <div className="flex items-center gap-2">
+            {healthStatus && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${HEALTH_DOT[healthStatus]}`}
+                title={`Fly.io status: ${healthStatus}`}
+              />
+            )}
+            <div className="font-semibold text-sm text-void-200">{agent.name}</div>
+          </div>
           <div className="text-xs text-void-500 mt-0.5">{agent.skill}</div>
         </div>
 
         <div className="text-xs font-mono text-void-500">iNFT {agent.inftId}</div>
         <div className="text-xs font-mono text-void-600">{agent.creator}</div>
-        {walletShort && (
+        {walletShort && agent.walletAddress && (
           <div className="text-[11px] font-mono text-void-600">
             payTo:{" "}
-            <span className="text-void-400" title={agent.walletAddress}>
+            <a
+              href={`https://testnet.arcscan.app/address/${agent.walletAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-dawg-400 hover:underline"
+              title={agent.walletAddress}
+            >
               {walletShort}
-            </span>
+            </a>
+          </div>
+        )}
+
+        {(earningsUsd != null || lastHire) && (
+          <div className="flex items-center gap-2 text-[11px] text-void-500 font-mono flex-wrap">
+            {earningsUsd != null && (
+              <span className="text-emerald-300">
+                Earned ${earningsUsd.toFixed(3)}
+              </span>
+            )}
+            {hireCount != null && hireCount > 0 && (
+              <span className="text-void-600">· {hireCount} calls</span>
+            )}
+            {lastHire && <span className="text-void-600">· {lastHire}</span>}
           </div>
         )}
 

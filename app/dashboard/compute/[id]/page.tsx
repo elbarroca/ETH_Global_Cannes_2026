@@ -10,6 +10,7 @@ import { Badge, SealedBadge } from "@/components/ui/badge";
 import { AgentGridCard } from "@/components/agent-grid-card";
 import { ComputeLog } from "@/components/compute-log";
 import { ExecuteTradeModal } from "@/components/execute-trade-modal";
+import { DebateTheater } from "@/components/debate-theater";
 
 const ACTION_COLORS: Record<string, { text: string; bg: string; border: string }> = {
   BUY: { text: "text-green-400", bg: "bg-emerald-950/30", border: "border-emerald-700/40" },
@@ -192,6 +193,16 @@ export default function ComputePage() {
           sealed={!!c.execAttestation}
         />
       </div>
+
+      {/* Debate Theater — turn-by-turn timeline from debate_transcripts */}
+      {userId && c.id && (
+        <DebateTheater
+          cycleUuid={c.id}
+          userId={userId}
+          cycleNumber={c.cycleNumber}
+          isActive={false}
+        />
+      )}
 
       {/* Logs Panel */}
       <ComputeLog actions={actions} />
