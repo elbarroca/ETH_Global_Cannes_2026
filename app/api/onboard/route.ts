@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
-import { getUserByWallet, createUser } from "@/src/store/user-store";
+import { getUserByWallet, createUser, updateUser } from "@/src/store/user-store";
 import { createProxyWallet } from "@/src/payments/circle-wallet";
 import { generateLinkCode } from "@/src/store/link-codes";
+import { mintAgentNFT } from "@/src/og/inft";
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,8 +53,22 @@ export async function POST(req: NextRequest) {
     const user = await createUser(walletAddress, proxyWallet, newUserId);
     const linkCode = generateLinkCode(user.id);
 
+    // Mint iNFT agent identity on 0G Chain (non-fatal)
+    let inftTokenId: number | null = null;
+    if (process.env.INFT_CONTRACT_ADDRESS) {
+      try {
+        const { tokenId } = await mintAgentNFT(walletAddress, proxyWallet.address, "balanced");
+        if (tokenId > 0) {
+          inftTokenId = tokenId;
+          await updateUser(user.id, { inftTokenId });
+        }
+      } catch (err) {
+        console.warn("[onboard] iNFT mint skipped:", err instanceof Error ? err.message : String(err));
+      }
+    }
+
     return NextResponse.json(
-      { userId: user.id, proxyWalletAddress: proxyWallet.address, telegramLinkCode: linkCode, existing: false },
+      { userId: user.id, proxyWalletAddress: proxyWallet.address, telegramLinkCode: linkCode, inftTokenId, existing: false },
       { status: 201 },
     );
   } catch (err) {
