@@ -75,7 +75,7 @@ export interface CycleDetail {
   riskAttestation: string | null;
   execAction: string | null;
   execPct: number | null;
-  execStopLoss: number | null;
+  execStopLoss: string | null;
   execAttestation: string | null;
   decision: string | null;
   asset: string | null;

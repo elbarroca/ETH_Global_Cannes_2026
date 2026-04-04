@@ -29,6 +29,9 @@ export interface UserRecord {
     lastCycleAt: string | null;
     approvalMode: "always" | "trades_only" | "auto";
     approvalTimeoutMin: number;
+    cycleCount?: number;
+    cyclePeriodMs?: number;
+    cyclesRemaining?: number;
   };
   fund: {
     depositedUsdc: number;
@@ -116,12 +119,17 @@ export async function onboard(
 
 export async function configure(
   userId: string,
-  riskProfile: string,
-  notifyPreference: string
+  opts: {
+    riskProfile?: string;
+    notifyPreference?: string;
+    approvalMode?: string;
+    cycleCount?: number;
+    cyclePeriodMs?: number;
+  }
 ): Promise<UserRecord> {
   return apiFetch("/api/configure", {
     method: "POST",
-    body: JSON.stringify({ userId, riskProfile, notifyPreference }),
+    body: JSON.stringify({ userId, ...opts }),
   });
 }
 
@@ -208,6 +216,27 @@ export async function getCycleDetail(
   return apiFetch<import("@/lib/types").ComputeDetailResponse>(
     `/api/cycle/detail/${userId}/${cycleNumber}`
   ).catch(() => null);
+}
+
+// ── Trade execution ─────────────────────────────────────────
+
+export interface TradeResult {
+  success: boolean;
+  txId?: string;
+  error?: string;
+  usdcAmount?: string;
+}
+
+export async function executeTrade(
+  userId: string,
+  action: string,
+  asset: string,
+  percentage: number,
+): Promise<TradeResult> {
+  return apiFetch<TradeResult>("/api/trade/execute", {
+    method: "POST",
+    body: JSON.stringify({ userId, action, asset, percentage }),
+  });
 }
 
 export async function getStats(): Promise<PlatformStats> {

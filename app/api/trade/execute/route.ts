@@ -12,9 +12,16 @@ export async function POST(request: Request) {
       percentage: number;
     };
 
-    if (!userId || !action || !asset || !percentage) {
+    if (!userId || !action || !asset) {
       return NextResponse.json(
-        { error: "userId, action, asset, and percentage are required" },
+        { error: "userId, action, and asset are required" },
+        { status: 400 },
+      );
+    }
+
+    if (typeof percentage !== "number" || percentage <= 0 || percentage > 100) {
+      return NextResponse.json(
+        { error: "percentage must be a number between 1 and 100" },
         { status: 400 },
       );
     }
@@ -34,6 +41,13 @@ export async function POST(request: Request) {
     if (!user.proxyWallet?.walletId || !user.proxyWallet?.address) {
       return NextResponse.json(
         { error: "No proxy wallet configured" },
+        { status: 400 },
+      );
+    }
+
+    if (percentage > user.agent.maxTradePercent) {
+      return NextResponse.json(
+        { error: `percentage exceeds max allowed (${user.agent.maxTradePercent}%)` },
         { status: 400 },
       );
     }

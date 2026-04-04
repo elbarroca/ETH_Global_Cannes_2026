@@ -52,13 +52,13 @@ export function mapCycleResultToCycle(result: CycleResult): Cycle {
     adversarial: {
       alpha: {
         argument: result.debate?.alpha?.reasoning
-          || String(alphaParsed.argument ?? alphaParsed.thesis ?? "Analyzing opportunity..."),
+          || String(alphaParsed.thesis ?? alphaParsed.argument ?? "Analyzing opportunity..."),
         recommendation: `${alphaParsed.action ?? "HOLD"} ${alphaParsed.pct ?? 0}% ${alphaParsed.asset ?? "ETH"}`,
         attestation: truncateHash(result.debate?.alpha?.attestationHash ?? ""),
       },
       risk: {
         argument: result.debate?.risk?.reasoning
-          || String(riskParsed.challenge ?? riskParsed.objection ?? "Evaluating risks..."),
+          || String(riskParsed.objection ?? riskParsed.challenge ?? "Evaluating risks..."),
         recommendation: `Max ${riskParsed.max_pct ?? riskParsed.maxSafePct ?? 0}%. Risks: ${Array.isArray(riskParsed.risks) ? (riskParsed.risks as string[]).join(", ") : "none flagged"}`,
         attestation: truncateHash(result.debate?.risk?.attestationHash ?? ""),
       },
