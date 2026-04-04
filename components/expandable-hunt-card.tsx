@@ -165,62 +165,99 @@ function CompactView({
 }
 
 // ── Rating buttons ──────────────────────────────────────────
+//
+// Explicit LIKE / DISLIKE pills for each specialist inside an expanded hunt
+// card. Votes POST to /api/marketplace/rate which runs an ELO update
+// (src/marketplace/reputation.ts) — the new reputation number is returned
+// and rendered in line so the user sees their vote move the marketplace
+// score immediately. Persisted per-browser via localStorage so users don't
+// double-vote the same agent on the same hunt.
 
-function RatingButtons({ agentName }: { agentName: string }) {
+interface RateResponse {
+  agentName: string;
+  reputation: number;
+}
+
+function RatingButtons({ agentName, cycleId }: { agentName: string; cycleId: number }) {
+  const storageKey = `alphadawg.vote.${cycleId}.${agentName}`;
   const [voted, setVoted] = useState<"up" | "down" | null>(null);
   const [loading, setLoading] = useState(false);
+  const [newReputation, setNewReputation] = useState<number | null>(null);
+  const [pulse, setPulse] = useState(false);
+
+  // Hydrate previous vote from localStorage (per cycle × agent).
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved === "up" || saved === "down") setVoted(saved);
+    } catch { /* private-mode browsers */ }
+  }, [storageKey]);
 
   const vote = useCallback(async (positive: boolean) => {
     if (loading) return;
     const next = positive ? "up" : "down";
-    // Toggle off if same vote
-    if (voted === next) { setVoted(null); return; }
+    if (voted === next) return; // No toggle-off — we want a committed rating.
     setLoading(true);
     try {
-      await fetch("/api/marketplace/rate", {
+      const res = await fetch("/api/marketplace/rate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ agentName, positive }),
       });
-      setVoted(next);
+      if (res.ok) {
+        const data = (await res.json()) as RateResponse;
+        setNewReputation(data.reputation);
+        setVoted(next);
+        setPulse(true);
+        setTimeout(() => setPulse(false), 800);
+        try { window.localStorage.setItem(storageKey, next); } catch { /* ignore */ }
+      }
     } catch { /* non-fatal */ }
     finally { setLoading(false); }
-  }, [agentName, voted, loading]);
+  }, [agentName, voted, loading, storageKey]);
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2">
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); vote(true); }}
         disabled={loading}
-        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold font-mono uppercase tracking-wider transition-all ${
           voted === "up"
-            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-            : "text-void-600 hover:text-emerald-400 hover:bg-emerald-500/10 border border-transparent"
-        }`}
-        title="Good call"
+            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-[0_0_12px_rgba(52,211,153,0.35)]"
+            : "bg-void-900/50 text-void-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-void-700/60 hover:border-emerald-500/40"
+        } ${pulse && voted === "up" ? "animate-pulse" : ""}`}
+        title="Good call — promote this specialist"
       >
         <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.228.22.442.393.626a2.491 2.491 0 001.903.874h.014a2.486 2.486 0 001.9-.874 2.49 2.49 0 00.392-.626M5.904 18.75c-.082-.228-.22-.442-.393-.626a2.485 2.485 0 00-1.9-.874A2.49 2.49 0 001.5 18.75" />
         </svg>
-        {voted === "up" && "Good"}
+        LIKE
       </button>
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); vote(false); }}
         disabled={loading}
-        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono transition-all ${
+        className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold font-mono uppercase tracking-wider transition-all ${
           voted === "down"
-            ? "bg-blood-500/20 text-blood-300 border border-blood-500/40"
-            : "text-void-600 hover:text-blood-300 hover:bg-blood-500/10 border border-transparent"
-        }`}
-        title="Bad call"
+            ? "bg-blood-500/20 text-blood-300 border border-blood-500/50 shadow-[0_0_12px_rgba(239,68,68,0.35)]"
+            : "bg-void-900/50 text-void-400 hover:text-blood-300 hover:bg-blood-500/10 border border-void-700/60 hover:border-blood-500/40"
+        } ${pulse && voted === "down" ? "animate-pulse" : ""}`}
+        title="Bad call — demote this specialist"
       >
         <svg className="w-3 h-3 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6.633 10.5c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 012.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 00.322-1.672V3a.75.75 0 01.75-.75A2.25 2.25 0 0116.5 4.5c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 01-2.649 7.521c-.388.482-.987.729-1.605.729H14.23c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 00-1.423-.23H5.904M14.25 9h2.25M5.904 18.75c.083.228.22.442.393.626a2.491 2.491 0 001.903.874h.014a2.486 2.486 0 001.9-.874 2.49 2.49 0 00.392-.626M5.904 18.75c-.082-.228-.22-.442-.393-.626a2.485 2.485 0 00-1.9-.874A2.49 2.49 0 001.5 18.75" />
         </svg>
-        {voted === "down" && "Bad"}
+        DISLIKE
       </button>
+      {newReputation != null && (
+        <span
+          className="font-pixel text-[13px] tabular-nums text-gold-400 glow-dawg"
+          title="New ELO reputation score after your vote — visible on the marketplace"
+        >
+          ELO {newReputation}
+        </span>
+      )}
     </div>
   );
 }
@@ -280,6 +317,9 @@ function InlineDetail({
             <Badge variant="amber">{cycle.specialists.length} hired</Badge>
           </CardHeader>
           <CardBody className="space-y-4">
+            <div className="rounded-md border border-dawg-500/20 bg-dawg-500/5 px-2.5 py-1.5 text-[10px] text-dawg-300 font-mono uppercase tracking-wider">
+              Rate each specialist — your vote moves their ELO score on the marketplace.
+            </div>
             {cycle.specialists.map((s, i) => {
               const hiredBy = s.hiredBy ?? "main-agent";
               const paymentUrl = s.paymentTxHash && s.paymentTxHash.startsWith("0x")
@@ -313,7 +353,7 @@ function InlineDetail({
                       <SealedBadge />
                       <span className="text-xs font-mono text-void-600">{s.attestation}</span>
                     </div>
-                    <RatingButtons agentName={s.name} />
+                    <RatingButtons agentName={s.name} cycleId={cycle.id} />
                   </div>
                 </div>
               );

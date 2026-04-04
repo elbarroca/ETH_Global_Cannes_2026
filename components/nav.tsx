@@ -7,7 +7,6 @@ import { WalletConnectButton } from "./wallet-connect";
 import { LiveBadge } from "./ui/badge";
 import { DawgLogo } from "./dawg-logo";
 import { useUser } from "@/contexts/user-context";
-import { useAgentBalance } from "@/hooks/use-agent-balance";
 import { arcAddressUrl, inftTokenUrl } from "@/lib/links";
 
 const TABS = [
@@ -108,7 +107,7 @@ function InftPill({ tokenId }: { tokenId: number }) {
 
 export function Nav() {
   const pathname = usePathname();
-  const { user, walletAddress } = useUser();
+  const { user, walletAddress, agentBalance } = useUser();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -116,7 +115,6 @@ export function Nav() {
   }, []);
 
   const proxyAddress = user?.proxyWallet?.address ?? null;
-  const { balance: agentBalance } = useAgentBalance(proxyAddress);
   const inftTokenId = user?.inftTokenId ?? null;
 
   return (

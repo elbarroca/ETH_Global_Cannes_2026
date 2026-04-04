@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getWalletBalance, type WalletBalanceResponse } from "@/lib/api";
 
 /**
  * Shape this component consumes. Mirrors the ad-hoc `fund` object the
@@ -12,7 +11,6 @@ import { getWalletBalance, type WalletBalanceResponse } from "@/lib/api";
 export interface NasdaqHeaderFund {
   nav: number;
   navChange24h?: number | null;
-  deposited?: number | null;
   totalCycles: number;
   totalSpend: number;
   totalPayments: number;
@@ -24,14 +22,13 @@ interface NasdaqHeaderProps {
   /** Whether the connected user has completed onboarding. Drives placeholders. */
   connected: boolean;
   /**
-   * User id. When provided, the header polls /api/wallet/balance/:userId every
-   * few seconds and overrides `fund.deposited` with the live Circle MPC proxy
-   * wallet balance. Without a userId the component falls back to the prop
-   * value (the DB accounting number piped through the user context).
+   * Live on-chain USDC balance of the agent's Circle MPC proxy wallet.
+   * Piped from UserContext so every UI surface (nav, hero, wallet card,
+   * deposit page) reads the exact same number and updates in lockstep.
    */
-  userId?: string | null;
-  /** Polling interval in ms. Defaults to 5s which feels live without hammering Circle. */
-  pollMs?: number;
+  agentBalance?: number | null;
+  /** Timestamp (ms) of the most recent successful balance read, for freshness UI. */
+  agentBalanceFetchedAt?: number | null;
 }
 
 // Keep the live read freshness banner readable in a glance.
@@ -71,13 +68,10 @@ function formatNumber(value: number): string {
 export function NasdaqHeader({
   fund,
   connected,
-  userId,
-  pollMs = 5_000,
+  agentBalance = null,
+  agentBalanceFetchedAt = null,
 }: NasdaqHeaderProps) {
   const [clock, setClock] = useState<string>("");
-  const [liveBalance, setLiveBalance] = useState<WalletBalanceResponse | null>(
-    null,
-  );
 
   // Tick the wall-clock every second so the board visibly feels "live".
   // Rendered only client-side to avoid an SSR hydration mismatch. The
@@ -99,37 +93,10 @@ export function NasdaqHeader({
     };
   }, []);
 
-  // Poll the live proxy + hot wallet balance. This is what makes the
-  // DEPOSITED readout real-time — `fund.deposited` is a DB accounting number
-  // that only moves on deposit/withdraw/swap events, so the hero was showing
-  // stale values whenever the proxy received USDC out-of-band.
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    const tick = async () => {
-      const data = await getWalletBalance(userId);
-      if (!cancelled && data) setLiveBalance(data);
-    };
-    // Kick off the first read on the next tick so we don't setState
-    // synchronously inside the effect body.
-    const first = setTimeout(tick, 0);
-    const id = setInterval(tick, pollMs);
-    return () => {
-      cancelled = true;
-      clearTimeout(first);
-      clearInterval(id);
-    };
-  }, [userId, pollMs]);
-
-  // Prefer the live Circle/Arc read; fall back to the DB value piped in via
-  // fund.deposited. Only the proxy wallet is treated as "deposited" for the
-  // hero — the hot wallet is transient execution scratch space and would
-  // confuse the total if added here.
-  const liveProxyUsdc = liveBalance?.proxyUsdc ?? null;
-  const depositedForDisplay =
-    liveProxyUsdc != null ? liveProxyUsdc : fund?.deposited ?? null;
-  const depositedIsLive = liveProxyUsdc != null;
-  const depositedStale = liveBalance?.errors.proxy != null;
+  // agentBalance is piped in from UserContext so every UI surface reads the
+  // same Arc RPC poll. null means either "not onboarded yet" or "first read
+  // still in flight" — the UI renders "$—" in both cases.
+  const depositedIsLive = agentBalance != null;
 
   const navLabel = fund ? formatCurrency(fund.nav) : "$------";
   const change = fund?.navChange24h ?? 0;
@@ -231,14 +198,12 @@ export function NasdaqHeader({
                   depositedIsLive ? "nasdaq-led-green" : ""
                 }`}
                 title={
-                  liveBalance
-                    ? `Circle MPC proxy ${liveBalance.proxyAddress ?? ""} · fetched ${formatAgeSeconds(liveBalance.fetchedAt)}`
+                  agentBalanceFetchedAt
+                    ? `Arc RPC direct read · fetched ${formatAgeSeconds(agentBalanceFetchedAt)}`
                     : undefined
                 }
               >
-                {depositedForDisplay != null
-                  ? formatCurrency(depositedForDisplay, 4)
-                  : "$—"}
+                {agentBalance != null ? formatCurrency(agentBalance, 4) : "$—"}
               </span>
               <LedSeparator />
               {depositedIsLive ? (
@@ -249,11 +214,9 @@ export function NasdaqHeader({
                   </span>
                   LIVE · ARC ONCHAIN
                 </span>
-              ) : depositedStale ? (
-                <span className="nasdaq-led-red">CIRCLE UNREACHABLE · SHOWING DB</span>
               ) : (
                 <span className="nasdaq-led-dim">
-                  {connected ? "ONCHAIN · SETTLED" : "CONNECT WALLET"}
+                  {connected ? "WAITING FOR ARC RPC…" : "CONNECT WALLET"}
                 </span>
               )}
             </div>
@@ -291,8 +254,8 @@ export function NasdaqHeader({
         {/* ── Row 3: Scrolling crawl (Bloomberg-style marquee) ───────────── */}
         <div className="relative overflow-hidden border-t border-dawg-500/20 bg-black py-2.5">
           <div className="nasdaq-ticker-track whitespace-nowrap text-[20px] uppercase leading-none">
-            <TickerStream fund={fund} liveDeposited={liveProxyUsdc} />
-            <TickerStream fund={fund} liveDeposited={liveProxyUsdc} aria-hidden />
+            <TickerStream fund={fund} liveDeposited={agentBalance} />
+            <TickerStream fund={fund} liveDeposited={agentBalance} aria-hidden />
           </div>
           {/* Black fade edges so the loop point is invisible */}
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-black to-transparent" />
@@ -367,12 +330,7 @@ function TickerStream({
     { label: "24H Δ", value: "0.00%", tone: "neutral" },
     {
       label: "CUSTODY",
-      value:
-        liveDeposited != null
-          ? formatCurrency(liveDeposited, 4)
-          : fund?.deposited != null
-            ? formatCurrency(fund.deposited, 4)
-            : "$—",
+      value: liveDeposited != null ? formatCurrency(liveDeposited, 4) : "$—",
       tone: liveDeposited != null ? "up" : "neutral",
     },
     { label: "HUNTS", value: fund ? formatNumber(fund.totalCycles) : "—", tone: "up" },
