@@ -14,9 +14,9 @@ const POLL_MS = 15_000;
 
 // Maps the 4 SwarmHealthState values to Tailwind color classes for the dot.
 const DOT_CLASSES: Record<SwarmHealthState, string> = {
-  online: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]",
-  waking: "bg-gold-400 shadow-[0_0_8px_rgba(251,191,36,0.6)] animate-pulse",
-  offline: "bg-blood-500",
+  online: "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.95)]",
+  waking: "bg-gold-400 shadow-[0_0_10px_rgba(251,191,36,0.95)] animate-pulse",
+  offline: "bg-blood-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]",
   timeout: "bg-blood-600",
 };
 
@@ -71,11 +71,11 @@ export function SwarmStatusBar() {
   }, [health]);
 
   return (
-    <div className="bg-void-900/80 backdrop-blur-sm border-b border-void-800 px-4 py-2.5 text-xs">
+    <div className="bg-black/90 backdrop-blur-sm border-b border-dawg-500/20 px-4 py-3">
       <div className="max-w-screen-2xl mx-auto flex items-center gap-4 flex-wrap">
         {/* Left: 13 agent health pills */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-void-500 mr-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-pixel glow-dawg-strong text-[18px] leading-none text-[#FFE066] uppercase tracking-[0.12em] mr-2">
             Swarm
           </span>
           {agentRows.map(({ spec, status, latencyMs, lastChecked }) => (
@@ -86,14 +86,16 @@ export function SwarmStatusBar() {
               onMouseLeave={() => setHovered(null)}
             >
               <div
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-md border cursor-default ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border cursor-default transition-colors ${
                   spec.role === "adversarial"
-                    ? "border-dawg-500/30 bg-dawg-500/5"
-                    : "border-void-800 bg-void-950/50"
+                    ? "border-dawg-500/50 bg-dawg-500/[0.06]"
+                    : "border-dawg-500/15 bg-black"
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${DOT_CLASSES[status]}`} />
-                <span className="font-mono text-[10px] text-void-300">{spec.name}</span>
+                <span className={`w-2 h-2 rounded-full ${DOT_CLASSES[status]}`} />
+                <span className="font-pixel text-[14px] leading-none text-[#FFCC00]/90 uppercase tracking-wider">
+                  {spec.name}
+                </span>
               </div>
               {hovered === spec.name && (
                 <div className="absolute top-full left-0 mt-1 z-50 w-52 bg-void-950 border border-void-800 rounded-lg shadow-xl p-2.5 space-y-1">
@@ -127,10 +129,10 @@ export function SwarmStatusBar() {
               )}
             </div>
           ))}
-          {loading && <span className="text-void-600">pinging…</span>}
+          {loading && <span className="font-pixel text-[14px] text-void-500">PINGING…</span>}
           {health && (
-            <span className="text-[10px] text-void-500 font-mono ml-1">
-              {health.summary.online}/{health.summary.total} online
+            <span className="font-pixel glow-green text-[15px] leading-none text-[#39FF7A] ml-1">
+              {health.summary.online}/{health.summary.total} ONLINE
             </span>
           )}
         </div>
@@ -209,17 +211,19 @@ function LiveContractsMenu() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-void-800 bg-void-950/60 hover:bg-void-900 transition-colors text-[10px] uppercase tracking-wider ${
-          open ? "text-dawg-300 border-dawg-500/40" : "text-void-500"
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border bg-black hover:bg-dawg-500/[0.06] transition-colors font-pixel text-[14px] leading-none uppercase tracking-wider ${
+          open
+            ? "text-[#FFE066] border-dawg-500/50 glow-dawg"
+            : "text-[#FFCC00]/70 border-dawg-500/25"
         }`}
         aria-haspopup="true"
         aria-expanded={open}
       >
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
         </svg>
         Contracts
-        <span className={`text-[8px] transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+        <span className={`text-[10px] transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
       </button>
 
       {open && (
@@ -283,15 +287,19 @@ function MetricChip({
   accent: "dawg" | "gold" | "teal" | "emerald";
 }) {
   const accentClasses: Record<typeof accent, string> = {
-    dawg: "text-dawg-300",
-    gold: "text-gold-400",
-    teal: "text-teal-300",
-    emerald: "text-emerald-300",
+    dawg:    "text-[#FFE066] glow-dawg-strong",
+    gold:    "text-[#FFCC00] glow-dawg",
+    teal:    "text-[#5EEAD4] glow-teal",
+    emerald: "text-[#39FF7A] glow-green",
   };
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-void-950/60 border border-void-800">
-      <span className="text-[9px] uppercase tracking-wider text-void-500">{label}</span>
-      <span className={`font-mono font-bold text-xs ${accentClasses[accent]}`}>{value}</span>
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-black border border-dawg-500/25">
+      <span className="font-pixel text-[13px] leading-none uppercase tracking-wider text-[#FFCC00]/60">
+        {label}
+      </span>
+      <span className={`font-pixel text-[18px] leading-none tabular-nums ${accentClasses[accent]}`}>
+        {value}
+      </span>
     </div>
   );
 }

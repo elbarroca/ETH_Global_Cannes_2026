@@ -8,111 +8,124 @@ import { arcTxUrl } from "@/lib/links";
 const POLL_MS = 3_000;
 const LIMIT = 25;
 
-// Action-type → color/label map. Each entry controls both the left border
-// of the row and the little pill next to the action name. Keep this aligned
-// with the action_type enum in src/store/action-logger.ts.
+/**
+ * Visual treatment per action type. `tone` drives the LED glow colour
+ * used on the big pixel-font label. `label` is the 3–6 char LED tag.
+ */
 interface ActionStyle {
   label: string;
-  dot: string;
-  text: string;
-  border: string;
+  tone: "dawg" | "green" | "red" | "teal" | "purple" | "void";
 }
 
 const ACTION_STYLES: Record<string, ActionStyle> = {
-  SPECIALIST_HIRED: {
-    label: "HIRE",
-    dot: "bg-dawg-400",
-    text: "text-dawg-300",
-    border: "border-l-dawg-500/60",
-  },
-  DEBATE_ALPHA: {
-    label: "ALPHA",
-    dot: "bg-emerald-400",
-    text: "text-emerald-300",
-    border: "border-l-emerald-500/60",
-  },
-  DEBATE_RISK: {
-    label: "RISK",
-    dot: "bg-blood-400",
-    text: "text-blood-300",
-    border: "border-l-blood-500/60",
-  },
-  DEBATE_EXECUTOR: {
-    label: "EXEC",
-    dot: "bg-blue-400",
-    text: "text-blue-300",
-    border: "border-l-blue-500/60",
-  },
-  HCS_LOGGED: {
-    label: "HCS",
-    dot: "bg-teal-400",
-    text: "text-teal-300",
-    border: "border-l-teal-500/60",
-  },
-  STORAGE_UPLOADED: {
-    label: "0G",
-    dot: "bg-teal-300",
-    text: "text-teal-200",
-    border: "border-l-teal-400/60",
-  },
-  INFT_UPDATED: {
-    label: "iNFT",
-    dot: "bg-purple-400",
-    text: "text-purple-300",
-    border: "border-l-purple-500/60",
-  },
-  TRADE_EXECUTED: {
-    label: "TRADE",
-    dot: "bg-gold-400",
-    text: "text-gold-300",
-    border: "border-l-gold-500/60",
-  },
-  SWAP_FAILED: {
-    label: "SWAP✗",
-    dot: "bg-blood-600",
-    text: "text-blood-300",
-    border: "border-l-blood-700/60",
-  },
-  CYCLE_STARTED: {
-    label: "START",
-    dot: "bg-void-400",
-    text: "text-void-300",
-    border: "border-l-void-700",
-  },
-  CYCLE_COMPLETED: {
-    label: "DONE",
-    dot: "bg-gold-300",
-    text: "text-gold-200",
-    border: "border-l-gold-400/60",
-  },
-  CYCLE_REJECTED: {
-    label: "REJ",
-    dot: "bg-blood-500",
-    text: "text-blood-300",
-    border: "border-l-blood-600/60",
-  },
-  AGENT_HIRED: {
-    label: "PACK+",
-    dot: "bg-dawg-300",
-    text: "text-dawg-200",
-    border: "border-l-dawg-400/60",
-  },
-  AGENT_FIRED: {
-    label: "PACK-",
-    dot: "bg-void-500",
-    text: "text-void-400",
-    border: "border-l-void-600",
-  },
+  SPECIALIST_HIRED: { label: "HIRE",     tone: "dawg" },
+  DEBATE_ALPHA:     { label: "ALPHA",    tone: "green" },
+  DEBATE_RISK:      { label: "RISK",     tone: "red" },
+  DEBATE_EXECUTOR:  { label: "VERDICT",  tone: "dawg" },
+  HCS_LOGGED:       { label: "HCS",      tone: "teal" },
+  STORAGE_UPLOADED: { label: "0G",       tone: "teal" },
+  INFT_UPDATED:     { label: "iNFT",     tone: "purple" },
+  TRADE_EXECUTED:   { label: "SWAP",     tone: "dawg" },
+  SWAP_FAILED:      { label: "SWAP✗",    tone: "red" },
+  CYCLE_STARTED:    { label: "START",    tone: "void" },
+  CYCLE_COMPLETED:  { label: "SEALED",   tone: "dawg" },
+  CYCLE_REJECTED:   { label: "REJ",      tone: "red" },
+  AGENT_HIRED:      { label: "PACK+",    tone: "dawg" },
+  AGENT_FIRED:      { label: "PACK−",    tone: "void" },
 };
 
-const DEFAULT_STYLE: ActionStyle = {
-  label: "EVENT",
-  dot: "bg-void-500",
-  text: "text-void-400",
-  border: "border-l-void-700",
+const DEFAULT_STYLE: ActionStyle = { label: "EVENT", tone: "void" };
+
+/**
+ * Human-friendly one-sentence description of what actually happened.
+ *
+ * Judges read this across the room — so we spell out the story in plain
+ * English, substituting the agent name + payment amount where available,
+ * rather than relying on cryptic codes like `DEBATE_ALPHA`.
+ */
+function describe(row: SwarmActivityRow): string {
+  const agent = row.agentName ? agentLabel(row.agentName) : null;
+  const price = row.paymentAmount ? `$${Number(row.paymentAmount).toFixed(3)}` : null;
+
+  switch (row.actionType) {
+    case "SPECIALIST_HIRED":
+      return agent && price
+        ? `Hired ${agent} · paid ${price} via x402`
+        : agent
+          ? `Hired ${agent} from the marketplace`
+          : "Hired a specialist via x402";
+    case "DEBATE_ALPHA":
+      return "Alpha agent argued the bull case";
+    case "DEBATE_RISK":
+      return "Risk agent challenged with the bear view";
+    case "DEBATE_EXECUTOR":
+      return "Executor issued the final verdict";
+    case "HCS_LOGGED":
+      return "Decision sealed to Hedera HCS topic";
+    case "STORAGE_UPLOADED":
+      return "Memory uploaded to 0G decentralized storage";
+    case "INFT_UPDATED":
+      return "Agent iNFT metadata refreshed on 0G Chain";
+    case "TRADE_EXECUTED":
+      return "Arc USDC swap executed on-chain";
+    case "SWAP_FAILED":
+      return "Swap failed — funds remain safe";
+    case "CYCLE_STARTED":
+      return "New hunt cycle initiated by the main agent";
+    case "CYCLE_COMPLETED":
+      return "Hunt cycle committed to the audit trail";
+    case "CYCLE_REJECTED":
+      return "Pending cycle rejected by the user";
+    case "AGENT_HIRED":
+      return agent
+        ? `${agent} joined the pack`
+        : "New specialist joined the pack";
+    case "AGENT_FIRED":
+      return agent
+        ? `${agent} removed from the pack`
+        : "Specialist removed from the pack";
+    default:
+      return agent ? `${agent} event` : "Swarm event";
+  }
+}
+
+const TONE_TEXT: Record<ActionStyle["tone"], string> = {
+  dawg:   "text-[#FFE066] glow-dawg-strong",
+  green:  "text-[#39FF7A] glow-green",
+  red:    "text-[#FF5A5A] glow-red",
+  teal:   "text-[#5EEAD4] glow-teal",
+  purple: "text-[#C497FF] glow-purple",
+  void:   "text-void-200 glow-void",
 };
 
-/** Sticky sidebar widget — live feed of recent agent_actions rows. */
+const TONE_DOT: Record<ActionStyle["tone"], string> = {
+  dawg:   "bg-dawg-400 shadow-[0_0_10px_rgba(255,199,0,0.9)]",
+  green:  "bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.9)]",
+  red:    "bg-blood-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]",
+  teal:   "bg-teal-400 shadow-[0_0_10px_rgba(20,184,166,0.9)]",
+  purple: "bg-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.9)]",
+  void:   "bg-void-400",
+};
+
+const TONE_BORDER: Record<ActionStyle["tone"], string> = {
+  dawg:   "border-l-dawg-500/80",
+  green:  "border-l-emerald-500/80",
+  red:    "border-l-blood-500/80",
+  teal:   "border-l-teal-500/80",
+  purple: "border-l-purple-500/80",
+  void:   "border-l-void-600",
+};
+
+/**
+ * Live feed of recent agent_actions rows, styled as a Marketsite-esque
+ * pixel LED board. Each row is a 3-line "event card":
+ *
+ *   Line 1 — big pixel label (HIRE / ALPHA / SWAP…) with glow + relative time
+ *   Line 2 — plain-English sentence describing what the swarm just did
+ *   Line 3 — meta: price, tx hash link, TEE ✓, duration
+ *
+ * Sized for TV viewing: labels are 22px, descriptions 14px, meta 12px.
+ */
 export function SwarmActivityTicker() {
   const [rows, setRows] = useState<SwarmActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,7 +139,6 @@ export function SwarmActivityTicker() {
       const data = (await res.json()) as SwarmActivityResponse;
       setRows(data.rows ?? []);
     } catch {
-      /* non-fatal */
     } finally {
       setLoading(false);
     }
@@ -138,7 +150,6 @@ export function SwarmActivityTicker() {
     return () => clearInterval(id);
   }, [fetchRows]);
 
-  // Auto-scroll to top on new rows unless user has manually scrolled down.
   useEffect(() => {
     if (!userScrolledRef.current && scrollRef.current) {
       scrollRef.current.scrollTop = 0;
@@ -150,31 +161,39 @@ export function SwarmActivityTicker() {
   };
 
   return (
-    <div className="bg-void-900 border border-void-800 rounded-2xl overflow-hidden flex flex-col h-[560px]">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-void-800">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-dawg-400 animate-pulse" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-void-300">
+    <div className="bg-black border-2 border-dawg-500/40 rounded-2xl overflow-hidden flex flex-col h-[620px] glow-card nasdaq-scanlines">
+      {/* Header strip — pixel LED title bar */}
+      <div className="relative flex items-center justify-between px-4 py-3 border-b border-dawg-500/30 bg-black">
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-dawg-400 opacity-60" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-dawg-400 shadow-[0_0_10px_rgba(255,199,0,0.9)]" />
+          </span>
+          <span className="font-pixel glow-dawg-strong text-[22px] leading-none text-[#FFE066] uppercase tracking-[0.1em]">
             Swarm Activity
           </span>
         </div>
-        <span className="text-[10px] font-mono text-void-600">
-          {rows.length} events
+        <span className="font-pixel glow-dawg text-[16px] leading-none text-[#FFCC00]">
+          {rows.length} EVENTS
         </span>
       </div>
+
+      {/* Scrollable feed */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto"
       >
         {loading && rows.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="w-4 h-4 border-2 border-dawg-500 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center py-10">
+            <div className="w-5 h-5 border-2 border-dawg-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : rows.length === 0 ? (
-          <div className="text-center py-6 text-xs text-void-600">No swarm activity yet</div>
+          <div className="font-pixel glow-dawg text-center py-8 text-[18px] text-[#FFCC00]/60">
+            Waiting for swarm events…
+          </div>
         ) : (
-          <ul className="divide-y divide-void-800/60">
+          <ul className="divide-y divide-dawg-500/10">
             {rows.map((row) => (
               <TickerRow key={row.id} row={row} />
             ))}
@@ -187,71 +206,80 @@ export function SwarmActivityTicker() {
 
 function TickerRow({ row }: { row: SwarmActivityRow }) {
   const style = ACTION_STYLES[row.actionType] ?? DEFAULT_STYLE;
-  const agent = row.agentName ? agentLabel(row.agentName) : null;
   const emoji = row.agentName ? agentEmoji(row.agentName) : null;
   const teeOk = row.teeVerified === true;
   const hasPayment = row.paymentTxHash && row.paymentAmount;
+  const duration = row.durationMs != null && row.durationMs > 0
+    ? `${(row.durationMs / 1000).toFixed(1)}s`
+    : null;
 
   return (
     <li
-      className={`payment-enter px-3 py-2 border-l-2 ${style.border} hover:bg-void-800/40 transition-colors`}
+      className={`payment-enter px-4 py-3.5 border-l-[3px] ${TONE_BORDER[style.tone]} hover:bg-dawg-500/[0.04] transition-colors`}
     >
-      <div className="flex items-center gap-2">
-        <span className={`w-1.5 h-1.5 rounded-full ${style.dot} shrink-0`} />
-        <span className={`font-mono text-[9px] font-bold ${style.text}`}>{style.label}</span>
-        {agent && (
-          <span className="font-mono text-[11px] text-void-300 truncate">
-            {emoji} {agent}
-          </span>
-        )}
-        <span className="ml-auto text-[9px] text-void-600 font-mono shrink-0">
+      {/* ── Line 1 — pixel LED action label + timestamp ─────────────── */}
+      <div className="flex items-center gap-2.5">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${TONE_DOT[style.tone]}`} />
+        <span
+          className={`font-pixel text-[22px] leading-none tracking-wider shrink-0 ${TONE_TEXT[style.tone]}`}
+        >
+          {style.label}
+        </span>
+        {emoji && <span className="text-[18px] leading-none shrink-0">{emoji}</span>}
+        <span className="font-pixel glow-dawg ml-auto text-[16px] leading-none text-[#FFCC00]/70 shrink-0">
           {relativeTime(row.createdAt)}
         </span>
       </div>
-      <div className="flex items-center gap-2 mt-1 pl-3.5">
-        {hasPayment && (
-          <span className="text-[9px] font-mono text-emerald-300/80">
-            ${Number(row.paymentAmount).toFixed(3)}
-          </span>
-        )}
-        {row.paymentTxHash && row.paymentTxHash.startsWith("0x") ? (
-          <a
-            href={arcTxUrl(row.paymentTxHash) ?? "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[9px] font-mono text-teal-300 hover:text-teal-200 truncate max-w-[80px]"
-            title={`View x402 payment on ArcScan: ${row.paymentTxHash}`}
-          >
-            {row.paymentTxHash.slice(0, 8)}… ↗
-          </a>
-        ) : row.paymentTxHash ? (
-          <span className="text-[9px] font-mono text-void-600 truncate max-w-[80px]">
-            {row.paymentTxHash.slice(0, 8)}…
-          </span>
-        ) : null}
-        {teeOk && (
-          <span className="text-[9px] font-mono text-gold-400">TEE ✓</span>
-        )}
-        {row.attestationHash && !hasPayment && (
-          <span className="text-[9px] font-mono text-void-600 truncate max-w-[120px]">
-            {row.attestationHash.slice(0, 14)}…
-          </span>
-        )}
-        {row.durationMs != null && row.durationMs > 0 && (
-          <span className="text-[9px] font-mono text-void-600">
-            {Math.round(row.durationMs / 100) / 10}s
-          </span>
-        )}
-      </div>
+
+      {/* ── Line 2 — descriptive sentence ───────────────────────────── */}
+      <p className="mt-2 text-sm leading-snug text-void-200">
+        {describe(row)}
+      </p>
+
+      {/* ── Line 3 — meta strip (price, tx hash, TEE, duration) ─────── */}
+      {(hasPayment || teeOk || row.paymentTxHash || duration) && (
+        <div className="mt-2 flex items-center gap-2.5 flex-wrap text-xs">
+          {hasPayment && (
+            <span className="font-pixel glow-green text-[15px] leading-none text-[#39FF7A]">
+              ${Number(row.paymentAmount).toFixed(3)}
+            </span>
+          )}
+          {row.paymentTxHash && row.paymentTxHash.startsWith("0x") ? (
+            <a
+              href={arcTxUrl(row.paymentTxHash) ?? "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-[11px] text-teal-300 hover:text-teal-200 underline decoration-dotted"
+              title={`View x402 payment on ArcScan: ${row.paymentTxHash}`}
+            >
+              {row.paymentTxHash.slice(0, 10)}… ↗
+            </a>
+          ) : row.paymentTxHash ? (
+            <span className="font-mono text-[11px] text-void-500">
+              {row.paymentTxHash.slice(0, 10)}…
+            </span>
+          ) : null}
+          {teeOk && (
+            <span className="font-pixel glow-dawg text-[14px] leading-none text-[#FFCC00]">
+              TEE ✓
+            </span>
+          )}
+          {duration && (
+            <span className="font-pixel text-[14px] leading-none text-void-400">
+              {duration}
+            </span>
+          )}
+        </div>
+      )}
     </li>
   );
 }
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
-  if (diff < 10_000) return "now";
-  if (diff < 60_000) return `${Math.floor(diff / 1000)}s`;
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
-  return `${Math.floor(diff / 86_400_000)}d`;
+  if (diff < 10_000) return "NOW";
+  if (diff < 60_000) return `${Math.floor(diff / 1000)}S`;
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}M`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}H`;
+  return `${Math.floor(diff / 86_400_000)}D`;
 }

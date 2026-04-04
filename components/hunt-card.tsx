@@ -12,9 +12,9 @@ import {
 } from "@/lib/links";
 
 const ACTION_STYLES: Record<string, { color: string; variant: "green" | "red" | "amber" }> = {
-  BUY: { color: "text-green-400", variant: "green" },
-  SELL: { color: "text-blood-400", variant: "red" },
-  HOLD: { color: "text-gold-400", variant: "amber" },
+  BUY:  { color: "text-[#39FF7A] glow-green",  variant: "green" },
+  SELL: { color: "text-[#FF5A5A] glow-red",    variant: "red" },
+  HOLD: { color: "text-[#FFCC00] glow-dawg",   variant: "amber" },
 };
 
 export function HuntCard({ cycle }: { cycle: Cycle }) {
@@ -46,17 +46,17 @@ export function HuntCard({ cycle }: { cycle: Cycle }) {
         {/* Top row: Hunt #, time, action label */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-void-200">
-              Hunt #{cycle.id}
+            <span className="font-pixel glow-dawg text-[20px] leading-none text-[#FFCC00] uppercase tracking-wider">
+              HUNT #{cycle.id}
             </span>
-            <span className="text-xs text-void-600">{time}</span>
+            <span className="font-pixel text-[14px] leading-none text-void-400">{time}</span>
           </div>
           <Badge variant={style.variant}>{cycle.trade.action}</Badge>
         </div>
 
         {/* Middle: trade detail */}
         <div className="flex items-center justify-between">
-          <span className={`text-lg font-bold ${style.color}`}>
+          <span className={`font-pixel text-[26px] leading-none uppercase tracking-wider tabular-nums ${style.color}`}>
             {cycle.trade.action} {cycle.trade.percentage}% {cycle.trade.asset}
           </span>
           {hcsHref ? (

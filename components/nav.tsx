@@ -8,6 +8,7 @@ import { LiveBadge } from "./ui/badge";
 import { DawgLogo } from "./dawg-logo";
 import { useUser } from "@/contexts/user-context";
 import { useAgentBalance } from "@/hooks/use-agent-balance";
+import { arcAddressUrl, inftTokenUrl } from "@/lib/links";
 
 const TABS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -29,12 +30,15 @@ function formatUsdc(value: number | null): string {
   return `$${value.toFixed(4)}`;
 }
 
-/** User (EOA) wallet pill — the wallet the user connected from MetaMask/Zerion/etc. */
+/** User (EOA) wallet pill — links to ArcScan (external, new tab). */
 function UserWalletPill({ address }: { address: string }) {
   return (
-    <div
-      className="hidden lg:flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg bg-void-800/70 border border-void-700/60"
-      title="Your connected wallet (EOA)"
+    <a
+      href={arcAddressUrl(address)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hidden lg:flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg bg-void-800/70 border border-void-700/60 hover:bg-void-800 hover:border-sky-500/40 transition-colors group"
+      title={`Your connected wallet (EOA) — ${address}\nClick to view on ArcScan ↗`}
     >
       <div className="flex items-center justify-center w-5 h-5 rounded-md bg-sky-500/15 border border-sky-500/30">
         <svg viewBox="0 0 24 24" className="w-3 h-3 text-sky-400" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -43,14 +47,14 @@ function UserWalletPill({ address }: { address: string }) {
         </svg>
       </div>
       <div className="flex flex-col leading-none">
-        <span className="text-[9px] uppercase tracking-wider text-void-500">You</span>
-        <span className="text-[11px] font-mono text-void-200 mt-0.5">{shorten(address)}</span>
+        <span className="text-[9px] uppercase tracking-wider text-void-500">You · ArcScan ↗</span>
+        <span className="text-[11px] font-mono text-void-200 mt-0.5 group-hover:text-sky-300">{shorten(address)}</span>
       </div>
-    </div>
+    </a>
   );
 }
 
-/** Agent (Circle MPC proxy) wallet pill — the wallet that executes trades. */
+/** Agent (Circle MPC proxy) wallet pill — links to ArcScan (external, new tab). */
 function AgentWalletPill({
   address,
   balance,
@@ -59,10 +63,12 @@ function AgentWalletPill({
   balance: number | null;
 }) {
   return (
-    <Link
-      href="/deposit"
-      title={`Agent proxy wallet (Circle MPC) — ${address}`}
-      className="hidden md:flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg bg-blood-900/25 border border-blood-700/40 hover:bg-blood-900/40 hover:border-blood-600/60 transition-colors"
+    <a
+      href={arcAddressUrl(address)}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Agent proxy wallet (Circle MPC) — ${address}\nClick to view on ArcScan ↗`}
+      className="hidden md:flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg bg-blood-900/25 border border-blood-700/40 hover:bg-blood-900/40 hover:border-blood-600/60 transition-colors group"
     >
       <div className="flex items-center justify-center w-5 h-5 rounded-md bg-blood-600/20 border border-blood-500/40">
         <svg viewBox="0 0 24 24" className="w-3 h-3 text-blood-300" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -74,14 +80,29 @@ function AgentWalletPill({
         </svg>
       </div>
       <div className="flex flex-col leading-none">
-        <span className="text-[9px] uppercase tracking-wider text-blood-400">Agent</span>
+        <span className="text-[9px] uppercase tracking-wider text-blood-400">Agent · ArcScan ↗</span>
         <span className="text-[11px] font-mono text-void-100 mt-0.5">
           <span className="text-gold-400 font-semibold">{formatUsdc(balance)}</span>
           <span className="text-void-600 mx-1">·</span>
-          <span className="text-void-400">{shorten(address)}</span>
+          <span className="text-void-400 group-hover:text-blood-200">{shorten(address)}</span>
         </span>
       </div>
-    </Link>
+    </a>
+  );
+}
+
+/** Lead Dawg iNFT pill — links to the specific token on 0G Chainscan. */
+function InftPill({ tokenId }: { tokenId: number }) {
+  return (
+    <a
+      href={inftTokenUrl(tokenId)}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Your Lead Dawg agent identity — iNFT #${tokenId}\nClick to view on 0G Chainscan ↗`}
+      className="hidden xl:inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-mono bg-gold-400/10 text-gold-400 border border-gold-400/30 hover:bg-gold-400/15 hover:border-gold-400/50 transition-colors"
+    >
+      iNFT #{String(tokenId).padStart(4, "0")} ↗
+    </a>
   );
 }
 
@@ -132,14 +153,7 @@ export function Nav() {
 
         {/* Right section — wallet identity */}
         <div className="flex items-center gap-2 shrink-0">
-          {inftTokenId !== null && (
-            <span
-              className="hidden xl:inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-mono bg-gold-400/10 text-gold-400 border border-gold-400/30"
-              title="Your agent's on-chain identity (ERC-7857 iNFT)"
-            >
-              iNFT #{String(inftTokenId).padStart(4, "0")}
-            </span>
-          )}
+          {inftTokenId !== null && <InftPill tokenId={inftTokenId} />}
 
           {/* Agent wallet — always relevant when user is onboarded */}
           {mounted && proxyAddress && (
