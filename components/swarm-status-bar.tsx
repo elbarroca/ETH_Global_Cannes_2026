@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SWARM_AGENTS } from "@/lib/swarm-endpoints";
+import { LIVE_CONTRACTS } from "@/lib/links";
 import type {
   SwarmHealthResponse,
   SwarmHealthAgent,
@@ -134,7 +135,7 @@ export function SwarmStatusBar() {
           )}
         </div>
 
-        {/* Right: 24h metric chips */}
+        {/* Right: 24h metric chips + Live Contracts menu */}
         <div className="flex items-center gap-2 ml-auto">
           <MetricChip
             label="24h cycles"
@@ -160,8 +161,114 @@ export function SwarmStatusBar() {
             }
             accent="emerald"
           />
+          <LiveContractsMenu />
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One-click verification menu. Shows the 4 live smart contracts / chain-level
+ * assets backing AlphaDawg with direct explorer links. This is the canonical
+ * "everything is real and verifiable" surface for judges — no searching, no
+ * copy-paste, just click and inspect on chain.
+ */
+function LiveContractsMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Close on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open]);
+
+  const chainAccent: Record<(typeof LIVE_CONTRACTS)[number]["chain"], string> = {
+    "0G Chain": "text-gold-400",
+    Hedera: "text-teal-300",
+    Arc: "text-dawg-300",
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-void-800 bg-void-950/60 hover:bg-void-900 transition-colors text-[10px] uppercase tracking-wider ${
+          open ? "text-dawg-300 border-dawg-500/40" : "text-void-500"
+        }`}
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+        </svg>
+        Contracts
+        <span className={`text-[8px] transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 w-[340px] bg-void-950 border border-void-800 rounded-xl shadow-2xl z-50 overflow-hidden">
+          <div className="px-3 py-2 border-b border-void-800 bg-void-900/60">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-void-300">
+                Live on-chain assets
+              </span>
+            </div>
+            <p className="text-[10px] text-void-600 mt-0.5">
+              Every click opens the canonical block explorer
+            </p>
+          </div>
+          <ul className="divide-y divide-void-800/60">
+            {LIVE_CONTRACTS.map((contract) => (
+              <li key={contract.label}>
+                <a
+                  href={contract.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-3 py-2.5 hover:bg-void-900 transition-colors group"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xs font-semibold text-void-200 group-hover:text-void-100">
+                      {contract.label}
+                    </span>
+                    <span className={`text-[9px] font-mono uppercase tracking-wider ${chainAccent[contract.chain]}`}>
+                      {contract.chain}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-void-500 mt-0.5 leading-snug">
+                    {contract.description}
+                  </p>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <span className="text-[9px] font-mono text-void-600 truncate">
+                      {contract.identifier}
+                    </span>
+                    <span className="text-[9px] text-dawg-400 group-hover:text-dawg-300">
+                      verify ↗
+                    </span>
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

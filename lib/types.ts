@@ -1,15 +1,25 @@
 export interface Cycle {
   id: number;
+  /** cycles.id (UUID) — used by DebateTheater to query debate_transcripts. */
+  dbId?: string;
   timestamp: string;
+  goal?: string;
   specialists: {
     name: string;
     emoji: string;
     analysis: string;
+    reasoning?: string;
+    signal?: string;
+    confidence?: number;
     price: number;
     attestation: string;
     model: string;
     provider: string;
     inftId: string;
+    // Hierarchical hiring attribution — which debate agent paid for this
+    // specialist, and the Arc tx hash of that payment.
+    hiredBy?: string;
+    paymentTxHash?: string;
   }[];
   adversarial: {
     alpha: { argument: string; recommendation: string; attestation: string };
@@ -21,6 +31,7 @@ export interface Cycle {
     to: string;
     amount: number;
     txHash: string;
+    hiredBy: string;
     chain: "arc" | "hedera";
   }[];
   hcs: { topicId: string; sequenceNumber: number; timestamp: string };
@@ -137,6 +148,8 @@ export interface ComputeDetailResponse {
 
 export interface Agent {
   name: string;
+  /** Canonical short registry name (e.g. "whale") — used to key into swarm health + earnings maps. */
+  registryName?: string;
   emoji: string;
   skill: string;
   accuracy: number;
@@ -148,4 +161,102 @@ export interface Agent {
   creator: string;
   isActive: boolean;
   walletAddress?: string;
+  /** Real ERC-7857 token ID on the VaultMindAgent contract. NULL if not minted. */
+  inftTokenId?: number | null;
+  /** ISO timestamp of the most recent SPECIALIST_HIRED row. */
+  lastHireAt?: string | null;
+}
+
+// ── Swarm Observatory (Tier 1) ───────────────────────────────────────
+// Types returned by /api/swarm/* and /api/marketplace/earnings. Each maps
+// 1:1 to a response shape — do not mutate without updating the routes.
+
+export type SwarmHealthState = "online" | "waking" | "offline" | "timeout";
+export type SwarmRole = "specialist" | "adversarial";
+
+export interface SwarmHealthAgent {
+  name: string;
+  role: SwarmRole;
+  status: SwarmHealthState;
+  latencyMs: number | null;
+  error: string | null;
+  lastChecked: string;
+}
+
+export interface SwarmHealthResponse {
+  generatedAt: string;
+  summary: {
+    total: number;
+    online: number;
+    waking: number;
+    offline: number;
+  };
+  agents: SwarmHealthAgent[];
+}
+
+export interface SwarmMetricsResponse {
+  last24h: {
+    cycles: number;
+    hires: number;
+    debateTurns: number;
+    teeAttestations: number;
+    paymentsUsd: number;
+  };
+  allTime: {
+    cycles: number;
+    specialistCalls: number;
+    totalUsdSpent: number;
+  };
+  generatedAt: string;
+}
+
+export interface SwarmActivityRow {
+  id: string;
+  actionType: string;
+  agentName: string | null;
+  status: string;
+  attestationHash: string | null;
+  teeVerified: boolean | null;
+  paymentAmount: string | null;
+  paymentNetwork: string | null;
+  paymentTxHash: string | null;
+  durationMs: number | null;
+  createdAt: string;
+}
+
+export interface SwarmActivityResponse {
+  rows: SwarmActivityRow[];
+  generatedAt: string;
+}
+
+export interface AgentEarnings {
+  agentName: string;
+  totalUsd: number;
+  hires: number;
+  lastHireAt: string | null;
+}
+
+export interface MarketplaceEarningsResponse {
+  agents: Record<string, AgentEarnings>;
+  generatedAt: string;
+}
+
+/** One row from debate_transcripts — matches /api/cycle/debate/[cycleId] response. */
+export interface DebateTurn {
+  id: string;
+  turnNumber: number;
+  phase: "intelligence" | "opening" | "rebuttal" | "decision" | "execution" | string;
+  fromAgent: string;
+  toAgent: string | null;
+  messageContent: string;
+  responseContent: string | null;
+  attestationHash: string | null;
+  teeVerified: boolean;
+  durationMs: number | null;
+  createdAt: string;
+}
+
+export interface DebateTranscriptResponse {
+  transcripts: DebateTurn[];
+  count: number;
 }

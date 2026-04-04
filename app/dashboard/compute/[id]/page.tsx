@@ -11,6 +11,14 @@ import { AgentGridCard } from "@/components/agent-grid-card";
 import { ComputeLog } from "@/components/compute-log";
 import { ExecuteTradeModal } from "@/components/execute-trade-modal";
 import { DebateTheater } from "@/components/debate-theater";
+import {
+  HCS_TOPIC_ID,
+  INFT_CONTRACT_ADDRESS,
+  arcTxUrl,
+  hashscanMessageUrl,
+  hashscanTopicUrl,
+  ogChainAddressUrl,
+} from "@/lib/links";
 
 const ACTION_COLORS: Record<string, { text: string; bg: string; border: string }> = {
   BUY: { text: "text-green-400", bg: "bg-emerald-950/30", border: "border-emerald-700/40" },
@@ -238,14 +246,47 @@ export default function ComputePage() {
         />
       )}
 
-      {/* On-chain proof footer */}
+      {/* On-chain proof footer — every id is a clickable link to its explorer */}
       <div className="flex items-center gap-4 text-xs text-void-600 flex-wrap">
         {c.hcsSeqNum != null && c.hcsSeqNum > 0 && (
-          <span>Hedera HCS: seq #{c.hcsSeqNum}</span>
+          <a
+            href={hashscanMessageUrl(HCS_TOPIC_ID, c.hcsSeqNum)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-teal-400 hover:text-teal-300 underline decoration-dotted"
+            title={`Topic ${HCS_TOPIC_ID}, message #${c.hcsSeqNum}`}
+          >
+            Hedera HCS: seq #{c.hcsSeqNum} ↗
+          </a>
         )}
+        <a
+          href={hashscanTopicUrl(HCS_TOPIC_ID)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-void-500 hover:text-teal-300 font-mono"
+          title="Full audit topic"
+        >
+          topic {HCS_TOPIC_ID}
+        </a>
         {c.storageHash && (
-          <span>0G Storage: {truncHash(c.storageHash)}</span>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(c.storageHash ?? "").catch(() => {})}
+            className="text-gold-400 hover:text-gold-300 font-mono"
+            title="Click to copy · 0G Storage roots are only retrievable via the indexer API (no public explorer)"
+          >
+            0G Storage: {truncHash(c.storageHash)} 📋
+          </button>
         )}
+        <a
+          href={ogChainAddressUrl(INFT_CONTRACT_ADDRESS)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-gold-400 hover:text-gold-300 underline decoration-dotted"
+          title="VaultMindAgent iNFT contract on 0G Chainscan"
+        >
+          iNFT contract ↗
+        </a>
         {c.totalCostUsd != null && (
           <span>Total cost: ${c.totalCostUsd.toFixed(3)}</span>
         )}
@@ -253,6 +294,35 @@ export default function ComputePage() {
           <span>NAV after: ${c.navAfter.toFixed(2)}</span>
         )}
       </div>
+
+      {/* Swap tx — if this cycle actually traded on Arc, surface the tx hash as a link */}
+      {actions.some((a) => a.paymentTxHash && a.paymentTxHash.startsWith("0x")) && (
+        <div className="border-t border-void-800 pt-3">
+          <h3 className="text-[11px] font-semibold text-void-500 uppercase tracking-wider mb-2">
+            x402 payment txs
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {actions
+              .filter((a) => a.paymentTxHash?.startsWith("0x"))
+              .slice(0, 10)
+              .map((a) => {
+                const href = arcTxUrl(a.paymentTxHash!);
+                return href ? (
+                  <a
+                    key={a.id}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-mono text-emerald-300 hover:text-emerald-200 bg-void-900 border border-void-800 rounded px-2 py-0.5"
+                    title={`${a.agentName} · ${a.paymentAmount}`}
+                  >
+                    {a.agentName}: {a.paymentTxHash!.slice(0, 10)}… ↗
+                  </a>
+                ) : null;
+              })}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

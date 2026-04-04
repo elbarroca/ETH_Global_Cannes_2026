@@ -52,7 +52,22 @@ export interface SpecialistResult {
   attestationHash: string;
   teeVerified: boolean;
   reputation?: number;
+  // Hierarchical hiring fields — tell the UI which debate agent paid for this
+  // specialist and what the Arc payment tx hash was.
+  hiredBy?: string;
+  paymentTxHash?: string;
+  priceUsd?: number;
   rawDataSnapshot?: unknown;
+}
+
+// Agent-to-agent payment attribution — who paid whom for which signal
+export interface PaymentRecord {
+  from: string; // human-readable hirer (alpha/risk/executor/main-agent)
+  to: string; // specialist name
+  amount: string; // "$0.001"
+  txHash: string; // x402 / Arc payment tx hash
+  hiredBy: string; // canonical role key — same as `from` when debate-hired
+  chain: "arc" | "hedera";
 }
 
 export interface DebateStage {
@@ -92,6 +107,7 @@ export interface CycleProofs {
 
 export interface CycleResult {
   cycleId: number;
+  goal?: string;
   specialists: SpecialistResult[];
   debate: {
     alpha: DebateStage;
@@ -99,6 +115,7 @@ export interface CycleResult {
     executor: DebateStage;
   };
   decision: Record<string, unknown>;
+  payments?: PaymentRecord[];
   seqNum: number;
   hashscanUrl?: string;
   storageHash?: string;
@@ -112,11 +129,15 @@ export interface CycleResult {
   timestamp: string;
 }
 
+// The tiny HCS audit record. Still returned inside the pending-cycle response
+// for approval-flow debugging; the dashboard itself reads EnrichedCycleResponse.
 export interface CompactCycleRecord {
   c: number;
   u: string;
   t: string;
   rp: string;
+  g?: string; // user goal (truncated)
+  sh?: string; // 0G storage rootHash / CID
   s: Array<{ n: string; sig: string; conf: number; att: string }>;
   adv: {
     a: { act: string; pct: number; att: string; r?: string };
@@ -125,6 +146,45 @@ export interface CompactCycleRecord {
   };
   d: { act: string; asset: string; pct: number };
   nav: number;
+}
+
+// Returned by /api/cycle/latest + /api/cycle/history. Enriched from Prisma
+// `cycles` rows + `agent_actions` hiredBy attribution. This is the shape the
+// dashboard renders directly — no more compact records from HCS mirror node.
+export interface EnrichedCycleResponse {
+  /** Integer cycle number scoped per user (display-friendly, 1-indexed). */
+  cycleId: number;
+  /** Database UUID for the cycles row — use this to query debate_transcripts. */
+  cycleUuid: string;
+  userId: string;
+  timestamp: string;
+  goal: string;
+  riskProfile: string;
+  specialists: Array<{
+    name: string;
+    signal: string;
+    confidence: number;
+    reasoning: string;
+    attestationHash: string;
+    teeVerified: boolean;
+    hiredBy: string;
+    paymentTxHash: string;
+    reputation?: number;
+  }>;
+  debate: {
+    alpha: { action: string; pct: number; reasoning: string; attestationHash: string };
+    risk: { maxPct: number; objection: string; reasoning: string; attestationHash: string };
+    executor: { action: string; pct: number; stopLoss: string; reasoning: string; attestationHash: string };
+  };
+  payments: PaymentRecord[];
+  decision: { action: string; asset: string; pct: number };
+  swap?: { success: boolean; txHash?: string; explorerUrl?: string; method?: string };
+  seqNum: number;
+  hashscanUrl: string | null;
+  storageHash: string | null;
+  inftTokenId: number | null;
+  navAfter: number;
+  totalCostUsd: number;
 }
 
 export interface OnboardResponse {
@@ -187,22 +247,25 @@ export async function getUser(walletAddress: string): Promise<UserRecord | null>
   return apiFetch<UserRecord | null>(`/api/user/${walletAddress}`).catch(() => null);
 }
 
-export async function getLatestCycle(userId: string): Promise<CompactCycleRecord | null> {
-  return apiFetch<CompactCycleRecord | null>(`/api/cycle/latest/${userId}`).catch(() => null);
+export async function getLatestCycle(userId: string): Promise<EnrichedCycleResponse | null> {
+  return apiFetch<EnrichedCycleResponse | null>(`/api/cycle/latest/${userId}`).catch(() => null);
 }
 
 export async function getCycleHistory(
   userId: string,
   limit = 10,
   offset = 0
-): Promise<CompactCycleRecord[]> {
-  return apiFetch<CompactCycleRecord[]>(
+): Promise<EnrichedCycleResponse[]> {
+  return apiFetch<EnrichedCycleResponse[]>(
     `/api/cycle/history/${userId}?limit=${limit}&offset=${offset}`
   ).catch(() => []);
 }
 
-export async function triggerCycle(userId: string): Promise<CycleResult> {
-  return apiFetch(`/api/cycle/run/${userId}`, { method: "POST" });
+export async function triggerCycle(userId: string, goal?: string): Promise<CycleResult> {
+  return apiFetch(`/api/cycle/run/${userId}`, {
+    method: "POST",
+    body: JSON.stringify(goal ? { goal } : {}),
+  });
 }
 
 // ── Pending cycle (two-phase approval flow) ──────────────────
@@ -222,8 +285,11 @@ export interface PendingCycleResponse {
   expiresAt: string;
 }
 
-export async function analyzeCycle(userId: string): Promise<PendingCycleResponse> {
-  return apiFetch(`/api/cycle/analyze/${userId}`, { method: "POST" });
+export async function analyzeCycle(userId: string, goal?: string): Promise<PendingCycleResponse> {
+  return apiFetch(`/api/cycle/analyze/${userId}`, {
+    method: "POST",
+    body: JSON.stringify(goal ? { goal } : {}),
+  });
 }
 
 export async function approveCycle(pendingId: string, userId: string, modifiedPct?: number): Promise<CycleResult> {
@@ -293,7 +359,13 @@ export interface LeaderboardAgent {
   tags: string[];
   price: string;
   active: boolean;
-  walletAddress?: string;
+  walletAddress?: string | null;
+  /** ISO timestamp of most recent SPECIALIST_HIRED row for this agent. */
+  lastHireAt?: string | null;
+  /** Count of SPECIALIST_HIRED rows for this agent (across all users). */
+  recentHires?: number;
+  /** Real ERC-7857 token ID on the VaultMindAgent contract. NULL if not minted. */
+  inftTokenId?: number | null;
 }
 
 export async function getLeaderboard(): Promise<LeaderboardAgent[]> {

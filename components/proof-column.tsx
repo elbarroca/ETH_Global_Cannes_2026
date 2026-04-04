@@ -5,7 +5,6 @@ import {
   arcTxUrl,
   hashscanTopicUrl,
   inftTokenUrl,
-  ogStorageUrl,
   truncateHash,
 } from "@/lib/links";
 
@@ -71,7 +70,8 @@ export function ProofColumn({ cycle }: { cycle: Cycle }) {
   const hashscanHref = cycle.hcs?.topicId && cycle.hcs.topicId !== "0.0.unknown"
     ? hashscanTopicUrl(cycle.hcs.topicId)
     : null;
-  const storageHref = cycle.storageHash ? ogStorageUrl(cycle.storageHash) : null;
+  // 0G Storage roots have no public browser explorer — render copyable instead.
+  const storageHref: string | null = null;
   const inftHref = cycle.inftTokenId ? inftTokenUrl(cycle.inftTokenId) : null;
   const swapHref = cycle.swap?.txHash ? (cycle.swap.explorerUrl ?? arcTxUrl(cycle.swap.txHash)) : null;
 

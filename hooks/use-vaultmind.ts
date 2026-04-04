@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getLatestCycle, getCycleHistory, triggerCycle, type CycleResult, type CompactCycleRecord } from "@/lib/api";
+import { getLatestCycle, getCycleHistory, triggerCycle, type CycleResult, type EnrichedCycleResponse } from "@/lib/api";
 import { useUser } from "@/contexts/user-context";
 
 export function useLatestCycle() {
   const { userId } = useUser();
-  const [cycle, setCycle] = useState<CompactCycleRecord | null>(null);
+  const [cycle, setCycle] = useState<EnrichedCycleResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +35,7 @@ export function useLatestCycle() {
 
 export function useCycleHistory(limit = 10) {
   const { userId } = useUser();
-  const [history, setHistory] = useState<CompactCycleRecord[]>([]);
+  const [history, setHistory] = useState<EnrichedCycleResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SwarmActivityResponse, SwarmActivityRow } from "@/lib/types";
 import { agentEmoji, agentLabel } from "@/lib/swarm-endpoints";
+import { arcTxUrl } from "@/lib/links";
 
 const POLL_MS = 3_000;
 const LIMIT = 25;
@@ -213,11 +214,21 @@ function TickerRow({ row }: { row: SwarmActivityRow }) {
             ${Number(row.paymentAmount).toFixed(3)}
           </span>
         )}
-        {row.paymentTxHash && (
+        {row.paymentTxHash && row.paymentTxHash.startsWith("0x") ? (
+          <a
+            href={arcTxUrl(row.paymentTxHash) ?? "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[9px] font-mono text-teal-300 hover:text-teal-200 truncate max-w-[80px]"
+            title={`View x402 payment on ArcScan: ${row.paymentTxHash}`}
+          >
+            {row.paymentTxHash.slice(0, 8)}… ↗
+          </a>
+        ) : row.paymentTxHash ? (
           <span className="text-[9px] font-mono text-void-600 truncate max-w-[80px]">
             {row.paymentTxHash.slice(0, 8)}…
           </span>
-        )}
+        ) : null}
         {teeOk && (
           <span className="text-[9px] font-mono text-gold-400">TEE ✓</span>
         )}

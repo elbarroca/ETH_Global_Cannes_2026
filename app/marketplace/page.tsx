@@ -36,6 +36,37 @@ const HEALTH_DOT: Record<SwarmHealthState, string> = {
   timeout: "bg-blood-600",
 };
 
+/**
+ * Honest iNFT row for marketplace cards. If the specialist has a real
+ * ERC-7857 token ID in marketplace_agents.inft_token_id, we render it as a
+ * clickable link to the token on 0G Chainscan. Otherwise we say "Not minted"
+ * in muted text — zero fabricated token IDs.
+ */
+function InftRow({ tokenId }: { tokenId: number | null | undefined }) {
+  if (tokenId == null) {
+    return (
+      <div className="text-xs font-mono text-void-600">
+        iNFT <span className="italic">not minted</span> · 0G Chain
+      </div>
+    );
+  }
+  return (
+    <div className="text-xs font-mono text-void-500">
+      iNFT{" "}
+      <a
+        href={inftTokenUrl(tokenId)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-gold-400 hover:underline"
+        title={`View iNFT #${tokenId} on 0G Chainscan`}
+      >
+        #{tokenId} ↗
+      </a>{" "}
+      · 0G Chain
+    </div>
+  );
+}
+
 export default function MarketplacePage() {
   const { userId, user } = useUser();
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
@@ -302,7 +333,14 @@ function ActiveAgentCard({
     <Card className="agent-card">
       <CardBody className="space-y-3">
         <div className="flex items-center justify-between">
-          <ZeroGBadge />
+          <a
+            href={ogChainAddressUrl(INFT_CONTRACT_ADDRESS)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="VaultMindAgent contract on 0G Chainscan"
+          >
+            <ZeroGBadge />
+          </a>
           <Badge variant="green">active</Badge>
         </div>
 
@@ -320,15 +358,13 @@ function ActiveAgentCard({
           <div className="text-xs text-void-500 mt-0.5">{agent.skill}</div>
         </div>
 
-        <div className="text-xs font-mono text-void-500">
-          iNFT {agent.inftId} · 0G Chain
-        </div>
+        <InftRow tokenId={agent.inftTokenId} />
 
         {walletShort && agent.walletAddress && (
           <div className="text-[11px] font-mono text-void-600">
             payTo:{" "}
             <a
-              href={`https://testnet.arcscan.app/address/${agent.walletAddress}`}
+              href={arcAddressUrl(agent.walletAddress)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-dawg-400 hover:underline"
@@ -408,7 +444,14 @@ function CommunityAgentCard({
       <CardBody className="space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-2xl">{agent.emoji}</span>
-          <ZeroGBadge />
+          <a
+            href={ogChainAddressUrl(INFT_CONTRACT_ADDRESS)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="VaultMindAgent contract on 0G Chainscan"
+          >
+            <ZeroGBadge />
+          </a>
         </div>
 
         <div>
@@ -424,13 +467,13 @@ function CommunityAgentCard({
           <div className="text-xs text-void-500 mt-0.5">{agent.skill}</div>
         </div>
 
-        <div className="text-xs font-mono text-void-500">iNFT {agent.inftId}</div>
+        <InftRow tokenId={agent.inftTokenId} />
         <div className="text-xs font-mono text-void-600">{agent.creator}</div>
         {walletShort && agent.walletAddress && (
           <div className="text-[11px] font-mono text-void-600">
             payTo:{" "}
             <a
-              href={`https://testnet.arcscan.app/address/${agent.walletAddress}`}
+              href={arcAddressUrl(agent.walletAddress)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-dawg-400 hover:underline"
