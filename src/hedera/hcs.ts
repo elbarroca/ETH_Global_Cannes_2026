@@ -81,9 +81,21 @@ export async function logSwarmEvent(
     }
   }
 
+  // Second fallback: if still too big, drop `verdict` entirely on turn events
+  // (the cycle-decision aggregate logCycle still carries the final verdicts).
+  // Keep `cot` — reasoning is the most valuable audit payload.
+  if (payloadBytes > MAX_PAYLOAD_BYTES && event.ev === "turn") {
+    const withoutVerdict = { ...event, verdict: { dropped: true } };
+    payload = JSON.stringify(withoutVerdict);
+    payloadBytes = Buffer.byteLength(payload, "utf8");
+    console.warn(
+      `[hcs] swarm-event ev=turn c=${event.c} t=${event.t}: verdict dropped to fit 1024-byte limit`,
+    );
+  }
+
   if (payloadBytes > MAX_PAYLOAD_BYTES) {
     throw new Error(
-      `HCS swarm event too large even after cot truncation: ${payloadBytes} bytes (ev=${event.ev})`,
+      `HCS swarm event too large even after cot+verdict truncation: ${payloadBytes} bytes (ev=${event.ev})`,
     );
   }
 
@@ -100,7 +112,7 @@ export async function logSwarmEvent(
     const seqNum = receipt.topicSequenceNumber?.toNumber() ?? 0;
 
     console.log(
-      `[hcs] swarm-event ev=${event.ev} c=${(event as { c?: number }).c ?? "?"} seq=${seqNum}`,
+      `[hcs] ✓ ev=${event.ev} c=${(event as { c?: number }).c ?? "?"} seq=${seqNum} bytes=${payloadBytes}`,
     );
 
     return { seqNum };

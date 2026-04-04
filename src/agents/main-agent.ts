@@ -1,7 +1,7 @@
 import { updateUser } from "../store/user-store";
 import { logAction, logCycleRecord } from "../store/action-logger";
 import { runAdversarialDebate } from "./adversarial";
-import { normalizeCot } from "./prompts";
+import { normalizeCot, compactVerdict } from "./prompts";
 import { hireSpecialists } from "./hire-specialist";
 import { selectSpecialists } from "../marketplace/hiring-strategy";
 import { getAgent } from "../config/agent-registry";
@@ -44,11 +44,37 @@ const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
 // Fire-and-forget swarm audit emitter. Every call is caught + logged so a
 // failed HCS write never fails a cycle. Used by analyzeCycle + commitCycle
 // to thread per-event audit messages alongside the existing logCycle aggregate.
+//
+// Traces each emit with byte count + summary before firing so we can diagnose
+// cluster issues on Hashscan without trawling raw payloads. Mirror of the
+// helper in adversarial.ts so both producers format their logs the same way.
 function emitSwarmEvent(event: SwarmEventRecord): void {
-  if (!TOPIC_ID) return;
+  if (!TOPIC_ID) {
+    console.warn(`[swarm] skip ev=${event.ev}: HCS_AUDIT_TOPIC_ID not set`);
+    return;
+  }
+
+  const bytes = Buffer.byteLength(JSON.stringify(event), "utf8");
+  let summary: string;
+  switch (event.ev) {
+    case "start":
+      summary = `c=${event.c} u=${event.u.slice(0, 8)} rp=${event.rp}`;
+      break;
+    case "hire":
+      summary = `c=${event.c} by=${event.by}→${event.to} ${event.sig}@${event.conf}% cot=${event.cot.length}steps`;
+      break;
+    case "turn":
+      summary = `c=${event.c} t=${event.t} ${event.ph} ${event.from}${event.to ? "→" + event.to : ""} cot=${event.cot.length}steps`;
+      break;
+    case "done":
+      summary = `c=${event.c} ${event.d.act} ${event.d.asset} ${event.d.pct}% sh=${event.sh?.slice(0, 12) ?? "none"}`;
+      break;
+  }
+  console.log(`[swarm] → ev=${event.ev} bytes=${bytes} ${summary}`);
+
   logSwarmEvent(TOPIC_ID, event).catch((err) => {
     console.warn(
-      `[cycle] logSwarmEvent failed (ev=${event.ev}):`,
+      `[swarm] ✗ ev=${event.ev} c=${(event as { c?: number }).c} failed:`,
       err instanceof Error ? err.message : String(err),
     );
   });
@@ -534,7 +560,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
         ph: "opening",
         from: "alpha",
         cot: normalizeCot((alphaResp.parsed as { cot?: unknown }).cot, alphaResp.reasoning),
-        verdict: alphaResp.parsed,
+        verdict: compactVerdict(alphaResp.parsed),
         att: (alphaResp.attestationHash ?? "").slice(0, 16),
       });
       emitSwarmEvent({
@@ -545,7 +571,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
         from: "risk",
         to: "alpha",
         cot: normalizeCot((riskResp.parsed as { cot?: unknown }).cot, riskResp.reasoning),
-        verdict: riskResp.parsed,
+        verdict: compactVerdict(riskResp.parsed),
         att: (riskResp.attestationHash ?? "").slice(0, 16),
       });
       emitSwarmEvent({
@@ -555,7 +581,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
         ph: "decision",
         from: "executor",
         cot: normalizeCot((executorResp.parsed as { cot?: unknown }).cot, executorResp.reasoning),
-        verdict: executorResp.parsed,
+        verdict: compactVerdict(executorResp.parsed),
         att: (executorResp.attestationHash ?? "").slice(0, 16),
       });
 
@@ -853,9 +879,10 @@ export async function commitCycle(
             await updateUser(user.id, {
               fund: {
                 depositedUsdc: holdingsUpdate.newDepositedUsdc,
-                // `holdings` is a new sub-field under user.fund — Prisma stores
-                // the whole fund JSON blob via JSONB merge, so this upserts.
-                ...(({ holdings: holdingsUpdate.newHoldings } as unknown) as Record<string, never>),
+                // `holdings` is a typed sub-field under user.fund — Prisma
+                // stores the whole fund JSON blob via JSONB merge (`||`), so
+                // this upserts without clobbering depositedUsdc/currentNav.
+                holdings: holdingsUpdate.newHoldings,
               },
             });
             await logAction({
@@ -1092,6 +1119,9 @@ export async function commitCycle(
       swapExplorerUrl: swapResult?.explorerUrl,
       totalCostUsd: 0.003,
       navAfter: user.fund.currentNav,
+      // Cache the synthesized narrative on the Cycle row so enrichCycleRow
+      // returns it directly without re-synthesizing or fetching from 0G.
+      narrative: JSON.parse(JSON.stringify(narrative)),
     });
   } catch (err) {
     console.warn("[cycle] logCycleRecord failed (non-fatal):", err instanceof Error ? err.message : String(err));

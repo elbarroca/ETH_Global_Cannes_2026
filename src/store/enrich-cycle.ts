@@ -1,16 +1,19 @@
 // Enriches a Prisma Cycle row into the shape the dashboard UI consumes.
 //
-// Hierarchical hiring produces three sources of cycle data:
-//   1. Prisma `cycles` table  — fast path: goal, payments (JSON), debate fields
+// Hierarchical hiring produces four sources of cycle data:
+//   1. Prisma `cycles` table  — fast path: goal, payments (JSON), specialists
+//      (JSON with picks inside), cached narrative, debate fields
 //   2. Prisma `agent_actions` — source of truth for specialist hiredBy + tx
-//   3. 0G Storage (via `storageHash`) — canonical RichCycleRecord, on-demand
+//   3. Prisma `users.fund` JSONB — current holdings at read time (ticker → amount)
+//   4. 0G Storage (via `storageHash`) — canonical RichCycleRecord, on-demand only
 //
-// We read from (1) + (2) here for speed. 0G is reserved for the optional
+// We read from (1) + (2) + (3) here for speed. 0G is reserved for the optional
 // "verify on 0G" flow behind a `?full=true` query param (not used here yet).
 
 import type { Cycle } from "@prisma/client";
 import { getPrisma } from "../config/prisma";
-import type { PaymentRecord, SpecialistResult } from "../types/index";
+import type { PaymentRecord, SpecialistResult, TokenPick } from "../types/index";
+import type { CycleNarrative } from "../agents/narrative";
 
 export interface EnrichedCycleResponse {
   /** Integer cycle number scoped per user (display-friendly, 1-indexed). */
@@ -31,6 +34,8 @@ export interface EnrichedCycleResponse {
     hiredBy: string;
     paymentTxHash: string;
     reputation?: number;
+    /** Multi-token shortlist (sentiment, momentum — empty for single-signal specialists). */
+    picks?: TokenPick[];
   }>;
   debate: {
     alpha: { action: string; pct: number; reasoning: string; attestationHash: string };
@@ -55,6 +60,10 @@ export interface EnrichedCycleResponse {
   inftTokenId: number | null;
   navAfter: number;
   totalCostUsd: number;
+  /** User's current on-chain holdings (ticker → amount). Empty object if never traded. */
+  holdings: Record<string, number>;
+  /** Cached CycleNarrative written at commit time — null for legacy rows. */
+  narrative: CycleNarrative | null;
 }
 
 interface StoredSpecialist {
@@ -67,6 +76,7 @@ interface StoredSpecialist {
   hiredBy?: string;
   paymentTxHash?: string;
   teeVerified?: boolean;
+  picks?: TokenPick[] | null;
 }
 
 export async function enrichCycleRow(cycle: Cycle): Promise<EnrichedCycleResponse> {
@@ -93,9 +103,9 @@ export async function enrichCycleRow(cycle: Cycle): Promise<EnrichedCycleRespons
 
   // The `specialists` column is a JSON snapshot written by logCycleRecord.
   // In the hierarchical path we now write the full hiredBy + paymentTxHash
-  // inline (see main-agent.ts commitCycle step 5), so the JSON is usually
-  // self-sufficient. We still merge AgentAction rows as a fallback for rows
-  // written before this refactor.
+  // + picks inline (see main-agent.ts commitCycle step 5), so the JSON is
+  // usually self-sufficient. We still merge AgentAction rows as a fallback
+  // for rows written before this refactor.
   const rawSpecialists = Array.isArray(cycle.specialists) ? (cycle.specialists as unknown as StoredSpecialist[]) : [];
   const specialists = rawSpecialists.map((s) => {
     const name = s.name ?? "unknown";
@@ -109,6 +119,7 @@ export async function enrichCycleRow(cycle: Cycle): Promise<EnrichedCycleRespons
       teeVerified: Boolean(s.teeVerified),
       hiredBy: s.hiredBy ?? fallback?.hiredBy ?? "main-agent",
       paymentTxHash: s.paymentTxHash ?? fallback?.paymentTxHash ?? "",
+      picks: Array.isArray(s.picks) ? s.picks : undefined,
     };
   });
 
@@ -127,6 +138,20 @@ export async function enrichCycleRow(cycle: Cycle): Promise<EnrichedCycleRespons
           hiredBy: ((a.payload ?? {}) as { hiredBy?: string }).hiredBy ?? "main-agent",
           chain: "arc",
         }));
+
+  // Holdings come from the user record's JSONB `fund.holdings` sub-field,
+  // updated atomically after each successful swap (see main-agent.ts step 1c).
+  // A user who never traded has no `holdings` key → empty object.
+  const user = await prisma.user.findUnique({
+    where: { id: cycle.userId },
+    select: { fund: true },
+  });
+  const holdings =
+    ((user?.fund ?? {}) as { holdings?: Record<string, number> }).holdings ?? {};
+
+  // Narrative is cached as a JSON column — written by commitCycle's
+  // logCycleRecord call. Legacy cycles (pre-narrative) will have null here.
+  const narrative = (cycle.narrative as unknown as CycleNarrative | null) ?? null;
 
   return {
     cycleId: cycle.cycleNumber,
@@ -177,6 +202,8 @@ export async function enrichCycleRow(cycle: Cycle): Promise<EnrichedCycleRespons
     inftTokenId: null, // Resolved from the user record on the client side if needed
     navAfter: cycle.navAfter ?? 0,
     totalCostUsd: cycle.totalCostUsd ?? 0,
+    holdings,
+    narrative,
   };
 }
 

@@ -4,6 +4,7 @@ import { notifyUser, sendApprovalNotification } from "../telegram/bot";
 import { scheduleNextHeartbeat } from "../hedera/scheduler";
 import { createPendingCycle, getPendingForUser } from "../store/pending-cycles";
 import { getPrisma } from "../config/prisma";
+import { evaluatePickPerformance } from "../marketplace/pick-tracker";
 
 const INTERVAL_MS = 1 * 60 * 1000; // 1 minute tick — per-user timing checked inside
 const DEFAULT_PERIOD_MS = 5 * 60 * 1000; // 5 minutes default
@@ -89,6 +90,14 @@ export async function runHeartbeat(): Promise<void> {
   } catch (err) {
     console.warn("[heartbeat] Scheduler failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
+
+  // Score any specialist picks that have reached their evaluation window.
+  // Non-fatal — failures here shouldn't block the main heartbeat loop.
+  // See docs/LESSONS_AND_UI_DATA_FLOW.md §1.11 for the outcome-linked
+  // reputation loop this closes.
+  evaluatePickPerformance({ windowHours: 1, batchSize: 50 }).catch((err) => {
+    console.warn("[heartbeat] pick evaluator tick failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  });
 
   console.log("[heartbeat] Done.");
 }

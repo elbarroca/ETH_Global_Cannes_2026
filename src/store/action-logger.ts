@@ -90,6 +90,8 @@ export async function logCycleRecord(
     swapExplorerUrl?: string;
     totalCostUsd?: number;
     navAfter?: number;
+    /** Cached CycleNarrative JSON — pass the synthesizeCycleNarrative output. */
+    narrative?: Prisma.InputJsonValue;
   },
 ): Promise<string> {
   const db = getPrisma();
@@ -123,6 +125,7 @@ export async function logCycleRecord(
       swapExplorerUrl: data.swapExplorerUrl,
       totalCostUsd: data.totalCostUsd,
       navAfter: data.navAfter,
+      narrative: data.narrative ?? undefined,
     },
   });
   return cycle.id;

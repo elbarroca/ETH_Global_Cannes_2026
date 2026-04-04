@@ -65,6 +65,11 @@ export interface UserRecord {
     depositedUsdc: number;
     htsShareBalance: number;
     currentNav: number;
+    /** Ticker → on-chain token amount bought via swaps. Populated by
+     * computeHoldingsUpdate() after each successful swap via atomic JSONB
+     * merge in updateUser(). Optional because users who never traded won't
+     * have the sub-field set. */
+    holdings?: Record<string, number>;
   };
   hotWalletIndex: number | null;
   hotWalletAddress: string | null;

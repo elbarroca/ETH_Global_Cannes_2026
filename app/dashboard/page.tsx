@@ -19,6 +19,8 @@ import {
   configure,
 } from "@/lib/api";
 import { ExpandableHuntCard } from "@/components/expandable-hunt-card";
+import { CycleNarrativePanel } from "@/components/cycle-narrative-panel";
+import { HoldingsWidget } from "@/components/holdings-widget";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreconditionModal } from "@/components/precondition-modal";
 import { TelegramModal } from "@/components/telegram-modal";
@@ -429,15 +431,32 @@ export default function DashboardPage() {
           />
         </div>
       ) : cycle && userId ? (
-        <ExpandableHuntCard
-          cycle={cycle}
-          userId={userId}
-          defaultExpanded
-          userInftTokenId={user?.inftTokenId ?? null}
-          computing={running || approving}
-          computingLabel={running ? "Analyzing" : "Committing"}
-          computingStage={stages[stageIdx]}
-        />
+        <>
+          <ExpandableHuntCard
+            cycle={cycle}
+            userId={userId}
+            defaultExpanded
+            userInftTokenId={user?.inftTokenId ?? null}
+            computing={running || approving}
+            computingLabel={running ? "Analyzing" : "Committing"}
+            computingStage={stages[stageIdx]}
+          />
+
+          {/* Narrative panel — explains what the augmented layer discussed
+              and why the executor landed on this decision. Populated from
+              cycles.narrative JSON column via enrichCycleRow. */}
+          {cycle.narrative && <CycleNarrativePanel narrative={cycle.narrative} />}
+
+          {/* Holdings widget — user's current on-chain positions. Reads
+              fund.holdings from the enriched cycle response (or falls back
+              to the user record for pre-swap users). */}
+          {user && (
+            <HoldingsWidget
+              depositedUsdc={user.fund.depositedUsdc}
+              holdings={cycle.holdings ?? user.fund.holdings ?? {}}
+            />
+          )}
+        </>
       ) : running || approving ? (
         // First-ever hunt in flight — no prior cycle to show, so render a
         // skeleton ExpandableHuntCard-shaped computing placeholder.
