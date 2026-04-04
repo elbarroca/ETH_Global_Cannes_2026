@@ -1,7 +1,9 @@
 # ═══════════════════════════════════════
-# VaultMind — Railway Multi-Process Dockerfile
-# Next.js (dashboard) + Backend (Telegram/heartbeat) + Specialists (x402)
+# AlphaDawg — OpenClaw Agent Swarm
+# 14 agents on 0G Compute (TEE sealed inference)
+# Telegram bot + heartbeat + 10 specialist servers
 # ═══════════════════════════════════════
+# Next.js (UI + API) runs separately — this is AGENTS ONLY
 
 # ── Stage 1: Dependencies ──────────────────────────────────────
 FROM node:22-slim AS deps
@@ -18,34 +20,8 @@ COPY prisma ./prisma/
 RUN npm ci --legacy-peer-deps
 RUN npx prisma generate
 
-# ── Stage 2: Build ─────────────────────────────────────────────
-FROM node:22-slim AS builder
-
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/prisma ./prisma
-COPY . .
-
-# Next.js needs NEXT_PUBLIC_* at build time (they're inlined into the JS bundle)
-ARG NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=""
-ARG NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID=""
-ARG NEXT_PUBLIC_HCS_TOPIC_ID=""
-ARG NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=""
-ARG NEXT_PUBLIC_API_URL=""
-ENV NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=$NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
-ENV NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID=$NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID
-ENV NEXT_PUBLIC_HCS_TOPIC_ID=$NEXT_PUBLIC_HCS_TOPIC_ID
-ENV NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=$NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-
-# Build Next.js (standalone output)
-RUN npm run build
-
-# ── Stage 3: Production ───────────────────────────────────────
-FROM node:22-slim AS production
+# ── Stage 2: Production ───────────────────────────────────────
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -53,37 +29,31 @@ RUN apt-get update && apt-get install -y \
     curl ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install OpenClaw globally
-RUN npm install -g openclaw tsx
+# tsx for running TypeScript directly
+RUN npm install -g tsx
 
-# Copy Next.js standalone + static assets
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+# Runtime deps
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/prisma ./prisma
+COPY package.json tsconfig.json ./
 
-# Copy source for backend (tsx runs TypeScript directly)
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
+# Agent source code (backend + specialists + 0G inference)
+COPY src ./src
 
-# Copy OpenClaw agent workspaces + config
-COPY --from=builder /app/openclaw ./openclaw
+# OpenClaw agent workspaces (SOUL.md, IDENTITY.md, openclaw.json)
+COPY openclaw ./openclaw
 
-# Copy entrypoint
-COPY docker-entrypoint.sh ./docker-entrypoint.sh
-RUN chmod +x ./docker-entrypoint.sh
+# Entrypoint
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
 
-# Railway exposes this port
-EXPOSE 3000
+# Specialist servers: 4001-4010
+# Backend API: 3001 (for curl testing, not dashboard)
+EXPOSE 3001 4001 4002 4003 4004 4005 4006 4007 4008 4009 4010
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-    CMD curl -f http://localhost:3000/ || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:4001/analyze 2>/dev/null || curl -f http://localhost:3001/api/health 2>/dev/null || exit 1
 
 ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
