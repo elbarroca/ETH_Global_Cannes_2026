@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { DawgLogo } from "./dawg-logo";
 
 const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "ETHGlobal_Cannes_2026_Bot";
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -67,18 +68,7 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
       <div className="w-full max-w-md mx-4 bg-void-900 border border-void-800 rounded-2xl p-8 space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="text-4xl">
-            <svg viewBox="0 0 120 120" className="w-16 h-16 mx-auto" xmlns="http://www.w3.org/2000/svg">
-              <rect x="4" y="4" width="112" height="112" rx="28" fill="#0C0A09"/>
-              <path d="M28 92 L42 28 L60 48 L78 28 L92 92 Z" fill="#7F1D1D"/>
-              <path d="M34 92 L46 36 L60 52 L74 36 L86 92 Z" fill="#DC2626"/>
-              <circle cx="50" cy="54" r="4.5" fill="#FBBF24"/>
-              <circle cx="70" cy="54" r="4.5" fill="#FBBF24"/>
-              <circle cx="50" cy="54" r="2" fill="#0C0A09"/>
-              <circle cx="70" cy="54" r="2" fill="#0C0A09"/>
-              <path d="M55 69 L60 73 L65 69" fill="none" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
+          <DawgLogo size={128} className="w-16 h-16 mx-auto rounded-2xl" />
           <h2 className="text-xl font-bold text-void-100">Connect Telegram</h2>
           <p className="text-sm text-void-400">
             Your agent reports hunts, debates, and proofs via Telegram. This step is required.

@@ -98,12 +98,12 @@ export function DawgLoader({
 
           {/* The coin itself — logo inside a circular mask */}
           <div
-            className={`dawg-coin w-28 h-28 rounded-full overflow-hidden ${
+            className={`dawg-coin w-28 h-28 rounded-full overflow-hidden bg-dawg-500 ${
               isBlasting ? "dawg-coin-blast" : "dawg-coin-spin"
             }`}
             onAnimationEnd={isBlasting ? handleBlastEnd : undefined}
           >
-            <DawgLogo className="w-full h-full" />
+            <DawgLogo size={256} className="w-full h-full object-cover" />
           </div>
         </div>
 

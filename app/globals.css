@@ -205,27 +205,21 @@ body {
   animation: shineSweep 1200ms ease-out;
 }
 
-/* Logo ear wiggle on hover */
-@keyframes earWiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25%      { transform: rotate(-6deg); }
-  60%      { transform: rotate(4deg); }
-  80%      { transform: rotate(-2deg); }
+/* Logo hover — whole-image tilt + lift (the logo is a raster, so we animate
+   the element itself rather than individual ears) */
+@keyframes dawgTilt {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25%      { transform: rotate(-5deg) scale(1.05); }
+  60%      { transform: rotate(3deg)  scale(1.04); }
+  80%      { transform: rotate(-1deg) scale(1.02); }
 }
 
-.dawg-logo-animated .dawg-ears {
-  transform-origin: 130px 82px;
-  transform-box: fill-box;
+.dawg-logo-animated {
+  transition: transform 180ms ease-out;
+  transform-origin: center bottom;
 }
-.dawg-logo-animated:hover .dawg-ears {
-  animation: earWiggle 800ms ease-in-out;
-}
-
-/* Logo glasses glint — subtle highlight sweep every few seconds */
-@keyframes glintBlink {
-  0%, 85%, 100% { opacity: 0; transform: translateX(0); }
-  88%           { opacity: 0.6; }
-  95%           { opacity: 0; transform: translateX(16px); }
+.dawg-logo-animated:hover {
+  animation: dawgTilt 800ms ease-in-out;
 }
 
 /* =========================================================================

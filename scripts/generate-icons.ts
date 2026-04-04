@@ -1,8 +1,10 @@
 /**
  * Icon generation pipeline.
  *
- * Renders PNG variants + favicon.ico from the canonical public/logo.svg.
- * Idempotent — re-run any time the SVG changes.
+ * Canonical source: public/logo-source.png — the exact AlphaDawg brand mark
+ * (612×612 raster). All icon variants are resized from this single file so
+ * every surface shows the identical logo. Idempotent: safe to re-run whenever
+ * the source changes.
  *
  * Usage: npm run setup:icons
  */
@@ -13,48 +15,47 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
-const SOURCE = join(PUBLIC_DIR, "logo.svg");
+const APP_DIR = join(__dirname, "..", "app");
+const SOURCE = join(PUBLIC_DIR, "logo-source.png");
 const DAWG_YELLOW = "#FFC700";
 
 type Target = {
   name: string;
-  size: number | { width: number; height: number };
-  background?: string; // hex; undefined = transparent
-  padding?: number;    // extra padding around logo in px (for OG image)
+  dir: "public" | "app";
+  size: number;
 };
 
 const TARGETS: Target[] = [
-  { name: "apple-touch-icon.png", size: 180, background: DAWG_YELLOW },
-  { name: "icon-192.png", size: 192, background: DAWG_YELLOW },
-  { name: "icon-512.png", size: 512, background: DAWG_YELLOW },
-  { name: "logo.png", size: 512 }, // transparent background
-  { name: "logo-square.png", size: 512, background: DAWG_YELLOW },
+  // Canonical brand copies in public/
+  { name: "logo.png", dir: "public", size: 612 },        // identical copy of source
+  { name: "logo-square.png", dir: "public", size: 512 },
+  { name: "apple-touch-icon.png", dir: "public", size: 180 },
+  { name: "icon-192.png", dir: "public", size: 192 },
+  { name: "icon-512.png", dir: "public", size: 512 },
 ];
 
-async function renderPng(svg: Buffer, target: Target): Promise<void> {
-  const out = join(PUBLIC_DIR, target.name);
-  const size = typeof target.size === "number"
-    ? { width: target.size, height: target.size }
-    : target.size;
+async function renderPng(source: Buffer, target: Target): Promise<void> {
+  const baseDir = target.dir === "public" ? PUBLIC_DIR : APP_DIR;
+  const out = join(baseDir, target.name);
 
-  let pipeline = sharp(svg, { density: 400 }).resize(size.width, size.height, {
-    fit: "contain",
-    background: target.background ?? { r: 0, g: 0, b: 0, alpha: 0 },
-  });
+  await sharp(source)
+    .resize(target.size, target.size, {
+      fit: "contain",
+      background: DAWG_YELLOW,
+    })
+    .flatten({ background: DAWG_YELLOW })
+    .png()
+    .toFile(out);
 
-  if (target.background) {
-    pipeline = pipeline.flatten({ background: target.background });
-  }
-
-  await pipeline.png().toFile(out);
-  console.log(`  ✓ ${target.name} (${size.width}x${size.height})`);
+  console.log(`  ✓ ${target.dir}/${target.name} (${target.size}x${target.size})`);
 }
 
-async function renderOgImage(svg: Buffer): Promise<void> {
-  // 1200x630 OG card: yellow background with centered logo
-  const logoSize = 440;
-  const logoPng = await sharp(svg, { density: 600 })
-    .resize(logoSize, logoSize, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+async function renderOgImage(source: Buffer): Promise<void> {
+  // 1200x630 social card: yellow background with the dawg logo centered
+  const logoSize = 500;
+  const logoPng = await sharp(source)
+    .resize(logoSize, logoSize, { fit: "contain", background: DAWG_YELLOW })
+    .flatten({ background: DAWG_YELLOW })
     .png()
     .toBuffer();
 
@@ -70,12 +71,11 @@ async function renderOgImage(svg: Buffer): Promise<void> {
     .png()
     .toFile(join(PUBLIC_DIR, "og-image.png"));
 
-  console.log("  ✓ og-image.png (1200x630)");
+  console.log("  ✓ public/og-image.png (1200x630)");
 }
 
-async function renderFavicon(svg: Buffer): Promise<void> {
-  // Generate a 32x32 PNG, wrap it in a minimal ICO container.
-  const png32 = await sharp(svg, { density: 400 })
+async function renderFavicon(source: Buffer): Promise<void> {
+  const png32 = await sharp(source)
     .resize(32, 32, { fit: "contain", background: DAWG_YELLOW })
     .flatten({ background: DAWG_YELLOW })
     .png()
@@ -83,7 +83,7 @@ async function renderFavicon(svg: Buffer): Promise<void> {
 
   const ico = pngToIco(png32, 32);
   await writeFile(join(PUBLIC_DIR, "favicon.ico"), ico);
-  console.log("  ✓ favicon.ico (32x32)");
+  console.log("  ✓ public/favicon.ico (32x32)");
 }
 
 /**
@@ -111,20 +111,20 @@ function pngToIco(png: Buffer, size: number): Buffer {
 
 async function main(): Promise<void> {
   console.log(`[icons] reading ${SOURCE}`);
-  const svg = await readFile(SOURCE);
+  const source = await readFile(SOURCE);
 
-  console.log("[icons] rendering PNG variants");
+  console.log("[icons] rendering size variants");
   for (const t of TARGETS) {
-    await renderPng(svg, t);
+    await renderPng(source, t);
   }
 
   console.log("[icons] rendering OG card");
-  await renderOgImage(svg);
+  await renderOgImage(source);
 
   console.log("[icons] rendering favicon.ico");
-  await renderFavicon(svg);
+  await renderFavicon(source);
 
-  console.log("[icons] done — 7 files written to public/");
+  console.log("[icons] done");
 }
 
 main().catch((err) => {
