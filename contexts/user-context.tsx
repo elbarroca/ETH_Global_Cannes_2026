@@ -43,6 +43,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (result.telegramLinkCode) setLinkCode(result.telegramLinkCode);
     } catch (err) {
       console.warn("[user-context] Failed to refresh link code:", err);
+      throw err; // Re-throw so modal can show error state
     }
   }, [address]);
 
@@ -52,7 +53,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
     if (fetched) {
       setUser(fetched);
       // Clear linkCode once telegram is verified
-      if (fetched.telegram?.verified) setLinkCode(null);
+      if (fetched.telegram?.verified) {
+        setLinkCode(null);
+      } else if (!linkCode && !onboardingRef.current) {
+        // Returning user without Telegram — generate a link code for the modal
+        try {
+          const result = await onboard(address, "mock", "AlphaDawg sign-in");
+          if (result.telegramLinkCode) setLinkCode(result.telegramLinkCode);
+        } catch { /* non-fatal */ }
+      }
       return;
     }
     // Auto-onboard on first connect (testnet — "mock" signature skips verification)

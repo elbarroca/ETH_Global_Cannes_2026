@@ -8,17 +8,13 @@ import type { Hex } from "viem";
 
 export function createPaymentFetch(privateKey: Hex): typeof fetch {
   const account = privateKeyToAccount(privateKey);
-
-  const signer = {
-    address: account.address,
-    signTypedData: (params: Parameters<typeof account.signTypedData>[0]) =>
-      account.signTypedData(params),
-  };
-
   const client = new x402Client();
-  registerBatchScheme(client, { signer });
 
-  return wrapFetchWithPayment(fetch, client) as typeof fetch;
+  // Pass account directly — privateKeyToAccount returns a LocalAccount
+  // that satisfies BatchEvmSigner structurally (has address + signTypedData)
+  registerBatchScheme(client, { signer: account });
+
+  return wrapFetchWithPayment(fetch, client);
 }
 
 // ── Gateway client (for deposit/withdraw/balance management) ──────────

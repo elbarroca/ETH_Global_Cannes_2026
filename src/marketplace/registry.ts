@@ -30,8 +30,9 @@ let registryLoadPromise: Promise<void> | null = null;
 async function ensureLoaded(): Promise<void> {
   if (registryLoaded) return;
   if (registryLoadPromise) return registryLoadPromise;
-  registryLoadPromise = loadRegistry().then(() => {
-    registryLoaded = true;
+  registryLoadPromise = loadRegistry().catch((err) => {
+    registryLoadPromise = null;
+    throw err;
   });
   return registryLoadPromise;
 }

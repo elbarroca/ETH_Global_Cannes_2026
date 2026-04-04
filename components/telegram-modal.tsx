@@ -15,6 +15,7 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
   const [secondsLeft, setSecondsLeft] = useState(600);
   const [expired, setExpired] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState(false);
 
   // Countdown timer
   useEffect(() => {
@@ -44,8 +45,11 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
+    setRefreshError(false);
     try {
       await onRefresh();
+    } catch {
+      setRefreshError(true);
     } finally {
       setRefreshing(false);
     }
@@ -143,6 +147,9 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
             >
               {refreshing ? "Generating..." : "Get new code"}
             </button>
+            {refreshError && (
+              <p className="text-xs text-blood-400">Failed to generate new code. Try again.</p>
+            )}
           </div>
         )}
 
