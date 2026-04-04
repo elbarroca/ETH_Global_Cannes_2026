@@ -84,42 +84,45 @@ export async function mintAgentNFT(
 
   console.log(`[iNFT] Minting for proxy ${proxyWalletAddress.slice(0, 10)}...`);
 
-  try {
-    const tx = await contract.mintAgent(
-      userWalletAddress,
-      proxyWalletAddress,
-      encryptedURI,
-      metadataHash,
-      soulHash,
-      riskProfile,
-    );
+  // NOTE: This function now throws on failure instead of silently returning
+  // {tokenId: 0}. The previous sentinel would poison the `if (user.inftTokenId
+  // && storageHash)` gate in commitCycle forever — one flaky mint would
+  // permanently disable iNFT metadata updates. Callers already wrap this in
+  // try/catch (non-fatal) so throwing is the correct contract.
+  const tx = await contract.mintAgent(
+    userWalletAddress,
+    proxyWalletAddress,
+    encryptedURI,
+    metadataHash,
+    soulHash,
+    riskProfile,
+  );
 
-    const receipt = await tx.wait();
+  const receipt = await tx.wait();
 
-    // Parse AgentMinted event to get tokenId
-    let tokenId = 0;
-    for (const log of receipt.logs) {
-      try {
-        const parsed = contract.interface.parseLog({
-          topics: log.topics as string[],
-          data: log.data,
-        });
-        if (parsed?.name === "AgentMinted") {
-          tokenId = Number(parsed.args[0]);
-          break;
-        }
-      } catch {
-        // Skip non-matching logs
+  // Parse AgentMinted event to get tokenId
+  let tokenId = 0;
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog({
+        topics: log.topics as string[],
+        data: log.data,
+      });
+      if (parsed?.name === "AgentMinted") {
+        tokenId = Number(parsed.args[0]);
+        break;
       }
+    } catch {
+      // Skip non-matching logs — other event types from the same tx.
     }
-
-    console.log(`[iNFT] Minted tokenId=${tokenId} tx=${receipt.hash}`);
-    return { tokenId, txHash: receipt.hash };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[iNFT] Mint failed: ${msg.slice(0, 120)}`);
-    return { tokenId: 0, txHash: "" };
   }
+
+  if (tokenId === 0) {
+    throw new Error(`iNFT mint completed but AgentMinted event not found in tx ${receipt.hash}`);
+  }
+
+  console.log(`[iNFT] Minted tokenId=${tokenId} tx=${receipt.hash}`);
+  return { tokenId, txHash: receipt.hash };
 }
 
 // ── UPDATE METADATA — called after each cycle ─────────────────────

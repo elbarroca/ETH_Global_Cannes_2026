@@ -1,12 +1,25 @@
 export type PendingCycleStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "TIMED_OUT";
 export type CycleOrigin = "ui" | "telegram" | "heartbeat";
 
+export type SpecialistPath = "hierarchical_x402" | "direct_x402" | "openclaw_gateway";
+export type OpenClawGatewayStatus = "active" | "offline";
+
+export interface CycleProofs {
+  hcs: boolean;
+  storage: boolean;
+  inft: boolean;
+  naryo: boolean;
+}
+
 export interface AnalysisResult {
   userId: string;
   cycleId: number;
   specialists: SpecialistResult[];
   debate: DebateResult;
   compactRecord: CompactCycleRecord;
+  // Runtime-only metadata — captured during analyzeCycle, re-derived on approve path
+  specialistPath?: SpecialistPath;
+  openclawGatewayStatus?: OpenClawGatewayStatus;
 }
 
 export interface PendingCycleRecord {
@@ -71,7 +84,46 @@ export interface SpecialistResult {
   teeVerified: boolean;
   reputation?: number;
   rawDataSnapshot?: unknown;
+  hiredBy?: string;
+  paymentTxHash?: string;
+  priceUsd?: number;
   [key: string]: unknown;
+}
+
+// Pure network result from callSpecialist() — no DB side effects
+export interface CallSpecialistResult {
+  name: string;
+  signal: string;
+  confidence: number;
+  reasoning: string;
+  attestationHash: string;
+  teeVerified: boolean;
+  rawDataSnapshot: unknown;
+  paymentTxHash: string;
+  priceUsd: number;
+  durationMs: number;
+}
+
+// Response from a debate agent's /hire-and-analyze endpoint
+export interface DebateAgentResponse {
+  name: "alpha" | "risk" | "executor";
+  content: string;
+  reasoning: string;
+  parsed: Record<string, unknown>;
+  attestationHash: string;
+  teeVerified: boolean;
+  specialists_hired: Array<{
+    name: string;
+    signal: string;
+    confidence: number;
+    reasoning?: string;
+    attestation: string;
+    teeVerified?: boolean;
+    paymentTxHash: string;
+    priceUsd: number;
+    rawDataSnapshot?: unknown;
+  }>;
+  total_cost_usd: number;
 }
 
 export interface DebateStageResult {
@@ -125,11 +177,16 @@ export interface CycleResult {
   debate: DebateResult;
   decision: Record<string, unknown>;
   seqNum: number;
-  hashscanUrl: string;
+  hashscanUrl?: string;
   storageHash?: string;
   inftTokenId?: number;
   swapResult?: ArcSwapResult;
   timestamp: Date;
+  specialistPath: SpecialistPath;
+  openclawGatewayStatus: OpenClawGatewayStatus;
+  proofs: CycleProofs;
+  degraded: boolean;
+  degradedReasons: string[];
 }
 
 export interface CompactCycleRecord {
@@ -145,4 +202,11 @@ export interface CompactCycleRecord {
   };
   d: { act: string; asset: string; pct: number };
   nav: number;
+  // Agent-to-agent payment graph (populated when debate agents hire their own specialists)
+  payments?: Array<{
+    to: string; // specialist name
+    amt: string; // "$0.001"
+    tx: string; // payment tx hash
+    by: string; // hiredBy: "alpha" | "risk" | "executor" | "main-agent"
+  }>;
 }

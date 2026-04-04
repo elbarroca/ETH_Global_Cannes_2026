@@ -16,82 +16,6 @@ import { fetchMacroData } from "./data/macro-data";
 
 const PROVIDER = process.env.OG_PROVIDER_ADDRESS!;
 
-// ─── Local fallback when 0G inference is unavailable ─────────────────────────
-
-function computeLocalFallback(
-  name: string,
-  rawData: string,
-): { signal: string; confidence: number } {
-  try {
-    const data = JSON.parse(rawData);
-    switch (name) {
-      case "sentiment": {
-        const fng = Number(data.fear_greed_value ?? 50);
-        if (fng >= 65) return { signal: "BUY", confidence: Math.min(fng, 80) };
-        if (fng <= 35) return { signal: "SELL", confidence: Math.min(100 - fng, 80) };
-        return { signal: "HOLD", confidence: 50 };
-      }
-      case "whale": {
-        const assessment = String(data.gas_assessment ?? "moderate");
-        if (assessment === "high_activity") return { signal: "BUY", confidence: 60 };
-        if (assessment === "low_activity") return { signal: "SELL", confidence: 55 };
-        return { signal: "HOLD", confidence: 50 };
-      }
-      case "momentum": {
-        const rsi = Number(data.rsi_14 ?? 50);
-        if (rsi < 35) return { signal: "BUY", confidence: 65 };
-        if (rsi > 65) return { signal: "SELL", confidence: 65 };
-        return { signal: "HOLD", confidence: 50 };
-      }
-      case "memecoin-hunter": {
-        const newPairs = Number(data.new_pairs_count ?? 0);
-        if (newPairs > 50) return { signal: "BUY", confidence: 55 };
-        return { signal: "HOLD", confidence: 45 };
-      }
-      case "twitter-alpha": {
-        const score = Number(data.crypto_sentiment_score ?? 50);
-        if (score > 70) return { signal: "BUY", confidence: Math.min(score, 75) };
-        if (score < 30) return { signal: "SELL", confidence: Math.min(100 - score, 75) };
-        return { signal: "HOLD", confidence: 50 };
-      }
-      case "defi-yield": {
-        const apy = Number(data.avg_stable_apy ?? 3);
-        if (apy > 6) return { signal: "BUY", confidence: 60 };
-        return { signal: "HOLD", confidence: 50 };
-      }
-      case "news-scanner": {
-        const bull = Number(data.bullish_count ?? 0);
-        const bear = Number(data.bearish_count ?? 0);
-        if (bull > bear * 2) return { signal: "BUY", confidence: 60 };
-        if (bear > bull * 2) return { signal: "SELL", confidence: 60 };
-        return { signal: "HOLD", confidence: 45 };
-      }
-      case "onchain-forensics": {
-        const direction = String(data.smart_money_direction ?? "neutral");
-        if (direction === "accumulating") return { signal: "BUY", confidence: 65 };
-        if (direction === "distributing") return { signal: "SELL", confidence: 65 };
-        return { signal: "HOLD", confidence: 50 };
-      }
-      case "options-flow": {
-        const pcRatio = Number(data.put_call_ratio ?? 1);
-        if (pcRatio < 0.7) return { signal: "BUY", confidence: 60 };
-        if (pcRatio > 1.3) return { signal: "SELL", confidence: 60 };
-        return { signal: "HOLD", confidence: 50 };
-      }
-      case "macro-correlator": {
-        const vix = Number(data.vix ?? 20);
-        if (vix > 30) return { signal: "SELL", confidence: 65 };
-        if (vix < 15) return { signal: "BUY", confidence: 55 };
-        return { signal: "HOLD", confidence: 50 };
-      }
-      default:
-        return { signal: "HOLD", confidence: 40 };
-    }
-  } catch {
-    return { signal: "HOLD", confidence: 30 };
-  }
-}
-
 // ─── Start all specialists ───────────────────────────────────────────────────
 
 export async function startSpecialists(): Promise<void> {
@@ -118,26 +42,13 @@ export async function startSpecialists(): Promise<void> {
       const rawData = await s.fetchData();
       console.log(`[specialist:${s.name}] Fetched real data (${rawData.length} bytes)`);
 
-      let parsed: { signal: string; confidence: number; [k: string]: unknown };
-      let reasoning: string;
-      let attestationHash: string;
-      let teeVerified: boolean;
-
-      try {
-        // 2. Pass through 0G sealed inference
-        const result = await sealedInference(PROVIDER, s.prompt, `Current market data:\n${rawData}`);
-        const dual = parseDualOutput(result.content, { signal: "HOLD" as const, confidence: 0 });
-        parsed = dual.parsed;
-        reasoning = dual.reasoning;
-        attestationHash = result.attestationHash;
-        teeVerified = result.teeVerified;
-      } catch (err) {
-        console.warn(`[specialist:${s.name}] 0G inference failed, using local fallback:`, err instanceof Error ? err.message : String(err));
-        parsed = { ...computeLocalFallback(s.name, rawData), degraded: true };
-        reasoning = `[FALLBACK] Local heuristic — 0G inference unavailable: ${err instanceof Error ? err.message : String(err)}`;
-        attestationHash = "local-fallback";
-        teeVerified = false;
-      }
+      // 2. Pass through 0G sealed inference. NO local heuristic fallback —
+      // if 0G is unavailable the specialist throws (client sees 500) so the
+      // orchestrator can flag the cycle as degraded instead of quietly serving
+      // hardcoded signals. This enforces the "0G sealed inference is the only
+      // source of truth" invariant from the 0G bounty.
+      const result = await sealedInference(PROVIDER, s.prompt, `Current market data:\n${rawData}`);
+      const { parsed, reasoning } = parseDualOutput(result.content, { signal: "HOLD" as const, confidence: 0 });
 
       // 3. Return analysis + raw data snapshot for transparency
       let rawSnapshot: unknown;
@@ -148,8 +59,8 @@ export async function startSpecialists(): Promise<void> {
         ...parsed,
         reasoning: reasoning || (parsed as { reasoning?: string }).reasoning || "",
         rawDataSnapshot: rawSnapshot,
-        attestationHash,
-        teeVerified,
+        attestationHash: result.attestationHash,
+        teeVerified: result.teeVerified,
       };
     });
   }
