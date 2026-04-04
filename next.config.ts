@@ -15,6 +15,8 @@ const nextConfig: NextConfig = {
     "node-telegram-bot-api",
     "ethers",
     "crypto-js",
+    "express",
+    "@circle-fin/x402-batching",
   ],
   turbopack: {
     resolveExtensions: [".ts", ".tsx", ".mts", ".js", ".jsx", ".mjs", ".json"],

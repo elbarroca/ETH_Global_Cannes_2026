@@ -27,14 +27,10 @@ export default function HistoryPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const { history, loading, hasMore, loadMore } = useCycleHistory(20);
 
-  const cycles: Array<Cycle & { pnl: number; win: boolean }> = history.map((record) => {
-    const cycle = mapCompactRecordToCycle(record);
-    return {
-      ...cycle,
-      pnl: 0,
-      win: cycle.trade.action !== "HOLD",
-    };
-  });
+  const cycles: Array<Cycle & { pnl: number }> = history.map((record) => ({
+    ...mapCompactRecordToCycle(record),
+    pnl: 0,
+  }));
 
   return (
     <main className="max-w-7xl mx-auto px-5 py-5 space-y-3">
@@ -73,7 +69,7 @@ export default function HistoryPage() {
         <div className="space-y-1.5">
           {cycles.map((cycle) => {
             const isOpen = expanded === cycle.id;
-            const { trade, adversarial, pnl, win } = cycle;
+            const { trade, adversarial, pnl } = cycle;
 
             return (
               <Card key={cycle.id}>
@@ -107,7 +103,9 @@ export default function HistoryPage() {
                     {pnl > 0 ? "+" : ""}
                     {pnl === 0 ? "$0.00" : `$${pnl.toFixed(2)}`}
                   </span>
-                  <Badge variant={win ? "green" : "amber"}>{win ? "trade" : "hold"}</Badge>
+                  <Badge variant={trade.action === "BUY" ? "green" : trade.action === "SELL" ? "red" : "gray"}>
+                    {trade.action}
+                  </Badge>
                   <span className="text-void-600 text-xs">{isOpen ? "\u25B2" : "\u25BC"}</span>
                 </button>
 
