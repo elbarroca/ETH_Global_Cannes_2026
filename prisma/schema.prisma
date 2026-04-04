@@ -24,6 +24,7 @@ model User {
   cycles             Cycle[]
   hiredAgents        UserHiredAgent[]
   pendingCycles      PendingCycle[]
+  chatMessages       ChatMessage[]
 
   @@index([walletAddress], map: "idx_users_wallet")
   @@map("users")
@@ -140,4 +141,17 @@ model PendingCycle {
   @@index([userId, status], map: "idx_pending_cycles_user_status")
   @@index([expiresAt], map: "idx_pending_cycles_expires")
   @@map("pending_cycles")
+}
+
+model ChatMessage {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id")
+  role      String   // "user" | "assistant"
+  content   String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt], map: "idx_chat_messages_user")
+  @@map("chat_messages")
 }

@@ -1,11 +1,12 @@
-import { getActiveUsers } from "../store/user-store";
+import { getActiveUsers, updateUser } from "../store/user-store";
 import { analyzeCycle, commitCycle, runCycle } from "./main-agent";
 import { notifyUser, sendApprovalNotification } from "../telegram/bot";
 import { scheduleNextHeartbeat } from "../hedera/scheduler";
 import { createPendingCycle, getPendingForUser } from "../store/pending-cycles";
 import { getPrisma } from "../config/prisma";
 
-const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const INTERVAL_MS = 1 * 60 * 1000; // 1 minute tick — per-user timing checked inside
+const DEFAULT_PERIOD_MS = 5 * 60 * 1000; // 5 minutes default
 
 export async function runHeartbeat(): Promise<void> {
   const users = await getActiveUsers();
@@ -18,12 +19,26 @@ export async function runHeartbeat(): Promise<void> {
 
   for (const user of users) {
     try {
+      // Per-user timing: skip if not enough time has elapsed
+      const periodMs = user.agent.cyclePeriodMs ?? DEFAULT_PERIOD_MS;
+      const lastAt = user.agent.lastCycleAt ? new Date(user.agent.lastCycleAt).getTime() : 0;
+      if (lastAt > 0 && Date.now() - lastAt < periodMs) {
+        continue; // Not time yet for this user
+      }
+
+      // If cycleCount was configured, check remaining
+      const remaining = user.agent.cyclesRemaining;
+      if (remaining != null && remaining <= 0) {
+        continue; // No cycles remaining
+      }
+
       const approvalMode = user.agent.approvalMode ?? "always";
 
       if (approvalMode === "auto") {
         // Existing behavior — full cycle, no pause
         const result = await runCycle(user);
         notifyUser(user, result);
+        await decrementCyclesRemaining(user.id);
         continue;
       }
 
@@ -60,6 +75,7 @@ export async function runHeartbeat(): Promise<void> {
         // Auto-approve (HOLD in trades_only mode)
         const result = await commitCycle(analysis, user);
         notifyUser(user, result);
+        await decrementCyclesRemaining(user.id);
       }
     } catch (err) {
       console.error(`[heartbeat] Cycle failed for user ${user.id}:`, err);
@@ -75,6 +91,22 @@ export async function runHeartbeat(): Promise<void> {
   }
 
   console.log("[heartbeat] Done.");
+}
+
+async function decrementCyclesRemaining(userId: string): Promise<void> {
+  try {
+    // Re-read fresh value to avoid stale snapshot race
+    const { getUserById } = await import("../store/user-store");
+    const fresh = await getUserById(userId);
+    if (!fresh || fresh.agent.cyclesRemaining == null) return;
+    const newRemaining = Math.max(0, fresh.agent.cyclesRemaining - 1);
+    await updateUser(userId, { agent: { cyclesRemaining: newRemaining } });
+    if (newRemaining === 0) {
+      console.log(`[heartbeat] User ${userId} completed all configured cycles`);
+    }
+  } catch (err) {
+    console.warn(`[heartbeat] Failed to decrement cycles for ${userId}:`, err);
+  }
 }
 
 export function startHeartbeatLoop(): void {

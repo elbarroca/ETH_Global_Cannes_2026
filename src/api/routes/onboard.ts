@@ -111,13 +111,17 @@ export function onboardRoutes(): Router {
     }
   });
 
-  // POST /api/configure — Set risk profile and notification preference
+  // POST /api/configure — Set risk profile, notification preference, approval mode
   router.post("/configure", async (req, res) => {
     try {
-      const { userId, riskProfile, notifyPreference } = req.body as {
+      const { userId, riskProfile, notifyPreference, approvalMode, approvalTimeoutMin, cycleCount, cyclePeriodMs } = req.body as {
         userId?: string;
         riskProfile?: string;
         notifyPreference?: string;
+        approvalMode?: string;
+        approvalTimeoutMin?: number;
+        cycleCount?: number;
+        cyclePeriodMs?: number;
       };
 
       if (!userId) {
@@ -137,16 +141,52 @@ export function onboardRoutes(): Router {
         return;
       }
 
+      const validApprovalModes = ["always", "trades_only", "auto"];
+      if (approvalMode && !validApprovalModes.includes(approvalMode)) {
+        res.status(400).json({ error: `approvalMode must be one of: ${validApprovalModes.join(", ")}`, code: 400 });
+        return;
+      }
+
+      if (approvalTimeoutMin !== undefined && (approvalTimeoutMin < 1 || approvalTimeoutMin > 60)) {
+        res.status(400).json({ error: "approvalTimeoutMin must be between 1 and 60", code: 400 });
+        return;
+      }
+
+      if (cycleCount !== undefined && (cycleCount < 0 || cycleCount > 100)) {
+        res.status(400).json({ error: "cycleCount must be between 0 and 100", code: 400 });
+        return;
+      }
+
+      const validPeriods = [300000, 900000, 1800000, 3600000]; // 5m, 15m, 30m, 1h
+      if (cyclePeriodMs !== undefined && !validPeriods.includes(cyclePeriodMs)) {
+        res.status(400).json({ error: `cyclePeriodMs must be one of: ${validPeriods.join(", ")}`, code: 400 });
+        return;
+      }
+
       const patch: {
         agent?: Partial<UserRecord["agent"]>;
         telegram?: Partial<UserRecord["telegram"]>;
       } = {};
 
-      if (riskProfile) {
-        patch.agent = {
-          riskProfile: riskProfile as UserRecord["agent"]["riskProfile"],
-          maxTradePercent: deriveMaxTrade(riskProfile),
-        };
+      if (riskProfile || approvalMode || approvalTimeoutMin !== undefined || cycleCount !== undefined || cyclePeriodMs !== undefined) {
+        patch.agent = {};
+        if (riskProfile) {
+          patch.agent.riskProfile = riskProfile as UserRecord["agent"]["riskProfile"];
+          patch.agent.maxTradePercent = deriveMaxTrade(riskProfile);
+        }
+        if (approvalMode) {
+          patch.agent.approvalMode = approvalMode as UserRecord["agent"]["approvalMode"];
+        }
+        if (approvalTimeoutMin !== undefined) {
+          patch.agent.approvalTimeoutMin = approvalTimeoutMin;
+        }
+        if (cycleCount !== undefined) {
+          patch.agent.cycleCount = cycleCount;
+          patch.agent.cyclesRemaining = cycleCount;
+        }
+        if (cyclePeriodMs !== undefined) {
+          patch.agent.cyclePeriodMs = cyclePeriodMs;
+        }
       }
 
       if (notifyPreference) {
