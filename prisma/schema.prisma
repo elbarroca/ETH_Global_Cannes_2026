@@ -66,6 +66,11 @@ model Cycle {
   swapExplorerUrl  String?       @map("swap_explorer_url")
   debateDurationMs Int?          @map("debate_duration_ms")
   debateTurns      Int?          @map("debate_turns")
+  // Cached CycleNarrative JSON (synthesizeCycleNarrative output). Populated
+  // by logCycleRecord on commit; read directly by enrichCycleRow so the
+  // dashboard doesn't re-synthesize on every fetch. The canonical copy still
+  // lives inside the 0G rich record at `storage_hash`.
+  narrative        Json?         @map("narrative")
   createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   actions          AgentAction[]
   transcripts      DebateTranscript[]

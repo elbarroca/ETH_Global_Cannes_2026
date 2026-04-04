@@ -12,7 +12,14 @@ import {
 import { createPublicClient, http, formatUnits } from "viem";
 import { getUser, onboard, type UserRecord } from "@/lib/api";
 import { useAccount } from "wagmi";
-import { arcTestnet } from "@/contexts/wagmi-provider";
+// Pull the chain definition from the neutral lib/ module instead of
+// @/contexts/wagmi-provider. wagmi-provider imports UserProvider from THIS
+// file, so going the other direction creates a TDZ cycle — the module runs
+// line 26 (`chain: arcTestnet`) before wagmi-provider finishes evaluating
+// its export. Next 16 surfaces that as:
+//   ReferenceError: Cannot access 'arcTestnet' before initialization
+// which wipes the dashboard on first render.
+import { arcTestnet } from "@/lib/arc-chain";
 
 // ── Shared Arc RPC client for live balance polling ──────────────────────
 //

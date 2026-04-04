@@ -68,6 +68,7 @@ export function mapCycleResultToCycle(result: CycleResult): Cycle {
       inftId: "",
       hiredBy: s.hiredBy,
       paymentTxHash: s.paymentTxHash,
+      picks: s.picks,
     })),
     adversarial: {
       alpha: {
@@ -141,6 +142,7 @@ export function mapCycleResultToCycle(result: CycleResult): Cycle {
     proofs: result.proofs,
     degraded: result.degraded,
     degradedReasons: result.degradedReasons,
+    narrative: result.narrative ?? undefined,
   };
 }
 
@@ -223,6 +225,7 @@ export function mapEnrichedResponseToCycle(r: EnrichedCycleResponse): Cycle {
       inftId: "",
       hiredBy: s.hiredBy,
       paymentTxHash: s.paymentTxHash,
+      picks: s.picks,
     })),
     adversarial: {
       alpha: {
@@ -275,5 +278,7 @@ export function mapEnrichedResponseToCycle(r: EnrichedCycleResponse): Cycle {
           method: (r.swap.method as Cycle["swap"] extends undefined ? never : NonNullable<Cycle["swap"]>["method"]) ?? "mock_swap",
         }
       : undefined,
+    holdings: r.holdings,
+    narrative: r.narrative,
   };
 }

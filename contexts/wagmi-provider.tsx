@@ -13,24 +13,16 @@ import {
   useConnection,
   useSwitchChain,
 } from "wagmi";
-import { defineChain } from "viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect } from "react";
 import { UserProvider } from "./user-context";
 import { AuthGuard } from "@/components/auth-guard";
+import { arcTestnet, ARC_TESTNET_RPC } from "@/lib/arc-chain";
 
-export const arcTestnet = defineChain({
-  id: 5042002,
-  name: "Arc Testnet",
-  nativeCurrency: { decimals: 18, name: "USD Coin", symbol: "USDC" },
-  rpcUrls: {
-    default: { http: ["https://rpc.testnet.arc.network"] },
-  },
-  blockExplorers: {
-    default: { name: "ArcScan", url: "https://testnet.arcscan.app" },
-  },
-  testnet: true,
-});
+// Re-export so existing `@/contexts/wagmi-provider` importers (deposit page,
+// etc.) keep working without a mass rename — the canonical definition now
+// lives in lib/arc-chain.
+export { arcTestnet };
 
 const wagmiConfig = createConfig({
   chains: [arcTestnet],
@@ -47,7 +39,8 @@ const queryClient = new QueryClient();
 
 const DYNAMIC_ENV_ID = process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID ?? "";
 
-const ARC_RPC = "https://rpc.testnet.arc.network";
+// Alias for readability — same URL as the canonical constant in lib/arc-chain.
+const ARC_RPC = ARC_TESTNET_RPC;
 
 // Intercept Dynamic SDK's DRPC calls and redirect to direct Arc RPC.
 // Dynamic's embedded wallet SDK hardcodes arc-testnet.drpc.org which has a

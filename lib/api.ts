@@ -1,3 +1,6 @@
+import type { CycleNarrative } from "@/src/agents/narrative";
+import type { TokenPick } from "@/src/types/index";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -38,6 +41,8 @@ export interface UserRecord {
     depositedUsdc: number;
     htsShareBalance: number;
     currentNav: number;
+    /** Ticker → token amount acquired through swaps (ETH, WETH, UNI, …). */
+    holdings?: Record<string, number>;
   };
   hotWalletIndex: number | null;
   hotWalletAddress: string | null;
@@ -58,6 +63,8 @@ export interface SpecialistResult {
   paymentTxHash?: string;
   priceUsd?: number;
   rawDataSnapshot?: unknown;
+  /** Multi-token shortlist the specialist emitted (sentiment, momentum, …). */
+  picks?: TokenPick[];
 }
 
 // Agent-to-agent payment attribution — who paid whom for which signal
@@ -127,6 +134,8 @@ export interface CycleResult {
   degraded?: boolean;
   degradedReasons?: string[];
   timestamp: string;
+  /** Synthesized cycle narrative — returned by commitCycle. */
+  narrative?: CycleNarrative | null;
 }
 
 // The tiny HCS audit record. Still returned inside the pending-cycle response
@@ -170,6 +179,8 @@ export interface EnrichedCycleResponse {
     hiredBy: string;
     paymentTxHash: string;
     reputation?: number;
+    /** Multi-token shortlist (sentiment, momentum — empty for single-signal specialists). */
+    picks?: TokenPick[];
   }>;
   debate: {
     alpha: { action: string; pct: number; reasoning: string; attestationHash: string };
@@ -185,6 +196,10 @@ export interface EnrichedCycleResponse {
   inftTokenId: number | null;
   navAfter: number;
   totalCostUsd: number;
+  /** User's on-chain holdings at the time of this cycle (USDC + tokens). */
+  holdings: Record<string, number>;
+  /** Cached CycleNarrative — written at commitCycle time, read directly here. */
+  narrative: CycleNarrative | null;
 }
 
 export interface OnboardResponse {

@@ -1,3 +1,6 @@
+import type { CycleNarrative } from "@/src/agents/narrative";
+import type { TokenPick } from "@/src/types/index";
+
 export interface Cycle {
   id: number;
   /** cycles.id (UUID) — used by DebateTheater to query debate_transcripts. */
@@ -20,6 +23,8 @@ export interface Cycle {
     // specialist, and the Arc tx hash of that payment.
     hiredBy?: string;
     paymentTxHash?: string;
+    /** Multi-token shortlist this specialist emitted — empty for single-signal specialists. */
+    picks?: TokenPick[];
   }[];
   adversarial: {
     alpha: { argument: string; recommendation: string; attestation: string };
@@ -71,6 +76,10 @@ export interface Cycle {
   degraded?: boolean;
   degradedReasons?: string[];
   debateTranscripts?: DebateTranscriptView[];
+  /** User's on-chain holdings at cycle commit time (ticker → amount). */
+  holdings?: Record<string, number>;
+  /** Synthesized narrative — populated for enriched responses only. */
+  narrative?: CycleNarrative | null;
 }
 
 export interface DebateTranscriptView {
