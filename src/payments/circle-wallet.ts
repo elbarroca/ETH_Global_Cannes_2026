@@ -1,7 +1,10 @@
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
 
-// Arc Testnet USDC (pre-deployed at fixed address)
-const USDC_ARC = process.env.USDC_ARC_ADDRESS ?? "0x3600000000000000000000000000000000000000";
+// Arc USDC is the chain's NATIVE currency — Circle's transfer API uses the
+// `blockchain` tag (ARC-TESTNET) instead of an ERC-20 token address. Keeping
+// USDC_ARC as an exported constant for any legacy call sites that need it,
+// but new code should prefer the native-transfer path via `blockchain`.
+export const USDC_ARC = process.env.USDC_ARC_ADDRESS ?? "0x3600000000000000000000000000000000000000";
 
 const CIRCLE_BLOCKCHAIN = "ARC-TESTNET" as const;
 
@@ -76,11 +79,16 @@ export async function agentTransfer(
   usdcAmount: string,
 ): Promise<{ txId: string; state: string }> {
   const circle = getClient();
-  // Circle SDK union types require walletAddress+blockchain for tokenAddress.
-  // With walletId, the wallet knows its chain — cast to satisfy the complex overload.
+  // Arc USDC is the chain's NATIVE currency, not an ERC-20. Circle's SDK
+  // represents native transfers by omitting tokenAddress and passing the
+  // blockchain tag instead. The docs call this the TokenAddressAndBlockchain-
+  // Input variant with an empty tokenAddress.
+  //
+  // The SDK's TypeScript union is too strict about walletId+blockchain being
+  // mutually exclusive, but the API accepts it — cast through unknown.
   const response = await circle.createTransaction({
     walletId,
-    tokenAddress: USDC_ARC,
+    blockchain: CIRCLE_BLOCKCHAIN,
     destinationAddress: toAddress,
     amount: [usdcAmount],
     fee: { type: "level", config: { feeLevel: "MEDIUM" } },
