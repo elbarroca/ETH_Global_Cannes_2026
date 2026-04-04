@@ -1,7 +1,7 @@
-import { getActiveUsers } from "../store/user-store.js";
-import { runCycle } from "./main-agent.js";
-import { notifyUser } from "../telegram/bot.js";
-import { scheduleNextHeartbeat } from "../hedera/scheduler.js";
+import { getActiveUsers } from "../store/user-store";
+import { runCycle } from "./main-agent";
+import { notifyUser } from "../telegram/bot";
+import { scheduleNextHeartbeat } from "../hedera/scheduler";
 
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 

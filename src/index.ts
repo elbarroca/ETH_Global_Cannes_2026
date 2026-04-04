@@ -1,11 +1,10 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { loadStore } from "./store/user-store.js";
-import { loadRegistry } from "./marketplace/registry.js";
-import { startBot } from "./telegram/bot.js";
-import { startApiServer } from "./api/server.js";
-import { startHeartbeatLoop } from "./agents/heartbeat.js";
+import { loadStore } from "./store/user-store";
+import { loadRegistry } from "./marketplace/registry";
+import { startBot } from "./telegram/bot";
+import { startHeartbeatLoop } from "./agents/heartbeat";
 
 const REQUIRED_ENV = [
   "OPERATOR_ID",
@@ -42,8 +41,7 @@ async function main(): Promise<void> {
   // Start Telegram bot
   startBot();
 
-  // Start Express API server
-  startApiServer();
+  // API is served by Next.js API routes — no Express server needed
 
   // Start heartbeat cycle loop
   startHeartbeatLoop();

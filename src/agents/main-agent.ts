@@ -1,19 +1,19 @@
-import { updateUser } from "../store/user-store.js";
-import { logAction, logCycleRecord } from "../store/action-logger.js";
-import { runAdversarialDebate } from "./adversarial.js";
-import { logCycle } from "../hedera/hcs.js";
-import { storeMemory } from "../og/storage.js";
-import { updateAgentMetadata } from "../og/inft.js";
-import { getUserPaymentFetch } from "../config/arc.js";
-import { hireFromMarketplace } from "../marketplace/registry.js";
-import { evaluateCycleSignals } from "../marketplace/reputation.js";
+import { updateUser } from "../store/user-store";
+import { logAction, logCycleRecord } from "../store/action-logger";
+import { runAdversarialDebate } from "./adversarial";
+import { logCycle } from "../hedera/hcs";
+import { storeMemory } from "../og/storage";
+import { updateAgentMetadata } from "../og/inft";
+import { getUserPaymentFetch } from "../config/arc";
+import { hireFromMarketplace } from "../marketplace/registry";
+import { evaluateCycleSignals } from "../marketplace/reputation";
 import type {
   UserRecord,
   SpecialistResult,
   CycleResult,
   CompactCycleRecord,
   DebateResult,
-} from "../types/index.js";
+} from "../types/index";
 
 const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
 

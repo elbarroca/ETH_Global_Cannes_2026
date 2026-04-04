@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { getUserById } from "../../store/user-store.js";
-import { getHistoryForUser } from "../../hedera/hcs.js";
-import { runCycle } from "../../agents/main-agent.js";
+import { getUserById } from "../../store/user-store";
+import { getHistoryForUser } from "../../hedera/hcs";
+import { runCycle } from "../../agents/main-agent";
 
 function getTopicId(): string {
   return process.env.HCS_AUDIT_TOPIC_ID ?? "";

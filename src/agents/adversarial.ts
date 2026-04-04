@@ -1,6 +1,6 @@
-import { sealedInference } from "../og/inference.js";
-import { PROMPTS, safeJsonParse } from "./prompts.js";
-import type { SpecialistResult, DebateResult } from "../types/index.js";
+import { sealedInference } from "../og/inference";
+import { PROMPTS, safeJsonParse } from "./prompts";
+import type { SpecialistResult, DebateResult } from "../types/index";
 
 const PROVIDER = process.env.OG_PROVIDER_ADDRESS!;
 const DELAY_MS = 2000;

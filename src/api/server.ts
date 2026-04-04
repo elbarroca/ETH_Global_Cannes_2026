@@ -1,9 +1,9 @@
 import express from "express";
-import { loadStore } from "../store/user-store.js";
-import { onboardRoutes } from "./routes/onboard.js";
-import { cycleRoutes } from "./routes/cycle.js";
-import { fundRoutes } from "./routes/fund.js";
-import { actionRoutes, cycleDbRoutes } from "./routes/actions.js";
+import { loadStore } from "../store/user-store";
+import { onboardRoutes } from "./routes/onboard";
+import { cycleRoutes } from "./routes/cycle";
+import { fundRoutes } from "./routes/fund";
+import { actionRoutes, cycleDbRoutes } from "./routes/actions";
 
 const PORT = Number(process.env.SERVER_PORT ?? 3001);
 

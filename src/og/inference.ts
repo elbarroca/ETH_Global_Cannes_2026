@@ -1,5 +1,5 @@
-import { getBroker } from "../config/og-compute.js";
-import type { InferenceResult } from "../types/index.js";
+import { getBroker } from "../config/og-compute";
+import type { InferenceResult } from "../types/index";
 
 export async function sealedInference(
   providerAddress: string,

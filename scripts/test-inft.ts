@@ -42,7 +42,7 @@ const testProxy = ethers.Wallet.createRandom();
 
 async function main(): Promise<void> {
   console.log("═══════════════════════════════════════════════");
-  console.log("  iNFT E2E TEST — VaultMindAgent on 0G Chain");
+  console.log("  iNFT E2E TEST — AlphaDawgAgent on 0G Chain");
   console.log("═══════════════════════════════════════════════");
   console.log(`  Contract: ${process.env.INFT_CONTRACT_ADDRESS}`);
   console.log(`  Test user: ${testUser.address}`);
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
 
   // TEST 2: Mint an agent iNFT
   console.log("\nTEST 2: Mint agent");
-  const soulHash = keccak256(toUtf8Bytes("VaultMind Test Agent SOUL"));
+  const soulHash = keccak256(toUtf8Bytes("AlphaDawg Test Agent SOUL"));
   const metaHash = keccak256(toUtf8Bytes("genesis"));
 
   const mintTx = await contract.mintAgent(

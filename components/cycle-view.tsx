@@ -7,7 +7,7 @@ import { ProofColumn } from "./proof-column";
 
 export function CycleView({ cycle }: { cycle: CycleResult }) {
   const specialists = cycle.specialists ?? [];
-  const exec = cycle.debate?.executor?.parsed;
+  const exec = cycle.debate?.executor?.parsed as { action?: string; pct?: number; asset?: string } | undefined;
 
   return (
     <div className="bg-void-900 rounded-2xl border border-void-800 overflow-hidden">

@@ -186,7 +186,7 @@ export const MOCK_AGENTS: Agent[] = [
     inftId: "#0847",
     model: "glm-5-chat",
     provider: "0x9f2b...4a1c",
-    creator: "VaultMind",
+    creator: "AlphaDawg",
     isActive: true,
   },
   {
@@ -199,7 +199,7 @@ export const MOCK_AGENTS: Agent[] = [
     inftId: "#0848",
     model: "glm-5-chat",
     provider: "0x9f2b...4a1c",
-    creator: "VaultMind",
+    creator: "AlphaDawg",
     isActive: true,
   },
   {
@@ -212,7 +212,7 @@ export const MOCK_AGENTS: Agent[] = [
     inftId: "#0849",
     model: "glm-5-chat",
     provider: "0x9f2b...4a1c",
-    creator: "VaultMind",
+    creator: "AlphaDawg",
     isActive: true,
   },
   {

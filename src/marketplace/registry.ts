@@ -1,8 +1,8 @@
 // Specialist marketplace registry — in-memory Map backed by Prisma persistence
 
-import { getPrisma } from "../config/prisma.js";
-import { logAction } from "../store/action-logger.js";
-import type { SpecialistResult } from "../types/index.js";
+import { getPrisma } from "../config/prisma";
+import { logAction } from "../store/action-logger";
+import type { SpecialistResult } from "../types/index";
 
 interface AgentRecord {
   id: string;

@@ -2,8 +2,8 @@ import {
   TopicMessageSubmitTransaction,
   TopicId,
 } from "@hashgraph/sdk";
-import { getHederaClient, getOperatorKey } from "../config/hedera.js";
-import type { CompactCycleRecord } from "../types/index.js";
+import { getHederaClient, getOperatorKey } from "../config/hedera";
+import type { CompactCycleRecord } from "../types/index";
 
 const HASHSCAN_BASE = "https://hashscan.io/testnet/topic";
 const MIRROR_BASE = "https://testnet.mirrornode.hedera.com/api/v1";
@@ -31,6 +31,9 @@ export async function logCycle(
     const receipt = await response.getReceipt(client);
     const seqNum = receipt.topicSequenceNumber?.toNumber() ?? 0;
 
+    // 6-second delay for mirror node propagation (reads after this write need it)
+    await new Promise((r) => setTimeout(r, 6000));
+
     return {
       seqNum,
       hashscanUrl: `${HASHSCAN_BASE}/${topicId}`,
@@ -44,9 +47,6 @@ export async function getHistory(
   topicId: string,
   limit = 25,
 ): Promise<CompactCycleRecord[]> {
-  // 6-second delay for mirror node propagation
-  await new Promise((r) => setTimeout(r, 6000));
-
   const url = `${MIRROR_BASE}/topics/${topicId}/messages?limit=${limit}&order=desc`;
   const res = await fetch(url);
   if (!res.ok) {

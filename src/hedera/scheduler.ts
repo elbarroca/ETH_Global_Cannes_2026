@@ -5,7 +5,7 @@ import {
   TopicId,
   Timestamp,
 } from "@hashgraph/sdk";
-import { getHederaClient, getOperatorKey, getOperatorId } from "../config/hedera.js";
+import { getHederaClient, getOperatorKey, getOperatorId } from "../config/hedera";
 
 export async function scheduleNextHeartbeat(
   delaySec = 300,

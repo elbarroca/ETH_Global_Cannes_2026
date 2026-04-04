@@ -1,5 +1,5 @@
 /**
- * VaultMind — Full Validation Script
+ * AlphaDawg — Full Validation Script
  * Runs each integration layer independently.
  * Usage: npx tsx scripts/validate-all.ts
  */
@@ -446,7 +446,7 @@ async function testOgStorage(): Promise<void> {
     const testData = {
       test: true,
       timestamp: new Date().toISOString(),
-      message: "VaultMind validation round-trip",
+      message: "AlphaDawg validation round-trip",
     };
 
     console.log("  ⏳ Uploading test data to 0G storage...");

@@ -3,9 +3,9 @@
 import type { CycleResult } from "@/lib/api";
 
 export function DebateColumn({ cycle }: { cycle: CycleResult }) {
-  const alpha = cycle.debate?.alpha?.parsed;
-  const risk = cycle.debate?.risk?.parsed;
-  const exec = cycle.debate?.executor?.parsed;
+  const alpha = cycle.debate?.alpha?.parsed as { action?: string; pct?: number; asset?: string; thesis?: string } | undefined;
+  const risk = cycle.debate?.risk?.parsed as { maxSafePct?: number; objection?: string } | undefined;
+  const exec = cycle.debate?.executor?.parsed as { action?: string; pct?: number; asset?: string; sl?: number; reasoning?: string } | undefined;
 
   return (
     <div className="space-y-4">

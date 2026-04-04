@@ -1,5 +1,5 @@
-import { deriveUserAccount } from "./wallets.js";
-import { createPaymentFetch } from "../payments/x402-client.js";
+import { deriveUserAccount } from "./wallets";
+import { createPaymentFetch } from "../payments/x402-client";
 
 // Per-user x402 payment client — signs with THIS user's HD-derived hot wallet
 export function getUserPaymentFetch(hotWalletIndex: number): typeof fetch {

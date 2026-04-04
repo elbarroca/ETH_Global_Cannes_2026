@@ -2,10 +2,10 @@ import TelegramBot from "node-telegram-bot-api";
 import {
   getUserByChatId,
   updateUser,
-} from "../store/user-store.js";
-import { redeemLinkCode } from "../store/link-codes.js";
-import { runCycle } from "../agents/main-agent.js";
-import type { UserRecord, CycleResult, CompactCycleRecord } from "../types/index.js";
+} from "../store/user-store";
+import { redeemLinkCode } from "../store/link-codes";
+import { runCycle } from "../agents/main-agent";
+import type { UserRecord, CycleResult, CompactCycleRecord } from "../types/index";
 
 const MIRROR_BASE = "https://testnet.mirrornode.hedera.com/api/v1";
 const HASHSCAN_BASE = "https://hashscan.io/testnet/topic";

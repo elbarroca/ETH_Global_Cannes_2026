@@ -3,8 +3,8 @@ import { readFile, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import crypto from "node:crypto";
-import { getStorageIndexerUrl } from "../config/og-storage.js";
-import { getOgWallet } from "../config/og-compute.js";
+import { getStorageIndexerUrl } from "../config/og-storage";
+import { getOgWallet } from "../config/og-compute";
 
 function getRpcUrl(): string {
   return process.env.OG_RPC_URL ?? "https://evmrpc-testnet.0g.ai";

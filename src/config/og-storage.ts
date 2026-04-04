@@ -1,5 +1,5 @@
 import { getFlowContract } from "@0gfoundation/0g-ts-sdk";
-import { getOgWallet } from "./og-compute.js";
+import { getOgWallet } from "./og-compute";
 
 let flowInstance: ReturnType<typeof getFlowContract> | null = null;
 

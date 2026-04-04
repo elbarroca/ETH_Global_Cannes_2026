@@ -6,11 +6,11 @@ import {
   updateUser,
   getAllUsers,
   getActiveUsers,
-} from "../../store/user-store.js";
-import { createProxyWallet } from "../../payments/circle-wallet.js";
-import { generateLinkCode } from "../../store/link-codes.js";
-import { mintAgentNFT } from "../../og/inft.js";
-import type { UserRecord } from "../../types/index.js";
+} from "../../store/user-store";
+import { createProxyWallet } from "../../payments/circle-wallet";
+import { generateLinkCode } from "../../store/link-codes";
+import { mintAgentNFT } from "../../og/inft";
+import type { UserRecord } from "../../types/index";
 
 function sanitizeUser(user: UserRecord) {
   const { proxyWallet, ...rest } = user;

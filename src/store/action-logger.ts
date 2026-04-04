@@ -1,4 +1,4 @@
-import { getPrisma } from "../config/prisma.js";
+import { getPrisma } from "../config/prisma";
 import type { Prisma } from "@prisma/client";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bridge Record<string, unknown> to Prisma JSON

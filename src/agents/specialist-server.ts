@@ -1,11 +1,11 @@
 import "dotenv/config";
-import { createSpecialistServer } from "../payments/x402-server.js";
-import { sealedInference } from "../og/inference.js";
-import { PROMPTS, safeJsonParse } from "./prompts.js";
-import { deriveSpecialistAddress } from "../config/wallets.js";
-import { fetchSentimentData } from "./data/sentiment-data.js";
-import { fetchWhaleData } from "./data/whale-data.js";
-import { fetchMomentumData } from "./data/momentum-data.js";
+import { createSpecialistServer } from "../payments/x402-server";
+import { sealedInference } from "../og/inference";
+import { PROMPTS, safeJsonParse } from "./prompts";
+import { deriveSpecialistAddress } from "../config/wallets";
+import { fetchSentimentData } from "./data/sentiment-data";
+import { fetchWhaleData } from "./data/whale-data";
+import { fetchMomentumData } from "./data/momentum-data";
 
 const PROVIDER = process.env.OG_PROVIDER_ADDRESS!;
 

@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { getUserById, updateUser } from "../../store/user-store.js";
-import { mintShares, burnShares, grantKyc, getTokenInfo } from "../../hedera/hts.js";
-import { agentTransfer } from "../../payments/circle-wallet.js";
-import { getOperatorId } from "../../config/hedera.js";
+import { getUserById, updateUser } from "../../store/user-store";
+import { mintShares, burnShares, grantKyc, getTokenInfo } from "../../hedera/hts";
+import { agentTransfer } from "../../payments/circle-wallet";
+import { getOperatorId } from "../../config/hedera";
 
 // Cache token decimals — fetched once on first deposit/withdraw
 let cachedDecimals: number | null = null;

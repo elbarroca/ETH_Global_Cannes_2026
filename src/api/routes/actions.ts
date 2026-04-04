@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getUserActions, getCycleActions, getUserCycles } from "../../store/action-logger.js";
+import { getUserActions, getCycleActions, getUserCycles } from "../../store/action-logger";
 
 export function actionRoutes(): Router {
   const router = Router();

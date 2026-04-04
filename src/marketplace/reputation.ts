@@ -1,6 +1,6 @@
 // ELO-style reputation scoring for specialist agents
 
-import { getPrisma } from "../config/prisma.js";
+import { getPrisma } from "../config/prisma";
 
 const K_FACTOR = 32;
 const DEFAULT_RATING = 500;

@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { encrypt, decrypt } from "./crypto.js";
+import { encrypt, decrypt } from "./crypto";
 
 export function generateProxyWallet(): { address: string; encryptedKey: string } {
   const wallet = ethers.Wallet.createRandom();
