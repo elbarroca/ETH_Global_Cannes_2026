@@ -1,5 +1,13 @@
 import { ethers } from "ethers";
-import { createZGComputeNetworkBroker } from "@0glabs/0g-serving-broker";
+import { createRequire } from "node:module";
+
+// Force CJS resolution — the ESM build of @0glabs/0g-serving-broker is broken
+// (lib.esm/index.mjs references exports that don't exist in the bundled chunk)
+const require = createRequire(import.meta.url);
+const ogBrokerModule = require("@0glabs/0g-serving-broker");
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type OGBroker = any;
 
 const OG_RPC_URL = process.env.OG_RPC_URL ?? "https://evmrpc-testnet.0g.ai";
 
@@ -8,7 +16,7 @@ export const OG_PROVIDER = process.env.OG_PROVIDER_ADDRESS!;
 
 let ogProviderInstance: ethers.JsonRpcProvider | null = null;
 let ogWalletInstance: ethers.Wallet | null = null;
-let brokerInstance: Awaited<ReturnType<typeof createZGComputeNetworkBroker>> | null = null;
+let brokerInstance: OGBroker | null = null;
 let autoFundingStarted = false;
 
 function getPrivateKey(): string {
@@ -30,9 +38,9 @@ export function getOgWallet(): ethers.Wallet {
   return ogWalletInstance;
 }
 
-export async function getBroker(): Promise<Awaited<ReturnType<typeof createZGComputeNetworkBroker>>> {
+export async function getBroker(): Promise<OGBroker> {
   if (!brokerInstance) {
-    brokerInstance = await createZGComputeNetworkBroker(getOgWallet());
+    brokerInstance = await ogBrokerModule.createZGComputeNetworkBroker(getOgWallet());
 
     // Start auto-funding to prevent mid-cycle balance failures
     if (!autoFundingStarted && OG_PROVIDER) {
