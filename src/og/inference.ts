@@ -1,70 +1,104 @@
 import { getBroker } from "../config/og-compute";
 import type { InferenceResult } from "../types/index";
 
+// ── Concurrency limiter: 0G allows max 5 concurrent, 30 req/min ────────────
+const MAX_CONCURRENT = 3;
+const INTER_REQUEST_DELAY_MS = 2000;
+let activeRequests = 0;
+const waitQueue: Array<() => void> = [];
+
+async function acquireSlot(): Promise<void> {
+  if (activeRequests < MAX_CONCURRENT) {
+    activeRequests++;
+    return;
+  }
+  return new Promise<void>((resolve) => {
+    waitQueue.push(() => {
+      activeRequests++;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot(): void {
+  activeRequests--;
+  const next = waitQueue.shift();
+  if (next) {
+    // Small delay between releasing and granting next slot
+    setTimeout(next, INTER_REQUEST_DELAY_MS);
+  }
+}
+
+// ── Sealed inference on 0G Compute Network (TEE-verified) ───────────────────
+
 export async function sealedInference(
   providerAddress: string,
   systemPrompt: string,
   userMessage: string,
 ): Promise<InferenceResult> {
-  const broker = await getBroker();
+  await acquireSlot();
 
-  const { endpoint, model } = await broker.inference.getServiceMetadata(providerAddress);
+  try {
+    const broker = await getBroker();
 
-  // Single-use headers — fresh per call
-  const headers = await broker.inference.getRequestHeaders(providerAddress);
+    const { endpoint, model } = await broker.inference.getServiceMetadata(providerAddress);
 
-  const response = await fetch(`${endpoint}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...headers,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      temperature: 0.7,
-      max_tokens: 768,
-    }),
-  });
+    // Single-use headers — fresh per call
+    const headers = await broker.inference.getRequestHeaders(providerAddress);
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`0G inference failed (${response.status}): ${text}`);
-  }
+    const response = await fetch(`${endpoint}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...headers,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+        temperature: 0.7,
+        max_tokens: 768,
+      }),
+    });
 
-  const data = (await response.json()) as {
-    id: string;
-    choices: Array<{ message: { content: string } }>;
-    usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
-  };
-
-  const content = data.choices?.[0]?.message?.content ?? "";
-
-  // Attestation hash: prefer ZG-Res-Key header, fallback to data.id
-  const attestationHash =
-    response.headers.get("ZG-Res-Key") ??
-    response.headers.get("zg-res-key") ??
-    data.id ??
-    "";
-
-  // TEE verification — non-fatal
-  // processResponse(provider, chatID, usageContent) — v0.7.4 signature
-  // chatID = ZG-Res-Key for TEE sig verification
-  // usageContent = JSON with token counts for fee caching (NOT the response text)
-  let teeVerified = false;
-  if (attestationHash) {
-    try {
-      const usageContent = JSON.stringify(data.usage ?? {});
-      teeVerified = (await broker.inference.processResponse(providerAddress, attestationHash, usageContent)) ?? false;
-    } catch (err) {
-      console.warn("[0G] TEE verification failed (non-fatal):", err);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`0G inference failed (${response.status}): ${text}`);
     }
-  }
 
-  return { content, attestationHash, teeVerified };
+    const data = (await response.json()) as {
+      id: string;
+      choices: Array<{ message: { content: string } }>;
+      usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+    };
+
+    const content = data.choices?.[0]?.message?.content ?? "";
+
+    // Attestation hash: prefer ZG-Res-Key header, fallback to data.id
+    const attestationHash =
+      response.headers.get("ZG-Res-Key") ??
+      response.headers.get("zg-res-key") ??
+      data.id ??
+      "";
+
+    // TEE verification — non-fatal
+    // processResponse(provider, chatID, usageContent) — v0.7.4 signature
+    let teeVerified = false;
+    if (attestationHash) {
+      try {
+        const usageContent = JSON.stringify(data.usage ?? {});
+        teeVerified = (await broker.inference.processResponse(providerAddress, attestationHash, usageContent)) ?? false;
+      } catch (err) {
+        console.warn("[0G] TEE verification failed (non-fatal):", err);
+      }
+    }
+
+    return { content, attestationHash, teeVerified };
+  } finally {
+    releaseSlot();
+  }
 }
 
 export async function listProviders(): Promise<Array<{ provider: string; model: string }>> {

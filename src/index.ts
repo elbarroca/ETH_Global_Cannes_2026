@@ -6,7 +6,7 @@ import { loadRegistry } from "./marketplace/registry";
 import { startBot } from "./telegram/bot";
 import { startHeartbeatLoop } from "./agents/heartbeat";
 import { startTimeoutChecker } from "./agents/timeout-checker";
-import { getGateway } from "./openclaw/gateway-client";
+import { listProviders } from "./og/inference";
 
 const REQUIRED_ENV = [
   "OPERATOR_ID",
@@ -42,18 +42,16 @@ async function main(): Promise<void> {
   await loadRegistry();
   console.log("Marketplace registry loaded.");
 
-  // Check OpenClaw Gateway connectivity (non-fatal)
+  // Verify 0G Compute Network provider
   try {
-    const gateway = getGateway();
-    const isUp = await gateway.ping();
-    if (isUp) {
-      const agents = await gateway.listAgents();
-      console.log(`OpenClaw Gateway connected (${agents.length} agents registered).`);
+    const providers = await listProviders();
+    if (providers.length > 0) {
+      console.log(`0G Compute ready: ${providers.length} providers (model: ${providers[0].model})`);
     } else {
-      console.warn("OpenClaw Gateway not reachable — falling back to direct 0G inference.");
+      console.warn("0G Compute: no providers found — inference calls will fail");
     }
-  } catch {
-    console.warn("OpenClaw Gateway check failed — falling back to direct 0G inference.");
+  } catch (err) {
+    console.warn("0G Compute verification failed:", err instanceof Error ? err.message : String(err));
   }
 
   // Start Telegram bot

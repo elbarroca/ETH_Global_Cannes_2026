@@ -1,21 +1,36 @@
 import { getUserPaymentFetch } from "../config/arc";
-import { getGateway } from "../openclaw/gateway-client";
+import { sealedInference } from "../og/inference";
+import { OG_PROVIDER } from "../config/og-compute";
 import { discoverSpecialists, incrementAgentHires } from "../marketplace/registry";
 import { logAction } from "../store/action-logger";
-import { parseDualOutput } from "./prompts";
+import { PROMPTS, parseDualOutput } from "./prompts";
 import type { SpecialistResult } from "../types/index";
 
 const SPECIALIST_PRICE = "$0.001";
 
-// Specialist fallback signals — used when OpenClaw Gateway is unavailable
+// Map specialist IDs to their 0G inference prompts
+const PROMPT_MAP: Record<string, string> = {
+  "sentiment": PROMPTS.sentiment.content,
+  "whale": PROMPTS.whale.content,
+  "momentum": PROMPTS.momentum.content,
+  "memecoin-hunter": PROMPTS.memecoin.content,
+  "twitter-alpha": PROMPTS.twitter.content,
+  "defi-yield": PROMPTS.defiYield.content,
+  "news-scanner": PROMPTS.news.content,
+  "onchain-forensics": PROMPTS.forensics.content,
+  "options-flow": PROMPTS.options.content,
+  "macro-correlator": PROMPTS.macro.content,
+};
+
+// Specialist fallback when 0G inference fails
 const SPECIALIST_FALLBACK: Record<string, unknown> = {
   signal: "HOLD",
   confidence: 50,
-  reasoning: "Gateway unavailable — defaulting to HOLD",
+  reasoning: "0G inference unavailable — defaulting to HOLD",
 };
 
-// ── Hire a single specialist: x402 pay → sessions_send ────────────────────────
-// Decouples payment (Arc bounty) from communication (OpenClaw bounty)
+// ── Hire a single specialist: x402 pay + 0G sealed inference ──────────────────
+// Payment on Arc (x402 bounty), inference on 0G Compute (TEE-verified)
 
 export async function hireSpecialist(
   specialistId: string,
@@ -24,19 +39,15 @@ export async function hireSpecialist(
   userWalletIndex: number | null,
 ): Promise<SpecialistResult> {
   const start = Date.now();
-  const gateway = getGateway();
 
   // Step 1: Pay specialist via x402 on Arc (satisfies Arc bounty)
   let paymentTxHash = "no-payment";
   if (userWalletIndex != null) {
     try {
       const payFetch = getUserPaymentFetch(userWalletIndex);
-      // Find specialist endpoint for payment
       const found = await discoverSpecialists({ tags: [specialistId], maxHires: 1 });
       if (found.length > 0 && found[0].endpoint) {
         const payRes = await payFetch(found[0].endpoint);
-        // The x402 wrapped fetch handles 402 → pay → retry automatically
-        // We just need to make the request to trigger the payment
         if (payRes.ok) {
           paymentTxHash = payRes.headers.get("x-payment-tx") ?? "paid";
         }
@@ -46,32 +57,39 @@ export async function hireSpecialist(
     }
   }
 
-  // Step 2: Send task to specialist via OpenClaw sessions_send
+  // Step 2: Run inference on 0G Compute (the ONLY inference path)
+  const prompt = PROMPT_MAP[specialistId];
+  if (!prompt) {
+    console.warn(`[hire] No prompt found for specialist ${specialistId} — returning fallback`);
+    return {
+      name: specialistId,
+      signal: "HOLD",
+      confidence: 50,
+      reasoning: `No prompt configured for ${specialistId}`,
+      attestationHash: "no-prompt",
+      teeVerified: false,
+      reputation: 500,
+    };
+  }
+
   let content = "";
-  let attestationHash = "gateway-" + Date.now().toString(36);
+  let attestationHash = "0g-failed";
   let teeVerified = false;
   let parsed: Record<string, unknown> = { ...SPECIALIST_FALLBACK };
   let reasoning = "";
 
   try {
-    const result = await gateway.sessionsSend(specialistId, task, 15);
+    const result = await sealedInference(OG_PROVIDER, prompt, task);
+    content = result.content;
+    attestationHash = result.attestationHash;
+    teeVerified = result.teeVerified;
 
-    if (result.status === "ok" && result.content) {
-      content = result.content;
-      attestationHash = result.runId ?? attestationHash;
-
-      // Parse dual output (reasoning text + JSON)
-      const parseResult = parseDualOutput<Record<string, unknown>>(content, SPECIALIST_FALLBACK as Record<string, unknown>);
-      parsed = parseResult.parsed;
-      reasoning = parseResult.reasoning;
-      teeVerified = false; // OpenClaw Gateway response — not a TEE attestation
-    } else if (result.status === "error") {
-      console.warn(`[hire] sessions_send to ${specialistId} failed: ${result.error}`);
-      reasoning = `[GATEWAY_ERROR] ${result.error}`;
-    }
+    const parseResult = parseDualOutput<Record<string, unknown>>(content, SPECIALIST_FALLBACK as Record<string, unknown>);
+    parsed = parseResult.parsed;
+    reasoning = parseResult.reasoning;
   } catch (err) {
-    console.warn(`[hire] OpenClaw send to ${specialistId} failed:`, err instanceof Error ? err.message : String(err));
-    reasoning = `[GATEWAY_UNAVAILABLE] ${err instanceof Error ? err.message : String(err)}`;
+    console.warn(`[hire] 0G inference for ${specialistId} failed:`, err instanceof Error ? err.message : String(err));
+    reasoning = `[0G_ERROR] ${err instanceof Error ? err.message : String(err)}`;
   }
 
   // Step 3: Increment hire count in marketplace
@@ -94,7 +112,7 @@ export async function hireSpecialist(
       paymentNetwork: "arc",
       paymentTxHash,
       durationMs,
-      payload: { signal: parsed.signal, confidence: parsed.confidence, method: "openclaw_sessions_send" },
+      payload: { signal: parsed.signal, confidence: parsed.confidence, method: "0g_sealed_inference" },
     });
   } catch {
     // non-fatal
@@ -107,12 +125,12 @@ export async function hireSpecialist(
     reasoning: reasoning || String(parsed.reasoning ?? ""),
     attestationHash,
     teeVerified,
-    reputation: 500, // Will be overridden by marketplace lookup
+    reputation: 500,
     rawDataSnapshot: parsed,
   };
 }
 
-// ── Hire multiple specialists in parallel ─────────────────────────────────────
+// ── Hire multiple specialists in parallel (rate-limited by inference.ts semaphore) ─
 
 export async function hireSpecialists(
   specialistIds: string[],
