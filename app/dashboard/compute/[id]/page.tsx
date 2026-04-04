@@ -7,6 +7,7 @@ import { getCycleDetail, executeTrade } from "@/lib/api";
 import type { ComputeDetailResponse } from "@/lib/types";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge, SealedBadge } from "@/components/ui/badge";
+import { DawgSpinner } from "@/components/dawg-spinner";
 import { AgentGridCard } from "@/components/agent-grid-card";
 import { ComputeLog } from "@/components/compute-log";
 import { ExecuteTradeModal } from "@/components/execute-trade-modal";
@@ -51,8 +52,7 @@ export default function ComputePage() {
     return (
       <main className="max-w-7xl mx-auto px-5 py-8">
         <div className="flex items-center justify-center py-20">
-          <div className="w-6 h-6 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
-          <span className="ml-3 text-void-400 text-sm">Loading hunt data...</span>
+          <DawgSpinner size={56} label="Loading hunt data…" />
         </div>
       </main>
     );

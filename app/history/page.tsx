@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge, SealedBadge, ZeroGBadge } from "@/components/ui/badge";
+import { DawgSpinner } from "@/components/dawg-spinner";
 import { useCycleHistory } from "@/hooks/use-vaultmind";
 import { mapEnrichedResponseToCycle } from "@/lib/cycle-mapper";
 import type { Cycle } from "@/lib/types";
@@ -49,8 +50,8 @@ export default function HistoryPage() {
       {/* Loading state */}
       {loading && cycles.length === 0 && (
         <Card>
-          <div className="px-4 py-8 text-center text-sm text-void-500">
-            Loading hunt history...
+          <div className="flex items-center justify-center px-4 py-10">
+            <DawgSpinner size={48} label="Loading hunt history…" />
           </div>
         </Card>
       )}
@@ -178,9 +179,9 @@ export default function HistoryPage() {
             <button
               onClick={loadMore}
               disabled={loading}
-              className="w-full py-3 text-sm text-void-500 hover:text-void-300 transition-colors"
+              className="flex w-full items-center justify-center py-3 text-sm text-void-500 transition-colors hover:text-void-300 disabled:cursor-not-allowed"
             >
-              {loading ? "Loading..." : "Load more"}
+              {loading ? <DawgSpinner size={18} label="Loading more…" /> : "Load more"}
             </button>
           )}
         </div>

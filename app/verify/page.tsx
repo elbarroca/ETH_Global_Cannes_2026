@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardBody, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, ZeroGBadge } from "@/components/ui/badge";
+import { DawgSpinner } from "@/components/dawg-spinner";
 import { useUser } from "@/contexts/user-context";
 import { getCycleDetail } from "@/lib/api";
 import type { CycleDetail, AgentActionRecord } from "@/lib/types";
@@ -121,11 +122,13 @@ function getTeeVerified(key: AgentKey, actions: AgentActionRecord[]): boolean {
 
 export default function VerifyPage() {
   return (
-    <Suspense fallback={
-      <main className="max-w-7xl mx-auto px-5 py-5">
-        <p className="text-void-500 text-sm animate-pulse">Loading...</p>
-      </main>
-    }>
+    <Suspense
+      fallback={
+        <main className="max-w-7xl mx-auto flex justify-center px-5 py-16">
+          <DawgSpinner size={56} label="Loading verification…" />
+        </main>
+      }
+    >
       <VerifyContent />
     </Suspense>
   );
@@ -166,8 +169,8 @@ function VerifyContent() {
 
   if (loading) {
     return (
-      <main className="max-w-7xl mx-auto px-5 py-5">
-        <p className="text-void-500 text-sm animate-pulse">Loading verification data...</p>
+      <main className="max-w-7xl mx-auto flex justify-center px-5 py-16">
+        <DawgSpinner size={56} label="Loading verification data…" />
       </main>
     );
   }

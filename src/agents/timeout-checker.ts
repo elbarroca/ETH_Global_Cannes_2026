@@ -28,9 +28,11 @@ export async function checkExpiredPendingCycles(): Promise<void> {
       const analysis: AnalysisResult = {
         userId: pending.userId,
         cycleId: pending.cycleNumber,
+        goal: pending.goal,
         specialists: pending.specialists,
         debate: pending.debate,
         compactRecord: pending.compactRecord,
+        richRecord: pending.richRecord,
       };
 
       const autoAction = getTimeoutAction(user.agent.riskProfile);

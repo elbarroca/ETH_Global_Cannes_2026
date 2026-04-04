@@ -414,9 +414,11 @@ function registerCallbacks(telegramBot: TelegramBot): void {
         const analysis: AnalysisResult = {
           userId: pending.userId,
           cycleId: pending.cycleNumber,
+          goal: pending.goal,
           specialists: pending.specialists,
           debate: pending.debate,
           compactRecord: pending.compactRecord,
+          richRecord: pending.richRecord,
         };
 
         try {
@@ -478,9 +480,11 @@ function registerCallbacks(telegramBot: TelegramBot): void {
         const analysis: AnalysisResult = {
           userId: pending.userId,
           cycleId: pending.cycleNumber,
+          goal: pending.goal,
           specialists: pending.specialists,
           debate: pending.debate,
           compactRecord: pending.compactRecord,
+          richRecord: pending.richRecord,
         };
 
         await rejectCycle(analysis, user, "user_rejected");
