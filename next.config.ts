@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   serverExternalPackages: [
     "@hashgraph/sdk",
     "@0glabs/0g-serving-broker",
