@@ -44,6 +44,9 @@ model Cycle {
   execPct          Int?          @map("exec_pct")
   execStopLoss     String?       @map("exec_stop_loss")
   execAttestation  String?       @map("exec_attestation")
+  alphaReasoning   String?       @map("alpha_reasoning")
+  riskReasoning    String?       @map("risk_reasoning")
+  execReasoning    String?       @map("exec_reasoning")
   decision         String?
   asset            String?
   decisionPct      Int?          @map("decision_pct")

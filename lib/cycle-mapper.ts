@@ -40,7 +40,9 @@ export function mapCycleResultToCycle(result: CycleResult): Cycle {
     specialists: (result.specialists ?? []).map((s) => ({
       name: NAME_MAP[s.name] ?? s.name,
       emoji: EMOJI_MAP[s.name] ?? "🤖",
-      analysis: `${s.signal} (confidence: ${s.confidence}%)${s.reputation ? ` [rep: ${s.reputation}]` : ""}`,
+      analysis: s.reasoning
+        ? `${s.reasoning}\n${s.signal} (confidence: ${s.confidence}%)${s.reputation ? ` [rep: ${s.reputation}]` : ""}`
+        : `${s.signal} (confidence: ${s.confidence}%)${s.reputation ? ` [rep: ${s.reputation}]` : ""}`,
       price: 0.001,
       attestation: truncateHash(s.attestationHash),
       model: "glm-5-chat",
@@ -49,17 +51,20 @@ export function mapCycleResultToCycle(result: CycleResult): Cycle {
     })),
     adversarial: {
       alpha: {
-        argument: String(alphaParsed.argument ?? alphaParsed.thesis ?? "Analyzing opportunity..."),
+        argument: result.debate?.alpha?.reasoning
+          || String(alphaParsed.argument ?? alphaParsed.thesis ?? "Analyzing opportunity..."),
         recommendation: `${alphaParsed.action ?? "HOLD"} ${alphaParsed.pct ?? 0}% ${alphaParsed.asset ?? "ETH"}`,
         attestation: truncateHash(result.debate?.alpha?.attestationHash ?? ""),
       },
       risk: {
-        argument: String(riskParsed.challenge ?? riskParsed.objection ?? "Evaluating risks..."),
+        argument: result.debate?.risk?.reasoning
+          || String(riskParsed.challenge ?? riskParsed.objection ?? "Evaluating risks..."),
         recommendation: `Max ${riskParsed.max_pct ?? riskParsed.maxSafePct ?? 0}%. Risks: ${Array.isArray(riskParsed.risks) ? (riskParsed.risks as string[]).join(", ") : "none flagged"}`,
         attestation: truncateHash(result.debate?.risk?.attestationHash ?? ""),
       },
       executor: {
-        argument: String(execParsed.reasoning ?? "Making final decision..."),
+        argument: result.debate?.executor?.reasoning
+          || String(execParsed.reasoning ?? "Making final decision..."),
         recommendation: `${execParsed.action ?? "HOLD"} ${execParsed.pct ?? 0}% ${execParsed.asset ?? "ETH"}${execParsed.stop_loss ? `. Stop ${execParsed.stop_loss}` : ""}`,
         attestation: truncateHash(result.debate?.executor?.attestationHash ?? ""),
       },
@@ -104,17 +109,17 @@ export function mapCompactRecordToCycle(record: CompactCycleRecord): Cycle {
     })),
     adversarial: {
       alpha: {
-        argument: `${record.adv.a.act} ${record.adv.a.pct}% ETH`,
+        argument: record.adv.a.r || `${record.adv.a.act} ${record.adv.a.pct}% ETH`,
         recommendation: `${record.adv.a.act} ${record.adv.a.pct}% ETH`,
         attestation: record.adv.a.att,
       },
       risk: {
-        argument: record.adv.r.obj,
+        argument: record.adv.r.r || record.adv.r.obj,
         recommendation: `Max ${record.adv.r.max}%`,
         attestation: record.adv.r.att,
       },
       executor: {
-        argument: `${record.adv.e.act} ${record.adv.e.pct}% ETH. Stop -${record.adv.e.sl}%`,
+        argument: record.adv.e.r || `${record.adv.e.act} ${record.adv.e.pct}% ETH. Stop -${record.adv.e.sl}%`,
         recommendation: `${record.adv.e.act} ${record.adv.e.pct}% ETH`,
         attestation: record.adv.e.att,
       },

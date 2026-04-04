@@ -18,7 +18,7 @@ export async function runHeartbeat(): Promise<void> {
 
   for (const user of users) {
     try {
-      const approvalMode = user.agent.approvalMode ?? "auto";
+      const approvalMode = user.agent.approvalMode ?? "always";
 
       if (approvalMode === "auto") {
         // Existing behavior — full cycle, no pause
