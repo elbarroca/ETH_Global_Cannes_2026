@@ -42,7 +42,19 @@ const OG_EXPLORER_BASE = "https://chainscan-galileo.0g.ai";
 
 // ── Compact card (collapsed state) ──────────────────────────
 
-function CompactView({ cycle, expanded, onClick }: { cycle: Cycle; expanded: boolean; onClick: () => void }) {
+function CompactView({
+  cycle,
+  expanded,
+  onClick,
+  computing,
+  computingLabel,
+}: {
+  cycle: Cycle;
+  expanded: boolean;
+  onClick: () => void;
+  computing?: boolean;
+  computingLabel?: string;
+}) {
   const style = ACTION_STYLES[cycle.trade.action] ?? ACTION_STYLES.HOLD;
   const time = new Date(cycle.timestamp).toLocaleTimeString("en-US", {
     hour: "2-digit",
@@ -67,6 +79,12 @@ function CompactView({ cycle, expanded, onClick }: { cycle: Cycle; expanded: boo
           <span className="font-pixel text-[13px] leading-none text-void-500">{time}</span>
         </div>
         <div className="flex items-center gap-2">
+          {computing && (
+            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-dawg-500/40 bg-dawg-500/10 text-[10px] font-semibold uppercase tracking-wider text-dawg-300">
+              <span className="w-2.5 h-2.5 border-2 border-dawg-400 border-t-transparent rounded-full animate-spin" />
+              {computingLabel ?? "Computing"}…
+            </span>
+          )}
           {cycle.proofs?.hcs && <span className="text-[9px] text-teal-400 font-mono">HCS ✓</span>}
           {cycle.proofs?.storage && <span className="text-[9px] text-purple-400 font-mono">0G ✓</span>}
           {cycle.proofs?.inft && <span className="text-[9px] text-gold-400 font-mono">iNFT ✓</span>}
@@ -553,11 +571,20 @@ export function ExpandableHuntCard({
   userId,
   defaultExpanded = false,
   userInftTokenId,
+  computing = false,
+  computingLabel,
+  computingStage,
 }: {
   cycle: Cycle;
   userId: string;
   defaultExpanded?: boolean;
   userInftTokenId?: number | null;
+  /** When true, renders a spinner badge in the card corner and surfaces the
+      current stage message in the expanded body. Used by the dashboard while
+      an analyze/approve flow is in flight. */
+  computing?: boolean;
+  computingLabel?: string;
+  computingStage?: string;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [actions, setActions] = useState<AgentActionRecord[]>([]);
@@ -575,14 +602,36 @@ export function ExpandableHuntCard({
   }, [expanded, userId, cycle.id]);
 
   return (
-    <div className={`bg-void-900 border rounded-2xl px-4 py-3 agent-card cursor-pointer transition-all ${expanded ? "border-dawg-500/30 glow-card col-span-full" : "border-void-800 hover:glow-card"}`}>
-      <CompactView cycle={cycle} expanded={expanded} onClick={() => setExpanded(!expanded)} />
+    <div className={`bg-void-900 border rounded-2xl px-4 py-3 agent-card cursor-pointer transition-all ${expanded ? "border-dawg-500/30 glow-card col-span-full" : "border-void-800 hover:glow-card"} ${computing ? "border-dawg-500/40" : ""}`}>
+      <CompactView
+        cycle={cycle}
+        expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+        computing={computing}
+        computingLabel={computingLabel}
+      />
 
       {/* Inline expand area using CSS grid animation */}
       <div className="hunt-expand-grid" data-open={expanded ? "true" : "false"}>
         <div className="hunt-expand-inner">
           {expanded && (
             <div className="pt-4 border-t border-void-800 mt-3">
+              {computing && (
+                <div className="mb-4 flex items-center gap-3 rounded-xl border border-dawg-500/30 bg-dawg-500/5 px-4 py-3">
+                  <span className="w-4 h-4 border-2 border-dawg-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-[11px] uppercase tracking-wider text-dawg-300 font-semibold">
+                      {computingLabel ?? "Computing"} new hunt
+                    </div>
+                    {computingStage && (
+                      <div className="text-xs text-void-400 mt-0.5">{computingStage}</div>
+                    )}
+                    <div className="text-[10px] text-void-600 mt-1">
+                      Showing last committed hunt until the new one finishes. Live logs will appear below.
+                    </div>
+                  </div>
+                </div>
+              )}
               <InlineDetail
                 cycle={cycle}
                 actions={actions}

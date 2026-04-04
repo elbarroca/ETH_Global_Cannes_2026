@@ -12,14 +12,12 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/user-context";
 import {
   getLatestCycle,
-  getCycleHistory,
   analyzeCycle,
   approveCycle,
   rejectCycle as rejectCycleApi,
   getPendingCycle,
   configure,
 } from "@/lib/api";
-import { HuntCard } from "@/components/hunt-card";
 import { ExpandableHuntCard } from "@/components/expandable-hunt-card";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreconditionModal } from "@/components/precondition-modal";
@@ -50,7 +48,6 @@ export default function DashboardPage() {
   const [pendingCycle, setPendingCycle] = useState<PendingCycleResponse | null>(null);
   const [stageIdx, setStageIdx] = useState(0);
   const [stages, setStages] = useState<string[]>(ANALYZE_STAGES);
-  const [pastCycles, setPastCycles] = useState<Cycle[]>([]);
   const [autoCycles, setAutoCycles] = useState(0);
   const [autoPeriod, setAutoPeriod] = useState(300000); // 5m default
   const [savingConfig, setSavingConfig] = useState(false);
@@ -106,9 +103,6 @@ export default function DashboardPage() {
     getPendingCycle(userId).then((pending) => {
       if (pending) setPendingCycle(pending);
     }).catch(() => {});
-    getCycleHistory(userId, 20).then((records) => {
-      setPastCycles(records.map(mapEnrichedResponseToCycle));
-    }).catch(() => {});
   }, [userId]);
 
   // Cycle through stage messages while running/approving
@@ -156,10 +150,6 @@ export default function DashboardPage() {
       const result = await approveCycle(pendingCycle.pendingId, userId);
       setLiveCycle(mapCycleResultToCycle(result));
       setPendingCycle(null);
-      // Refresh hunt history
-      getCycleHistory(userId, 20).then((records) => {
-        setPastCycles(records.map(mapEnrichedResponseToCycle));
-      }).catch(() => {});
     } catch (err) {
       console.warn("[dashboard] Approval failed:", err);
     } finally {
@@ -236,8 +226,6 @@ export default function DashboardPage() {
     memory: [],
     rebuttalTriggered: pendingCycle?.debate?.rebuttalTriggered,
   } : null;
-
-  const displayCycle = pendingAsCycle ?? cycle;
 
   return (
     <>
@@ -427,7 +415,24 @@ export default function DashboardPage() {
           userId={userId}
           defaultExpanded
           userInftTokenId={user?.inftTokenId ?? null}
+          computing={running || approving}
+          computingLabel={running ? "Analyzing" : "Committing"}
+          computingStage={stages[stageIdx]}
         />
+      ) : running || approving ? (
+        // First-ever hunt in flight — no prior cycle to show, so render a
+        // skeleton ExpandableHuntCard-shaped computing placeholder.
+        <Card>
+          <CardBody className="py-8 space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="w-4 h-4 border-2 border-dawg-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm font-semibold text-void-200">
+                Computing Hunt #{(user?.agent?.lastCycleId ?? 0) + 1}…
+              </span>
+            </div>
+            <p className="text-xs text-void-500 animate-pulse">{stages[stageIdx]}</p>
+          </CardBody>
+        </Card>
       ) : (
         <Card>
           <CardBody className="text-center py-12 space-y-3">
@@ -437,20 +442,6 @@ export default function DashboardPage() {
             </p>
           </CardBody>
         </Card>
-      )}
-
-      {/* Row 3: Past hunt cards */}
-      {pastCycles.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-void-600 uppercase tracking-wider">
-            Hunt history
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {pastCycles.map((c) => (
-              <ExpandableHuntCard key={c.id} cycle={c} userId={userId!} />
-            ))}
-          </div>
-        </div>
       )}
 
       {/* Row 4: Agent Wallet + Status bar */}
@@ -842,232 +833,3 @@ function ChallengeColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => vo
   );
 }
 
-const INFT_CONTRACT_ADDRESS =
-  process.env.NEXT_PUBLIC_INFT_CONTRACT ?? "0x73e3016D0D3Bf2985c55860cd2A51FF017c2c874";
-const OG_EXPLORER_BASE = "https://chainscan-galileo.0g.ai";
-
-function RightColumn({
-  cycle,
-  userInftTokenId,
-}: {
-  cycle: Cycle;
-  userInftTokenId: number | null;
-}) {
-  const totalCost = cycle.payments.reduce((s, p) => s + p.amount, 0);
-  const effectiveInftTokenId = cycle.inftTokenId ?? userInftTokenId ?? null;
-  const swap = cycle.swap;
-
-  return (
-    <div className="space-y-3">
-      {/* Arc Payments */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
-            Arc payments
-          </div>
-          <Badge variant="blue">USDC</Badge>
-        </CardHeader>
-        <CardBody className="space-y-2">
-          {cycle.payments.map((p, i) => (
-            <div key={i} className="flex items-center justify-between text-sm">
-              <span className="text-void-500">
-                {p.from} → {p.to}
-              </span>
-              <span className="font-mono text-void-200">
-                ${p.amount.toFixed(3)}
-              </span>
-            </div>
-          ))}
-          <hr className="border-void-800 my-1" />
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-void-200">
-              Hunt cost:
-            </span>
-            <span className="font-mono font-bold text-void-100">
-              ${totalCost.toFixed(3)}
-            </span>
-          </div>
-          <p className="text-xs text-blue-400">Circle Nanopayments · Gas-free</p>
-        </CardBody>
-      </Card>
-
-      {/* Arc Execution */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-            <span className="w-2 h-2 rounded-full bg-indigo-500" />
-            Arc execution
-          </div>
-          <Badge variant="indigo">Testnet</Badge>
-        </CardHeader>
-        <CardBody className="space-y-2">
-          {swap ? (
-            swap.success && swap.txHash ? (
-              <>
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
-                    Method
-                  </div>
-                  <span className="font-mono text-xs text-void-300">
-                    {swap.method}
-                  </span>
-                </div>
-                {swap.amountIn && (
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
-                      Amount
-                    </div>
-                    <span className="font-mono text-xs text-void-200">
-                      ${swap.amountIn} USDC
-                    </span>
-                  </div>
-                )}
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
-                    Tx hash
-                  </div>
-                  <span className="font-mono text-xs text-gold-400 break-all">
-                    {swap.txHash.slice(0, 18)}…{swap.txHash.slice(-6)}
-                  </span>
-                </div>
-                {swap.explorerUrl && (
-                  <a
-                    href={swap.explorerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block text-xs text-indigo-300 hover:underline"
-                  >
-                    View on ArcScan →
-                  </a>
-                )}
-              </>
-            ) : (
-              <div className="text-xs text-void-500">
-                {swap.method === "skipped"
-                  ? `Skipped: ${swap.reason ?? "no allocation required"}`
-                  : `Failed: ${swap.reason ?? "unknown error"}`}
-              </div>
-            )
-          ) : (
-            <p className="text-xs text-void-600">
-              No on-chain execution for this cycle (HOLD or zero allocation).
-            </p>
-          )}
-        </CardBody>
-      </Card>
-
-      {/* Hedera Audit */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-            <span className="w-2 h-2 rounded-full bg-teal-500" />
-            Hedera audit
-          </div>
-        </CardHeader>
-        <CardBody>
-          <CodeBlock>
-            <div className="space-y-1 text-void-500">
-              <div>
-                Topic:{" "}
-                <span className="text-void-200">
-                  {cycle.hcs.topicId}
-                </span>
-              </div>
-              <div>
-                Seq:{" "}
-                <span className="text-void-200">
-                  #{cycle.hcs.sequenceNumber}
-                </span>{" "}
-                · Time: {cycle.hcs.timestamp}
-              </div>
-              <div className="text-void-600">
-                6 attestations · 3 payments · 1 decision
-              </div>
-            </div>
-          </CodeBlock>
-          <a
-            href={`https://hashscan.io/testnet/topic/${cycle.hcs.topicId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block mt-2 text-xs text-teal-400 hover:underline transition-colors"
-          >
-            Verify on Hashscan →
-          </a>
-        </CardBody>
-      </Card>
-
-      {/* 0G Proof */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-            <span className="w-2 h-2 rounded-full bg-gold-400" />
-            0G proof
-          </div>
-          <ZeroGBadge label="0G Storage + Chain" />
-        </CardHeader>
-        <CardBody className="space-y-3">
-          {/* Storage Hash */}
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
-              0G Storage root
-            </div>
-            {cycle.storageHash ? (
-              <span className="font-mono text-sm text-gold-400 break-all">
-                {cycle.storageHash}
-              </span>
-            ) : (
-              <span className="text-xs text-void-600">Pending commit</span>
-            )}
-          </div>
-
-          {/* iNFT */}
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
-              iNFT (ERC-7857)
-            </div>
-            {effectiveInftTokenId != null ? (
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm text-gold-400">
-                    Token #{effectiveInftTokenId}
-                  </span>
-                  <Badge variant="green">0G Chain</Badge>
-                </div>
-                <a
-                  href={`${OG_EXPLORER_BASE}/address/${INFT_CONTRACT_ADDRESS}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block text-xs text-gold-400 hover:underline"
-                >
-                  View on 0G Explorer →
-                </a>
-              </div>
-            ) : (
-              <span className="text-xs text-void-600">No iNFT minted</span>
-            )}
-          </div>
-
-          {/* Memory */}
-          {cycle.memory.length > 0 && (
-            <div>
-              <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
-                Pack memory
-              </div>
-              {cycle.memory.map((m) => (
-                <div key={m.cycleRef} className="flex gap-2">
-                  <span className="font-mono text-xs text-gold-400 shrink-0 pt-0.5">
-                    #{m.cycleRef}
-                  </span>
-                  <p className="text-xs text-void-500 leading-relaxed">
-                    {m.text}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardBody>
-      </Card>
-    </div>
-  );
-}
