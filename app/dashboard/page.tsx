@@ -367,7 +367,7 @@ export default function DashboardPage() {
               onReject={handleReject}
             />
           ) : cycle ? (
-            <RightColumn cycle={cycle} />
+            <RightColumn cycle={cycle} userInftTokenId={user?.inftTokenId ?? null} />
           ) : null}
         </div>
       ) : (
@@ -716,8 +716,20 @@ function ChallengeColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => vo
   );
 }
 
-function RightColumn({ cycle }: { cycle: Cycle }) {
+const INFT_CONTRACT_ADDRESS =
+  process.env.NEXT_PUBLIC_INFT_CONTRACT ?? "0x73e3016D0D3Bf2985c55860cd2A51FF017c2c874";
+const OG_EXPLORER_BASE = "https://chainscan-galileo.0g.ai";
+
+function RightColumn({
+  cycle,
+  userInftTokenId,
+}: {
+  cycle: Cycle;
+  userInftTokenId: number | null;
+}) {
   const totalCost = cycle.payments.reduce((s, p) => s + p.amount, 0);
+  const effectiveInftTokenId = cycle.inftTokenId ?? userInftTokenId ?? null;
+  const swap = cycle.swap;
 
   return (
     <div className="space-y-3">
@@ -751,6 +763,71 @@ function RightColumn({ cycle }: { cycle: Cycle }) {
             </span>
           </div>
           <p className="text-xs text-blue-400">Circle Nanopayments · Gas-free</p>
+        </CardBody>
+      </Card>
+
+      {/* Arc Execution */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
+            <span className="w-2 h-2 rounded-full bg-indigo-500" />
+            Arc execution
+          </div>
+          <Badge variant="indigo">Testnet</Badge>
+        </CardHeader>
+        <CardBody className="space-y-2">
+          {swap ? (
+            swap.success && swap.txHash ? (
+              <>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
+                    Method
+                  </div>
+                  <span className="font-mono text-xs text-void-300">
+                    {swap.method}
+                  </span>
+                </div>
+                {swap.amountIn && (
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
+                      Amount
+                    </div>
+                    <span className="font-mono text-xs text-void-200">
+                      ${swap.amountIn} USDC
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
+                    Tx hash
+                  </div>
+                  <span className="font-mono text-xs text-gold-400 break-all">
+                    {swap.txHash.slice(0, 18)}…{swap.txHash.slice(-6)}
+                  </span>
+                </div>
+                {swap.explorerUrl && (
+                  <a
+                    href={swap.explorerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-xs text-indigo-300 hover:underline"
+                  >
+                    View on ArcScan →
+                  </a>
+                )}
+              </>
+            ) : (
+              <div className="text-xs text-void-500">
+                {swap.method === "skipped"
+                  ? `Skipped: ${swap.reason ?? "no allocation required"}`
+                  : `Failed: ${swap.reason ?? "unknown error"}`}
+              </div>
+            )
+          ) : (
+            <p className="text-xs text-void-600">
+              No on-chain execution for this cycle (HOLD or zero allocation).
+            </p>
+          )}
         </CardBody>
       </Card>
 
@@ -823,12 +900,22 @@ function RightColumn({ cycle }: { cycle: Cycle }) {
             <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
               iNFT (ERC-7857)
             </div>
-            {cycle.inftTokenId ? (
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-sm text-gold-400">
-                  Token #{cycle.inftTokenId}
-                </span>
-                <Badge variant="green">0G Chain</Badge>
+            {effectiveInftTokenId != null ? (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm text-gold-400">
+                    Token #{effectiveInftTokenId}
+                  </span>
+                  <Badge variant="green">0G Chain</Badge>
+                </div>
+                <a
+                  href={`${OG_EXPLORER_BASE}/address/${INFT_CONTRACT_ADDRESS}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-xs text-gold-400 hover:underline"
+                >
+                  View on 0G Explorer →
+                </a>
               </div>
             ) : (
               <span className="text-xs text-void-600">No iNFT minted</span>

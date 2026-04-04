@@ -106,6 +106,18 @@ export function mapCycleResultToCycle(result: CycleResult): Cycle {
     memory: [],
     storageHash: result.storageHash,
     inftTokenId: result.inftTokenId,
+    swap: result.swapResult
+      ? {
+          success: result.swapResult.success,
+          txHash: result.swapResult.txHash,
+          explorerUrl: result.swapResult.explorerUrl,
+          method: result.swapResult.method,
+          reason: result.swapResult.reason,
+          amountIn: result.swapResult.amountIn,
+          tokenIn: result.swapResult.tokenIn,
+          tokenOut: result.swapResult.tokenOut,
+        }
+      : undefined,
   };
 }
 

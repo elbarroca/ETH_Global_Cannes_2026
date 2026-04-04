@@ -35,9 +35,16 @@ export interface Cycle {
   inftTokenId?: number;
   rebuttalTriggered?: boolean;
   swap?: {
-    txHash: string;
-    explorerUrl: string;
-    method: "uniswap_v3" | "direct_transfer" | "skipped";
+    success: boolean;
+    txHash?: string;
+    explorerUrl?: string;
+    method:
+      | "uniswap_v3"
+      | "direct_transfer"
+      | "mock_swap"
+      | "native_transfer"
+      | "skipped";
+    reason?: string;
     amountIn?: string;
     tokenIn?: string;
     tokenOut?: string;
@@ -130,4 +137,5 @@ export interface Agent {
   provider: string;
   creator: string;
   isActive: boolean;
+  walletAddress?: string;
 }

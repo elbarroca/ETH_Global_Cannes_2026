@@ -51,12 +51,26 @@ export function HuntCard({ cycle }: { cycle: Cycle }) {
         </div>
 
         {/* Bottom: metadata */}
-        <div className="flex items-center gap-3 text-xs text-void-600">
+        <div className="flex items-center gap-3 text-xs text-void-600 flex-wrap">
           <span>{specialistCount} specialists</span>
           <span className="w-1 h-1 rounded-full bg-void-700" />
           <span>{specialistCount * 2} sealed inferences</span>
           <span className="w-1 h-1 rounded-full bg-void-700" />
           <span>${cost} spent</span>
+          {cycle.swap?.success && cycle.swap.txHash && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-void-700" />
+              <span className="text-indigo-300 font-mono">
+                Arc tx {cycle.swap.txHash.slice(0, 6)}…{cycle.swap.txHash.slice(-4)}
+              </span>
+            </>
+          )}
+          {cycle.inftTokenId != null && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-void-700" />
+              <span className="text-gold-400 font-mono">iNFT #{cycle.inftTokenId}</span>
+            </>
+          )}
         </div>
       </button>
     </Card>

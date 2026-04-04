@@ -21,8 +21,13 @@ const EMOJI_MAP: Record<string, string> = {
   momentum: "\uD83D\uDCC8",
 };
 
+function truncateAddress(addr: string | null | undefined): string | null {
+  if (!addr) return null;
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
 export default function MarketplacePage() {
-  const { userId } = useUser();
+  const { userId, user } = useUser();
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [myAgents, setMyAgents] = useState<HiredAgent[]>([]);
   const [loadingPack, setLoadingPack] = useState(true);
@@ -63,6 +68,7 @@ export default function MarketplacePage() {
           provider: "0G Sealed TEE",
           creator: "AlphaDawg",
           isActive: e.active,
+          walletAddress: e.walletAddress,
         }));
         setAllAgents(mapped);
       })
@@ -95,6 +101,7 @@ export default function MarketplacePage() {
       provider: "0G Sealed TEE",
       creator: "AlphaDawg",
       isActive: true,
+      walletAddress: h.walletAddress ?? undefined,
     };
   });
 
@@ -139,7 +146,9 @@ export default function MarketplacePage() {
             </p>
           </div>
           <span className="text-xs font-mono px-2.5 py-1 rounded-md bg-void-800/60 text-void-400 border border-void-700/40">
-            Lead Dawg: iNFT #0846 on 0G Chain
+            {user?.inftTokenId != null
+              ? `Lead Dawg: iNFT #${user.inftTokenId} on 0G Chain`
+              : "Lead Dawg: iNFT not minted"}
           </span>
         </div>
 
@@ -206,6 +215,7 @@ function ActiveAgentCard({
   firing: boolean;
   onFire: () => void;
 }) {
+  const walletShort = truncateAddress(agent.walletAddress);
   return (
     <Card className="agent-card">
       <CardBody className="space-y-3">
@@ -223,6 +233,15 @@ function ActiveAgentCard({
         <div className="text-xs font-mono text-void-500">
           iNFT {agent.inftId} · 0G Chain
         </div>
+
+        {walletShort && (
+          <div className="text-[11px] font-mono text-void-600">
+            payTo:{" "}
+            <span className="text-void-400" title={agent.walletAddress}>
+              {walletShort}
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 text-xs">
           <span className="text-green-400 font-medium">{agent.accuracy}% accurate</span>
@@ -266,6 +285,7 @@ function CommunityAgentCard({
   hiring: boolean;
   onHire: () => void;
 }) {
+  const walletShort = truncateAddress(agent.walletAddress);
   return (
     <Card className="agent-card hover:border-blood-800/50">
       <CardBody className="space-y-2.5">
@@ -281,6 +301,14 @@ function CommunityAgentCard({
 
         <div className="text-xs font-mono text-void-500">iNFT {agent.inftId}</div>
         <div className="text-xs font-mono text-void-600">{agent.creator}</div>
+        {walletShort && (
+          <div className="text-[11px] font-mono text-void-600">
+            payTo:{" "}
+            <span className="text-void-400" title={agent.walletAddress}>
+              {walletShort}
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 text-xs">
           <span className="text-green-400 font-medium">{agent.accuracy}% accurate</span>

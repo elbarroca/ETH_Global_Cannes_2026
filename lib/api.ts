@@ -63,6 +63,23 @@ export interface DebateStage {
   teeVerified: boolean;
 }
 
+export interface ArcSwapResultDto {
+  success: boolean;
+  txHash?: string;
+  chain: "arc-testnet";
+  explorerUrl?: string;
+  method:
+    | "uniswap_v3"
+    | "direct_transfer"
+    | "mock_swap"
+    | "native_transfer"
+    | "skipped";
+  reason?: string;
+  amountIn?: string;
+  tokenIn?: string;
+  tokenOut?: string;
+}
+
 export interface CycleResult {
   cycleId: number;
   specialists: SpecialistResult[];
@@ -76,6 +93,7 @@ export interface CycleResult {
   hashscanUrl: string;
   storageHash?: string;
   inftTokenId?: number;
+  swapResult?: ArcSwapResultDto;
   timestamp: string;
 }
 
@@ -260,6 +278,7 @@ export interface LeaderboardAgent {
   tags: string[];
   price: string;
   active: boolean;
+  walletAddress?: string;
 }
 
 export async function getLeaderboard(): Promise<LeaderboardAgent[]> {
@@ -279,6 +298,7 @@ export interface HiredAgent {
   totalHires: number;
   correctCalls: number;
   hiredAt: string;
+  walletAddress?: string;
 }
 
 export async function getMyAgents(userId: string): Promise<HiredAgent[]> {
