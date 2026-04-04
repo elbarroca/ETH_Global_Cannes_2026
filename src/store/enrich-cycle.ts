@@ -47,6 +47,8 @@ export interface EnrichedCycleResponse {
     action: string;
     asset: string;
     pct: number;
+    assetSubstituted?: boolean;
+    originalAsset?: string;
   };
   swap?: {
     success: boolean;
@@ -187,6 +189,11 @@ export async function enrichCycleRow(cycle: Cycle): Promise<EnrichedCycleRespons
       action: cycle.decision ?? "HOLD",
       asset: cycle.asset ?? "ETH",
       pct: cycle.decisionPct ?? 0,
+      // The substitution flags live on the narrative (which is persisted as a
+      // JSON blob on the cycles row) because we deliberately didn't add Prisma
+      // columns for them — they're display metadata, not a schema concern.
+      assetSubstituted: narrative?.assetSubstituted,
+      originalAsset: narrative?.originalAsset,
     },
     swap: cycle.swapTxHash
       ? {

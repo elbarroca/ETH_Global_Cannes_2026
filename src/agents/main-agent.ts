@@ -2,10 +2,11 @@ import { updateUser } from "../store/user-store";
 import { logAction, logCycleRecord } from "../store/action-logger";
 import { runAdversarialDebate } from "./adversarial";
 import { normalizeCot, compactVerdict } from "./prompts";
+import { emitSwarmEvent, emitHireWithRichData, emitTurnWithRichData } from "./swarm-emit";
 import { hireSpecialists } from "./hire-specialist";
 import { selectSpecialists } from "../marketplace/hiring-strategy";
 import { getAgent } from "../config/agent-registry";
-import { logCycle, logSwarmEvent } from "../hedera/hcs";
+import { logCycle } from "../hedera/hcs";
 import { storeMemory } from "../og/storage";
 import { updateAgentMetadata } from "../og/inft";
 import { getUserPaymentFetch, getUserPrivateKey } from "../config/arc";
@@ -16,7 +17,8 @@ import { prepareSwapFunds, computeHoldingsUpdate } from "../payments/fund-swap";
 import { getTokenPrice } from "../payments/circle-wallet";
 import { synthesizeCycleNarrative, type CycleNarrative } from "./narrative";
 import { recordPickEntries } from "../marketplace/pick-tracker";
-import { filterTradeablePicks } from "./data/pick-filter";
+import { filterTradeablePicks, validateTradeableAsset } from "./data/pick-filter";
+import { fetchCycleLiquidity } from "./data/liquidity-injector";
 import { getPrisma } from "../config/prisma";
 import { getGateway } from "../openclaw/gateway-client";
 import type {
@@ -35,49 +37,101 @@ import type {
   CycleProofs,
   OpenClawGatewayStatus,
   SpecialistPath,
-  SwarmEventRecord,
+  RichHireData,
+  RichTurnData,
+  CycleLiquidity,
 } from "../types/index";
 import type { RiskProfile, MarketVolatility, DebateRole } from "./role-manifests";
 
 const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
 
-// Fire-and-forget swarm audit emitter. Every call is caught + logged so a
-// failed HCS write never fails a cycle. Used by analyzeCycle + commitCycle
-// to thread per-event audit messages alongside the existing logCycle aggregate.
-//
-// Traces each emit with byte count + summary before firing so we can diagnose
-// cluster issues on Hashscan without trawling raw payloads. Mirror of the
-// helper in adversarial.ts so both producers format their logs the same way.
-function emitSwarmEvent(event: SwarmEventRecord): void {
-  if (!TOPIC_ID) {
-    console.warn(`[swarm] skip ev=${event.ev}: HCS_AUDIT_TOPIC_ID not set`);
-    return;
-  }
+// Helper: build a RichHireData payload from a SpecialistResult. Used by both
+// the flat and hierarchical hire paths to persist full input/output to 0G
+// Storage alongside the compact HCS hire event. Captures the exact market
+// data the LLM saw (rawDataSnapshot), the full parsed JSON, the untruncated
+// cot steps, the full attestation hash, and the payment proof — everything
+// needed for a judge/verifier to replay the specialist interaction byte-for-byte.
+function buildRichHireData(
+  sp: SpecialistResult,
+  cycleId: number,
+  userId: string,
+  task: string,
+): RichHireData {
+  const parsed = (sp as unknown as { parsed?: Record<string, unknown> }).parsed ?? {};
+  return {
+    schemaVersion: 1,
+    eventKind: "hire",
+    cycleId,
+    userId,
+    timestamp: new Date().toISOString(),
+    specialist: sp.name,
+    hiredBy: sp.hiredBy ?? "main",
+    input: {
+      task,
+      marketData: sp.rawDataSnapshot ?? null,
+    },
+    output: {
+      signal: sp.signal,
+      confidence: sp.confidence,
+      parsed: parsed as Record<string, unknown>,
+      reasoning: sp.reasoning ?? "",
+      cot: normalizeCot((sp as unknown as { cot?: unknown }).cot, sp.reasoning),
+      picks: sp.picks ?? null,
+    },
+    attestation: {
+      hash: sp.attestationHash, // full, not truncated
+      teeVerified: sp.teeVerified,
+    },
+    payment: {
+      txHash: sp.paymentTxHash ?? "no-payment",
+      priceUsd: sp.priceUsd ?? 0.001,
+      network: sp.paymentTxHash && sp.paymentTxHash !== "no-payment" ? "arc" : "none",
+    },
+    durationMs: (sp as unknown as { durationMs?: number }).durationMs ?? 0,
+  };
+}
 
-  const bytes = Buffer.byteLength(JSON.stringify(event), "utf8");
-  let summary: string;
-  switch (event.ev) {
-    case "start":
-      summary = `c=${event.c} u=${event.u.slice(0, 8)} rp=${event.rp}`;
-      break;
-    case "hire":
-      summary = `c=${event.c} by=${event.by}→${event.to} ${event.sig}@${event.conf}% cot=${event.cot.length}steps`;
-      break;
-    case "turn":
-      summary = `c=${event.c} t=${event.t} ${event.ph} ${event.from}${event.to ? "→" + event.to : ""} cot=${event.cot.length}steps`;
-      break;
-    case "done":
-      summary = `c=${event.c} ${event.d.act} ${event.d.asset} ${event.d.pct}% sh=${event.sh?.slice(0, 12) ?? "none"}`;
-      break;
-  }
-  console.log(`[swarm] → ev=${event.ev} bytes=${bytes} ${summary}`);
-
-  logSwarmEvent(TOPIC_ID, event).catch((err) => {
-    console.warn(
-      `[swarm] ✗ ev=${event.ev} c=${(event as { c?: number }).c} failed:`,
-      err instanceof Error ? err.message : String(err),
-    );
-  });
+// Helper: build a RichTurnData payload for a hierarchical debate turn. The
+// Fly.io agent ran the turn remotely and returned a DebateAgentResponse; we
+// reconstruct the input context from the ctx we sent and capture the full
+// response for 0G Storage persistence.
+function buildRichTurnFromHierarchical(
+  resp: DebateAgentResponse,
+  turnNumber: number,
+  phase: "opening" | "rebuttal" | "decision",
+  from: string,
+  to: string | undefined,
+  cycleId: number,
+  userId: string,
+  ctx: DebateCallContext,
+): RichTurnData {
+  return {
+    schemaVersion: 1,
+    eventKind: "turn",
+    cycleId,
+    userId,
+    timestamp: new Date().toISOString(),
+    turnNumber,
+    phase,
+    from,
+    to,
+    input: {
+      systemPromptName: from,
+      userMessage: `[hierarchical] debate agent hired own specialists; see debateCtx for input context`,
+      debateCtx: ctx as unknown as Record<string, unknown>,
+    },
+    output: {
+      content: resp.content,
+      parsed: resp.parsed,
+      reasoning: resp.reasoning,
+      cot: normalizeCot((resp.parsed as { cot?: unknown }).cot, resp.reasoning),
+    },
+    attestation: {
+      hash: resp.attestationHash, // full hash
+      teeVerified: resp.teeVerified,
+    },
+    durationMs: 0, // not tracked for hierarchical path
+  };
 }
 
 // Hierarchical hiring: delegate debate decisions to Fly.io debate agents.
@@ -92,6 +146,8 @@ interface DebateCallContext {
   riskProfile: RiskProfile;
   marketVolatility: MarketVolatility;
   maxTradePercent: number;
+  /** Real-time liquidity snapshot — ground truth for % → USD conversion. */
+  cycleLiquidity?: CycleLiquidity;
   alphaThesis?: string;
   alphaParsed?: Record<string, unknown>;
   riskChallenge?: string;
@@ -301,6 +357,7 @@ function buildRichRecord(
   specialists: SpecialistResult[],
   debate: DebateResult,
   payments: PaymentRecord[],
+  cycleLiquidity?: CycleLiquidity,
   swapResult?: ArcSwapResult,
 ): RichCycleRecord {
   const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number };
@@ -361,6 +418,7 @@ function buildRichRecord(
           method: swapResult.method,
         }
       : undefined,
+    cycleLiquidity,
     nav: user.fund.currentNav,
   };
 }
@@ -415,6 +473,29 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     console.warn("[cycle] logAction CYCLE_STARTED failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
+  // Fetch real-time USDC liquidity BEFORE any specialist or debate agent runs.
+  // This is the honest budget the agents will reason against — the DB's
+  // `user.fund.depositedUsdc` can drift from the actual Circle proxy balance
+  // (external top-ups, failed transfers, manual tests), and if we let specialists
+  // emit percentages against the stale value the swap pipeline will either fail
+  // at prepareSwapFunds() or execute against a phantom budget. The snapshot
+  // flows through DebateCallContext → fly-agent-server → specialist data
+  // payloads → prompts → narrative → UI so every layer sees the same truth.
+  // Non-fatal: on failure, returns zeros and the cycle proceeds (prompts will
+  // see "$0 available" and HOLD naturally).
+  const cycleLiquidity: CycleLiquidity = await fetchCycleLiquidity(user);
+  console.log(
+    `[cycle] Liquidity snapshot: available $${cycleLiquidity.availableUsd.toFixed(4)} (proxy $${cycleLiquidity.proxyUsd.toFixed(4)}, hot $${cycleLiquidity.hotUsd.toFixed(4)}, deposited-db $${cycleLiquidity.depositedUsd.toFixed(4)})`,
+  );
+  if (
+    cycleLiquidity.depositedUsd > 0 &&
+    Math.abs(cycleLiquidity.proxyUsd - cycleLiquidity.depositedUsd) > 0.01
+  ) {
+    console.warn(
+      `[cycle] ⚠ DB/chain drift detected: DB $${cycleLiquidity.depositedUsd.toFixed(4)} vs chain $${cycleLiquidity.proxyUsd.toFixed(4)} — honoring $${cycleLiquidity.availableUsd.toFixed(4)}`,
+    );
+  }
+
   // 1. Hire specialists + run debate
   //
   // HIERARCHICAL PATH (default): delegate to the three Fly.io debate agents
@@ -441,6 +522,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     riskProfile: user.agent.riskProfile as RiskProfile,
     marketVolatility: "medium",
     maxTradePercent: user.agent.maxTradePercent,
+    cycleLiquidity,
   };
 
   let hierarchicalSucceeded = false;
@@ -519,7 +601,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
           agentName: spec.name,
           attestationHash: spec.attestationHash,
           teeVerified: spec.teeVerified,
-          paymentAmount: "$0.001",
+          paymentAmount: "0.001",
           paymentNetwork: "arc",
           paymentTxHash: spec.paymentTxHash,
           payload: {
@@ -529,61 +611,109 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
             method: "hierarchical_x402",
           },
         }).catch(() => {});
-
-        // Emit the swarm-hire event to HCS — preserves hiredBy attribution so
-        // Hashscan viewers can see Alpha hired sentiment, Risk hired whale, etc.
-        emitSwarmEvent({
-          ev: "hire",
-          c: cycleId,
-          by: spec.hiredBy ?? "main",
-          to: spec.name,
-          sig: spec.signal,
-          conf: spec.confidence,
-          cot: normalizeCot(
-            (spec as unknown as { cot?: unknown }).cot,
-            spec.reasoning,
-          ),
-          att: (spec.attestationHash ?? "").slice(0, 16),
-        });
       }
 
-      // Emit synthesized debate-turn events for the hierarchical path.
-      // Unlike the flat path (where runAdversarialDebate emits turns inline),
-      // here the turns already ran remotely on Fly.io — we reconstruct them
-      // from each DebateAgentResponse. Order matches the synthetic transcripts
-      // built by synthesizeDebateResult().
-      let hTurn = 0;
-      emitSwarmEvent({
-        ev: "turn",
-        c: cycleId,
-        t: ++hTurn,
-        ph: "opening",
-        from: "alpha",
-        cot: normalizeCot((alphaResp.parsed as { cot?: unknown }).cot, alphaResp.reasoning),
-        verdict: compactVerdict(alphaResp.parsed),
-        att: (alphaResp.attestationHash ?? "").slice(0, 16),
-      });
-      emitSwarmEvent({
-        ev: "turn",
-        c: cycleId,
-        t: ++hTurn,
-        ph: "opening",
-        from: "risk",
-        to: "alpha",
-        cot: normalizeCot((riskResp.parsed as { cot?: unknown }).cot, riskResp.reasoning),
-        verdict: compactVerdict(riskResp.parsed),
-        att: (riskResp.attestationHash ?? "").slice(0, 16),
-      });
-      emitSwarmEvent({
-        ev: "turn",
-        c: cycleId,
-        t: ++hTurn,
-        ph: "decision",
-        from: "executor",
-        cot: normalizeCot((executorResp.parsed as { cot?: unknown }).cot, executorResp.reasoning),
-        verdict: compactVerdict(executorResp.parsed),
-        att: (executorResp.attestationHash ?? "").slice(0, 16),
-      });
+      // Emit swarm-hire events with FULL input/output persisted to 0G Storage.
+      // Each hire event's `sh` field is the 0G rootHash of a RichHireData
+      // payload containing the market data snapshot, full parsed JSON, full
+      // cot, full attestation, payment proof, and reasoning. Done in parallel
+      // via Promise.all so N specialists don't add N × (0G latency) to the
+      // cycle — the batch completes in ~the slowest single upload.
+      await Promise.all(
+        specialists.map((spec) =>
+          emitHireWithRichData(
+            {
+              ev: "hire",
+              c: cycleId,
+              by: spec.hiredBy ?? "main",
+              to: spec.name,
+              sig: spec.signal,
+              conf: spec.confidence,
+              cot: normalizeCot(
+                (spec as unknown as { cot?: unknown }).cot,
+                spec.reasoning,
+              ),
+              att: (spec.attestationHash ?? "").slice(0, 16),
+            },
+            buildRichHireData(spec, cycleId, user.id, `[hierarchical] ${spec.hiredBy ?? "main"} hired ${spec.name} for debate`),
+          ),
+        ),
+      );
+
+      // Emit synthesized debate-turn events for the hierarchical path, also
+      // with full 0G-persisted rich payloads so the complete remote agent
+      // response (content, parsed, reasoning, attestation) is verifiable.
+      // The turns already ran on Fly.io — we reconstruct the input context
+      // from the ctx we sent and capture the full response for 0G.
+      const hTurn1 = 1;
+      const hTurn2 = 2;
+      const hTurn3 = 3;
+      await Promise.all([
+        emitTurnWithRichData(
+          {
+            ev: "turn",
+            c: cycleId,
+            t: hTurn1,
+            ph: "opening",
+            from: "alpha",
+            cot: normalizeCot((alphaResp.parsed as { cot?: unknown }).cot, alphaResp.reasoning),
+            verdict: compactVerdict(alphaResp.parsed),
+            att: (alphaResp.attestationHash ?? "").slice(0, 16),
+          },
+          buildRichTurnFromHierarchical(alphaResp, hTurn1, "opening", "alpha", undefined, cycleId, user.id, debateCtx),
+        ),
+        emitTurnWithRichData(
+          {
+            ev: "turn",
+            c: cycleId,
+            t: hTurn2,
+            ph: "opening",
+            from: "risk",
+            to: "alpha",
+            cot: normalizeCot((riskResp.parsed as { cot?: unknown }).cot, riskResp.reasoning),
+            verdict: compactVerdict(riskResp.parsed),
+            att: (riskResp.attestationHash ?? "").slice(0, 16),
+          },
+          buildRichTurnFromHierarchical(
+            riskResp,
+            hTurn2,
+            "opening",
+            "risk",
+            "alpha",
+            cycleId,
+            user.id,
+            { ...debateCtx, alphaThesis: alphaResp.reasoning, alphaParsed: alphaResp.parsed },
+          ),
+        ),
+        emitTurnWithRichData(
+          {
+            ev: "turn",
+            c: cycleId,
+            t: hTurn3,
+            ph: "decision",
+            from: "executor",
+            cot: normalizeCot((executorResp.parsed as { cot?: unknown }).cot, executorResp.reasoning),
+            verdict: compactVerdict(executorResp.parsed),
+            att: (executorResp.attestationHash ?? "").slice(0, 16),
+          },
+          buildRichTurnFromHierarchical(
+            executorResp,
+            hTurn3,
+            "decision",
+            "executor",
+            undefined,
+            cycleId,
+            user.id,
+            {
+              ...debateCtx,
+              alphaThesis: alphaResp.reasoning,
+              alphaParsed: alphaResp.parsed,
+              riskChallenge: riskResp.reasoning,
+              riskParsed: riskResp.parsed,
+            },
+          ),
+        ),
+      ]);
 
       debate = synthesizeDebateResult(alphaResp, riskResp, executorResp);
       hierarchicalSucceeded = true;
@@ -653,27 +783,34 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
       }
     }
 
-    // Emit one swarm-hire event per fulfilled specialist in the flat path.
-    // The hiring agent is "main" because this path hires up-front before any
-    // debate agent has spoken. `normalizeCot` falls back to splitting the
-    // specialist's reasoning when the model omits `cot`.
-    for (const sp of specialists) {
-      emitSwarmEvent({
-        ev: "hire",
-        c: cycleId,
-        by: "main",
-        to: sp.name,
-        sig: sp.signal,
-        conf: sp.confidence,
-        cot: normalizeCot(
-          (sp as unknown as { cot?: unknown }).cot,
-          sp.reasoning,
+    // Emit one swarm-hire event per fulfilled specialist in the flat path,
+    // each with a full RichHireData payload persisted to 0G Storage. The
+    // hiring agent is "main" because this path hires up-front before any
+    // debate agent has spoken. Done in parallel so N specialists add
+    // ~1 × (0G latency) to the cycle, not N × it.
+    const flatHireTask = `Analyze current market conditions for ETH. Risk profile: ${user.agent.riskProfile}. Max allocation: ${user.agent.maxTradePercent}%.`;
+    await Promise.all(
+      specialists.map((sp) =>
+        emitHireWithRichData(
+          {
+            ev: "hire",
+            c: cycleId,
+            by: "main",
+            to: sp.name,
+            sig: sp.signal,
+            conf: sp.confidence,
+            cot: normalizeCot(
+              (sp as unknown as { cot?: unknown }).cot,
+              sp.reasoning,
+            ),
+            att: (sp.attestationHash ?? "").slice(0, 16),
+          },
+          buildRichHireData(sp, cycleId, user.id, flatHireTask),
         ),
-        att: (sp.attestationHash ?? "").slice(0, 16),
-      });
-    }
+      ),
+    );
 
-    debate = await runAdversarialDebate(specialists, user.agent.riskProfile, user.agent.maxTradePercent, cycleId);
+    debate = await runAdversarialDebate(specialists, user.agent.riskProfile, user.agent.maxTradePercent, cycleId, user.id);
     specialistPath = "direct_x402";
     console.log(`[cycle] Flat debate complete — executor: ${JSON.stringify(debate.executor.parsed)}`);
   }
@@ -687,10 +824,13 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     console.warn("[cycle] logAction debate failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 3. Build compact + rich records (but do NOT commit to HCS/0G yet)
+  // 3. Build compact + rich records (but do NOT commit to HCS/0G yet).
+  // The rich record carries the cycleLiquidity snapshot so commitCycle can
+  // cap the swap amount against real proxy balance even though it runs in a
+  // separate function call (potentially after user approval delay).
   const payments = buildPaymentRecords(specialists);
   const compactRecord = buildCompactRecord(cycleId, user, goal, specialists, debate);
-  const richRecord = buildRichRecord(cycleId, user, goal, specialists, debate, payments);
+  const richRecord = buildRichRecord(cycleId, user, goal, specialists, debate, payments, cycleLiquidity);
 
   return {
     userId: user.id,
@@ -717,6 +857,15 @@ export async function commitCycle(
   const payments = [...analysis.richRecord.payments];
   const compactRecord = { ...analysis.compactRecord };
   const richRecord: RichCycleRecord = { ...analysis.richRecord };
+  // Liquidity snapshot was captured in analyzeCycle and persisted on the rich
+  // record; fall back to zeros if this is a legacy AnalysisResult without it.
+  const cycleLiquidity: CycleLiquidity = analysis.richRecord.cycleLiquidity ?? {
+    proxyUsd: 0,
+    hotUsd: 0,
+    availableUsd: 0,
+    depositedUsd: user.fund.depositedUsdc,
+    timestamp: new Date().toISOString(),
+  };
 
   // Track every chain write so the UI can honestly render "degraded" when
   // something silently fails. Each flag flips to true only on confirmed success.
@@ -767,13 +916,17 @@ export async function commitCycle(
 
   if (debateOverride && alphaAsset) {
     const cappedPct = Math.min(alphaPct, riskMaxPct, user.agent.maxTradePercent);
+    // Run the override asset through the EVM whitelist too — alpha's 7B can
+    // still hallucinate off-chain tickers. validateTradeableAsset canonicalizes
+    // ETH→WETH and falls back to the chain default if alpha picked nonsense.
+    const overrideValidation = validateTradeableAsset(alphaAsset);
     console.log(
-      `[cycle] Executor override: executor said HOLD but debate default says BUY → forcing BUY ${alphaAsset} ${cappedPct}% (alpha=${alphaPct}%, risk.max=${riskMaxPct}%, user.max=${user.agent.maxTradePercent}%)`,
+      `[cycle] Executor override: executor said HOLD but debate default says BUY → forcing BUY ${overrideValidation.asset} ${cappedPct}% (alpha=${alphaPct}%, risk.max=${riskMaxPct}%, user.max=${user.agent.maxTradePercent}%)`,
     );
     // Mutate the parsed result in place — downstream code reads execParsed.
     execParsed.action = "BUY";
     execParsed.pct = cappedPct;
-    execParsed.asset = alphaAsset;
+    execParsed.asset = overrideValidation.asset;
     if (!execParsed.stop_loss) execParsed.stop_loss = "-5%";
     // Tag the override on the debate.executor.parsed so it lands in HCS + 0G
     // for full audit transparency — a reader can tell the executor's raw 7B
@@ -809,10 +962,48 @@ export async function commitCycle(
   let holdingsUpdate: ReturnType<typeof computeHoldingsUpdate> | undefined;
   const finalAction = String(execParsed.action ?? "HOLD");
   const finalPct = modifiedPct ?? Number(execParsed.pct ?? 0);
-  const finalAsset = String((execParsed as { asset?: string }).asset ?? "ETH");
+
+  // Gate the final asset through the EVM whitelist — the executor's 7B can
+  // still hallucinate non-EVM tickers (SIREN, ADA, SOL) even after specialist
+  // picks[] are filtered. This is the last line of defense before the asset
+  // lands in narrative.headline, HCS d.asset, Prisma cycles.asset, and the UI.
+  // If the executor picks junk, fall back to alpha's asset; if that's also
+  // junk, fall back to the chain default (WETH on Arc).
+  const rawFinalAsset = String((execParsed as { asset?: string }).asset ?? "ETH");
+  const alphaAssetForValidation =
+    typeof alphaParsed.asset === "string" && alphaParsed.asset.trim()
+      ? alphaParsed.asset
+      : null;
+  const assetValidation = validateTradeableAsset(rawFinalAsset, alphaAssetForValidation);
+  const finalAsset = assetValidation.asset;
+  if (assetValidation.substituted) {
+    console.warn(
+      `[cycle] finalAsset filtered: ${assetValidation.original ?? "(empty)"} → ${finalAsset}`,
+    );
+    (execParsed as Record<string, unknown>).asset_substituted = true;
+    (execParsed as Record<string, unknown>).original_asset = assetValidation.original;
+    // Reflect the substitution in the executor's persisted output so downstream
+    // narrative/HCS readers see the honest chain (was: X, now: Y).
+    execParsed.asset = finalAsset;
+    await logAction({
+      userId: user.id,
+      actionType: "CYCLE_COMPLETED",
+      agentName: "asset-validator",
+      payload: {
+        stage: "asset_filtered",
+        original: assetValidation.original,
+        final: finalAsset,
+      },
+    }).catch(() => {});
+  }
 
   if (finalAction !== "HOLD" && finalPct > 0 && user.fund.depositedUsdc > 0 && user.hotWalletIndex != null) {
-    const swapAmount = calculateSwapAmount(user.fund.depositedUsdc, finalPct);
+    // Cap the allocation against real proxy-wallet liquidity, not the stale DB
+    // `depositedUsdc` value. If the DB and chain have drifted, honoring the
+    // smaller of the two is the honest budget — prepareSwapFunds() would
+    // otherwise throw later when it couldn't cover the transfer.
+    const honestBudget = Math.min(user.fund.depositedUsdc, cycleLiquidity.availableUsd);
+    const swapAmount = calculateSwapAmount(honestBudget, finalPct);
 
     if (swapAmount > 0) {
       try {
@@ -833,7 +1024,7 @@ export async function commitCycle(
           actionType: "PAYMENT_SENT",
           agentName: "fund-swap",
           paymentNetwork: "arc",
-          paymentAmount: `$${prep.transferredUsd.toFixed(6)}`,
+          paymentAmount: prep.transferredUsd.toFixed(6),
           payload: {
             stage: "funds_ready",
             skipped: prep.skipped,
@@ -857,7 +1048,7 @@ export async function commitCycle(
           agentName: "arc-swap",
           paymentNetwork: "arc",
           paymentTxHash: swapResult.txHash,
-          paymentAmount: `$${swapAmount.toFixed(4)}`,
+          paymentAmount: swapAmount.toFixed(4),
           payload: {
             ...swapResult,
             asset: finalAsset,
@@ -949,8 +1140,29 @@ export async function commitCycle(
     usdcSpent: holdingsUpdate?.usdcSpent ?? null,
     overrideApplied: (debate.executor.parsed as Record<string, unknown>).override_applied === true,
     overrideReason: ((debate.executor.parsed as Record<string, unknown>).override_reason as string) ?? null,
+    cycleLiquidity,
+    assetSubstituted: (execParsed as Record<string, unknown>).asset_substituted === true,
+    originalAsset: (execParsed as Record<string, unknown>).original_asset as string | undefined,
   });
   richRecord.narrative = narrative;
+  // Write the post-validation asset into the decision field so HCS + Prisma
+  // + the dashboard headline all show the honest ticker instead of the
+  // executor's raw (possibly hallucinated) output. buildRichRecord hardcodes
+  // "ETH" at construction time; we overwrite it here after asset validation.
+  richRecord.decision.asset = finalAsset;
+  richRecord.decision.action = String(execParsed.action ?? "HOLD");
+  richRecord.decision.pct = modifiedPct ?? finalPct;
+  // Propagate asset substitution flags so downstream HCS / Prisma / UI
+  // consumers can show "WETH (was: SIREN — filtered)".
+  if ((execParsed as Record<string, unknown>).asset_substituted === true) {
+    richRecord.decision.assetSubstituted = true;
+    richRecord.decision.originalAsset = (execParsed as Record<string, unknown>).original_asset as string | undefined;
+  }
+  // Also sync the compact record — this is what gets logged to HCS with a
+  // 1024-byte ceiling, so readers of the audit chain see the same ticker.
+  compactRecord.d.asset = finalAsset;
+  compactRecord.d.act = String(execParsed.action ?? "HOLD");
+  compactRecord.d.pct = modifiedPct ?? finalPct;
 
   // Log the narrative as a dedicated audit row so the SSE stream can pick it
   // up and surface it to the client without having to re-synthesize.

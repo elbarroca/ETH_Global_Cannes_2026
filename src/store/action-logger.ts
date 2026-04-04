@@ -23,6 +23,7 @@ type ActionType =
   | "CYCLE_TIMED_OUT"
   | "AGENT_HIRED"
   | "AGENT_FIRED"
+  | "AGENT_RATED"
   | "TRADE_EXECUTED"
   | "SWAP_EXECUTED"
   | "SWAP_FAILED"

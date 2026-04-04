@@ -123,3 +123,64 @@ function clampConfidence(n: number): number {
   if (typeof n !== "number" || !Number.isFinite(n)) return 50;
   return Math.max(0, Math.min(100, Math.round(n)));
 }
+
+export interface AssetValidationResult {
+  asset: string;
+  substituted: boolean;
+  original?: string;
+}
+
+/**
+ * Gate a final-decision asset field against the EVM whitelist.
+ *
+ * `filterTradeablePicks` filters specialist `picks[]`, but debate agents
+ * (alpha/risk/executor) emit a single top-level `asset` field in their JSON
+ * output. The 7B model can still hallucinate off-chain tickers there (e.g.
+ * "SIREN", "ADA") even after the picks filter runs. This function is the
+ * last line of defense before the asset lands in `finalAsset`, the narrative
+ * headline, HCS `d.asset`, and the `cycles` Prisma row.
+ *
+ * Resolution order:
+ *   1. Canonicalize `ETH` → `WETH` (swap router expects the wrapped form)
+ *   2. If `primary` is whitelisted, return it unchanged
+ *   3. Else try `fallback` (usually alpha's asset) the same way
+ *   4. Else return the chain's default fallback ticker (WETH on Arc),
+ *      flagging `substituted: true` with the original ticker for audit
+ */
+export function validateTradeableAsset(
+  primary: string | null | undefined,
+  fallback?: string | null,
+): AssetValidationResult {
+  const chain = getActiveChain();
+  const allowed = getTradableTickers();
+  const defaultTicker = getDefaultFallbackTicker(chain);
+
+  const canon = (a: string | null | undefined): string | null => {
+    if (!a) return null;
+    const up = String(a).trim().toUpperCase();
+    if (!up) return null;
+    return up === "ETH" ? "WETH" : up;
+  };
+
+  const p = canon(primary);
+  if (p && allowed.has(p)) {
+    // getTradableTickers() includes ETH as an alias for WETH — canonicalize
+    // back to WETH for the returned asset regardless.
+    return { asset: p === "ETH" ? "WETH" : p, substituted: false };
+  }
+
+  const f = canon(fallback);
+  if (f && allowed.has(f)) {
+    return {
+      asset: f === "ETH" ? "WETH" : f,
+      substituted: true,
+      original: p ?? undefined,
+    };
+  }
+
+  return {
+    asset: defaultTicker,
+    substituted: true,
+    original: p ?? undefined,
+  };
+}

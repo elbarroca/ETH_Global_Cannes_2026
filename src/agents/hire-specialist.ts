@@ -4,7 +4,7 @@ import { incrementAgentHires } from "../marketplace/registry";
 import { logAction } from "../store/action-logger";
 import { parseDualOutput } from "./prompts";
 import { getTradableTickers } from "./data/token-universe";
-import type { CallSpecialistResult, SpecialistResult, TokenPick } from "../types/index";
+import type { CallSpecialistResult, SpecialistResult, TokenPick, CycleLiquidity } from "../types/index";
 
 // Normalize a `picks` array coming out of the specialist's JSON and filter
 // out any picks whose asset isn't tradable on the current execution chain.
@@ -60,7 +60,10 @@ function normalizePicks(raw: unknown): TokenPick[] | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
-const SPECIALIST_PRICE = "$0.001";
+// Stored as a bare numeric string so downstream readers (the SwarmActivityTicker,
+// the Arc payments column in the hunt card, anything calling Number() on it)
+// can parse it without a strip step. The `$` belongs to presentation, not data.
+const SPECIALIST_PRICE = "0.001";
 const SPECIALIST_PRICE_USD = 0.001;
 
 const SPECIALIST_FALLBACK: Record<string, unknown> = {
@@ -79,6 +82,7 @@ export async function callSpecialist(
   specialistId: string,
   task: string,
   userWalletIndex: number | null,
+  cycleLiquidity?: CycleLiquidity,
 ): Promise<CallSpecialistResult> {
   const start = Date.now();
 
@@ -131,7 +135,10 @@ export async function callSpecialist(
     const res = await payFetch(analyzeUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task }),
+      // Forward the liquidity snapshot so the specialist can inject it into
+      // its data payload and the 7B model sees the user's real buying power
+      // alongside the market data.
+      body: JSON.stringify({ task, cycleLiquidity }),
     });
 
     if (!res.ok) {
@@ -141,7 +148,15 @@ export async function callSpecialist(
     }
 
     const data = (await res.json()) as Record<string, unknown>;
-    paymentTxHash = res.headers.get("x-payment-tx") ?? "paid";
+    // Prefer the real settlement hash echoed by the seller in the response body
+    // (populated from `req.payment.transaction` by the Circle Gateway middleware
+    // after on-chain settlement). Fall back to the x-payment-tx header for
+    // non-Circle x402 implementations, then "no-payment" for the last-resort
+    // case where no middleware ran. See DEMO-HONESTY-SPRINT P10 for why this
+    // used to be a hardcoded "paid" string.
+    const bodyHash = typeof data.paymentTxHash === "string" ? data.paymentTxHash : null;
+    const headerHash = res.headers.get("x-payment-tx");
+    paymentTxHash = bodyHash ?? headerHash ?? "no-payment";
 
     if (data.signal) {
       parsed = data;
@@ -181,6 +196,11 @@ export async function callSpecialist(
     priceUsd: SPECIALIST_PRICE_USD,
     durationMs: Date.now() - start,
     picks,
+    // Preserve the full parsed JSON so the swarm audit trail can persist it
+    // to 0G Storage alongside the compact HCS hire event — gives verifiers
+    // byte-for-byte access to the specialist's complete output (fear_greed,
+    // whale_activity, top_yield_protocol, cot, reasoning, picks, etc.).
+    parsed,
   };
 }
 
@@ -195,8 +215,9 @@ export async function hireSpecialist(
   userId: string,
   userWalletIndex: number | null,
   hiredBy: string = "main-agent",
+  cycleLiquidity?: CycleLiquidity,
 ): Promise<SpecialistResult> {
-  const result = await callSpecialist(specialistId, task, userWalletIndex);
+  const result = await callSpecialist(specialistId, task, userWalletIndex, cycleLiquidity);
 
   // Increment hire count in marketplace (non-fatal)
   try {
@@ -242,6 +263,10 @@ export async function hireSpecialist(
     paymentTxHash: result.paymentTxHash,
     priceUsd: result.priceUsd,
     picks: result.picks,
+    // Propagate the full parsed JSON through to the swarm audit trail layer
+    // (see buildRichHireData in main-agent.ts).
+    parsed: result.parsed,
+    durationMs: result.durationMs,
   };
 }
 
@@ -253,9 +278,10 @@ export async function hireSpecialists(
   userId: string,
   userWalletIndex: number | null,
   hiredBy: string = "main-agent",
+  cycleLiquidity?: CycleLiquidity,
 ): Promise<SpecialistResult[]> {
   const results = await Promise.allSettled(
-    specialistIds.map((id) => hireSpecialist(id, task, userId, userWalletIndex, hiredBy)),
+    specialistIds.map((id) => hireSpecialist(id, task, userId, userWalletIndex, hiredBy, cycleLiquidity)),
   );
 
   return results

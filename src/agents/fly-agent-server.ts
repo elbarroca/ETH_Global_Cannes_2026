@@ -4,6 +4,7 @@
 
 import "dotenv/config";
 import express from "express";
+import { createGatewayMiddleware, type PaymentRequest } from "@circle-fin/x402-batching/server";
 import { sealedInference } from "../og/inference";
 import { OG_PROVIDER } from "../config/og-compute";
 import { PROMPTS, parseDualOutput } from "./prompts";
@@ -20,7 +21,13 @@ import { fetchMacroData } from "./data/macro-data";
 import { callSpecialist } from "./hire-specialist";
 import { selectForRole, type RiskProfile, type MarketVolatility, type DebateRole } from "./role-manifests";
 import { buildSpecialistContext } from "./adversarial";
-import type { CallSpecialistResult, SpecialistResult } from "../types/index";
+import { injectLiquidityInto, formatLiquidityTable } from "./data/liquidity-injector";
+import { deriveSpecialistAccount } from "../config/wallets";
+import type {
+  CallSpecialistResult,
+  SpecialistResult,
+  CycleLiquidity,
+} from "../types/index";
 
 const AGENT_NAME = process.env.AGENT_NAME;
 if (!AGENT_NAME) {
@@ -75,8 +82,56 @@ app.get("/healthz", (_req, res) => {
   res.json({ agent: AGENT_NAME, status: "ok", provider: OG_PROVIDER });
 });
 
-// Main analysis endpoint — works for both specialists AND debate agents
-app.all("/analyze", async (req, res) => {
+// ── x402 nanopayment middleware (leaf specialists only) ──────────────────────
+//
+// Before this was wired, `app.all("/analyze", ...)` had no payment enforcement
+// at all — the buyer's `payFetch` negotiated against a server that returned
+// 200 immediately, so no on-chain payment ever happened and the tx hash was a
+// hardcoded string. Fix: attach `createGatewayMiddleware` on the POST /analyze
+// route so every call goes through Circle Gateway batched settlement on Arc
+// testnet. The middleware populates `req.payment.transaction` after settling,
+// which we echo back to the buyer in the response body.
+//
+// Debate agents (alpha/risk/executor) don't get the paywall — they only expose
+// the internal /hire-and-analyze endpoint which is called by main-agent, not by
+// paying users.
+const SPECIALIST_PAY_INDEX: Record<string, number> = {
+  sentiment: 1,
+  whale: 2,
+  momentum: 3,
+  "memecoin-hunter": 4,
+  "twitter-alpha": 5,
+  "defi-yield": 6,
+  "news-scanner": 7,
+  "onchain-forensics": 8,
+  "options-flow": 9,
+  "macro-correlator": 10,
+};
+
+const isLeafSpecialist = DATA_FETCHERS[AGENT_NAME] != null;
+
+// Build the middleware once at module init. Each specialist has its own
+// deterministic seller address derived from the master mnemonic at a fixed
+// HD index — matches the existing `deriveSpecialistAccount` convention and
+// avoids env-var plumbing per Fly app. `networks: ["eip155:5042002"]` pins
+// the accepted chain to Arc testnet (CAIP-2).
+const gateway = isLeafSpecialist
+  ? createGatewayMiddleware({
+      sellerAddress: deriveSpecialistAccount(SPECIALIST_PAY_INDEX[AGENT_NAME] ?? 0).address,
+      networks: ["eip155:5042002"],
+      description: `${AGENT_NAME} specialist analysis`,
+    })
+  : null;
+
+if (isLeafSpecialist && gateway) {
+  console.log(
+    `[fly] ${AGENT_NAME}: x402 paywall active, seller=${deriveSpecialistAccount(SPECIALIST_PAY_INDEX[AGENT_NAME] ?? 0).address} price=$0.001`,
+  );
+}
+
+// Shared handler — runs for both paywalled (specialist) and paywall-less
+// (debate agent) paths. The middleware above determines which one is active.
+const analyzeHandler = async (req: express.Request, res: express.Response) => {
   const prompt = PROMPT_MAP[AGENT_NAME];
   if (!prompt) {
     res.status(404).json({ error: `No prompt for agent: ${AGENT_NAME}` });
@@ -85,14 +140,33 @@ app.all("/analyze", async (req, res) => {
 
   try {
     let userMessage: string;
+    let rawSnapshot: unknown = null;
+    const body = req.body as {
+      userMessage?: string;
+      systemPrompt?: string;
+      task?: string;
+      cycleLiquidity?: CycleLiquidity;
+    };
 
     if (DATA_FETCHERS[AGENT_NAME]) {
-      // Specialist: fetch real data, then run 0G inference
+      // Specialist: fetch real data, inject liquidity (if caller provided it),
+      // then run 0G inference. The LIQUIDITY block grounds the 7B model's
+      // confidence in the user's real buying power — no more recommending
+      // sizes the user can't execute.
       const rawData = await DATA_FETCHERS[AGENT_NAME]();
-      userMessage = `Current market data:\n${rawData}`;
+      let parsedData: Record<string, unknown> = {};
+      try {
+        parsedData = JSON.parse(rawData) as Record<string, unknown>;
+      } catch {
+        parsedData = { raw: rawData };
+      }
+      if (body.cycleLiquidity) {
+        injectLiquidityInto(parsedData, body.cycleLiquidity);
+      }
+      rawSnapshot = parsedData;
+      userMessage = `Current market data:\n${JSON.stringify(parsedData, null, 2)}`;
     } else {
       // Debate agent: use the provided context from request body
-      const body = req.body as { userMessage?: string; systemPrompt?: string; task?: string };
       userMessage = body.userMessage ?? body.task ?? JSON.stringify(req.body);
     }
 
@@ -100,10 +174,13 @@ app.all("/analyze", async (req, res) => {
     const result = await sealedInference(OG_PROVIDER, prompt, userMessage);
     const { reasoning, parsed } = parseDualOutput(result.content, { signal: "HOLD", confidence: 50 });
 
-    let rawSnapshot: unknown;
-    if (DATA_FETCHERS[AGENT_NAME]) {
-      try { rawSnapshot = JSON.parse(userMessage.replace("Current market data:\n", "")); } catch { rawSnapshot = null; }
-    }
+    // Capture the real x402 settlement tx hash when the middleware ran.
+    // `req.payment.transaction` is populated by `gateway.require(price)` after
+    // Circle Gateway batched settlement on Arc. Echoed back to the buyer in
+    // the response body so `hire-specialist.callSpecialist` can persist it
+    // into the AgentAction.payment_tx_hash column instead of the "paid" stub.
+    const payment = (req as unknown as PaymentRequest).payment;
+    const paymentTxHash = payment?.transaction ?? "no-payment";
 
     res.json({
       name: AGENT_NAME,
@@ -113,6 +190,9 @@ app.all("/analyze", async (req, res) => {
       rawDataSnapshot: rawSnapshot,
       attestationHash: result.attestationHash,
       teeVerified: result.teeVerified,
+      paymentTxHash,
+      paymentNetwork: payment?.network ?? null,
+      paymentPayer: payment?.payer ?? null,
     });
   } catch (err) {
     console.error(`[${AGENT_NAME}] Inference failed:`, err);
@@ -143,7 +223,17 @@ app.all("/analyze", async (req, res) => {
       teeVerified: false,
     });
   }
-});
+};
+
+// Wire the /analyze route: paywalled POST for leaf specialists, paywall-less
+// POST for debate agents. Debate agents also accept GET for health-check-style
+// introspection from the orchestrator — the pre-sprint code used app.all, we
+// keep only POST here to make the contract explicit.
+if (isLeafSpecialist && gateway) {
+  app.post("/analyze", gateway.require("$0.001"), analyzeHandler);
+} else {
+  app.post("/analyze", analyzeHandler);
+}
 
 // ── Hierarchical hiring endpoint — debate agents only ────────────────────────
 // When this container runs as a debate agent (alpha/risk/executor), it exposes
@@ -172,6 +262,7 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
       riskChallenge?: string;
       riskParsed?: Record<string, unknown>;
       maxTradePercent?: number;
+      cycleLiquidity?: CycleLiquidity;
     };
 
     const prompt = PROMPT_MAP[AGENT_NAME];
@@ -185,16 +276,25 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
     const riskProfile = body.riskProfile ?? "balanced";
     const marketVolatility = body.marketVolatility ?? "medium";
     const maxTradePercent = body.maxTradePercent ?? 10;
+    const cycleLiquidity = body.cycleLiquidity;
 
     try {
       // 1. Select specialists for this role
       const specIds = selectForRole(role, { riskProfile, userGoal, marketVolatility });
       console.log(`[${AGENT_NAME}] Hiring specialists: ${specIds.length > 0 ? specIds.join(", ") : "(none)"}`);
+      if (cycleLiquidity) {
+        console.log(
+          `[${AGENT_NAME}] Liquidity context: $${cycleLiquidity.availableUsd.toFixed(4)} available (proxy $${cycleLiquidity.proxyUsd.toFixed(4)})`,
+        );
+      }
 
-      // 2. Hire them in parallel via x402 (user's wallet signs payments)
+      // 2. Hire them in parallel via x402 (user's wallet signs payments) —
+      //    pass cycleLiquidity so each specialist's data payload includes the
+      //    LIQUIDITY block and the 7B model recommends sizes against real
+      //    buying power rather than a phantom budget.
       const hireTask = `Analyze for ${AGENT_NAME} debate. User goal: "${userGoal}". Risk profile: ${riskProfile}.`;
       const hireResults = await Promise.allSettled(
-        specIds.map((id) => callSpecialist(id, hireTask, body.userWalletIndex ?? null)),
+        specIds.map((id) => callSpecialist(id, hireTask, body.userWalletIndex ?? null, cycleLiquidity)),
       );
       const hiredSpecs: CallSpecialistResult[] = hireResults
         .filter((r): r is PromiseFulfilledResult<CallSpecialistResult> => r.status === "fulfilled")
@@ -202,12 +302,16 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
 
       // 3. Build context string. callSpecialist returns a CallSpecialistResult which
       //    is a subset of SpecialistResult — cast via unknown is safe because buildSpecialistContext
-      //    only reads fields that both types have.
+      //    only reads fields that both types have. Pass cycleLiquidity so the
+      //    AVAILABLE LIQUIDITY block is prepended before the confluence table.
       const specContext = hiredSpecs.length > 0
-        ? buildSpecialistContext(hiredSpecs as unknown as SpecialistResult[])
-        : "(none — no specialists hired for this role)";
+        ? buildSpecialistContext(hiredSpecs as unknown as SpecialistResult[], cycleLiquidity)
+        : cycleLiquidity
+          ? `${formatLiquidityTable(cycleLiquidity)}\n\n(none — no specialists hired for this role)`
+          : "(none — no specialists hired for this role)";
 
-      // 4. Compose the role-specific debate message
+      // 4. Compose the role-specific debate message. The specContext already
+      //    carries the LIQUIDITY block, so prompts can reference it by name.
       let userMessage: string;
       if (role === "alpha") {
         userMessage = `User goal: "${userGoal}"\n\nSpecialist signals (you hired these):\n${specContext}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.`;
@@ -215,7 +319,7 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
         userMessage = `User goal: "${userGoal}"\n\nAlpha's thesis: "${body.alphaThesis ?? "(no thesis provided)"}"\nAlpha proposes: ${JSON.stringify(body.alphaParsed ?? {})}\n\nDefensive specialists (you hired these):\n${specContext}\n\nMax allowed: ${maxTradePercent}%. Challenge Alpha based on YOUR defensive data.`;
       } else {
         // executor
-        userMessage = `User goal: "${userGoal}"\n\nAlpha argues: "${body.alphaThesis ?? ""}"\nAlpha: ${JSON.stringify(body.alphaParsed ?? {})}\n\nRisk challenges: "${body.riskChallenge ?? ""}"\nRisk: ${JSON.stringify(body.riskParsed ?? {})}\n\n${hiredSpecs.length > 0 ? `Tiebreakers (you hired):\n${specContext}\n\n` : ""}Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.`;
+        userMessage = `User goal: "${userGoal}"\n\nAlpha argues: "${body.alphaThesis ?? ""}"\nAlpha: ${JSON.stringify(body.alphaParsed ?? {})}\n\nRisk challenges: "${body.riskChallenge ?? ""}"\nRisk: ${JSON.stringify(body.riskParsed ?? {})}\n\n${hiredSpecs.length > 0 ? `Tiebreakers (you hired):\n${specContext}\n\n` : cycleLiquidity ? `${formatLiquidityTable(cycleLiquidity)}\n\n` : ""}Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.`;
       }
 
       // 5. Run 0G sealed inference locally (inside this container)

@@ -23,6 +23,7 @@ import type {
   DebateResult,
   ArcSwapResult,
   TokenPick,
+  CycleLiquidity,
 } from "../types/index";
 
 export interface SpecialistDiscussionEntry {
@@ -82,6 +83,24 @@ export interface ExecutionSummary {
   newDepositedUsdc: number;
 }
 
+/**
+ * Per-role breakdown of how a percentage decision was reached, grounded in
+ * real liquidity. Surfaced in the UI so the user sees
+ * "Alpha chose 10% (= $0.045) because confluence=WETH 3× and risk capped at 10%".
+ */
+export interface AllocationRationale {
+  role: "alpha" | "risk" | "executor";
+  action: string;
+  asset: string;
+  pct: number;
+  /** pct × cycleLiquidity.availableUsd / 100 — the concrete dollar amount. */
+  usdAmount: number;
+  /** Top 3 tickers from confluence so the user sees the voting picture. */
+  topConfluence: Array<{ ticker: string; count: number }>;
+  /** Short human-readable explanation built from the structured fields. */
+  explanation: string;
+}
+
 export interface CycleNarrative {
   version: 1;
   goal: string;
@@ -92,8 +111,16 @@ export interface CycleNarrative {
   specialistDiscussion: SpecialistDiscussionEntry[];
   augmentedDebate: AugmentedDebateSummary;
   marketplaceContext: MarketplaceContextSummary;
+  /** Real-time liquidity snapshot taken at cycle start — the budget the debate reasoned against. */
+  cycleLiquidity?: CycleLiquidity;
+  /** Per-role allocation breakdown: why this % and what it resolves to in USD. */
+  allocationRationale?: AllocationRationale[];
   /** Populated only when the cycle actually executed a swap. */
   execution: ExecutionSummary | null;
+  /** True when finalAsset was substituted from an off-chain ticker. */
+  assetSubstituted?: boolean;
+  /** Original executor-picked ticker before validation, if substituted. */
+  originalAsset?: string;
 }
 
 interface NarrativeInput {
@@ -109,6 +136,12 @@ interface NarrativeInput {
   usdcSpent: number | null;
   overrideApplied: boolean;
   overrideReason: string | null;
+  /** Real-time liquidity snapshot — the budget debate agents reasoned against. */
+  cycleLiquidity?: CycleLiquidity;
+  /** True when finalAsset was substituted by the EVM-whitelist guard. */
+  assetSubstituted?: boolean;
+  /** The executor's original (rejected) ticker, if substitution fired. */
+  originalAsset?: string;
 }
 
 // Build a cycle-level narrative for the user. Pure function — no side effects.
@@ -126,6 +159,9 @@ export function synthesizeCycleNarrative(input: NarrativeInput): CycleNarrative 
     usdcSpent,
     overrideApplied,
     overrideReason,
+    cycleLiquidity,
+    assetSubstituted,
+    originalAsset,
   } = input;
 
   // ── Confluence scoring ────────────────────────────────────────────────
@@ -202,6 +238,49 @@ export function synthesizeCycleNarrative(input: NarrativeInput): CycleNarrative 
     overrideApplied,
     overrideReason,
   };
+
+  // ── Allocation rationale per role ─────────────────────────────────────
+  // For each debate role, compute the concrete USD amount its percentage
+  // resolves to against the real liquidity snapshot. This is what the UI
+  // renders next to each debate turn: "chose 10% → $0.045 of $0.45 available".
+  const availableUsd = cycleLiquidity?.availableUsd ?? 0;
+  const topConfluence = Object.entries(confluence)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([ticker, count]) => ({ ticker, count }));
+  const topConfluenceStr = topConfluence.length > 0
+    ? topConfluence.map((c) => `${c.ticker} ${c.count}×`).join(", ")
+    : "(no confluence)";
+  const computeUsd = (pct: number) => Math.round(availableUsd * pct) / 100;
+  const allocationRationale: AllocationRationale[] = [
+    {
+      role: "alpha",
+      action: augmentedDebate.alpha.action,
+      asset: augmentedDebate.alpha.asset,
+      pct: augmentedDebate.alpha.pct,
+      usdAmount: computeUsd(augmentedDebate.alpha.pct),
+      topConfluence,
+      explanation: `Chose ${augmentedDebate.alpha.action} ${augmentedDebate.alpha.pct}% ${augmentedDebate.alpha.asset} — confluence: ${topConfluenceStr}. At $${availableUsd.toFixed(4)} available, this resolves to $${computeUsd(augmentedDebate.alpha.pct).toFixed(4)}.`,
+    },
+    {
+      role: "risk",
+      action: "CAP",
+      asset: augmentedDebate.alpha.asset,
+      pct: augmentedDebate.risk.maxPct,
+      usdAmount: computeUsd(augmentedDebate.risk.maxPct),
+      topConfluence,
+      explanation: `Capped at ${augmentedDebate.risk.maxPct}%${augmentedDebate.risk.redFlags.length > 0 ? ` (red flags: ${augmentedDebate.risk.redFlags.join(", ")})` : " (no red flags)"} — max $${computeUsd(augmentedDebate.risk.maxPct).toFixed(4)} of $${availableUsd.toFixed(4)} available.`,
+    },
+    {
+      role: "executor",
+      action: augmentedDebate.executor.action,
+      asset: augmentedDebate.executor.asset,
+      pct: augmentedDebate.executor.pct,
+      usdAmount: computeUsd(augmentedDebate.executor.pct),
+      topConfluence,
+      explanation: `Final call: ${augmentedDebate.executor.action} ${augmentedDebate.executor.pct}% ${augmentedDebate.executor.asset} → $${computeUsd(augmentedDebate.executor.pct).toFixed(4)} USDC${overrideApplied ? " (deterministic override fired)" : ""}.`,
+    },
+  ];
 
   // ── Marketplace context ───────────────────────────────────────────────
   const marketplaceContext: MarketplaceContextSummary = {
@@ -281,6 +360,10 @@ export function synthesizeCycleNarrative(input: NarrativeInput): CycleNarrative 
     specialistDiscussion,
     augmentedDebate,
     marketplaceContext,
+    cycleLiquidity,
+    allocationRationale,
     execution,
+    assetSubstituted,
+    originalAsset,
   };
 }

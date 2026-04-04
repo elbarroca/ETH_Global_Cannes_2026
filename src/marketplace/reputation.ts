@@ -5,6 +5,8 @@ import { getPrisma } from "../config/prisma";
 const K_FACTOR = 32;
 const DEFAULT_RATING = 500;
 
+export type RatingKind = "like" | "dislike" | "verify";
+
 // ── ELO calculation ──────────────────────────────────────────
 
 function eloUpdate(currentRating: number, wasCorrect: boolean): number {
@@ -58,6 +60,117 @@ export async function evaluateCycleSignals(
     );
   }
 }
+
+// ── Record user rating with full history ─────────────────────
+//
+// Canonical rating write path. Unlike `updateSpecialistReputation()` above
+// (which mutates `marketplace_agents.reputation` without leaving a trail),
+// this helper:
+//
+//   1. Loads the current reputation → `reputationBefore`.
+//   2. Runs the ELO math against the vote polarity (like/verify positive,
+//      dislike negative).
+//   3. Inside a transaction, upserts the `AgentRating` row keyed on
+//      (userId, agentName, cycleId) and updates `marketplace_agents.reputation`
+//      in lockstep. Flipping a vote on the same (user × specialist × cycle)
+//      rewrites the same row — the on-chain HCS log retains the full history
+//      of flips because each API call emits a fresh `ev: "rating"` message.
+//
+// Does NOT log to HCS — the API route wraps this call, awaits the HCS write,
+// and then stamps the returned seq number back onto the same `AgentRating` row.
+// Separating concerns lets the HCS network outage path degrade gracefully
+// (the Supabase rating still commits).
+
+export interface RecordRatingArgs {
+  userId: string;
+  agentName: string;
+  cycleId: number;
+  kind: RatingKind;
+}
+
+export interface RecordRatingResult {
+  ratingId: string;
+  reputationBefore: number;
+  reputationAfter: number;
+}
+
+export async function recordRating(
+  args: RecordRatingArgs,
+): Promise<RecordRatingResult> {
+  const prisma = getPrisma();
+
+  const agent = await prisma.marketplaceAgent.findUnique({
+    where: { name: args.agentName },
+    select: { reputation: true },
+  });
+  if (!agent) {
+    throw new Error(`Marketplace agent not found: ${args.agentName}`);
+  }
+
+  const reputationBefore = agent.reputation;
+  const positive = args.kind !== "dislike";
+  const reputationAfter = eloUpdate(reputationBefore, positive);
+
+  // Transactional update: the agent_ratings row and marketplace_agents row
+  // must agree on the after-value, otherwise a crash between the two would
+  // leave the audit trail inconsistent with the displayed ELO.
+  const rating = await prisma.$transaction(async (tx) => {
+    await tx.marketplaceAgent.update({
+      where: { name: args.agentName },
+      data: { reputation: reputationAfter },
+    });
+
+    return tx.agentRating.upsert({
+      where: {
+        userId_agentName_cycleId: {
+          userId: args.userId,
+          agentName: args.agentName,
+          cycleId: args.cycleId,
+        },
+      },
+      create: {
+        userId: args.userId,
+        agentName: args.agentName,
+        cycleId: args.cycleId,
+        kind: args.kind,
+        reputationBefore,
+        reputationAfter,
+      },
+      update: {
+        kind: args.kind,
+        reputationBefore,
+        reputationAfter,
+        hcsSeqNum: null, // invalidate prior HCS stamp — caller will re-log
+        hcsTopicId: null,
+      },
+    });
+  });
+
+  return {
+    ratingId: rating.id,
+    reputationBefore,
+    reputationAfter,
+  };
+}
+
+// Attach the HCS sequence number emitted by `logSwarmEvent` back to a rating
+// row. Fire-and-forget — a failed stamp must not invalidate the rating itself
+// because the Supabase write already succeeded.
+export async function attachHcsSeqToRating(
+  ratingId: string,
+  hcsSeqNum: number,
+  hcsTopicId: string,
+): Promise<void> {
+  const prisma = getPrisma();
+  await prisma.agentRating.update({
+    where: { id: ratingId },
+    data: { hcsSeqNum, hcsTopicId },
+  });
+}
+
+// Expose ELO math for callers that want the new value without writing to DB
+// (e.g. the legacy /rate fast-path that doesn't carry userId/cycleId).
+export { eloUpdate };
 
 // ── Leaderboard ──────────────────────────────────────────────
 
