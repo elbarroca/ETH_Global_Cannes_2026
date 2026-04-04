@@ -3,20 +3,42 @@ import { getAgent } from "../config/agent-registry";
 import { incrementAgentHires } from "../marketplace/registry";
 import { logAction } from "../store/action-logger";
 import { parseDualOutput } from "./prompts";
+import { getTradableTickers } from "./data/token-universe";
 import type { CallSpecialistResult, SpecialistResult, TokenPick } from "../types/index";
 
-// Normalize a `picks` array coming out of the specialist's JSON. The 7B
-// model sometimes emits picks with lowercase tickers, string confidence
-// values, or missing fields — coerce everything into the TokenPick shape
-// so downstream code can trust it.
+// Normalize a `picks` array coming out of the specialist's JSON and filter
+// out any picks whose asset isn't tradable on the current execution chain.
+//
+// The 7B model routinely hallucinates tokens it saw during training (SOL,
+// ADA, DOT, BTC) even when the prompt only contains EVM tickers. Without a
+// deterministic filter, those hallucinations leak into the augmented layer,
+// which then suggests trades the agent physically cannot execute.
+//
+// This filter is the hard-enforcement backstop: any pick whose asset is NOT
+// in the tradable-tickers whitelist for the active chain is dropped before
+// it reaches the debate layer. The prompt tells the model what's allowed;
+// this code enforces it.
+//
+// See docs/SYSTEM_STATE_AND_FIXES.md §2.1 for the full honesty constraint.
 function normalizePicks(raw: unknown): TokenPick[] | undefined {
   if (!Array.isArray(raw)) return undefined;
+  const tradable = getTradableTickers();
   const normalized: TokenPick[] = [];
+  const rejected: string[] = [];
+
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const p = item as Record<string, unknown>;
     const asset = String(p.asset ?? p.ticker ?? p.symbol ?? "").toUpperCase().trim();
     if (!asset) continue;
+
+    // Reject hallucinated non-EVM tokens. The 7B doesn't get to pick BTC,
+    // SOL, ADA, etc. unless they're whitelisted for the active chain.
+    if (!tradable.has(asset)) {
+      rejected.push(asset);
+      continue;
+    }
+
     const signalRaw = String(p.signal ?? "HOLD").toUpperCase();
     const signal: TokenPick["signal"] =
       signalRaw === "BUY" || signalRaw === "SELL" ? signalRaw : "HOLD";
@@ -28,6 +50,13 @@ function normalizePicks(raw: unknown): TokenPick[] | undefined {
     });
     if (normalized.length >= 5) break; // safety cap
   }
+
+  if (rejected.length > 0) {
+    console.warn(
+      `[hire-specialist] rejected ${rejected.length} hallucinated picks not tradable on current chain: ${rejected.join(", ")}`,
+    );
+  }
+
   return normalized.length > 0 ? normalized : undefined;
 }
 
@@ -84,7 +113,14 @@ export async function callSpecialist(
   }
 
   let content = "";
-  let attestationHash = "http-failed";
+  // Start as "pending" so only a real failure below stamps an error provenance.
+  // Generic "http-failed" was misleading — it hid POST/GET method mismatches
+  // and other root causes behind a single string. The new scheme:
+  //   - success path:     `chatcmpl-*` or whatever 0G returns
+  //   - non-2xx response: `http-<status>` (e.g. http-405, http-500)
+  //   - thrown exception: `net-error`
+  //   - agent unlisted:   `not-found`
+  let attestationHash = "pending";
   let teeVerified = false;
   let parsed: Record<string, unknown> = { ...SPECIALIST_FALLBACK };
   let reasoning = "";
@@ -100,6 +136,7 @@ export async function callSpecialist(
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
+      attestationHash = `http-${res.status}`;
       throw new Error(`${specialistId} returned ${res.status}: ${body.slice(0, 200)}`);
     }
 
@@ -120,6 +157,11 @@ export async function callSpecialist(
     }
   } catch (err) {
     console.warn(`[call] HTTP call to ${specialistId} (${analyzeUrl}) failed:`, err instanceof Error ? err.message : String(err));
+    // If the !res.ok branch already set http-<status>, keep it. Otherwise this
+    // was a thrown exception (network failure, x402 sign error, etc.).
+    if (attestationHash === "pending") {
+      attestationHash = "net-error";
+    }
     reasoning = `[HTTP_ERROR] ${err instanceof Error ? err.message : String(err)}`;
   }
 

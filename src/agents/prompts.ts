@@ -384,6 +384,74 @@ export function normalizeCot(raw: unknown, fallbackReasoning?: string): string[]
   return [];
 }
 
+/**
+ * Compact a parsed LLM output for inclusion as the `verdict` field of an HCS
+ * SwarmEventRecord. The raw `parsed` object can be big:
+ *
+ *   - Alpha/Risk/Executor now emit `cot[]` inside their JSON (we asked for it).
+ *     That cot is already hoisted to the event's top-level `cot` field, so
+ *     carrying it inside `verdict` would double-count bytes against the 1024-
+ *     byte HCS message limit.
+ *   - Risk emits `risks[]` and `red_flags[]` which are fine for Prisma debug
+ *     but waste HCS bytes.
+ *   - Sentiment/Whale/News etc. emit `breaking_headlines[]`, `trending_topics`,
+ *     `whale_entities[]` — verbose arrays not needed for an audit pointer.
+ *   - `thesis`, `reasoning`, `objection`, `reason` strings can blow past
+ *     100+ chars when the model is chatty.
+ *
+ * This helper:
+ *   - drops known-heavy keys
+ *   - truncates string values to 80 chars
+ *   - keeps numbers/booleans as-is
+ *   - flattens picks[] to at most 2 entries with short reason fields
+ *   - skips nested objects (too risky to compact safely)
+ *
+ * The goal is a verdict < ~250 bytes so the enclosing event stays well under
+ * the 1024-byte HCS limit even after cot + wrapper overhead.
+ */
+export function compactVerdict(parsed: Record<string, unknown>): Record<string, unknown> {
+  const SKIP_KEYS = new Set([
+    "cot",
+    "risks",
+    "red_flags",
+    "breaking_headlines",
+    "whale_entities",
+    "trending_topics",
+    "rawDataSnapshot",
+    "influencer_consensus",
+    "notable_blocks",
+  ]);
+  const STRING_BUDGET = 80;
+  const out: Record<string, unknown> = {};
+
+  for (const [k, v] of Object.entries(parsed)) {
+    if (SKIP_KEYS.has(k)) continue;
+    if (v == null) continue;
+    if (typeof v === "string") {
+      out[k] = v.length > STRING_BUDGET ? v.slice(0, STRING_BUDGET - 3) + "..." : v;
+    } else if (typeof v === "number" || typeof v === "boolean") {
+      out[k] = v;
+    } else if (Array.isArray(v) && k === "picks") {
+      // Keep picks[] because the debate layer reads it, but cap entries and
+      // drop the verbose `reason` sub-field.
+      out[k] = v.slice(0, 2).map((item) => {
+        if (item != null && typeof item === "object") {
+          const sub = item as Record<string, unknown>;
+          return {
+            asset: String(sub.asset ?? ""),
+            signal: String(sub.signal ?? ""),
+            confidence: Number(sub.confidence ?? 0),
+          };
+        }
+        return item;
+      });
+    }
+    // nested objects + unknown arrays are silently dropped
+  }
+
+  return out;
+}
+
 export function safeJsonParse<T>(raw: string, fallback: T): T {
   // Strip markdown code fences
   const cleaned = raw.replace(/```json?\s*/gi, "").replace(/```\s*/g, "").trim();

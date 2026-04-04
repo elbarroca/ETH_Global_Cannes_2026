@@ -154,6 +154,12 @@ export interface Agent {
   skill: string;
   accuracy: number;
   timesHired: number;
+  /**
+   * ELO-style reputation score (0-1000, initial 500). Updated by thumbs
+   * up/down on hunt cards via POST /api/marketplace/rate → reputation.ts.
+   * Headline number on the marketplace cards.
+   */
+  reputation: number;
   pricePerQuery: number;
   inftId: string;
   model: string;

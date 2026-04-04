@@ -247,31 +247,8 @@ export async function getUser(walletAddress: string): Promise<UserRecord | null>
   return apiFetch<UserRecord | null>(`/api/user/${walletAddress}`).catch(() => null);
 }
 
-// ── Live wallet balance (proxy + hot wallet) ────────────────
-//
-// Polled from the NasdaqHeader so the DEPOSITED readout reflects the true
-// Circle MPC custody balance + Arc hot wallet balance instead of the DB
-// accounting number. DB value is included as a last-resort fallback.
-
-export interface WalletBalanceResponse {
-  userId: string;
-  proxyUsdc: number | null;
-  hotWalletUsdc: number | null;
-  totalUsdc: number | null;
-  depositedUsdcDb: number;
-  proxyAddress: string | null;
-  hotWalletAddress: string | null;
-  fetchedAt: number;
-  errors: { proxy: string | null; hotWallet: string | null };
-}
-
-export async function getWalletBalance(
-  userId: string,
-): Promise<WalletBalanceResponse | null> {
-  return apiFetch<WalletBalanceResponse>(`/api/wallet/balance/${userId}`).catch(
-    () => null,
-  );
-}
+// Live wallet balance is now polled directly via Arc RPC from UserContext.
+// Every UI surface reads that single value — see contexts/user-context.tsx.
 
 export async function getLatestCycle(userId: string): Promise<EnrichedCycleResponse | null> {
   return apiFetch<EnrichedCycleResponse | null>(`/api/cycle/latest/${userId}`).catch(() => null);

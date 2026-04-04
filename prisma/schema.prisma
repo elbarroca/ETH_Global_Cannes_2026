@@ -125,6 +125,43 @@ model MarketplaceAgent {
   @@map("marketplace_agents")
 }
 
+// Per-pick performance tracking for specialists.
+//
+// When a specialist emits a pick (sentiment picks "BUY UNI 80%"), we snapshot
+// the asset's current USD price + timestamp. A later evaluator job wakes up
+// Δt after the pick (e.g. 24h) and scores it: did the price move in the
+// direction the specialist predicted? Correct picks boost the specialist's
+// marketplace reputation; wrong picks cut it. Over enough cycles, the hire/
+// fire rotation (see src/marketplace/hire-fire.ts, planned) prunes consistently
+// bad specialists and hires replacements from the marketplace.
+//
+// See docs/SYSTEM_STATE_AND_FIXES.md Problem 5 for the full design.
+model SpecialistPickEntry {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cycleId         String   @map("cycle_id") @db.Uuid
+  cycleNumber     Int      @map("cycle_number")
+  userId          String   @map("user_id")
+  specialistName  String   @map("specialist_name")
+  asset           String   // ticker — "WETH", "UNI", etc.
+  signal          String   // BUY | SELL | HOLD
+  confidence      Int      // 0-100
+  reason          String   @db.Text
+  entryPriceUsd   Float    @map("entry_price_usd")
+  enteredAt       DateTime @default(now()) @map("entered_at") @db.Timestamptz(6)
+  // Evaluation fields — populated by pick-evaluator.ts on a delayed tick
+  evaluatedAt     DateTime? @map("evaluated_at") @db.Timestamptz(6)
+  exitPriceUsd    Float?   @map("exit_price_usd")
+  pnlPct          Float?   @map("pnl_pct")
+  correct         Boolean? // did the signal direction match the price movement?
+  scored          Boolean  @default(false)
+
+  @@index([specialistName, enteredAt], map: "idx_pick_entries_specialist")
+  @@index([cycleId], map: "idx_pick_entries_cycle")
+  @@index([asset, enteredAt], map: "idx_pick_entries_asset")
+  @@index([scored, enteredAt], map: "idx_pick_entries_scored")
+  @@map("specialist_pick_entries")
+}
+
 model DebateTranscript {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   cycleId         String   @map("cycle_id") @db.Uuid
