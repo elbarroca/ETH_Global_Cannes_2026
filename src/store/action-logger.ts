@@ -74,6 +74,8 @@ export async function logCycleRecord(
   userId: string,
   cycleNumber: number,
   data: {
+    goal?: string;
+    payments?: Prisma.InputJsonValue;
     specialists: Prisma.InputJsonValue;
     alpha?: { action: string; pct: number; attestation: string; reasoning?: string };
     risk?: { challenge: string; maxPct: number; attestation: string; reasoning?: string };
@@ -84,6 +86,8 @@ export async function logCycleRecord(
     hcsSeqNum?: number;
     hashscanUrl?: string;
     storageHash?: string;
+    swapTxHash?: string;
+    swapExplorerUrl?: string;
     totalCostUsd?: number;
     navAfter?: number;
   },
@@ -93,6 +97,8 @@ export async function logCycleRecord(
     data: {
       userId,
       cycleNumber,
+      goal: data.goal,
+      payments: data.payments,
       specialists: data.specialists,
       alphaAction: data.alpha?.action,
       alphaPct: data.alpha?.pct,
@@ -113,6 +119,8 @@ export async function logCycleRecord(
       hcsSeqNum: data.hcsSeqNum,
       hashscanUrl: data.hashscanUrl,
       storageHash: data.storageHash,
+      swapTxHash: data.swapTxHash,
+      swapExplorerUrl: data.swapExplorerUrl,
       totalCostUsd: data.totalCostUsd,
       navAfter: data.navAfter,
     },

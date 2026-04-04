@@ -18,6 +18,8 @@ import type {
   SpecialistResult,
   CycleResult,
   CompactCycleRecord,
+  RichCycleRecord,
+  PaymentRecord,
   DebateResult,
   DebateStageResult,
   DebateAgentResponse,
@@ -154,9 +156,29 @@ function synthesizeDebateResult(
   };
 }
 
+// Build the agent-to-agent payment graph from hierarchical-hiring metadata on
+// the specialist list. Only entries with a real paymentTxHash are included.
+function buildPaymentRecords(specialists: SpecialistResult[]): PaymentRecord[] {
+  return specialists
+    .filter((sp) => sp.hiredBy && sp.paymentTxHash && sp.paymentTxHash !== "no-payment")
+    .map<PaymentRecord>((sp) => ({
+      from: sp.hiredBy ?? "main-agent",
+      to: sp.name,
+      amount: "$0.001",
+      txHash: sp.paymentTxHash ?? "",
+      hiredBy: sp.hiredBy ?? "main-agent",
+      chain: "arc",
+    }));
+}
+
+// Lean HCS audit pointer (must fit under 1024 bytes). The full record — goal,
+// payment graph, reasoning, full attestation hashes — lives in 0G Storage; the
+// `sh` field (storageHash/CID) is injected by commitCycle after the 0G write
+// so independent verifiers reading HCS can hop to the rich record.
 function buildCompactRecord(
   cycleId: number,
   user: UserRecord,
+  goal: string,
   specialists: SpecialistResult[],
   debate: DebateResult,
 ): CompactCycleRecord {
@@ -166,24 +188,12 @@ function buildCompactRecord(
 
   const stopLoss = parseFloat(String(execParsed.stop_loss ?? "-5").replace("%", "").replace("-", ""));
 
-  // Agent-to-agent payment graph: only populated when specialists were hired
-  // by individual debate agents (hierarchical path). Each entry proves which
-  // debate agent paid for which specialist analysis.
-  const paidHires = specialists.filter((sp) => sp.hiredBy && sp.paymentTxHash && sp.paymentTxHash !== "no-payment");
-  const payments = paidHires.length > 0
-    ? paidHires.map((sp) => ({
-        to: sp.name,
-        amt: "$0.001",
-        tx: (sp.paymentTxHash ?? "").slice(0, 16),
-        by: sp.hiredBy ?? "main-agent",
-      }))
-    : undefined;
-
   const record: CompactCycleRecord = {
     c: cycleId,
     u: user.id,
     t: new Date().toISOString(),
     rp: user.agent.riskProfile,
+    g: goal.slice(0, 120) || undefined,
     s: specialists.map((sp) => ({
       n: sp.name,
       sig: sp.signal,
@@ -217,30 +227,111 @@ function buildCompactRecord(
       pct: Number(execParsed.pct ?? 0),
     },
     nav: user.fund.currentNav,
-    payments,
   };
 
   // Safety check: drop reasoning excerpts if record exceeds HCS byte limit.
-  // Payments are more valuable than reasoning excerpts for the audit trail,
-  // so we drop reasoning first, then payments if still over budget.
-  if (Buffer.byteLength(JSON.stringify(record), "utf8") > 950) {
+  // We reserved ~80 bytes for the `sh` field that commitCycle will inject
+  // after the 0G storage upload, so the ceiling here is 870 instead of 950.
+  if (Buffer.byteLength(JSON.stringify(record), "utf8") > 870) {
     delete record.adv.a.r;
     delete record.adv.r.r;
     delete record.adv.e.r;
   }
-  if (Buffer.byteLength(JSON.stringify(record), "utf8") > 950) {
-    delete record.payments;
+  // If still over, drop the goal excerpt (0G has it anyway).
+  if (Buffer.byteLength(JSON.stringify(record), "utf8") > 870) {
+    delete record.g;
   }
 
   return record;
 }
 
+// The full cycle record persisted to 0G Storage — source of truth for the UI
+// payment graph and for anyone running an independent "verify on 0G" check.
+// HCS keeps only the CID pointer; Prisma keeps a Json cache for fast reads.
+function buildRichRecord(
+  cycleId: number,
+  user: UserRecord,
+  goal: string,
+  specialists: SpecialistResult[],
+  debate: DebateResult,
+  payments: PaymentRecord[],
+  swapResult?: ArcSwapResult,
+): RichCycleRecord {
+  const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number };
+  const riskParsed = debate.risk.parsed as { challenge?: string; objection?: string; max_pct?: number };
+  const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
+
+  return {
+    version: 1,
+    cycleId,
+    userId: user.id,
+    timestamp: new Date().toISOString(),
+    goal,
+    riskProfile: user.agent.riskProfile,
+    specialists: specialists.map((sp) => ({
+      name: sp.name,
+      signal: sp.signal,
+      confidence: sp.confidence,
+      reasoning: sp.reasoning ?? "",
+      attestationHash: sp.attestationHash, // full, not truncated
+      teeVerified: sp.teeVerified,
+      hiredBy: sp.hiredBy ?? "main-agent",
+      paymentTxHash: sp.paymentTxHash ?? "no-payment",
+      priceUsd: sp.priceUsd ?? 0.001,
+      reputation: sp.reputation ?? 500,
+    })),
+    debate: {
+      alpha: {
+        action: String(alphaParsed.action ?? "HOLD"),
+        pct: Number(alphaParsed.pct ?? 0),
+        reasoning: debate.alpha.reasoning ?? "",
+        attestationHash: debate.alpha.attestationHash,
+      },
+      risk: {
+        maxPct: Number(riskParsed.max_pct ?? 0),
+        objection: String(riskParsed.challenge ?? riskParsed.objection ?? ""),
+        reasoning: debate.risk.reasoning ?? "",
+        attestationHash: debate.risk.attestationHash,
+      },
+      executor: {
+        action: String(execParsed.action ?? "HOLD"),
+        pct: Number(execParsed.pct ?? 0),
+        stopLoss: String(execParsed.stop_loss ?? "-5%"),
+        reasoning: debate.executor.reasoning ?? "",
+        attestationHash: debate.executor.attestationHash,
+      },
+    },
+    payments,
+    decision: {
+      action: String(execParsed.action ?? "HOLD"),
+      asset: "ETH",
+      pct: Number(execParsed.pct ?? 0),
+    },
+    swap: swapResult
+      ? {
+          success: swapResult.success,
+          txHash: swapResult.txHash,
+          explorerUrl: swapResult.explorerUrl,
+          method: swapResult.method,
+        }
+      : undefined,
+    nav: user.fund.currentNav,
+  };
+}
+
 // ── Phase 1: Analyze (hire specialists + adversarial debate) ─────────────────
 
-export async function analyzeCycle(user: UserRecord): Promise<AnalysisResult> {
+export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise<AnalysisResult> {
   const cycleId = user.agent.lastCycleId + 1;
 
-  console.log(`[cycle] Analyzing for user ${user.id} (risk: ${user.agent.riskProfile})`);
+  // Default goal when the caller (heartbeat / Telegram /run) doesn't supply one.
+  // Dashboard callers send a real goal from the input box.
+  const goal =
+    userGoal && userGoal.trim().length > 0
+      ? userGoal.trim()
+      : `Grow portfolio, max ${user.agent.maxTradePercent}% per trade, ${user.agent.riskProfile} risk`;
+
+  console.log(`[cycle] Analyzing for user ${user.id} (risk: ${user.agent.riskProfile}) goal: "${goal}"`);
   console.log(`[cycle] Proxy wallet: ${user.proxyWallet.address} (Circle: ${user.proxyWallet.walletId})`);
 
   // Probe OpenClaw gateway so we can honestly report its status in the CycleResult.
@@ -287,7 +378,7 @@ export async function analyzeCycle(user: UserRecord): Promise<AnalysisResult> {
   let specialistPath: SpecialistPath = "direct_x402";
 
   const debateCtx: DebateCallContext = {
-    userGoal: `Grow portfolio, max ${user.agent.maxTradePercent}% per trade, ${user.agent.riskProfile} risk`,
+    userGoal: goal,
     userWalletIndex: user.hotWalletIndex,
     riskProfile: user.agent.riskProfile as RiskProfile,
     marketVolatility: "medium",
@@ -432,15 +523,19 @@ export async function analyzeCycle(user: UserRecord): Promise<AnalysisResult> {
     console.warn("[cycle] logAction debate failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 3. Build compact record (but do NOT commit to HCS/0G yet)
-  const compactRecord = buildCompactRecord(cycleId, user, specialists, debate);
+  // 3. Build compact + rich records (but do NOT commit to HCS/0G yet)
+  const payments = buildPaymentRecords(specialists);
+  const compactRecord = buildCompactRecord(cycleId, user, goal, specialists, debate);
+  const richRecord = buildRichRecord(cycleId, user, goal, specialists, debate, payments);
 
   return {
     userId: user.id,
     cycleId,
+    goal,
     specialists,
     debate,
     compactRecord,
+    richRecord,
     specialistPath,
     openclawGatewayStatus,
   };
@@ -454,8 +549,10 @@ export async function commitCycle(
   modifiedPct?: number,
 ): Promise<CycleResult> {
   const start = Date.now();
-  const { cycleId, specialists, debate } = analysis;
-  const record = { ...analysis.compactRecord };
+  const { cycleId, goal, specialists, debate } = analysis;
+  const payments = [...analysis.richRecord.payments];
+  const compactRecord = { ...analysis.compactRecord };
+  const richRecord: RichCycleRecord = { ...analysis.richRecord };
 
   // Track every chain write so the UI can honestly render "degraded" when
   // something silently fails. Each flag flips to true only on confirmed success.
@@ -464,93 +561,19 @@ export async function commitCycle(
 
   // Apply modified percentage if user changed it
   if (modifiedPct !== undefined) {
-    record.d.pct = modifiedPct;
-    record.adv.e.pct = modifiedPct;
+    compactRecord.d.pct = modifiedPct;
+    compactRecord.adv.e.pct = modifiedPct;
+    richRecord.decision.pct = modifiedPct;
+    richRecord.debate.executor.pct = modifiedPct;
   }
 
-  // 1. Log to Hedera HCS — the audit trail proof. Failure is non-fatal for the
-  // overall cycle but we NEVER fabricate the hashscanUrl. If the write fails,
-  // hashscanUrl stays undefined and the UI shows "HCS unavailable" honestly.
-  let seqNum = 0;
-  let hashscanUrl: string | undefined;
-  try {
-    const hcsResult = await logCycle(TOPIC_ID, record);
-    seqNum = hcsResult.seqNum;
-    hashscanUrl = hcsResult.hashscanUrl;
-    proofs.hcs = true;
-    console.log(`[cycle] Logged to HCS: seq=${seqNum} ${hashscanUrl}`);
-    await logAction({ userId: user.id, actionType: "HCS_LOGGED", payload: { seqNum, hashscanUrl } }).catch(() => {});
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn("[cycle] HCS log failed:", msg);
-    degradedReasons.push(`HCS log failed: ${msg.slice(0, 80)}`);
-  }
-
-  // 1b. Emit CycleCompleted event on Hedera EVM for Naryo (non-fatal — gated
-  // behind NARYO_AUDIT_CONTRACT_ADDRESS env var; absence counts as "disabled",
-  // not "degraded".
-  if (process.env.NARYO_AUDIT_CONTRACT_ADDRESS) {
-    try {
-      const { emitCycleEvent } = await import("../naryo/emit-event");
-      await emitCycleEvent(
-        user.walletAddress,
-        cycleId,
-        record.d.act ?? "HOLD",
-        record.d.asset ?? "ETH",
-        record.d.pct ?? 0,
-      );
-      proofs.naryo = true;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn("[cycle] Naryo event emit failed:", msg);
-      degradedReasons.push(`Naryo event emit failed: ${msg.slice(0, 80)}`);
-    }
-  } else {
-    // Naryo not configured — treated as a successful no-op so it doesn't mark
-    // the cycle as degraded on users without the env var set.
-    proofs.naryo = true;
-  }
-
-  // 2. Store cycle result to 0G decentralized storage — the memory proof.
-  let storageHash: string | undefined;
-  try {
-    storageHash = await storeMemory(user.id, record);
-    proofs.storage = true;
-    console.log(`[cycle] Stored to 0G: ${storageHash}`);
-    await logAction({ userId: user.id, actionType: "STORAGE_UPLOADED", payload: { storageHash } });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn("[cycle] 0G storage failed:", msg);
-    degradedReasons.push(`0G storage failed: ${msg.slice(0, 80)}`);
-  }
-
-  // 3. Update iNFT metadata on 0G Chain — the intelligent NFT proof. Only runs
-  // when the user has an iNFT AND storage succeeded (needs the storageHash).
-  if (user.inftTokenId && storageHash) {
-    try {
-      await updateAgentMetadata(user.inftTokenId, storageHash);
-      proofs.inft = true;
-      await logAction({ userId: user.id, actionType: "INFT_UPDATED", payload: { inftTokenId: user.inftTokenId, storageHash } });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn("[cycle] iNFT update failed:", msg);
-      degradedReasons.push(`iNFT metadata update failed: ${msg.slice(0, 80)}`);
-    }
-  } else if (!user.inftTokenId) {
-    // No iNFT minted for this user yet — treat as success so we don't flag
-    // cycles as degraded just because the user onboarded before iNFT was live.
-    proofs.inft = true;
-  } else {
-    // Has iNFT but storage failed → iNFT can't be updated → counts as degraded
-    degradedReasons.push("iNFT metadata update skipped: 0G storage hash unavailable");
-  }
-
-  // 4. Parse debate results for cycle record
+  // Parse debate results early — needed for Naryo + swap + Prisma steps
   const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number };
   const riskParsed = debate.risk.parsed as { challenge?: string; objection?: string; max_pct?: number };
   const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
 
-  // 4b. Execute Arc swap if executor decided to trade (non-fatal)
+  // 1. Execute Arc swap FIRST if executor decided to trade — so the swap tx
+  // hash lands in the rich record before we upload it to 0G. Non-fatal.
   let swapResult: ArcSwapResult | undefined;
   const finalAction = String(execParsed.action ?? "HOLD");
   const finalPct = modifiedPct ?? Number(execParsed.pct ?? 0);
@@ -575,16 +598,116 @@ export async function commitCycle(
     }
   }
 
-  // 5. Save full cycle record to Supabase (non-fatal)
+  // Fold the swap result into the rich record so 0G + Prisma both see it.
+  if (swapResult) {
+    richRecord.swap = {
+      success: swapResult.success,
+      txHash: swapResult.txHash,
+      explorerUrl: swapResult.explorerUrl,
+      method: swapResult.method,
+    };
+  }
+
+  // 2. Store the FULL rich record to 0G decentralized storage — this is the
+  // source of truth for the UI payment graph + "verify on 0G" independent
+  // check. HCS gets only the CID pointer. Order matters: 0G first, HCS
+  // second — otherwise HCS can't carry the `sh` field.
+  let storageHash: string | undefined;
+  try {
+    storageHash = await storeMemory(user.id, richRecord);
+    proofs.storage = true;
+    compactRecord.sh = storageHash; // inject CID into the HCS audit pointer
+    console.log(`[cycle] Stored rich record to 0G: ${storageHash}`);
+    await logAction({ userId: user.id, actionType: "STORAGE_UPLOADED", payload: { storageHash } });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("[cycle] 0G storage failed:", msg);
+    degradedReasons.push(`0G storage failed: ${msg.slice(0, 80)}`);
+  }
+
+  // 3. Log the compact record to Hedera HCS — the audit trail proof. If 0G
+  // succeeded, the record now carries `sh` so anyone reading HCS can fetch
+  // the full rich record from 0G. Failure here is non-fatal.
+  let seqNum = 0;
+  let hashscanUrl: string | undefined;
+  try {
+    const hcsResult = await logCycle(TOPIC_ID, compactRecord);
+    seqNum = hcsResult.seqNum;
+    hashscanUrl = hcsResult.hashscanUrl;
+    proofs.hcs = true;
+    console.log(`[cycle] Logged to HCS: seq=${seqNum} ${hashscanUrl}`);
+    await logAction({ userId: user.id, actionType: "HCS_LOGGED", payload: { seqNum, hashscanUrl } }).catch(() => {});
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("[cycle] HCS log failed:", msg);
+    degradedReasons.push(`HCS log failed: ${msg.slice(0, 80)}`);
+  }
+
+  // 3b. Emit CycleCompleted event on Hedera EVM for Naryo (non-fatal — gated
+  // behind NARYO_AUDIT_CONTRACT_ADDRESS env var; absence counts as "disabled",
+  // not "degraded".
+  if (process.env.NARYO_AUDIT_CONTRACT_ADDRESS) {
+    try {
+      const { emitCycleEvent } = await import("../naryo/emit-event");
+      await emitCycleEvent(
+        user.walletAddress,
+        cycleId,
+        compactRecord.d.act ?? "HOLD",
+        compactRecord.d.asset ?? "ETH",
+        compactRecord.d.pct ?? 0,
+      );
+      proofs.naryo = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[cycle] Naryo event emit failed:", msg);
+      degradedReasons.push(`Naryo event emit failed: ${msg.slice(0, 80)}`);
+    }
+  } else {
+    // Naryo not configured — treated as a successful no-op so it doesn't mark
+    // the cycle as degraded on users without the env var set.
+    proofs.naryo = true;
+  }
+
+  // 4. Update iNFT metadata on 0G Chain — the intelligent NFT proof. Only runs
+  // when the user has an iNFT AND storage succeeded (needs the storageHash).
+  if (user.inftTokenId && storageHash) {
+    try {
+      await updateAgentMetadata(user.inftTokenId, storageHash);
+      proofs.inft = true;
+      await logAction({ userId: user.id, actionType: "INFT_UPDATED", payload: { inftTokenId: user.inftTokenId, storageHash } });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[cycle] iNFT update failed:", msg);
+      degradedReasons.push(`iNFT metadata update failed: ${msg.slice(0, 80)}`);
+    }
+  } else if (!user.inftTokenId) {
+    // No iNFT minted for this user yet — treat as success so we don't flag
+    // cycles as degraded just because the user onboarded before iNFT was live.
+    proofs.inft = true;
+  } else {
+    // Has iNFT but storage failed → iNFT can't be updated → counts as degraded
+    degradedReasons.push("iNFT metadata update skipped: 0G storage hash unavailable");
+  }
+
+  // 5. Save full cycle record to Supabase (non-fatal). We persist the `goal`
+  // and the full `payments` graph so the dashboard can read them without a
+  // mirror-node round-trip or a 0G indexer fetch on every page load.
   let cycleDbUuid: string | null = null;
   try {
     cycleDbUuid = await logCycleRecord(user.id, cycleId, {
-      specialists: specialists.map((s) => ({
+      goal,
+      // Prisma's Json input type rejects typed array literals directly — both
+      // payments and specialists are cast to plain records to satisfy it.
+      payments: JSON.parse(JSON.stringify(payments)),
+      specialists: JSON.parse(JSON.stringify(specialists.map((s) => ({
         name: s.name,
         signal: s.signal,
         confidence: s.confidence,
         attestation: s.attestationHash,
-      })),
+        reasoning: s.reasoning ?? "",
+        hiredBy: s.hiredBy ?? "main-agent",
+        paymentTxHash: s.paymentTxHash ?? "",
+      })))),
       alpha: {
         action: String(alphaParsed.action ?? "HOLD"),
         pct: modifiedPct ?? Number(alphaParsed.pct ?? 0),
@@ -610,6 +733,8 @@ export async function commitCycle(
       hcsSeqNum: seqNum,
       hashscanUrl,
       storageHash,
+      swapTxHash: swapResult?.txHash,
+      swapExplorerUrl: swapResult?.explorerUrl,
       totalCostUsd: 0.003,
       navAfter: user.fund.currentNav,
     });
@@ -691,9 +816,11 @@ export async function commitCycle(
   return {
     userId: user.id,
     cycleId,
+    goal,
     specialists,
     debate,
     decision: debate.executor.parsed,
+    payments,
     seqNum,
     hashscanUrl,
     storageHash,
@@ -738,7 +865,7 @@ export async function rejectCycle(
 
 // ── Backward-compat wrapper (used by heartbeat auto-mode) ────────────────────
 
-export async function runCycle(user: UserRecord): Promise<CycleResult> {
-  const analysis = await analyzeCycle(user);
+export async function runCycle(user: UserRecord, userGoal?: string): Promise<CycleResult> {
+  const analysis = await analyzeCycle(user, userGoal);
   return commitCycle(analysis, user);
 }

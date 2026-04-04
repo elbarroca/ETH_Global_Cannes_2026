@@ -34,6 +34,8 @@ model Cycle {
   id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId           String        @map("user_id")
   cycleNumber      Int           @map("cycle_number")
+  goal             String?       @db.Text
+  payments         Json?
   specialists      Json          @default("[]")
   alphaAction      String?       @map("alpha_action")
   alphaPct         Int?          @map("alpha_pct")
@@ -160,11 +162,13 @@ model PendingCycle {
   id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId        String    @map("user_id")
   cycleNumber   Int       @map("cycle_number")
+  goal          String?   @db.Text
   status        String    @default("PENDING_APPROVAL")
   origin        String    @default("ui")
   specialists   Json      @default("[]")
   debate        Json      @default("{}")
   compactRecord Json      @default("{}") @map("compact_record")
+  richRecord    Json?     @map("rich_record")
   expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
   resolvedAt    DateTime? @map("resolved_at") @db.Timestamptz(6)
   resolvedBy    String?   @map("resolved_by")

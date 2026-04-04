@@ -14,9 +14,11 @@ export interface CycleProofs {
 export interface AnalysisResult {
   userId: string;
   cycleId: number;
+  goal: string;
   specialists: SpecialistResult[];
   debate: DebateResult;
   compactRecord: CompactCycleRecord;
+  richRecord: RichCycleRecord;
   // Runtime-only metadata — captured during analyzeCycle, re-derived on approve path
   specialistPath?: SpecialistPath;
   openclawGatewayStatus?: OpenClawGatewayStatus;
@@ -26,11 +28,13 @@ export interface PendingCycleRecord {
   id: string;
   userId: string;
   cycleNumber: number;
+  goal: string;
   status: PendingCycleStatus;
   origin: CycleOrigin;
   specialists: SpecialistResult[];
   debate: DebateResult;
   compactRecord: CompactCycleRecord;
+  richRecord: RichCycleRecord;
   expiresAt: string;
   telegramMsgId: number | null;
 }
@@ -173,9 +177,11 @@ export interface ArcSwapResult {
 export interface CycleResult {
   userId: string;
   cycleId: number;
+  goal: string;
   specialists: SpecialistResult[];
   debate: DebateResult;
   decision: Record<string, unknown>;
+  payments: PaymentRecord[];
   seqNum: number;
   hashscanUrl?: string;
   storageHash?: string;
@@ -189,11 +195,17 @@ export interface CycleResult {
   degradedReasons: string[];
 }
 
+// The lean record that gets serialised to HCS (must fit under 1024 bytes).
+// Payment graph + goal text + full reasoning live in 0G Storage instead — this
+// record is the audit pointer: who/when/what decision + storageHash (`sh`) so
+// independent verifiers can fetch the rich record from 0G.
 export interface CompactCycleRecord {
   c: number;
   u: string;
   t: string;
   rp: string;
+  g?: string; // user goal (truncated)
+  sh?: string; // 0G storage rootHash / CID — points at the RichCycleRecord
   s: Array<{ n: string; sig: string; conf: number; att: string }>;
   adv: {
     a: { act: string; pct: number; att: string; r?: string };
@@ -202,11 +214,48 @@ export interface CompactCycleRecord {
   };
   d: { act: string; asset: string; pct: number };
   nav: number;
-  // Agent-to-agent payment graph (populated when debate agents hire their own specialists)
-  payments?: Array<{
-    to: string; // specialist name
-    amt: string; // "$0.001"
-    tx: string; // payment tx hash
-    by: string; // hiredBy: "alpha" | "risk" | "executor" | "main-agent"
+}
+
+// Agent-to-agent payment attribution — who paid whom for which signal
+export interface PaymentRecord {
+  from: string; // human-readable hirer (alpha/risk/executor/main-agent)
+  to: string; // specialist name
+  amount: string; // "$0.001"
+  txHash: string; // x402 / Arc payment tx hash
+  hiredBy: string; // canonical role key — same as `from` when debate-hired
+  chain: "arc" | "hedera";
+}
+
+// The full cycle record persisted to 0G Storage. This is the source of truth
+// for the UI payment-graph view and the "verify on 0G" independent check.
+// HCS keeps a tiny pointer (`CompactCycleRecord.sh`), Prisma keeps a fast-path
+// cached copy of `payments[]` + `goal` for list queries.
+export interface RichCycleRecord {
+  version: 1;
+  cycleId: number;
+  userId: string;
+  timestamp: string;
+  goal: string;
+  riskProfile: string;
+  specialists: Array<{
+    name: string;
+    signal: string;
+    confidence: number;
+    reasoning: string;
+    attestationHash: string; // full, not truncated
+    teeVerified: boolean;
+    hiredBy: string;
+    paymentTxHash: string;
+    priceUsd: number;
+    reputation: number;
   }>;
+  debate: {
+    alpha: { action: string; pct: number; reasoning: string; attestationHash: string };
+    risk: { maxPct: number; objection: string; reasoning: string; attestationHash: string };
+    executor: { action: string; pct: number; stopLoss: string; reasoning: string; attestationHash: string };
+  };
+  payments: PaymentRecord[];
+  decision: { action: string; asset: string; pct: number };
+  swap?: { success: boolean; txHash?: string; explorerUrl?: string; method: string };
+  nav: number;
 }

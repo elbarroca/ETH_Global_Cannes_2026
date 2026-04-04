@@ -35,7 +35,12 @@ export const arcTestnet = defineChain({
 const wagmiConfig = createConfig({
   chains: [arcTestnet],
   transports: { [arcTestnet.id]: http("https://rpc.testnet.arc.network") },
-  multiInjectedProviderDiscovery: true,
+  // Disabled: Dynamic's EthereumWalletConnectors already discovers EVM wallets
+  // via EIP-6963 and bridges them to wagmi via DynamicWagmiConnector. Wagmi's
+  // own independent discovery adds duplicate injected providers (including
+  // Phantom), which then show up in Dynamic's picker — disabling it here
+  // ensures there is a single source of truth for wallet discovery.
+  multiInjectedProviderDiscovery: false,
 });
 
 const queryClient = new QueryClient();
@@ -160,25 +165,98 @@ function isBlockedWallet(wallet: {
   );
 }
 
+/**
+ * Remove Phantom and friends from Dynamic's connector list at the source.
+ *
+ * `EthereumWalletConnectors(props)` returns an array of connector class
+ * constructors. Two sources seed Phantom:
+ *   1. `injectedWalletOverrides = [PhantomEvm, ExodusEvm]` — hardcoded named
+ *      classes; caught by `ConnectorClass.name === 'PhantomEvm'`.
+ *   2. `fetchInjectedWalletConnector()` reads the static wallet-book and
+ *      builds anonymous classes via `getConnectorConstructorInjectedWallet`;
+ *      these set `this.name` / `this.overrideKey` in the constructor, so we
+ *      have to instantiate them with dummy props to read those fields.
+ *
+ * Filtering here means Phantom never enters Dynamic's wallet list — not as a
+ * card, not as an "install" prompt, not in the "more wallets" view. The
+ * downstream `walletsFilter` below is kept purely as belt-and-suspenders.
+ */
+function isBlockedConnectorClass(Connector: unknown): boolean {
+  if (!Connector || typeof Connector !== "function") return false;
+
+  // Named classes (PhantomEvm, ExodusEvm). Anonymous classes report "".
+  const className = ((Connector as { name?: string }).name ?? "").toLowerCase();
+  if (
+    Array.from(BLOCKED_WALLET_GROUPS).some((blocked) => className.includes(blocked))
+  ) {
+    return true;
+  }
+
+  // Anonymous wallet-book connectors set `name` + `overrideKey` in the ctor,
+  // so we have to instantiate to introspect. Pass a minimal dummy props bag;
+  // InjectedWalletBase only uses it lazily via getters, so this is safe.
+  try {
+    const instance = new (Connector as new (props: Record<string, unknown>) => {
+      name?: string;
+      overrideKey?: string;
+    })({});
+    const name = (instance.name ?? "").toLowerCase();
+    const key = (instance.overrideKey ?? "").toLowerCase();
+    return Array.from(BLOCKED_WALLET_GROUPS).some(
+      (blocked) => name.includes(blocked) || key.includes(blocked),
+    );
+  } catch {
+    // Can't instantiate (needs special props) — keep it to avoid false positives.
+    return false;
+  }
+}
+
+/** Filtered Ethereum connectors factory — drop-in replacement for `EthereumWalletConnectors`. */
+const FilteredEthereumWalletConnectors: typeof EthereumWalletConnectors = (
+  props,
+) => {
+  const connectors = EthereumWalletConnectors(props);
+  return connectors.filter((c) => !isBlockedConnectorClass(c));
+};
+
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <DynamicContextProvider
       settings={{
         environmentId: DYNAMIC_ENV_ID,
-        walletConnectors: [EthereumWalletConnectors],
+        walletConnectors: [FilteredEthereumWalletConnectors],
         initialAuthenticationMode: "connect-only",
         overrides: { evmNetworks: [ARC_TESTNET_NETWORK] },
-        walletsFilter: (wallets) =>
-          wallets
+        walletsFilter: (wallets) => {
+          // Diagnostic: if Phantom still leaks into the list after the
+          // connector-level filter, log it so we can see the actual key/name/
+          // group shape and tighten the matcher.
+          if (typeof window !== "undefined") {
+            const leaks = wallets.filter((w) => {
+              const blob = `${w.key} ${w.name} ${w.group ?? ""} ${w.chainGroup ?? ""}`.toLowerCase();
+              return blob.includes("phantom");
+            });
+            if (leaks.length > 0) {
+              console.warn(
+                "[wallet-filter] Phantom leaked past connector filter:",
+                leaks.map((w) => ({
+                  key: w.key,
+                  name: w.name,
+                  group: w.group,
+                  chainGroup: w.chainGroup,
+                })),
+              );
+            }
+          }
+          return wallets
             .filter((w) => !isBlockedWallet(w))
             .map((w) => ({
               ...w,
-              // Also strip blocked wallets from any grouped-wallet containers
-              // (some Dynamic views expand groups inline).
               groupedWallets: w.groupedWallets?.filter(
                 (gw) => !isBlockedWallet(gw),
               ),
-            })),
+            }));
+        },
       }}
     >
       <WagmiProvider config={wagmiConfig}>
