@@ -1,49 +1,17 @@
 import { sealedInference } from "../og/inference";
 import { OG_PROVIDER } from "../config/og-compute";
 import { getAgentUrl } from "../config/agent-registry";
-import { PROMPTS, parseDualOutput, normalizeCot, compactVerdict } from "./prompts";
-import { logSwarmEvent } from "../hedera/hcs";
-import type { SpecialistResult, DebateResult, DebateTranscriptEntry, DebatePhase, SwarmEventRecord } from "../types/index";
-
-const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
-
-// Fire-and-forget swarm event emitter. Failures are logged but never thrown —
-// a stumble in the audit trail must never fail a cycle.
-//
-// Traces each emit attempt with byte count + summary so we can diagnose
-// cluster issues on Hashscan without trawling raw payloads. The debug line
-// fires BEFORE logSwarmEvent so we see attempts even if HCS is slow/down.
-function emitSwarmEvent(event: SwarmEventRecord): void {
-  if (!TOPIC_ID) {
-    console.warn(`[swarm] skip ev=${event.ev}: HCS_AUDIT_TOPIC_ID not set`);
-    return;
-  }
-
-  const bytes = Buffer.byteLength(JSON.stringify(event), "utf8");
-  let summary: string;
-  switch (event.ev) {
-    case "start":
-      summary = `c=${event.c} u=${event.u.slice(0, 8)} rp=${event.rp}`;
-      break;
-    case "hire":
-      summary = `c=${event.c} by=${event.by}→${event.to} ${event.sig}@${event.conf}% cot=${event.cot.length}steps`;
-      break;
-    case "turn":
-      summary = `c=${event.c} t=${event.t} ${event.ph} ${event.from}${event.to ? "→" + event.to : ""} cot=${event.cot.length}steps`;
-      break;
-    case "done":
-      summary = `c=${event.c} ${event.d.act} ${event.d.asset} ${event.d.pct}% sh=${event.sh?.slice(0, 12) ?? "none"}`;
-      break;
-  }
-  console.log(`[swarm] → ev=${event.ev} bytes=${bytes} ${summary}`);
-
-  logSwarmEvent(TOPIC_ID, event).catch((err) => {
-    console.warn(
-      `[swarm] ✗ ev=${event.ev} c=${(event as { c?: number }).c} failed:`,
-      err instanceof Error ? err.message : String(err),
-    );
-  });
-}
+import { PROMPTS, parseDualOutput, normalizeCot, normalizeCotFull } from "./prompts";
+import { emitTurnWithRichData } from "./swarm-emit";
+import { formatLiquidityTable } from "./data/liquidity-injector";
+import type {
+  SpecialistResult,
+  DebateResult,
+  DebateTranscriptEntry,
+  DebatePhase,
+  RichTurnData,
+  CycleLiquidity,
+} from "../types/index";
 
 const DELAY_MS = 2000;
 const DELIBERATION_PAUSE_MS = parseInt(process.env.DEBATE_DELIBERATION_PAUSE_MS ?? "10000", 10);
@@ -55,6 +23,33 @@ const USE_REMOTE_DEBATE = process.env.USE_REMOTE_DEBATE !== "false";
 const ALPHA_FALLBACK = { action: "HOLD", asset: "ETH", pct: 0, thesis: "Parse failed — defaulting to HOLD" };
 const RISK_FALLBACK = { max_pct: 0, risks: ["parse failure"], objection: "Parse failed — blocking trade" };
 const EXECUTOR_FALLBACK = { action: "HOLD", asset: "ETH", pct: 0, stop_loss: "-5%", reasoning: "Parse failed — defaulting to HOLD" };
+
+/**
+ * A specialist is "failed" when its hire never produced a real analysis —
+ * the attestationHash column carries an error sentinel instead of a real
+ * chatcmpl-* id. Failed specialists' fallback `{signal: "HOLD", confidence: 50}`
+ * results pollute the debate context: Risk reads them as conservative
+ * evidence, caps max_pct, and the executor override fails to fire. We
+ * filter them out before building the prompt context and carry a separate
+ * degraded-notice so the debate knows the count was incomplete.
+ *
+ * The sentinels come from `callSpecialist()` in `src/agents/hire-specialist.ts`:
+ *   - `http-<status>`  → the specialist responded with a non-2xx code
+ *                        (402 insufficient_balance falls in this bucket)
+ *   - `net-error`      → thrown exception (DNS, x402 sign error, ECONNREFUSED)
+ *   - `not-found`      → agent id wasn't in the registry
+ *   - `pending`        → never updated from its initial value, i.e. the hire
+ *                        path bailed before running
+ */
+function isFailedSpecialist(s: SpecialistResult): boolean {
+  const att = s.attestationHash ?? "";
+  return (
+    att.startsWith("http-") ||
+    att === "net-error" ||
+    att === "not-found" ||
+    att === "pending"
+  );
+}
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -84,12 +79,33 @@ export function computeConfluence(specialists: SpecialistResult[]): Record<strin
 // Exported so fly-agent-server.ts (/hire-and-analyze endpoint) can reuse the
 // same formatting when debate agents hire their own specialists.
 //
-// The output now contains a CROSS-SPECIALIST CONFLUENCE TABLE section computed
-// deterministically from every specialist's picks[]. The alpha prompt
-// references this table directly so the 7B model doesn't have to count —
-// it just picks the top-confluence ticker.
-export function buildSpecialistContext(specialists: SpecialistResult[]): string {
-  const perSpec = specialists
+// The output now contains:
+//   1. an AVAILABLE LIQUIDITY block — so alpha/risk/executor can convert
+//      their % directly to a USD amount against the user's real buying power
+//   2. a CROSS-SPECIALIST CONFLUENCE TABLE — computed deterministically from
+//      every specialist's picks[] so the 7B model doesn't have to count
+//
+// The alpha prompt references both sections by name — 7B models can read
+// structured lines reliably but cannot count or compute arithmetic on the fly.
+export function buildSpecialistContext(
+  specialists: SpecialistResult[],
+  cycleLiquidity?: CycleLiquidity,
+): string {
+  // Exclude failed hires before they pollute the debate context. A specialist
+  // that 402'd (insufficient_balance) or timed out ends up with a fallback
+  // `signal: "HOLD", confidence: 50` — feeding that to Risk looks like
+  // genuine consensus to HOLD and blocks the BUY override in main-agent.ts.
+  // Instead we silence those rows and surface a one-line degraded notice
+  // below the confluence table, so the debate layer is informed but not
+  // misled.
+  const liveSpecialists = specialists.filter((s) => !isFailedSpecialist(s));
+  const failedCount = specialists.length - liveSpecialists.length;
+  const failedNames = specialists
+    .filter((s) => isFailedSpecialist(s))
+    .map((s) => `${s.name}(${s.attestationHash ?? "?"})`)
+    .join(", ");
+
+  const perSpec = liveSpecialists
     .map((s, idx) => {
       const repLabel = (s.reputation ?? 500) >= 700 ? "HIGH-REP" : (s.reputation ?? 500) >= 400 ? "MED-REP" : "LOW-REP";
       const lines = [`[#${idx + 1} ${repLabel}] ${s.name}: ${s.signal} (confidence: ${s.confidence}%, reputation: ${s.reputation ?? 500})`];
@@ -139,19 +155,38 @@ export function buildSpecialistContext(specialists: SpecialistResult[]): string 
     })
     .join("\n");
 
+  // ── Liquidity block (real-time) ──────────────────────────────────────
+  // Prepend the user's actual USDC buying power so debate agents can convert
+  // their chosen % directly to a USD amount. The 7B model is unreliable at
+  // arithmetic, so we pre-compute 1%/3%/5%/10% of availableUsd in a lookup.
+  const liquidityBlock = cycleLiquidity
+    ? `${formatLiquidityTable(cycleLiquidity)}\n\n`
+    : "";
+
   // ── Confluence table (deterministic) ─────────────────────────────────
   // Rank tickers by number of specialists that picked them. This is the
   // single most important signal alpha uses — a ticker with 3 picks beats
   // a ticker with 1 pick, regardless of individual confidence scores.
-  const confluence = computeConfluence(specialists);
+  // Compute from liveSpecialists only — failed hires never produced picks.
+  const confluence = computeConfluence(liveSpecialists);
   const ranked = Object.entries(confluence).sort((a, b) => b[1] - a[1]);
+
+  // One-line degraded notice appended to the context when any specialist
+  // failed. Explicitly tells the debate agents those rows were EXCLUDED
+  // from the consensus count so they don't treat the shortfall as "HOLD
+  // consensus" and defensively clamp percentages.
+  const degradedNotice =
+    failedCount > 0
+      ? `\n\nDEGRADED NOTICE: ${failedCount} specialist${failedCount > 1 ? "s were" : " was"} unreachable this cycle (${failedNames}). Their signals are EXCLUDED from the consensus count above, NOT counted as HOLD. Judge the live signals on their own merits — do not defensively clamp because some feeds are down.`
+      : "";
+
   if (ranked.length === 0) {
-    return `${perSpec}\n\nCROSS-SPECIALIST CONFLUENCE TABLE:\n  (no picks emitted — default to HOLD or pick the single-signal consensus)`;
+    return `${liquidityBlock}${perSpec}\n\nCROSS-SPECIALIST CONFLUENCE TABLE:\n  (no picks emitted — default to HOLD or pick the single-signal consensus)${degradedNotice}`;
   }
   const tableLines = ranked.map(
     ([ticker, count]) => `  ${ticker}: ${count}× ${count >= 2 ? "(CONFLUENCE — multiple specialists agree)" : "(single specialist)"}`,
   );
-  return `${perSpec}\n\nCROSS-SPECIALIST CONFLUENCE TABLE (ticker × # specialists who picked it):\n${tableLines.join("\n")}\n\nThe top entry is the strongest multi-source signal. Prefer it unless Risk flags something specific.`;
+  return `${liquidityBlock}${perSpec}\n\nCROSS-SPECIALIST CONFLUENCE TABLE (ticker × # specialists who picked it):\n${tableLines.join("\n")}\n\nThe top entry is the strongest multi-source signal. Prefer it unless Risk flags something specific.${degradedNotice}`;
 }
 
 function isEmptyParse(obj: Record<string, unknown>): boolean {
@@ -251,11 +286,52 @@ export async function runAdversarialDebate(
   riskProfile: string,
   maxTradePercent: number,
   cycleId?: number,
+  userId?: string,
 ): Promise<DebateResult> {
   const debateStart = Date.now();
   const transcripts: DebateTranscriptEntry[] = [];
   const specContext = buildSpecialistContext(specialistResults);
   let turnCounter = 0;
+
+  // Helper: build RichTurnData from a single LLM turn's inputs and outputs.
+  // This is the full-fidelity payload that gets uploaded to 0G Storage
+  // alongside the compact HCS turn event so verifiers can reconstruct the
+  // exact prompt + exact response byte-for-byte.
+  const buildRichTurn = (
+    turnNum: number,
+    phase: DebatePhase,
+    from: string,
+    to: string | undefined,
+    promptKey: "alpha" | "risk" | "executor",
+    userMessage: string,
+    stage: { content: string; parsed: Record<string, unknown>; reasoning: string; attestationHash: string; teeVerified: boolean },
+    durationMs: number,
+  ): RichTurnData => ({
+    schemaVersion: 1,
+    eventKind: "turn",
+    cycleId: cycleId ?? 0,
+    userId: userId ?? "unknown",
+    timestamp: new Date().toISOString(),
+    turnNumber: turnNum,
+    phase,
+    from,
+    to,
+    input: {
+      systemPromptName: promptKey,
+      userMessage, // full prompt including specContext, not truncated
+    },
+    output: {
+      content: stage.content, // complete raw LLM response
+      parsed: stage.parsed, // full parsed JSON
+      reasoning: stage.reasoning,
+      cot: normalizeCotFull((stage.parsed as { cot?: unknown }).cot, stage.reasoning),
+    },
+    attestation: {
+      hash: stage.attestationHash, // full hash, not truncated
+      teeVerified: stage.teeVerified,
+    },
+    durationMs,
+  });
 
   // Log specialist intelligence phase
   for (const spec of specialistResults) {
@@ -269,18 +345,23 @@ export async function runAdversarialDebate(
   const alphaMsg = `Specialist signals:\n${specContext}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.`;
   let t0 = Date.now();
   let alpha = await inferWithRetry("alpha", PROMPTS.alpha.content, alphaMsg, ALPHA_FALLBACK);
-  recordTranscript(transcripts, "opening", "main-orchestrator", "alpha", alphaMsg, alpha.content, alpha.attestationHash, alpha.teeVerified, Date.now() - t0);
+  let alphaDuration = Date.now() - t0;
+  recordTranscript(transcripts, "opening", "main-orchestrator", "alpha", alphaMsg, alpha.content, alpha.attestationHash, alpha.teeVerified, alphaDuration);
   if (cycleId != null) {
-    emitSwarmEvent({
-      ev: "turn",
-      c: cycleId,
-      t: ++turnCounter,
-      ph: "opening",
-      from: "alpha",
-      cot: normalizeCot((alpha.parsed as { cot?: unknown }).cot, alpha.reasoning),
-      verdict: compactVerdict(alpha.parsed),
-      att: (alpha.attestationHash ?? "").slice(0, 16),
-    });
+    const tNum = ++turnCounter;
+    await emitTurnWithRichData(
+      {
+        ev: "turn",
+        c: cycleId,
+        t: tNum,
+        ph: "opening",
+        from: "alpha",
+        cot: normalizeCotFull((alpha.parsed as { cot?: unknown }).cot, alpha.reasoning),
+        verdict: alpha.parsed,
+        att: alpha.attestationHash ?? "",
+      },
+      buildRichTurn(tNum, "opening", "alpha", undefined, "alpha", alphaMsg, alpha, alphaDuration),
+    );
   }
 
   await delay(DELAY_MS);
@@ -290,19 +371,24 @@ export async function runAdversarialDebate(
   const riskMsg = `Specialist signals:\n${specContext}\n\nAlpha argues: "${alpha.reasoning}"${alphaCotBlock}\nAlpha proposes: ${JSON.stringify(alpha.parsed)}\n\nMax allowed: ${maxTradePercent}%. Challenge this.`;
   t0 = Date.now();
   let risk = await inferWithRetry("risk", PROMPTS.risk.content, riskMsg, RISK_FALLBACK);
-  recordTranscript(transcripts, "opening", "main-orchestrator", "risk", riskMsg, risk.content, risk.attestationHash, risk.teeVerified, Date.now() - t0);
+  let riskDuration = Date.now() - t0;
+  recordTranscript(transcripts, "opening", "main-orchestrator", "risk", riskMsg, risk.content, risk.attestationHash, risk.teeVerified, riskDuration);
   if (cycleId != null) {
-    emitSwarmEvent({
-      ev: "turn",
-      c: cycleId,
-      t: ++turnCounter,
-      ph: "opening",
-      from: "risk",
-      to: "alpha",
-      cot: normalizeCot((risk.parsed as { cot?: unknown }).cot, risk.reasoning),
-      verdict: compactVerdict(risk.parsed),
-      att: (risk.attestationHash ?? "").slice(0, 16),
-    });
+    const tNum = ++turnCounter;
+    await emitTurnWithRichData(
+      {
+        ev: "turn",
+        c: cycleId,
+        t: tNum,
+        ph: "opening",
+        from: "risk",
+        to: "alpha",
+        cot: normalizeCotFull((risk.parsed as { cot?: unknown }).cot, risk.reasoning),
+        verdict: risk.parsed,
+        att: risk.attestationHash ?? "",
+      },
+      buildRichTurn(tNum, "opening", "risk", "alpha", "risk", riskMsg, risk, riskDuration),
+    );
   }
 
   await delay(DELAY_MS);
@@ -312,18 +398,23 @@ export async function runAdversarialDebate(
   const executorMsg = `Specialist signals:\n${specContext}\n\nAlpha argues: "${alpha.reasoning}"${alphaCotBlock}\nAlpha: ${JSON.stringify(alpha.parsed)}\n\nRisk challenges: "${risk.reasoning}"${riskCotBlock}\nRisk: ${JSON.stringify(risk.parsed)}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.`;
   t0 = Date.now();
   let executor = await inferWithRetry("executor", PROMPTS.executor.content, executorMsg, EXECUTOR_FALLBACK);
-  recordTranscript(transcripts, "decision", "main-orchestrator", "executor", executorMsg, executor.content, executor.attestationHash, executor.teeVerified, Date.now() - t0);
+  let executorDuration = Date.now() - t0;
+  recordTranscript(transcripts, "decision", "main-orchestrator", "executor", executorMsg, executor.content, executor.attestationHash, executor.teeVerified, executorDuration);
   if (cycleId != null) {
-    emitSwarmEvent({
-      ev: "turn",
-      c: cycleId,
-      t: ++turnCounter,
-      ph: "decision",
-      from: "executor",
-      cot: normalizeCot((executor.parsed as { cot?: unknown }).cot, executor.reasoning),
-      verdict: compactVerdict(executor.parsed),
-      att: (executor.attestationHash ?? "").slice(0, 16),
-    });
+    const tNum = ++turnCounter;
+    await emitTurnWithRichData(
+      {
+        ev: "turn",
+        c: cycleId,
+        t: tNum,
+        ph: "decision",
+        from: "executor",
+        cot: normalizeCotFull((executor.parsed as { cot?: unknown }).cot, executor.reasoning),
+        verdict: executor.parsed,
+        att: executor.attestationHash ?? "",
+      },
+      buildRichTurn(tNum, "decision", "executor", undefined, "executor", executorMsg, executor, executorDuration),
+    );
   }
 
   // ── Round 2: Rebuttal if confidence is low ────────────────────
@@ -339,19 +430,24 @@ export async function runAdversarialDebate(
     const alphaRebuttalMsg = `REBUTTAL ROUND. Executor initially decided: ${JSON.stringify(executor.parsed)}\nRisk argued: "${risk.reasoning}"\n\nSpecialist signals:\n${specContext}\n\nDefend or revise your position. Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.`;
     t0 = Date.now();
     alpha = await inferWithRetry("alpha", PROMPTS.alpha.content, alphaRebuttalMsg, ALPHA_FALLBACK);
-    recordTranscript(transcripts, "rebuttal", "main-orchestrator", "alpha", alphaRebuttalMsg, alpha.content, alpha.attestationHash, alpha.teeVerified, Date.now() - t0);
+    alphaDuration = Date.now() - t0;
+    recordTranscript(transcripts, "rebuttal", "main-orchestrator", "alpha", alphaRebuttalMsg, alpha.content, alpha.attestationHash, alpha.teeVerified, alphaDuration);
     if (cycleId != null) {
-      emitSwarmEvent({
-        ev: "turn",
-        c: cycleId,
-        t: ++turnCounter,
-        ph: "rebuttal",
-        from: "alpha",
-        to: "risk",
-        cot: normalizeCot((alpha.parsed as { cot?: unknown }).cot, alpha.reasoning),
-        verdict: compactVerdict(alpha.parsed),
-        att: (alpha.attestationHash ?? "").slice(0, 16),
-      });
+      const tNum = ++turnCounter;
+      await emitTurnWithRichData(
+        {
+          ev: "turn",
+          c: cycleId,
+          t: tNum,
+          ph: "rebuttal",
+          from: "alpha",
+          to: "risk",
+          cot: normalizeCotFull((alpha.parsed as { cot?: unknown }).cot, alpha.reasoning),
+          verdict: alpha.parsed,
+          att: alpha.attestationHash ?? "",
+        },
+        buildRichTurn(tNum, "rebuttal", "alpha", "risk", "alpha", alphaRebuttalMsg, alpha, alphaDuration),
+      );
     }
 
     await delay(DELAY_MS);
@@ -359,19 +455,24 @@ export async function runAdversarialDebate(
     const riskRebuttalMsg = `REBUTTAL ROUND. Executor initially decided: ${JSON.stringify(executor.parsed)}\nAlpha now argues: "${alpha.reasoning}"\nAlpha revised: ${JSON.stringify(alpha.parsed)}\n\nSpecialist signals:\n${specContext}\n\nMax allowed: ${maxTradePercent}%. Revise your challenge.`;
     t0 = Date.now();
     risk = await inferWithRetry("risk", PROMPTS.risk.content, riskRebuttalMsg, RISK_FALLBACK);
-    recordTranscript(transcripts, "rebuttal", "main-orchestrator", "risk", riskRebuttalMsg, risk.content, risk.attestationHash, risk.teeVerified, Date.now() - t0);
+    riskDuration = Date.now() - t0;
+    recordTranscript(transcripts, "rebuttal", "main-orchestrator", "risk", riskRebuttalMsg, risk.content, risk.attestationHash, risk.teeVerified, riskDuration);
     if (cycleId != null) {
-      emitSwarmEvent({
-        ev: "turn",
-        c: cycleId,
-        t: ++turnCounter,
-        ph: "rebuttal",
-        from: "risk",
-        to: "alpha",
-        cot: normalizeCot((risk.parsed as { cot?: unknown }).cot, risk.reasoning),
-        verdict: compactVerdict(risk.parsed),
-        att: (risk.attestationHash ?? "").slice(0, 16),
-      });
+      const tNum = ++turnCounter;
+      await emitTurnWithRichData(
+        {
+          ev: "turn",
+          c: cycleId,
+          t: tNum,
+          ph: "rebuttal",
+          from: "risk",
+          to: "alpha",
+          cot: normalizeCotFull((risk.parsed as { cot?: unknown }).cot, risk.reasoning),
+          verdict: risk.parsed,
+          att: risk.attestationHash ?? "",
+        },
+        buildRichTurn(tNum, "rebuttal", "risk", "alpha", "risk", riskRebuttalMsg, risk, riskDuration),
+      );
     }
 
     await delay(DELAY_MS);
@@ -379,18 +480,23 @@ export async function runAdversarialDebate(
     const executorFinalMsg = `FINAL DECISION after rebuttal.\n\nSpecialist signals:\n${specContext}\n\nAlpha (rebuttal): "${alpha.reasoning}"\nAlpha: ${JSON.stringify(alpha.parsed)}\n\nRisk (rebuttal): "${risk.reasoning}"\nRisk: ${JSON.stringify(risk.parsed)}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make your FINAL call.`;
     t0 = Date.now();
     executor = await inferWithRetry("executor", PROMPTS.executor.content, executorFinalMsg, EXECUTOR_FALLBACK);
-    recordTranscript(transcripts, "decision", "main-orchestrator", "executor", executorFinalMsg, executor.content, executor.attestationHash, executor.teeVerified, Date.now() - t0);
+    executorDuration = Date.now() - t0;
+    recordTranscript(transcripts, "decision", "main-orchestrator", "executor", executorFinalMsg, executor.content, executor.attestationHash, executor.teeVerified, executorDuration);
     if (cycleId != null) {
-      emitSwarmEvent({
-        ev: "turn",
-        c: cycleId,
-        t: ++turnCounter,
-        ph: "decision",
-        from: "executor",
-        cot: normalizeCot((executor.parsed as { cot?: unknown }).cot, executor.reasoning),
-        verdict: compactVerdict(executor.parsed),
-        att: (executor.attestationHash ?? "").slice(0, 16),
-      });
+      const tNum = ++turnCounter;
+      await emitTurnWithRichData(
+        {
+          ev: "turn",
+          c: cycleId,
+          t: tNum,
+          ph: "decision",
+          from: "executor",
+          cot: normalizeCotFull((executor.parsed as { cot?: unknown }).cot, executor.reasoning),
+          verdict: executor.parsed,
+          att: executor.attestationHash ?? "",
+        },
+        buildRichTurn(tNum, "decision", "executor", undefined, "executor", executorFinalMsg, executor, executorDuration),
+      );
     }
   }
 

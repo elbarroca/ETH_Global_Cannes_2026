@@ -18,9 +18,9 @@ import {
   getPendingCycle,
   configure,
 } from "@/lib/api";
+import Link from "next/link";
 import { ExpandableHuntCard } from "@/components/expandable-hunt-card";
 import { CycleNarrativePanel } from "@/components/cycle-narrative-panel";
-import { HoldingsWidget } from "@/components/holdings-widget";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreconditionModal } from "@/components/precondition-modal";
 import { TelegramModal } from "@/components/telegram-modal";
@@ -407,8 +407,14 @@ export default function DashboardPage() {
       {/* Row 2: Current hunt as expandable card */}
       {pendingCycle ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <PackColumn cycle={pendingAsCycle!} onVerify={() => router.push("/verify")} />
-          <ChallengeColumn cycle={pendingAsCycle!} onVerify={() => router.push("/verify")} />
+          <PackColumn
+            cycle={pendingAsCycle!}
+            onVerify={() => router.push(`/verify?cycle=${pendingCycle.cycleNumber}`)}
+          />
+          <ChallengeColumn
+            cycle={pendingAsCycle!}
+            onVerify={() => router.push(`/verify?cycle=${pendingCycle.cycleNumber}`)}
+          />
           <ApprovalPanel
             pendingCycle={pendingCycle}
             approving={approving}
@@ -433,11 +439,13 @@ export default function DashboardPage() {
               cycles.narrative JSON column via enrichCycleRow. */}
           {cycle.narrative && <CycleNarrativePanel narrative={cycle.narrative} />}
 
-          {/* Holdings widget — user's current on-chain positions. Reads
-              fund.holdings from the enriched cycle response (or falls back
-              to the user record for pre-swap users). */}
+          {/* Holdings KPI — one-line summary that points at the full
+              /portfolio page (pie chart + evolution + attribution log).
+              We keep a KPI on the dashboard so the hunt context stays at
+              a glance, but the detail view now lives in its own tab so
+              it's not fighting the hunt controls for space. */}
           {user && (
-            <HoldingsWidget
+            <HoldingsSummaryKpi
               depositedUsdc={user.fund.depositedUsdc}
               holdings={cycle.holdings ?? user.fund.holdings ?? {}}
             />
@@ -870,6 +878,64 @@ function ChallengeColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => vo
         })}
       </CardBody>
     </Card>
+  );
+}
+
+// Compact holdings KPI strip — the full portfolio (pie chart + evolution +
+// attribution) lives on /portfolio. This one-liner stays on the dashboard so
+// users can tell at a glance whether their agent has open positions without
+// the widget eating half the hunt column.
+function HoldingsSummaryKpi({
+  depositedUsdc,
+  holdings,
+}: {
+  depositedUsdc: number;
+  holdings: Record<string, number>;
+}) {
+  const tokenEntries = Object.entries(holdings ?? {}).filter(([, v]) => v > 0);
+  const tokenCount = tokenEntries.length;
+  const topToken = tokenEntries.sort((a, b) => b[1] - a[1])[0];
+
+  return (
+    <Link
+      href="/portfolio"
+      className="block group"
+    >
+      <Card>
+        <div className="flex items-center justify-between px-4 py-3 gap-3 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-void-600">Your holdings</div>
+              <div className="text-xl font-bold font-mono tabular-nums text-void-100 leading-tight">
+                ${depositedUsdc.toFixed(2)}{" "}
+                <span className="text-xs font-normal text-void-500">USDC</span>
+              </div>
+            </div>
+            {tokenCount > 0 && (
+              <>
+                <div className="h-8 w-px bg-void-800" />
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-void-600">
+                    Token positions
+                  </div>
+                  <div className="text-sm text-void-200 leading-tight font-mono">
+                    {tokenCount} position{tokenCount === 1 ? "" : "s"}
+                    {topToken && (
+                      <span className="text-void-500 ml-1.5">
+                        · top {topToken[0]} {topToken[1].toFixed(4)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <span className="text-[11px] font-mono text-teal-300 group-hover:text-teal-200 underline decoration-dotted">
+            View portfolio ↗
+          </span>
+        </div>
+      </Card>
+    </Link>
   );
 }
 

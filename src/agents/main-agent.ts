@@ -1,7 +1,7 @@
 import { updateUser } from "../store/user-store";
 import { logAction, logCycleRecord } from "../store/action-logger";
 import { runAdversarialDebate } from "./adversarial";
-import { normalizeCot, compactVerdict } from "./prompts";
+import { normalizeCotFull } from "./prompts";
 import { emitSwarmEvent, emitHireWithRichData, emitTurnWithRichData } from "./swarm-emit";
 import { hireSpecialists } from "./hire-specialist";
 import { selectSpecialists } from "../marketplace/hiring-strategy";
@@ -75,7 +75,7 @@ function buildRichHireData(
       confidence: sp.confidence,
       parsed: parsed as Record<string, unknown>,
       reasoning: sp.reasoning ?? "",
-      cot: normalizeCot((sp as unknown as { cot?: unknown }).cot, sp.reasoning),
+      cot: normalizeCotFull((sp as unknown as { cot?: unknown }).cot, sp.reasoning),
       picks: sp.picks ?? null,
     },
     attestation: {
@@ -124,7 +124,7 @@ function buildRichTurnFromHierarchical(
       content: resp.content,
       parsed: resp.parsed,
       reasoning: resp.reasoning,
-      cot: normalizeCot((resp.parsed as { cot?: unknown }).cot, resp.reasoning),
+      cot: normalizeCotFull((resp.parsed as { cot?: unknown }).cot, resp.reasoning),
     },
     attestation: {
       hash: resp.attestationHash, // full hash
@@ -752,11 +752,11 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
               to: spec.name,
               sig: spec.signal,
               conf: spec.confidence,
-              cot: normalizeCot(
+              cot: normalizeCotFull(
                 (spec as unknown as { cot?: unknown }).cot,
                 spec.reasoning,
               ),
-              att: (spec.attestationHash ?? "").slice(0, 16),
+              att: spec.attestationHash ?? "",
             },
             buildRichHireData(spec, cycleId, user.id, `[hierarchical] ${spec.hiredBy ?? "main"} hired ${spec.name} for debate`),
           ),
@@ -779,9 +779,9 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
             t: hTurn1,
             ph: "opening",
             from: "alpha",
-            cot: normalizeCot((alphaResp.parsed as { cot?: unknown }).cot, alphaResp.reasoning),
-            verdict: compactVerdict(alphaResp.parsed),
-            att: (alphaResp.attestationHash ?? "").slice(0, 16),
+            cot: normalizeCotFull((alphaResp.parsed as { cot?: unknown }).cot, alphaResp.reasoning),
+            verdict: alphaResp.parsed,
+            att: alphaResp.attestationHash ?? "",
           },
           buildRichTurnFromHierarchical(alphaResp, hTurn1, "opening", "alpha", undefined, cycleId, user.id, debateCtx),
         ),
@@ -793,9 +793,9 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
             ph: "opening",
             from: "risk",
             to: "alpha",
-            cot: normalizeCot((riskResp.parsed as { cot?: unknown }).cot, riskResp.reasoning),
-            verdict: compactVerdict(riskResp.parsed),
-            att: (riskResp.attestationHash ?? "").slice(0, 16),
+            cot: normalizeCotFull((riskResp.parsed as { cot?: unknown }).cot, riskResp.reasoning),
+            verdict: riskResp.parsed,
+            att: riskResp.attestationHash ?? "",
           },
           buildRichTurnFromHierarchical(
             riskResp,
@@ -815,9 +815,9 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
             t: hTurn3,
             ph: "decision",
             from: "executor",
-            cot: normalizeCot((executorResp.parsed as { cot?: unknown }).cot, executorResp.reasoning),
-            verdict: compactVerdict(executorResp.parsed),
-            att: (executorResp.attestationHash ?? "").slice(0, 16),
+            cot: normalizeCotFull((executorResp.parsed as { cot?: unknown }).cot, executorResp.reasoning),
+            verdict: executorResp.parsed,
+            att: executorResp.attestationHash ?? "",
           },
           buildRichTurnFromHierarchical(
             executorResp,
@@ -922,11 +922,11 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
             to: sp.name,
             sig: sp.signal,
             conf: sp.confidence,
-            cot: normalizeCot(
+            cot: normalizeCotFull(
               (sp as unknown as { cot?: unknown }).cot,
               sp.reasoning,
             ),
-            att: (sp.attestationHash ?? "").slice(0, 16),
+            att: sp.attestationHash ?? "",
           },
           buildRichHireData(sp, cycleId, user.id, flatHireTask),
         ),

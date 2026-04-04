@@ -6,7 +6,7 @@ import { Card, CardBody, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, ZeroGBadge } from "@/components/ui/badge";
 import { DawgSpinner } from "@/components/dawg-spinner";
 import { useUser } from "@/contexts/user-context";
-import { getCycleDetail } from "@/lib/api";
+import { getCycleDetail, getLatestCycle } from "@/lib/api";
 import type { CycleDetail, AgentActionRecord } from "@/lib/types";
 import {
   INFT_CONTRACT_ADDRESS,
@@ -159,26 +159,63 @@ function VerifyContent() {
   const [actions, setActions] = useState<AgentActionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Resolve the cycle number with a three-step fallback so a missing query
+  // param or stale UserContext cache can never wedge the verification view:
+  //
+  //   1. `?cycle=N` query param         — explicit target (from dashboard navigation)
+  //   2. `user.agent.lastCycleId`       — cached in UserContext (may be stale)
+  //   3. `getLatestCycle(userId)`       — authoritative DB lookup (same path dashboard uses)
+  //
+  // Without step 3 the page was rendering "No cycle data found" whenever the
+  // dashboard linked to /verify without a cycle id AND the cached user record
+  // hadn't refreshed after the last cycle commit.
   const cycleParam = searchParams.get("cycle");
   const parsedCycle = cycleParam ? parseInt(cycleParam, 10) : NaN;
-  const cycleNumber = isNaN(parsedCycle) ? (user?.agent?.lastCycleId ?? 0) : parsedCycle;
+  const paramOrCached =
+    !isNaN(parsedCycle)
+      ? parsedCycle
+      : user?.agent?.lastCycleId && user.agent.lastCycleId > 0
+        ? user.agent.lastCycleId
+        : null;
 
   useEffect(() => {
-    if (!userId || cycleNumber <= 0) {
+    if (!userId) {
       setLoading(false);
       return;
     }
     setLoading(true);
-    getCycleDetail(userId, cycleNumber)
-      .then((data) => {
-        if (data) {
-          setCycle(data.cycle);
-          setActions(data.actions);
+
+    const loadCycle = async () => {
+      // Try the known cycle number first; fall back to /api/cycle/latest if
+      // either (a) we had no number to begin with or (b) the detail lookup
+      // returned null because the param pointed at a stale id.
+      if (paramOrCached && paramOrCached > 0) {
+        const detail = await getCycleDetail(userId, paramOrCached).catch(() => null);
+        if (detail) {
+          setCycle(detail.cycle);
+          setActions(detail.actions);
+          setLoading(false);
+          return;
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [userId, cycleNumber]);
+      }
+      // Fallback: hit /api/cycle/latest — it reads Prisma directly and is the
+      // same endpoint the dashboard uses, so if the dashboard shows hunt #N
+      // this will find it. EnrichedCycleResponse carries `cycleId` at the top
+      // level; we then re-fetch via getCycleDetail so the attestation/action
+      // lookup path this page already uses works unchanged.
+      const latest = await getLatestCycle(userId).catch(() => null);
+      if (latest && typeof latest.cycleId === "number" && latest.cycleId > 0) {
+        const detail = await getCycleDetail(userId, latest.cycleId).catch(() => null);
+        if (detail) {
+          setCycle(detail.cycle);
+          setActions(detail.actions);
+        }
+      }
+      setLoading(false);
+    };
+
+    void loadCycle();
+  }, [userId, paramOrCached]);
 
   const agent = AGENT_META[selected];
   const attestation = getAttestationForAgent(selected, cycle, actions);
