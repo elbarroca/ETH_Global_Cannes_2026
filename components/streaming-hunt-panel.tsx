@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStreamingCycle } from "@/hooks/use-streaming-cycle";
+import { useUser } from "@/contexts/user-context";
 import { arcTxUrl } from "@/lib/links";
 
 // The "streaming hunt" panel — live view of a cycle as it unfolds.
@@ -29,6 +30,19 @@ function formatElapsed(startedAt: number | null): string {
 export function StreamingHuntPanel({ userId }: { userId: string | null }) {
   const [goal, setGoal] = useState("Find the best ETH entry this week — I want to accumulate");
   const stream = useStreamingCycle(userId);
+  const { refreshAgentBalance } = useUser();
+
+  // When a cycle stream finishes (running transitions true → false), refresh
+  // the agent's on-chain balance once so the nav pill reflects the post-cycle
+  // total without waiting for the next ticker poll. Uses a ref to detect the
+  // transition so we don't refetch on every render.
+  const wasRunningRef = useRef(false);
+  useEffect(() => {
+    if (wasRunningRef.current && !stream.running) {
+      void refreshAgentBalance();
+    }
+    wasRunningRef.current = stream.running;
+  }, [stream.running, refreshAgentBalance]);
 
   const start = async () => {
     if (!userId || stream.running) return;

@@ -301,20 +301,6 @@ export default function DashboardPage() {
         agentBalanceFetchedAt={agentBalanceFetchedAt}
       />
 
-      {/* Naryo Multichain Event Stream */}
-      <Card>
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-void-400 uppercase tracking-wider">Multichain Events</h3>
-              <span className="text-[10px] px-1.5 py-0.5 bg-void-800 text-void-500 rounded">Naryo</span>
-            </div>
-            <LiveBadge />
-          </div>
-          <NaryoFeed />
-        </div>
-      </Card>
-
       {/* Hunt section — goal input + cycle header + trigger button */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -456,6 +442,22 @@ export default function DashboardPage() {
               holdings={cycle.holdings ?? user.fund.holdings ?? {}}
             />
           )}
+
+          {/* Naryo Multichain Event Stream — secondary context, rendered
+              below the current cycle card so the hunt controls + current
+              hunt stay in the prime above-the-fold position. */}
+          <Card>
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-void-400 uppercase tracking-wider">Multichain Events</h3>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-void-800 text-void-500 rounded">Naryo</span>
+                </div>
+                <LiveBadge />
+              </div>
+              <NaryoFeed />
+            </div>
+          </Card>
         </>
       ) : running || approving ? (
         // First-ever hunt in flight — no prior cycle to show, so render a

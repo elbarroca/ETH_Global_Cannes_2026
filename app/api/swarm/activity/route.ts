@@ -39,6 +39,9 @@ export async function GET(request: Request): Promise<NextResponse> {
         paymentTxHash: true,
         durationMs: true,
         createdAt: true,
+        // Payload carries context the ticker uses to describe events in plain
+        // English (e.g. rating kind + before/after ELO for AGENT_RATED rows).
+        payload: true,
       },
     });
 
@@ -55,6 +58,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         paymentTxHash: r.paymentTxHash,
         durationMs: r.durationMs,
         createdAt: r.createdAt.toISOString(),
+        payload: r.payload ?? null,
       })),
       generatedAt: new Date().toISOString(),
     });

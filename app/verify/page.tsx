@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardBody, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, ZeroGBadge } from "@/components/ui/badge";
@@ -16,6 +16,23 @@ import {
   hashscanTopicUrl,
   hashscanMessageUrl,
 } from "@/lib/links";
+
+// Mapping from the AGENT_KEYS selector names (SentimentBot, WhaleEye, …) to
+// the canonical `marketplace_agents.name` values stored in Supabase. Only
+// specialists are in the marketplace — adversarial agents (Alpha/Risk/Executor)
+// are platform infra, so the VerifyRatingButton renders null for them.
+const SPECIALIST_MARKETPLACE_NAMES: Partial<Record<string, string>> = {
+  SentimentBot: "sentiment",
+  WhaleEye: "whale",
+  MomentumX: "momentum",
+  MemecoinHunter: "memecoin-hunter",
+  TwitterAlpha: "twitter-alpha",
+  DeFiYield: "defi-yield",
+  NewsScanner: "news-scanner",
+  OnChainForensics: "onchain-forensics",
+  OptionsFlow: "options-flow",
+  MacroCorrelator: "macro-correlator",
+};
 
 type AgentKey = "SentimentBot" | "WhaleEye" | "MomentumX" | "MemecoinHunter" | "TwitterAlpha" | "DeFiYield" | "NewsScanner" | "OnChainForensics" | "OptionsFlow" | "MacroCorrelator" | "Alpha" | "Risk" | "Executor";
 
@@ -350,6 +367,25 @@ function VerifyContent() {
               the model, or the output, the attestation hash would not match.
             </p>
           </div>
+
+          {/* Verify-as-rating action — records a verified-kind rating on HCS
+              + Supabase. Only rendered for marketplace specialists; returns
+              null for Alpha/Risk/Executor (platform infra). */}
+          {AGENT_META[selected].type === "Specialist" && (
+            <div className="bg-void-950 border border-emerald-900/40 rounded-xl p-4 space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">
+                    Endorse this attestation
+                  </p>
+                  <p className="text-[11px] text-void-500 mt-0.5">
+                    Checked the proof? Commit a verified-rating to {selected}&apos;s on-chain ELO.
+                  </p>
+                </div>
+                <VerifyRatingButton agentKey={selected} cycleNumber={cycle.cycleNumber} />
+              </div>
+            </div>
+          )}
         </CardBody>
       </Card>
 
@@ -428,6 +464,134 @@ function DetailBlock({
     <div>
       <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">{label}</div>
       <div>{children}</div>
+    </div>
+  );
+}
+
+// ── Verify-as-rating button ─────────────────────────────────
+//
+// Explicit "I checked this attestation and endorse it" action. POSTs to
+// /api/marketplace/rate with kind="verify" — same ELO update math as a like
+// but labelled distinctly on HCS so downstream analytics can separate passive
+// likes from attestation-verified endorsements. The user's verification
+// becomes part of the specialist's on-chain reputation trail.
+//
+// Only rendered for marketplace specialists — adversarial agents (Alpha/
+// Risk/Executor) aren't in `marketplace_agents`, so rating them would 404.
+
+interface VerifyRateResponse {
+  agentName: string;
+  reputation: number;
+  reputationBefore?: number;
+  hcsSeqNum?: number | null;
+  hcsTopicId?: string | null;
+}
+
+function VerifyRatingButton({
+  agentKey,
+  cycleNumber,
+}: {
+  agentKey: string;
+  cycleNumber: number;
+}) {
+  const { userId } = useUser();
+  const marketplaceName = SPECIALIST_MARKETPLACE_NAMES[agentKey] ?? null;
+  const storageKey = marketplaceName
+    ? `alphadawg.verify.${cycleNumber}.${marketplaceName}`
+    : null;
+  const [submitting, setSubmitting] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [reputation, setReputation] = useState<number | null>(null);
+  const [hcsLink, setHcsLink] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      if (window.localStorage.getItem(storageKey) === "1") setVerified(true);
+    } catch { /* private-mode browsers */ }
+  }, [storageKey]);
+
+  const handleVerify = useCallback(async () => {
+    if (!userId || !marketplaceName || submitting || verified) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/marketplace/rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          agentName: marketplaceName,
+          cycleId: cycleNumber,
+          kind: "verify",
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Request failed" }));
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as VerifyRateResponse;
+      setReputation(data.reputation);
+      setVerified(true);
+      if (data.hcsSeqNum != null && data.hcsTopicId) {
+        setHcsLink(
+          `https://hashscan.io/testnet/topic/${data.hcsTopicId}?s=${data.hcsSeqNum}`,
+        );
+      }
+      if (storageKey) {
+        try { window.localStorage.setItem(storageKey, "1"); } catch { /* ignore */ }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [userId, marketplaceName, cycleNumber, storageKey, submitting, verified]);
+
+  if (!marketplaceName) return null; // Adversarial agent — not in marketplace.
+  if (!userId) {
+    return (
+      <p className="text-[11px] text-void-600 italic">
+        Connect your wallet to record your verification on-chain.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <button
+        type="button"
+        onClick={handleVerify}
+        disabled={submitting || verified}
+        className={`px-3 py-1.5 rounded-md text-[11px] font-bold font-mono uppercase tracking-wider border transition-all ${
+          verified
+            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-[0_0_14px_rgba(52,211,153,0.35)] cursor-default"
+            : "bg-void-900/80 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70"
+        } ${submitting ? "opacity-60" : ""}`}
+        title="I checked this TEE attestation and endorse this specialist — records a verified-rating on HCS."
+      >
+        {verified ? "✓ Verified" : submitting ? "Signing…" : "Verify ✓"}
+      </button>
+      {verified && reputation != null && (
+        <span className="font-pixel text-[13px] tabular-nums text-gold-400 glow-dawg">
+          ELO {reputation}
+        </span>
+      )}
+      {hcsLink && (
+        <a
+          href={hcsLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-[11px] text-teal-300 hover:text-teal-200 underline decoration-dotted"
+          title="View this verified-rating on Hashscan — the before/after ELO is logged to HCS as proof."
+        >
+          HCS ↗
+        </a>
+      )}
+      {error && (
+        <span className="text-[11px] text-blood-300">{error}</span>
+      )}
     </div>
   );
 }

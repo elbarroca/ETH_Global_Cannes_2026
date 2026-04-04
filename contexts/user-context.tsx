@@ -93,10 +93,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, [proxyAddress]);
 
-  // Poll the agent wallet balance every 5s. One timer in context means nav,
+  // Poll the agent wallet balance every 3s. One timer in context means nav,
   // hero, dashboard wallet card and deposit page all show the exact same
-  // number with no risk of drift between components. All setState calls are
-  // deferred via setTimeout(0) so React doesn't complain about
+  // number with no risk of drift between components. 3s matches the swarm
+  // activity ticker poll cadence — when that ticker detects a balance-moving
+  // action (SPECIALIST_HIRED, TRADE_EXECUTED) it also calls
+  // refreshAgentBalance() for an immediate update, making the perceived lag
+  // sub-second during a live hunt. All setState calls are deferred via
+  // setTimeout(0) so React doesn't complain about
   // react-hooks/set-state-in-effect.
   useEffect(() => {
     let cancelled = false;
@@ -116,7 +120,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       await refreshAgentBalance();
     };
     const first = setTimeout(tick, 0);
-    const interval = setInterval(tick, 5_000);
+    const interval = setInterval(tick, 3_000);
     return () => {
       cancelled = true;
       clearTimeout(first);

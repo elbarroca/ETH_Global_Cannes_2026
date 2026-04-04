@@ -4,9 +4,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SwarmActivityResponse, SwarmActivityRow } from "@/lib/types";
 import { agentEmoji, agentLabel } from "@/lib/swarm-endpoints";
 import { arcTxUrl } from "@/lib/links";
+import { useUser } from "@/contexts/user-context";
 
 const POLL_MS = 3_000;
 const LIMIT = 25;
+
+/**
+ * Action types whose appearance in the feed means the agent wallet balance
+ * just moved on Arc. When the ticker's poll detects a new row with one of
+ * these types, it asks `user-context` to re-fetch the balance immediately
+ * so the nav pill and Nasdaq header update within one tick instead of
+ * waiting for the next 3s balance poll to fire.
+ */
+const BALANCE_MOVING_ACTIONS = new Set([
+  "SPECIALIST_HIRED",
+  "TRADE_EXECUTED",
+  "SWAP_EXECUTED",
+  "PAYMENT_SENT",
+  "AGENT_HIRED",
+]);
 
 /**
  * Visual treatment per action type. `tone` drives the LED glow colour
@@ -32,9 +48,32 @@ const ACTION_STYLES: Record<string, ActionStyle> = {
   CYCLE_REJECTED:   { label: "REJ",      tone: "red" },
   AGENT_HIRED:      { label: "PACK+",    tone: "dawg" },
   AGENT_FIRED:      { label: "PACK−",    tone: "void" },
+  AGENT_RATED:      { label: "RATE",     tone: "purple" },
 };
 
 const DEFAULT_STYLE: ActionStyle = { label: "EVENT", tone: "void" };
+
+// Sentinel written by `callSpecialist()` in src/agents/hire-specialist.ts when
+// a hire runs without an x402 payment (e.g. specialist served over plain HTTP,
+// or the x402 middleware didn't fire). The field isn't null — it's this exact
+// string — so we filter it out explicitly before treating `paymentTxHash` as
+// a real on-chain receipt.
+const NO_PAYMENT_SENTINEL = "no-payment";
+
+/**
+ * Parse a `payment_amount` column value into a USD number.
+ *
+ * Historical rows may contain a leading `$` (the column was briefly stored as
+ * `"$0.001"` before we normalized it to bare numeric strings). Strip it before
+ * calling `Number()` so those legacy rows don't render as `$NaN`.
+ */
+function parsePaymentAmount(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/^\$/, "").trim();
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
 
 /**
  * Human-friendly one-sentence description of what actually happened.
@@ -45,7 +84,24 @@ const DEFAULT_STYLE: ActionStyle = { label: "EVENT", tone: "void" };
  */
 function describe(row: SwarmActivityRow): string {
   const agent = row.agentName ? agentLabel(row.agentName) : null;
-  const price = row.paymentAmount ? `$${Number(row.paymentAmount).toFixed(3)}` : null;
+  const amount = parsePaymentAmount(row.paymentAmount);
+  const price = amount != null ? `$${amount.toFixed(3)}` : null;
+
+  // Narrow payload for rating rows — action-type-dependent shape (see
+  // app/api/marketplace/rate/route.ts). Degrades gracefully if payload is
+  // missing or a field has the wrong type.
+  if (row.actionType === "AGENT_RATED") {
+    const p = row.payload ?? {};
+    const kind = typeof p.kind === "string" ? p.kind : null;
+    const rb = typeof p.reputationBefore === "number" ? p.reputationBefore : null;
+    const ra = typeof p.reputationAfter === "number" ? p.reputationAfter : null;
+    const verb = kind === "verify" ? "verified" : kind === "dislike" ? "disliked" : "liked";
+    const who = agent ?? "a specialist";
+    if (rb != null && ra != null) {
+      return `User ${verb} ${who} · ELO ${rb} → ${ra}`;
+    }
+    return `User ${verb} ${who}`;
+  }
 
   switch (row.actionType) {
     case "SPECIALIST_HIRED":
@@ -127,22 +183,53 @@ const TONE_BORDER: Record<ActionStyle["tone"], string> = {
  * Sized for TV viewing: labels are 22px, descriptions 14px, meta 12px.
  */
 export function SwarmActivityTicker() {
+  const { refreshAgentBalance } = useUser();
   const [rows, setRows] = useState<SwarmActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const userScrolledRef = useRef(false);
+  // Remember the newest row id we've already shown so we can detect
+  // genuinely-new rows on each poll. Lives in a ref so updating it doesn't
+  // trigger a re-render loop.
+  const lastSeenIdRef = useRef<string | null>(null);
 
   const fetchRows = useCallback(async () => {
     try {
       const res = await fetch(`/api/swarm/activity?limit=${LIMIT}`, { cache: "no-store" });
       if (!res.ok) return;
       const data = (await res.json()) as SwarmActivityResponse;
-      setRows(data.rows ?? []);
+      const nextRows = data.rows ?? [];
+      setRows(nextRows);
+
+      // Detect new balance-moving rows since the last poll. `nextRows` is
+      // newest-first, so walk from the top until we hit the previous top id.
+      // Any row above that cutoff is new. If any new row is a balance-moving
+      // action (hire, swap, transfer) trigger an out-of-band balance refresh
+      // so the nav pill updates within ~200ms instead of waiting up to 3s
+      // for the user-context's own poll to tick.
+      const previousTopId = lastSeenIdRef.current;
+      let sawBalanceMovingNewRow = false;
+      for (const row of nextRows) {
+        if (row.id === previousTopId) break;
+        if (BALANCE_MOVING_ACTIONS.has(row.actionType)) {
+          sawBalanceMovingNewRow = true;
+          break;
+        }
+      }
+      if (nextRows.length > 0) {
+        lastSeenIdRef.current = nextRows[0].id;
+      }
+      // Skip the very first poll (previousTopId === null) so we don't
+      // pointlessly refetch balance on page load — user-context's own
+      // initial tick handles that.
+      if (sawBalanceMovingNewRow && previousTopId !== null) {
+        void refreshAgentBalance();
+      }
     } catch {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshAgentBalance]);
 
   useEffect(() => {
     void fetchRows();
@@ -208,7 +295,10 @@ function TickerRow({ row }: { row: SwarmActivityRow }) {
   const style = ACTION_STYLES[row.actionType] ?? DEFAULT_STYLE;
   const emoji = row.agentName ? agentEmoji(row.agentName) : null;
   const teeOk = row.teeVerified === true;
-  const hasPayment = row.paymentTxHash && row.paymentAmount;
+  const amount = parsePaymentAmount(row.paymentAmount);
+  const hasRealTx =
+    !!row.paymentTxHash && row.paymentTxHash !== NO_PAYMENT_SENTINEL;
+  const hasPayment = amount != null && hasRealTx;
   const duration = row.durationMs != null && row.durationMs > 0
     ? `${(row.durationMs / 1000).toFixed(1)}s`
     : null;
@@ -237,14 +327,14 @@ function TickerRow({ row }: { row: SwarmActivityRow }) {
       </p>
 
       {/* ── Line 3 — meta strip (price, tx hash, TEE, duration) ─────── */}
-      {(hasPayment || teeOk || row.paymentTxHash || duration) && (
+      {(hasPayment || teeOk || hasRealTx || duration) && (
         <div className="mt-2 flex items-center gap-2.5 flex-wrap text-xs">
-          {hasPayment && (
+          {hasPayment && amount != null && (
             <span className="font-pixel glow-green text-[15px] leading-none text-[#39FF7A]">
-              ${Number(row.paymentAmount).toFixed(3)}
+              ${amount.toFixed(3)}
             </span>
           )}
-          {row.paymentTxHash && row.paymentTxHash.startsWith("0x") ? (
+          {hasRealTx && row.paymentTxHash && row.paymentTxHash.startsWith("0x") ? (
             <a
               href={arcTxUrl(row.paymentTxHash) ?? "#"}
               target="_blank"

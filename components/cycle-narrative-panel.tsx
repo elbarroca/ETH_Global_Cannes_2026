@@ -14,11 +14,29 @@ import { arcTxUrl } from "@/lib/links";
 // narrative (legacy rows), this component renders nothing.
 
 export function CycleNarrativePanel({ narrative }: { narrative: CycleNarrative }) {
-  const { headline, finalReasoning, specialistDiscussion, augmentedDebate, marketplaceContext, execution } = narrative;
+  const {
+    headline,
+    finalReasoning,
+    specialistDiscussion,
+    augmentedDebate,
+    marketplaceContext,
+    execution,
+    cycleLiquidity,
+    allocationRationale,
+    assetSubstituted,
+    originalAsset,
+  } = narrative;
 
   const confluenceEntries = Object.entries(marketplaceContext.confluenceScore).sort(
     (a, b) => b[1] - a[1],
   );
+
+  // Pre-compute pct-to-usd lookup helper for rationale rendering
+  const toUsd = (pct: number): string => {
+    if (!cycleLiquidity) return "";
+    const usd = (cycleLiquidity.availableUsd * pct) / 100;
+    return `$${usd.toFixed(4)}`;
+  };
 
   return (
     <Card>
@@ -30,7 +48,45 @@ export function CycleNarrativePanel({ narrative }: { narrative: CycleNarrative }
           </div>
           <h3 className="text-base font-bold text-void-100 mt-1">{headline}</h3>
           <p className="text-sm text-void-400 mt-2 leading-relaxed">{finalReasoning}</p>
+          {assetSubstituted && originalAsset && (
+            <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-blood-900/30 border border-blood-700/40 text-[10px] font-mono uppercase tracking-wider text-blood-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-blood-500" />
+              asset filtered: {originalAsset} → {augmentedDebate.executor.asset}
+              <span className="text-blood-500/70">(non-EVM ticker, not swappable)</span>
+            </div>
+          )}
         </div>
+
+        {/* ── Real-time liquidity snapshot ─────────────────────── */}
+        {cycleLiquidity && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-void-600 mb-2">
+              Available liquidity (real-time)
+            </div>
+            <div className="flex items-baseline gap-3 flex-wrap font-mono text-xs">
+              <span className="text-base font-bold text-gold-400">
+                ${cycleLiquidity.availableUsd.toFixed(4)}
+              </span>
+              <span className="text-void-500">USDC ready to deploy</span>
+              <span className="text-void-700">·</span>
+              <span className="text-void-500">
+                proxy ${cycleLiquidity.proxyUsd.toFixed(4)}
+              </span>
+              <span className="text-void-700">·</span>
+              <span className="text-void-500">
+                hot ${cycleLiquidity.hotUsd.toFixed(4)}
+              </span>
+              {Math.abs(cycleLiquidity.proxyUsd - cycleLiquidity.depositedUsd) > 0.01 && (
+                <span className="text-blood-400 text-[10px]">
+                  ⚠ DB/chain drift
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-void-600 mt-1">
+              Every % chosen by the debate resolves against this balance — no phantom budget.
+            </p>
+          </div>
+        )}
 
         {/* ── Confluence score ────────────────────────────────── */}
         {confluenceEntries.length > 0 && (
@@ -58,40 +114,61 @@ export function CycleNarrativePanel({ narrative }: { narrative: CycleNarrative }
         {/* ── Augmented debate rows ───────────────────────────── */}
         <div>
           <div className="text-[11px] uppercase tracking-wider text-void-600 mb-2">
-            Augmented debate
+            Augmented debate · allocation rationale
           </div>
-          <div className="space-y-2 text-xs">
+          <div className="space-y-3 text-xs">
+            {/* Alpha — thesis + concrete USD amount */}
             <div className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 shrink-0" />
-              <div>
-                <span className="text-green-400 font-semibold">Alpha</span>
-                <span className="text-void-500">
-                  {" "}
-                  → {augmentedDebate.alpha.action} {augmentedDebate.alpha.pct}%{" "}
-                  {augmentedDebate.alpha.asset}
-                </span>
+              <div className="flex-1">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-green-400 font-semibold">Alpha</span>
+                  <span className="text-void-500">
+                    → {augmentedDebate.alpha.action} {augmentedDebate.alpha.pct}%{" "}
+                    {augmentedDebate.alpha.asset}
+                  </span>
+                  {cycleLiquidity && augmentedDebate.alpha.pct > 0 && (
+                    <span className="text-gold-400 font-mono">
+                      = {toUsd(augmentedDebate.alpha.pct)}
+                    </span>
+                  )}
+                </div>
                 {augmentedDebate.alpha.thesis && (
                   <p className="text-void-400 italic mt-0.5">
                     &ldquo;{augmentedDebate.alpha.thesis.slice(0, 200)}&rdquo;
                   </p>
                 )}
+                {allocationRationale && allocationRationale[0]?.topConfluence.length > 0 && (
+                  <p className="text-[10px] text-void-600 mt-1 font-mono">
+                    confluence:{" "}
+                    {allocationRationale[0].topConfluence
+                      .map((c) => `${c.ticker} ${c.count}×`)
+                      .join(", ")}
+                  </p>
+                )}
               </div>
             </div>
 
+            {/* Risk — cap + concrete USD ceiling */}
             <div className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-blood-500 mt-1.5 shrink-0" />
-              <div>
-                <span className="text-blood-300 font-semibold">Risk</span>
-                <span className="text-void-500">
-                  {" "}
-                  → max {augmentedDebate.risk.maxPct}%
-                </span>
-                {augmentedDebate.risk.redFlags.length > 0 && (
-                  <span className="text-blood-400">
-                    {" "}
-                    (red flags: {augmentedDebate.risk.redFlags.join(", ")})
+              <div className="flex-1">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-blood-300 font-semibold">Risk</span>
+                  <span className="text-void-500">
+                    → max {augmentedDebate.risk.maxPct}%
                   </span>
-                )}
+                  {cycleLiquidity && augmentedDebate.risk.maxPct > 0 && (
+                    <span className="text-gold-400 font-mono">
+                      = {toUsd(augmentedDebate.risk.maxPct)} ceiling
+                    </span>
+                  )}
+                  {augmentedDebate.risk.redFlags.length > 0 && (
+                    <span className="text-blood-400 text-[10px]">
+                      red flags: {augmentedDebate.risk.redFlags.join(", ")}
+                    </span>
+                  )}
+                </div>
                 {augmentedDebate.risk.objection && (
                   <p className="text-void-400 italic mt-0.5">
                     &ldquo;{augmentedDebate.risk.objection.slice(0, 200)}&rdquo;
@@ -100,15 +177,22 @@ export function CycleNarrativePanel({ narrative }: { narrative: CycleNarrative }
               </div>
             </div>
 
+            {/* Executor — final decision + concrete USD amount */}
             <div className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-gold-400 mt-1.5 shrink-0" />
-              <div>
-                <span className="text-gold-400 font-semibold">Executor</span>
-                <span className="text-void-500">
-                  {" "}
-                  → {augmentedDebate.executor.action} {augmentedDebate.executor.pct}%{" "}
-                  {augmentedDebate.executor.asset} · stop {augmentedDebate.executor.stopLoss}
-                </span>
+              <div className="flex-1">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-gold-400 font-semibold">Executor</span>
+                  <span className="text-void-500">
+                    → {augmentedDebate.executor.action} {augmentedDebate.executor.pct}%{" "}
+                    {augmentedDebate.executor.asset} · stop {augmentedDebate.executor.stopLoss}
+                  </span>
+                  {cycleLiquidity && augmentedDebate.executor.pct > 0 && (
+                    <span className="text-gold-400 font-mono font-bold">
+                      = {toUsd(augmentedDebate.executor.pct)}
+                    </span>
+                  )}
+                </div>
                 {augmentedDebate.overrideApplied && augmentedDebate.overrideReason && (
                   <p className="text-xs text-gold-400 mt-1 font-semibold">
                     ⚡ override fired: {augmentedDebate.overrideReason}

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardBody, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
 import { ComputeLog } from "@/components/compute-log";
+import { useUser } from "@/contexts/user-context";
 import { getCycleDetail } from "@/lib/api";
 import { arcTxUrl } from "@/lib/links";
 import type { Cycle, AgentActionRecord } from "@/lib/types";
@@ -97,12 +98,27 @@ function CompactView({
         {cycle.trade.action} {cycle.trade.percentage}% {cycle.trade.asset}
       </div>
 
-      {/* Specialist signals strip */}
+      {/* Filtered-asset chip — appears when the executor's raw ticker was
+          rewritten by the EVM whitelist gate (e.g. SIREN → WETH). Clicking
+          the hunt surfaces the full before/after in the narrative panel. */}
+      {cycle.trade.assetSubstituted && cycle.trade.originalAsset && (
+        <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-blood-700/40 bg-blood-900/20 text-[10px] font-mono uppercase tracking-wider text-blood-300">
+          <span className="w-1 h-1 rounded-full bg-blood-500" />
+          filtered: {cycle.trade.originalAsset} → {cycle.trade.asset}
+        </div>
+      )}
+
+      {/* Specialist signals strip — each chip now shows an inline tx ↗ link
+          when the specialist hire produced a real Arc settlement hash (starts
+          with 0x). Hardcoded "paid" / "no-payment" strings render without a
+          link so legacy rows still display but don't mislead. */}
       {cycle.specialists.length > 0 && (
         <div className="flex items-center gap-2 mt-2.5 overflow-x-auto pb-1">
           {cycle.specialists.map((s, i) => {
             const sigColor =
               (s.signal ?? "HOLD") === "BUY" ? "text-[#39FF7A]" : (s.signal ?? "HOLD") === "SELL" ? "text-[#FF5A5A]" : "text-[#FFCC00]";
+            const realTxHash = s.paymentTxHash?.startsWith("0x") ? s.paymentTxHash : null;
+            const txUrl = realTxHash ? arcTxUrl(realTxHash) : null;
             return (
               <div
                 key={i}
@@ -114,6 +130,18 @@ function CompactView({
                 </span>
                 {s.attestation && s.attestation !== "mock-s" && (
                   <span className="w-1 h-1 rounded-full bg-gold-400" title="TEE attested" />
+                )}
+                {txUrl && realTxHash && (
+                  <a
+                    href={txUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={stop}
+                    title={`Real Arc x402 settlement: ${realTxHash}`}
+                    className="text-[9px] font-mono text-teal-400 hover:text-teal-300 underline decoration-dotted"
+                  >
+                    tx ↗
+                  </a>
                 )}
               </div>
             );
@@ -167,22 +195,34 @@ function CompactView({
 // ── Rating buttons ──────────────────────────────────────────
 //
 // Explicit LIKE / DISLIKE pills for each specialist inside an expanded hunt
-// card. Votes POST to /api/marketplace/rate which runs an ELO update
-// (src/marketplace/reputation.ts) — the new reputation number is returned
-// and rendered in line so the user sees their vote move the marketplace
-// score immediately. Persisted per-browser via localStorage so users don't
-// double-vote the same agent on the same hunt.
+// card. Votes POST to /api/marketplace/rate which runs an ELO update via
+// `recordRating()` (src/marketplace/reputation.ts). The API also:
+//
+//   - Upserts an `agent_ratings` row keyed on (userId, agentName, cycleId)
+//     — the canonical per-user history.
+//   - Awaits a `logSwarmEvent({ ev: "rating", ... })` write, so the response
+//     carries a Hashscan seq number which we render as an "↗ HCS" link.
+//
+// Persisted per-browser via localStorage as a UX speed optimization; the
+// server's unique constraint is the authoritative dedupe.
 
 interface RateResponse {
   agentName: string;
   reputation: number;
+  reputationBefore?: number;
+  kind?: "like" | "dislike" | "verify";
+  ratingId?: string;
+  hcsSeqNum?: number | null;
+  hcsTopicId?: string | null;
 }
 
 function RatingButtons({ agentName, cycleId }: { agentName: string; cycleId: number }) {
+  const { userId } = useUser();
   const storageKey = `alphadawg.vote.${cycleId}.${agentName}`;
   const [voted, setVoted] = useState<"up" | "down" | null>(null);
   const [loading, setLoading] = useState(false);
   const [newReputation, setNewReputation] = useState<number | null>(null);
+  const [hcsLink, setHcsLink] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
 
   // Hydrate previous vote from localStorage (per cycle × agent).
@@ -199,10 +239,22 @@ function RatingButtons({ agentName, cycleId }: { agentName: string; cycleId: num
     if (voted === next) return; // No toggle-off — we want a committed rating.
     setLoading(true);
     try {
+      // Canonical payload when we have the user id — gets history + HCS.
+      // Falls back to the legacy `positive` shape otherwise so anonymous
+      // dashboard viewers still see something happen (the legacy path just
+      // skips the audit write).
+      const body = userId
+        ? {
+            userId,
+            agentName,
+            cycleId,
+            kind: positive ? "like" : "dislike",
+          }
+        : { agentName, positive };
       const res = await fetch("/api/marketplace/rate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentName, positive }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         const data = (await res.json()) as RateResponse;
@@ -210,11 +262,18 @@ function RatingButtons({ agentName, cycleId }: { agentName: string; cycleId: num
         setVoted(next);
         setPulse(true);
         setTimeout(() => setPulse(false), 800);
+        if (data.hcsSeqNum != null && data.hcsTopicId) {
+          setHcsLink(
+            `https://hashscan.io/testnet/topic/${data.hcsTopicId}?s=${data.hcsSeqNum}`,
+          );
+        } else {
+          setHcsLink(null);
+        }
         try { window.localStorage.setItem(storageKey, next); } catch { /* ignore */ }
       }
     } catch { /* non-fatal */ }
     finally { setLoading(false); }
-  }, [agentName, voted, loading, storageKey]);
+  }, [agentName, cycleId, userId, voted, loading, storageKey]);
 
   return (
     <div className="flex items-center gap-2">
@@ -257,6 +316,18 @@ function RatingButtons({ agentName, cycleId }: { agentName: string; cycleId: num
         >
           ELO {newReputation}
         </span>
+      )}
+      {hcsLink && (
+        <a
+          href={hcsLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="font-mono text-[10px] text-teal-300 hover:text-teal-200 underline decoration-dotted"
+          title="Verify this rating on Hashscan — the before/after ELO is logged to HCS as proof"
+        >
+          HCS ↗
+        </a>
       )}
     </div>
   );

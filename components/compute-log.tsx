@@ -41,8 +41,12 @@ export function ComputeLog({ actions }: { actions: AgentActionRecord[] }) {
             tint: "text-void-400",
           };
           const agentSuffix = a.agentName ? ` ${a.agentName}` : "";
-          const paymentSuffix =
-            a.paymentAmount != null ? ` ($${a.paymentAmount})` : "";
+          // Legacy rows may contain a leading "$" — strip it so we don't
+          // render "$$0.001" after prepending our own dollar sign below.
+          const rawAmount = a.paymentAmount != null
+            ? String(a.paymentAmount).replace(/^\$/, "").trim()
+            : "";
+          const paymentSuffix = rawAmount ? ` ($${rawAmount})` : "";
 
           return (
             <div
