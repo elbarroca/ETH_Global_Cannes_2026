@@ -1,19 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardBody } from "@/components/ui/card";
 import { useUser } from "@/contexts/user-context";
 import { deposit, withdraw } from "@/lib/api";
-import { useConnection } from "wagmi";
-import { useSendTransaction, useWaitForTransactionReceipt } from "wagmi";
-import { parseUnits } from "viem";
+import { useConnection, useWalletClient } from "wagmi";
+import { parseUnits, createPublicClient, http } from "viem";
+import { arcTestnet } from "@/contexts/wagmi-provider";
 
 type Tab = "deposit" | "withdraw";
 const QUICK_AMOUNTS = [1, 10, 50, 100];
 
+// Our own public client — bypasses Dynamic/DRPC entirely
+const publicClient = createPublicClient({
+  chain: arcTestnet,
+  transport: http("https://rpc.testnet.arc.network"),
+});
+
 export default function DepositPage() {
   const { user, userId, refetch } = useUser();
   const { isConnected } = useConnection();
+  const { data: walletClient } = useWalletClient();
   const [tab, setTab] = useState<Tab>("deposit");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,70 +28,52 @@ export default function DepositPage() {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"idle" | "wallet" | "confirming" | "recording">("idle");
 
-  const { mutate: sendTransaction, data: txHash, isPending: isSendPending } = useSendTransaction();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash: txHash,
-  });
-
   const deposited = user?.fund?.depositedUsdc ?? 0;
   const nav = user?.fund?.currentNav ?? 0;
   const shares = user?.fund?.htsShareBalance ?? 0;
   const proxyAddress = user?.proxyWallet?.address;
 
   async function handleDeposit() {
-    if (!amount || parseFloat(amount) <= 0 || !userId || !proxyAddress) return;
+    if (!amount || parseFloat(amount) <= 0 || !userId || !proxyAddress || !walletClient) return;
     setError(null);
 
     const parsedAmount = parseFloat(amount);
-    // Arc Testnet native currency IS USDC (18 decimals)
     const usdcUnits = parseUnits(parsedAmount.toString(), 18);
 
     try {
       setStep("wallet");
 
-      // Native value transfer — USDC is the gas token on Arc
-      sendTransaction({
+      // Send via wagmi wallet client (Zerion/MetaMask/any) — bypasses Dynamic preview
+      const txHash = await walletClient.sendTransaction({
         to: proxyAddress as `0x${string}`,
         value: usdcUnits,
-      }, {
-        onError: (err) => {
-          setError(err instanceof Error ? err.message : "Wallet transaction failed");
-          setStep("idle");
-        },
+        gas: 21000n,
+        chain: arcTestnet,
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Transaction failed");
+
+      setStep("confirming");
+
+      // Wait for confirmation using our own RPC (not DRPC)
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+      setStep("recording");
+      await deposit(userId, parsedAmount, txHash);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      setAmount("");
+      await refetch();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message
+        : typeof err === "object" && err !== null && "message" in err ? String((err as { message: unknown }).message)
+        : "Transaction failed";
+      // Don't show error if user just rejected
+      if (!msg.includes("User denied") && !msg.includes("user rejected")) {
+        setError(msg);
+      }
+    } finally {
       setStep("idle");
     }
   }
-
-  // When tx is sent, move to confirming
-  useEffect(() => {
-    if (txHash && step === "wallet") {
-      setStep("confirming");
-    }
-  }, [txHash, step]);
-
-  // When tx confirms on-chain, record the deposit server-side
-  useEffect(() => {
-    if (!isConfirmed || step !== "confirming" || !txHash || !userId || !amount) return;
-
-    setStep("recording");
-
-    (async () => {
-      try {
-        await deposit(userId, parseFloat(amount), txHash);
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-        setAmount("");
-        await refetch();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to record deposit");
-      } finally {
-        setStep("idle");
-      }
-    })();
-  }, [isConfirmed, step, txHash, userId, amount, refetch]);
 
   async function handleWithdraw() {
     if (!amount || parseFloat(amount) <= 0 || !userId) return;
@@ -111,7 +100,7 @@ export default function DepositPage() {
     }
   }
 
-  const isProcessing = loading || isSendPending || isConfirming || step === "recording";
+  const isProcessing = loading || step !== "idle";
 
   const pnl = nav - deposited;
   const pnlPct = deposited > 0 ? (pnl / deposited) * 100 : 0;

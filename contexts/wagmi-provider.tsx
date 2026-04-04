@@ -11,37 +11,55 @@ import { UserProvider } from "./user-context";
 import { AuthGuard } from "@/components/auth-guard";
 
 export const arcTestnet = defineChain({
-  id: 2655,
+  id: 5042002,
   name: "Arc Testnet",
   nativeCurrency: { decimals: 18, name: "USD Coin", symbol: "USDC" },
   rpcUrls: {
     default: { http: ["https://rpc.testnet.arc.network"] },
   },
   blockExplorers: {
-    default: { name: "Arc Explorer", url: "https://explorer.testnet.arc.network" },
+    default: { name: "ArcScan", url: "https://testnet.arcscan.app" },
   },
   testnet: true,
 });
 
 const wagmiConfig = createConfig({
   chains: [arcTestnet],
-  transports: { [arcTestnet.id]: http() },
-  multiInjectedProviderDiscovery: false,
+  transports: { [arcTestnet.id]: http("https://rpc.testnet.arc.network") },
+  multiInjectedProviderDiscovery: true,
 });
 
 const queryClient = new QueryClient();
 
 const DYNAMIC_ENV_ID = process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID ?? "";
 
+const ARC_RPC = "https://rpc.testnet.arc.network";
+
+// Intercept Dynamic SDK's DRPC calls and redirect to direct Arc RPC.
+// Dynamic's embedded wallet SDK hardcodes arc-testnet.drpc.org which has a
+// 3-request batch limit on the free tier, causing 500 errors.
+if (typeof window !== "undefined") {
+  const _fetch = window.fetch;
+  window.fetch = (input, init) => {
+    if (typeof input === "string" && input.includes("arc-testnet.drpc.org")) {
+      input = ARC_RPC;
+    } else if (input instanceof Request && input.url.includes("arc-testnet.drpc.org")) {
+      input = new Request(ARC_RPC, input);
+    }
+    return _fetch(input, init);
+  };
+}
+
 const ARC_TESTNET_NETWORK = {
-  blockExplorerUrls: ["https://explorer.testnet.arc.network"],
+  blockExplorerUrls: ["https://testnet.arcscan.app"],
   chainId: arcTestnet.id,
   chainName: "Arc Testnet",
   iconUrls: ["https://app.dynamic.xyz/assets/networks/base.svg"],
   name: "Arc Testnet",
   nativeCurrency: { decimals: 18, name: "USD Coin", symbol: "USDC" },
   networkId: arcTestnet.id,
-  rpcUrls: ["https://rpc.testnet.arc.network"],
+  rpcUrls: [ARC_RPC],
+  privateCustomerRpcUrls: [ARC_RPC],
   vanityName: "Arc Testnet",
 };
 
@@ -61,11 +79,30 @@ function ChainGuard({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("unhandledrejection", handler);
   }, []);
 
-  // Auto-switch to Arc Testnet when wallet connects on wrong chain
+  // Add Arc Testnet to MetaMask with correct RPC, then switch
   useEffect(() => {
-    if (isConnected && chainId && chainId !== arcTestnet.id && switchChain) {
-      switchChain({ chainId: arcTestnet.id });
-    }
+    if (!isConnected || !chainId) return;
+
+    (async () => {
+      try {
+        await window.ethereum?.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: `0x${arcTestnet.id.toString(16)}`,
+            chainName: "Arc Testnet",
+            rpcUrls: [ARC_RPC],
+            nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 18 },
+            blockExplorerUrls: ["https://testnet.arcscan.app"],
+          }],
+        });
+      } catch {
+        // User rejected or already added — ignore
+      }
+
+      if (chainId !== arcTestnet.id && switchChain) {
+        switchChain({ chainId: arcTestnet.id });
+      }
+    })();
   }, [isConnected, chainId, switchChain]);
 
   return <>{children}</>;
