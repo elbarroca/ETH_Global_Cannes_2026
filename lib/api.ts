@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_BASE = "";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -15,7 +15,6 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export interface UserRecord {
   id: string;
   walletAddress: string;
-  linkCode?: string;
   telegram: {
     chatId: string | null;
     username: string | null;
@@ -140,16 +139,16 @@ export async function getUser(walletAddress: string): Promise<UserRecord | null>
   return apiFetch<UserRecord | null>(`/api/user/${walletAddress}`).catch(() => null);
 }
 
-export async function getLatestCycle(userId: string): Promise<CycleResult | null> {
-  return apiFetch<CycleResult | null>(`/api/cycle/latest/${userId}`).catch(() => null);
+export async function getLatestCycle(userId: string): Promise<CompactCycleRecord | null> {
+  return apiFetch<CompactCycleRecord | null>(`/api/cycle/latest/${userId}`).catch(() => null);
 }
 
 export async function getCycleHistory(
   userId: string,
   limit = 10,
   offset = 0
-): Promise<CycleResult[]> {
-  return apiFetch<CycleResult[]>(
+): Promise<CompactCycleRecord[]> {
+  return apiFetch<CompactCycleRecord[]>(
     `/api/cycle/history/${userId}?limit=${limit}&offset=${offset}`
   ).catch(() => []);
 }

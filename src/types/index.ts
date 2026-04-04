@@ -39,6 +39,8 @@ export interface SpecialistResult {
   confidence: number;
   attestationHash: string;
   teeVerified: boolean;
+  reputation?: number;
+  rawDataSnapshot?: unknown;
   [key: string]: unknown;
 }
 

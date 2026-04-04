@@ -27,11 +27,11 @@ export function cycleRoutes(): Router {
 
       const history = await getHistoryForUser(topicId, user.id, 1);
       if (history.length === 0) {
-        res.json({ cycle: null, message: "No cycles found for this user" });
+        res.json(null);
         return;
       }
 
-      res.json({ cycle: history[0] });
+      res.json(history[0]);
     } catch (err) {
       res.status(500).json({ error: String(err), code: 500 });
     }
@@ -55,7 +55,7 @@ export function cycleRoutes(): Router {
       const limit = Math.min(Number(req.query.limit ?? 10), 100);
       const history = await getHistoryForUser(topicId, user.id, limit);
 
-      res.json({ cycles: history, total: history.length });
+      res.json(history);
     } catch (err) {
       res.status(500).json({ error: String(err), code: 500 });
     }
@@ -75,15 +75,12 @@ export function cycleRoutes(): Router {
 
       res.json({
         cycleId: result.cycleId,
+        specialists: result.specialists,
+        debate: result.debate,
         decision: result.decision,
-        specialists: result.specialists.map((s) => ({
-          name: s.name,
-          signal: s.signal,
-          confidence: s.confidence,
-        })),
         seqNum: result.seqNum,
         hashscanUrl: result.hashscanUrl,
-        timestamp: result.timestamp.toISOString(),
+        timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp,
       });
     } catch (err) {
       res.status(500).json({ error: String(err), code: 500 });

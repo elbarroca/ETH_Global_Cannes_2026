@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardBody, MetricCard, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
+import { MOCK_FUND, MOCK_CYCLE } from "@/lib/mock-data";
 import { mapCycleResultToCycle, mapCompactRecordToCycle } from "@/lib/cycle-mapper";
 import type { Cycle } from "@/lib/types";
 import { useRouter } from "next/navigation";
@@ -15,14 +16,13 @@ export default function DashboardPage() {
   const [running, setRunning] = useState(false);
   const [liveCycle, setLiveCycle] = useState<Cycle | null>(null);
 
-  const fund = {
-    nav: user?.fund.currentNav ?? 0,
-    totalCycles: user?.agent.lastCycleId ?? 0,
-    totalSpend: (user?.agent.lastCycleId ?? 0) * 0.003,
-    totalPayments: (user?.agent.lastCycleId ?? 0) * 3,
-    totalInferences: (user?.agent.lastCycleId ?? 0) * 6,
-  };
-  const cycle = liveCycle;
+  // Use real data when available, fallback to mock
+  const fund = user ? {
+    ...MOCK_FUND,
+    nav: user.fund.currentNav,
+    totalCycles: user.agent.lastCycleId,
+  } : MOCK_FUND;
+  const cycle = liveCycle ?? MOCK_CYCLE;
 
   useEffect(() => {
     if (userId) {
