@@ -239,6 +239,7 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
           paymentTxHash: s.paymentTxHash,
           priceUsd: s.priceUsd,
           rawDataSnapshot: s.rawDataSnapshot,
+          picks: s.picks, // multi-token shortlist from sentiment/momentum etc.
         })),
         total_cost_usd: hiredSpecs.reduce((sum, s) => sum + s.priceUsd, 0),
       });

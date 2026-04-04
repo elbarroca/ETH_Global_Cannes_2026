@@ -1,6 +1,7 @@
-// Fetches REAL sentiment data — CoinGecko + Fear & Greed Index
+// Fetches REAL sentiment data — CoinGecko + Fear & Greed Index + multi-token universe
 
 import { cachedFetch } from "./cached-fetch";
+import { fetchTokenUniverse, formatUniverseForPrompt } from "./token-universe";
 
 function getCoinGeckoBase(): string {
   return process.env.COINGECKO_API_URL ?? "https://api.coingecko.com/api/v3";
@@ -61,6 +62,31 @@ export async function fetchSentimentData(): Promise<string> {
     }));
   } catch {
     results.trending_coins = [];
+  }
+
+  // ── Multi-token research universe ────────────────────────────────────
+  // The sentiment specialist is no longer ETH-only. We attach the top 20
+  // tokens by market cap so the prompt can cross-reference Fear & Greed +
+  // trending status + price action across the whole set and pick the 2-3
+  // most promising candidates. This is the foundation of "specialists pick
+  // any token" — each specialist will layer its own lens over this universe.
+  try {
+    const universe = await fetchTokenUniverse(20);
+    const trendingSymbols = new Set(
+      (results.trending_coins as Array<{ symbol: string }> | undefined ?? []).map((t) => t.symbol.toUpperCase()),
+    );
+    results.universe = universe.map((t) => ({
+      symbol: t.symbol,
+      name: t.name,
+      rank: t.rank,
+      change24h: t.change24h,
+      change7d: t.change7d,
+      is_trending: trendingSymbols.has(t.symbol),
+    }));
+    results.universe_table = formatUniverseForPrompt(universe);
+  } catch (err) {
+    results.universe_error = String(err);
+    results.universe = [];
   }
 
   return JSON.stringify(results);

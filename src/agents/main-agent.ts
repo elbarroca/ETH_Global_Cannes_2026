@@ -415,6 +415,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
 
       // Flatten all hired specialists into SpecialistResult[] for downstream code.
       // Each one gets hiredBy tag so we know which debate agent paid for it.
+      // picks[] is preserved so the debate layer can see multi-token shortlists.
       const flatten = (resp: DebateAgentResponse): SpecialistResult[] =>
         resp.specialists_hired.map((s) => ({
           name: s.name,
@@ -428,6 +429,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
           paymentTxHash: s.paymentTxHash,
           priceUsd: s.priceUsd,
           rawDataSnapshot: s.rawDataSnapshot,
+          picks: s.picks,
         }));
 
       specialists = [
@@ -569,9 +571,68 @@ export async function commitCycle(
   }
 
   // Parse debate results early — needed for Naryo + swap + Prisma steps
-  const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number };
-  const riskParsed = debate.risk.parsed as { challenge?: string; objection?: string; max_pct?: number };
-  const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
+  const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number; asset?: string };
+  const riskParsed = debate.risk.parsed as { challenge?: string; objection?: string; max_pct?: number; red_flags?: unknown };
+  const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string; asset?: string };
+
+  // ── Deterministic executor override ─────────────────────────────────────
+  // The executor prompt explicitly says: "If Risk.max_pct >= 3 AND Risk
+  // listed no red_flags, your DEFAULT is to BUY at Risk.max_pct." The 7B
+  // qwen model often ignores this and defaults to HOLD on "mixed signals",
+  // wasting the upstream debate work. This override enforces the prompt's
+  // own stated rule when the model fails to comply.
+  //
+  // Conditions for override (all must be true):
+  //   · Executor picked HOLD
+  //   · Alpha proposed BUY with pct > 0
+  //   · Risk.max_pct >= 3
+  //   · Risk.red_flags is empty / missing
+  //   · Alpha proposed a valid asset ticker
+  const alphaAction = String(alphaParsed.action ?? "HOLD").toUpperCase();
+  const alphaPct = Number(alphaParsed.pct ?? 0);
+  const alphaAsset = typeof alphaParsed.asset === "string" && alphaParsed.asset.trim().length > 0
+    ? alphaParsed.asset.trim().toUpperCase()
+    : null;
+  const riskMaxPct = Number(riskParsed.max_pct ?? 0);
+  const redFlags = Array.isArray(riskParsed.red_flags) ? (riskParsed.red_flags as unknown[]) : [];
+  const executorSaidHold = String(execParsed.action ?? "HOLD").toUpperCase() === "HOLD";
+  const debateOverride =
+    executorSaidHold &&
+    alphaAction === "BUY" &&
+    alphaPct > 0 &&
+    riskMaxPct >= 3 &&
+    redFlags.length === 0 &&
+    alphaAsset != null;
+
+  if (debateOverride && alphaAsset) {
+    const cappedPct = Math.min(alphaPct, riskMaxPct, user.agent.maxTradePercent);
+    console.log(
+      `[cycle] Executor override: executor said HOLD but debate default says BUY → forcing BUY ${alphaAsset} ${cappedPct}% (alpha=${alphaPct}%, risk.max=${riskMaxPct}%, user.max=${user.agent.maxTradePercent}%)`,
+    );
+    // Mutate the parsed result in place — downstream code reads execParsed.
+    execParsed.action = "BUY";
+    execParsed.pct = cappedPct;
+    execParsed.asset = alphaAsset;
+    if (!execParsed.stop_loss) execParsed.stop_loss = "-5%";
+    // Tag the override on the debate.executor.parsed so it lands in HCS + 0G
+    // for full audit transparency — a reader can tell the executor's raw 7B
+    // output was overridden and why.
+    (debate.executor.parsed as Record<string, unknown>).override_applied = true;
+    (debate.executor.parsed as Record<string, unknown>).override_reason =
+      `Alpha BUY ${alphaAsset} ${alphaPct}%, Risk.max ${riskMaxPct}% with no red_flags — enforcing prompt default`;
+    await logAction({
+      userId: user.id,
+      actionType: "CYCLE_COMPLETED",
+      agentName: "executor-override",
+      payload: {
+        stage: "override_applied",
+        alphaAsset,
+        alphaPct,
+        riskMaxPct,
+        cappedPct,
+      },
+    }).catch(() => {});
+  }
 
   // 1. Execute Arc swap FIRST if executor decided to trade — so the swap tx
   // hash lands in the rich record before we upload it to 0G. Non-fatal.
@@ -800,6 +861,10 @@ export async function commitCycle(
         reasoning: s.reasoning ?? "",
         hiredBy: s.hiredBy ?? "main-agent",
         paymentTxHash: s.paymentTxHash ?? "",
+        // Multi-token shortlist — present when the specialist emitted picks[]
+        // (sentiment, momentum today; news-scanner etc. to follow). Preserving
+        // this so the dashboard + enrichCycleRow can surface the full pick graph.
+        picks: s.picks ?? null,
       })))),
       alpha: {
         action: String(alphaParsed.action ?? "HOLD"),
@@ -821,7 +886,10 @@ export async function commitCycle(
         reasoning: debate.executor.reasoning ?? "",
       },
       decision: String(execParsed.action ?? "HOLD"),
-      asset: "ETH",
+      // Use the executor's chosen asset (post-override), defaulting to ETH
+      // only when the debate produced no valid ticker. finalAsset was set
+      // during the swap pipeline step above.
+      asset: finalAsset,
       decisionPct: modifiedPct ?? Number(execParsed.pct ?? 0),
       hcsSeqNum: seqNum,
       hashscanUrl,

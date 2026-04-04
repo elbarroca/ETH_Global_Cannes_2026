@@ -3,7 +3,33 @@ import { getAgent } from "../config/agent-registry";
 import { incrementAgentHires } from "../marketplace/registry";
 import { logAction } from "../store/action-logger";
 import { parseDualOutput } from "./prompts";
-import type { CallSpecialistResult, SpecialistResult } from "../types/index";
+import type { CallSpecialistResult, SpecialistResult, TokenPick } from "../types/index";
+
+// Normalize a `picks` array coming out of the specialist's JSON. The 7B
+// model sometimes emits picks with lowercase tickers, string confidence
+// values, or missing fields — coerce everything into the TokenPick shape
+// so downstream code can trust it.
+function normalizePicks(raw: unknown): TokenPick[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const normalized: TokenPick[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const p = item as Record<string, unknown>;
+    const asset = String(p.asset ?? p.ticker ?? p.symbol ?? "").toUpperCase().trim();
+    if (!asset) continue;
+    const signalRaw = String(p.signal ?? "HOLD").toUpperCase();
+    const signal: TokenPick["signal"] =
+      signalRaw === "BUY" || signalRaw === "SELL" ? signalRaw : "HOLD";
+    normalized.push({
+      asset,
+      signal,
+      confidence: Math.max(0, Math.min(100, Number(p.confidence ?? 50))),
+      reason: String(p.reason ?? p.reasoning ?? ""),
+    });
+    if (normalized.length >= 5) break; // safety cap
+  }
+  return normalized.length > 0 ? normalized : undefined;
+}
 
 const SPECIALIST_PRICE = "$0.001";
 const SPECIALIST_PRICE_USD = 0.001;
@@ -97,6 +123,10 @@ export async function callSpecialist(
     reasoning = `[HTTP_ERROR] ${err instanceof Error ? err.message : String(err)}`;
   }
 
+  // Multi-token picks — present only when the specialist's prompt emits them
+  // (currently sentiment + momentum). Normalized to tolerate 7B JSON quirks.
+  const picks = normalizePicks(parsed.picks);
+
   return {
     name: specialistId,
     signal: String(parsed.signal ?? "HOLD"),
@@ -108,6 +138,7 @@ export async function callSpecialist(
     paymentTxHash,
     priceUsd: SPECIALIST_PRICE_USD,
     durationMs: Date.now() - start,
+    picks,
   };
 }
 
@@ -168,6 +199,7 @@ export async function hireSpecialist(
     hiredBy,
     paymentTxHash: result.paymentTxHash,
     priceUsd: result.priceUsd,
+    picks: result.picks,
   };
 }
 

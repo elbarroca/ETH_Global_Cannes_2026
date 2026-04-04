@@ -1,6 +1,8 @@
-// Fetches REAL price history and computes technical indicators locally
+// Fetches REAL price history and computes technical indicators locally +
+// broad-universe momentum rankings for multi-token picks.
 
 import { cachedFetch } from "./cached-fetch";
+import { fetchTokenUniverse, formatUniverseForPrompt, type TokenUniverseEntry } from "./token-universe";
 
 function getCoinGeckoBase(): string {
   return process.env.COINGECKO_API_URL ?? "https://api.coingecko.com/api/v3";
@@ -146,6 +148,38 @@ export async function fetchMomentumData(): Promise<string> {
               : "stable";
   } catch (err) {
     results.error = String(err);
+  }
+
+  // ── Multi-token momentum ranking ──────────────────────────────────────
+  // The momentum specialist grades every top-20 token on a simple composite
+  // score = weighted blend of 24h + 7d change. Full RSI/MACD are ETH-only
+  // (the price-history fetch is expensive); for the broader universe we
+  // use the cheap % deltas that come with the coins/markets endpoint.
+  try {
+    const universe: TokenUniverseEntry[] = await fetchTokenUniverse(20);
+    const ranked = universe
+      .map((t) => {
+        const c24 = t.change24h ?? 0;
+        const c7 = t.change7d ?? 0;
+        // Composite: short-term (24h) weighted 0.6, medium (7d) weighted 0.4
+        const score = c24 * 0.6 + c7 * 0.4;
+        return {
+          symbol: t.symbol,
+          name: t.name,
+          rank: t.rank,
+          change24h: c24,
+          change7d: c7,
+          composite_score: Math.round(score * 100) / 100,
+          volume24h: t.volume24h,
+        };
+      })
+      .sort((a, b) => b.composite_score - a.composite_score);
+
+    results.universe_top_momentum = ranked.slice(0, 10); // top 10 by composite
+    results.universe_weakest = ranked.slice(-5).reverse(); // weakest 5 for SELL candidates
+    results.universe_table = formatUniverseForPrompt(universe);
+  } catch (err) {
+    results.universe_error = String(err);
   }
 
   return JSON.stringify(results);

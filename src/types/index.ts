@@ -79,6 +79,19 @@ export interface InferenceResult {
   teeVerified: boolean;
 }
 
+/**
+ * A multi-token pick emitted by a specialist. When specialists extend beyond
+ * ETH-only analysis (sentiment, momentum, news-scanner etc.), they output
+ * 1-3 picks here so the augmented layer can see the full shortlist and the
+ * executor can choose which asset to actually trade.
+ */
+export interface TokenPick {
+  asset: string; // ticker — "BTC", "ETH", "SOL", "UNI", etc.
+  signal: "BUY" | "SELL" | "HOLD";
+  confidence: number; // 0-100
+  reason: string; // one-clause justification
+}
+
 export interface SpecialistResult {
   name: string;
   signal: string;
@@ -91,6 +104,8 @@ export interface SpecialistResult {
   hiredBy?: string;
   paymentTxHash?: string;
   priceUsd?: number;
+  /** Multi-token shortlist — present when the specialist's prompt emits picks[]. */
+  picks?: TokenPick[];
   [key: string]: unknown;
 }
 
@@ -106,6 +121,8 @@ export interface CallSpecialistResult {
   paymentTxHash: string;
   priceUsd: number;
   durationMs: number;
+  /** Multi-token shortlist — parsed from the specialist's JSON response. */
+  picks?: TokenPick[];
 }
 
 // Response from a debate agent's /hire-and-analyze endpoint
@@ -126,6 +143,8 @@ export interface DebateAgentResponse {
     paymentTxHash: string;
     priceUsd: number;
     rawDataSnapshot?: unknown;
+    /** Multi-token shortlist — forwarded from the specialist's response. */
+    picks?: TokenPick[];
   }>;
   total_cost_usd: number;
 }

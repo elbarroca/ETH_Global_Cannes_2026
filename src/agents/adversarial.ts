@@ -30,6 +30,16 @@ export function buildSpecialistContext(specialists: SpecialistResult[]): string 
 
       if (s.reasoning) lines.push(`  reasoning: "${s.reasoning}"`);
 
+      // Multi-token picks — if the specialist emitted a shortlist, surface it
+      // so the debate layer can see which tokens were actually suggested and
+      // let the executor pick an asset beyond ETH.
+      if (Array.isArray(s.picks) && s.picks.length > 0) {
+        const pickStr = s.picks
+          .map((p) => `${p.asset}:${p.signal}(${p.confidence}%)`)
+          .join(", ");
+        lines.push(`  picks: ${pickStr}`);
+      }
+
       const snap = s.rawDataSnapshot as Record<string, unknown> | undefined;
       if (snap) {
         const h: string[] = [];
