@@ -136,6 +136,8 @@ export default function MarketplacePage() {
           // fabricate an ID from totalHires anymore — that was misleading.
           inftId: e.inftTokenId != null ? `#${e.inftTokenId}` : "",
           inftTokenId: e.inftTokenId ?? null,
+          storageRootHash: e.storageRootHash ?? null,
+          storageUri: e.storageUri ?? null,
           model: "glm-5-chat",
           provider: "0G Sealed TEE",
           creator: "AlphaDawg",
@@ -547,6 +549,39 @@ function InftPill({
   );
 }
 
+/**
+ * 0G Storage pill — shows the Merkle root hash that the specialist's iNFT
+ * points at on-chain (VaultMindAgent.encryptedURIs[tokenId] = "0g-storage://{rootHash}").
+ *
+ * Click to copy the full rootHash. There is no public browser explorer for
+ * 0G Storage roots — the blob is retrievable programmatically via the 0G
+ * indexer API. The tooltip explains this so judges know the path.
+ */
+function StoragePill({ rootHash }: { rootHash: string | null | undefined }) {
+  if (!rootHash) {
+    return (
+      <span className="inline-flex items-center rounded-md border border-void-800 bg-void-900/60 px-2 py-0.5 font-mono text-[10px] text-void-600">
+        0G Storage · pending
+      </span>
+    );
+  }
+  const short = `${rootHash.slice(0, 6)}…${rootHash.slice(-4)}`;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigator.clipboard.writeText(rootHash).catch(() => {});
+      }}
+      className="inline-flex items-center gap-1 rounded-md border border-teal-800/40 bg-teal-950/30 px-2 py-0.5 font-mono text-[10px] text-teal-300 transition-colors hover:border-teal-500/40 hover:bg-teal-900/40"
+      title={`0G Storage root: ${rootHash}\n\nClick to copy.\n\nThis hash is bound on-chain in VaultMindAgent.encryptedURIs[tokenId]. Retrievable via the 0G indexer API.`}
+    >
+      0G Storage {short} <span className="text-teal-500">📋</span>
+    </button>
+  );
+}
+
 function ActiveAgentCard({
   agent,
   firing,
@@ -608,17 +643,18 @@ function ActiveAgentCard({
               ${agent.pricePerQuery.toFixed(3)}
             </span>
           </div>
-          <button
-            onClick={onFire}
-            disabled={firing}
-            className="inline-flex min-w-[88px] items-center justify-center rounded-lg border border-blood-800/40 bg-blood-900/30 px-3 py-2 text-xs font-semibold text-blood-300 transition-colors hover:bg-blood-900/50 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {firing ? (
-              <DawgSpinner size={14} label="Firing…" labelClassName="text-blood-300" />
-            ) : (
-              "Fire"
-            )}
-          </button>
+          {firing ? (
+            <div className="flex min-w-[88px] justify-center">
+              <DawgSpinner size={28} label="Firing…" labelClassName="text-blood-300" />
+            </div>
+          ) : (
+            <button
+              onClick={onFire}
+              className="inline-flex min-w-[88px] items-center justify-center rounded-lg border border-blood-800/40 bg-blood-900/30 px-3 py-2 text-xs font-semibold text-blood-300 transition-colors hover:bg-blood-900/50"
+            >
+              Fire
+            </button>
+          )}
         </div>
 
         <div className="flex items-center justify-between border-t border-void-800/80 pt-3 text-[11px] font-mono text-void-600">
@@ -725,17 +761,16 @@ function CommunityAgentCard({
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               Hired
             </span>
+          ) : hiring ? (
+            <div className="flex min-w-[96px] justify-center">
+              <DawgSpinner size={28} label="Hiring…" labelClassName="text-dawg-300" />
+            </div>
           ) : (
             <button
               onClick={onHire}
-              disabled={hiring}
-              className="inline-flex min-w-[96px] items-center justify-center rounded-lg bg-dawg-500 px-3 py-2 text-xs font-bold text-void-950 shadow-[0_0_0_1px_rgba(255,199,0,0.3),0_8px_20px_-8px_rgba(255,199,0,0.5)] transition-all hover:bg-dawg-400 hover:shadow-[0_0_0_1px_rgba(255,199,0,0.4),0_10px_24px_-8px_rgba(255,199,0,0.6)] disabled:cursor-not-allowed disabled:opacity-80"
+              className="inline-flex min-w-[96px] items-center justify-center rounded-lg bg-dawg-500 px-3 py-2 text-xs font-bold text-void-950 shadow-[0_0_0_1px_rgba(255,199,0,0.3),0_8px_20px_-8px_rgba(255,199,0,0.5)] transition-all hover:bg-dawg-400 hover:shadow-[0_0_0_1px_rgba(255,199,0,0.4),0_10px_24px_-8px_rgba(255,199,0,0.6)]"
             >
-              {hiring ? (
-                <DawgSpinner size={14} label="Hiring…" labelClassName="text-void-950" />
-              ) : (
-                "Hire"
-              )}
+              Hire
             </button>
           )}
         </div>

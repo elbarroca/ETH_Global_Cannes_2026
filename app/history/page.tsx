@@ -175,15 +175,19 @@ export default function HistoryPage() {
           })}
 
           {/* Load more */}
-          {hasMore && (
-            <button
-              onClick={loadMore}
-              disabled={loading}
-              className="flex w-full items-center justify-center py-3 text-sm text-void-500 transition-colors hover:text-void-300 disabled:cursor-not-allowed"
-            >
-              {loading ? <DawgSpinner size={18} label="Loading more…" /> : "Load more"}
-            </button>
-          )}
+          {hasMore &&
+            (loading ? (
+              <div className="flex w-full justify-center py-3">
+                <DawgSpinner size={32} label="Loading more…" />
+              </div>
+            ) : (
+              <button
+                onClick={loadMore}
+                className="flex w-full items-center justify-center py-3 text-sm text-void-500 transition-colors hover:text-void-300"
+              >
+                Load more
+              </button>
+            ))}
         </div>
       )}
     </main>

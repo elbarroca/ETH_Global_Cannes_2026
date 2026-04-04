@@ -17,11 +17,19 @@ export async function GET() {
         _max: { createdAt: true },
         _count: { _all: true },
       }),
-      // Real on-chain metadata: inftTokenId + walletAddress. `inft_token_id`
-      // is NULL for all 10 agents today — we pass it through as-is so the
-      // UI can render "Not minted" honestly rather than a fabricated number.
+      // Real on-chain metadata: iNFT token id + wallet + 0G Storage root hash.
+      // Every specialist has all three populated after the mint/store backfill:
+      //   · inftTokenId  → ERC-7857 token on VaultMindAgent (0G Chain)
+      //   · walletAddress → HD-derived receive wallet on Arc (x402 payout)
+      //   · storageRootHash → 0G Storage Merkle root bound via updateMetadata
       prisma.marketplaceAgent.findMany({
-        select: { name: true, inftTokenId: true, walletAddress: true },
+        select: {
+          name: true,
+          inftTokenId: true,
+          walletAddress: true,
+          storageRootHash: true,
+          storageUri: true,
+        },
       }),
     ]);
 
@@ -34,11 +42,18 @@ export async function GET() {
       });
     }
 
-    const chainByName = new Map<string, { inftTokenId: number | null; walletAddress: string | null }>();
+    const chainByName = new Map<string, {
+      inftTokenId: number | null;
+      walletAddress: string | null;
+      storageRootHash: string | null;
+      storageUri: string | null;
+    }>();
     for (const row of chainRows) {
       chainByName.set(row.name, {
         inftTokenId: row.inftTokenId,
         walletAddress: row.walletAddress,
+        storageRootHash: row.storageRootHash,
+        storageUri: row.storageUri,
       });
     }
 
@@ -56,6 +71,8 @@ export async function GET() {
         active: !!spec,
         walletAddress: chain?.walletAddress ?? spec?.walletAddress ?? null,
         inftTokenId: chain?.inftTokenId ?? null,
+        storageRootHash: chain?.storageRootHash ?? null,
+        storageUri: chain?.storageUri ?? null,
         lastHireAt: hire?.lastHireAt ? hire.lastHireAt.toISOString() : null,
         recentHires: hire?.hires ?? 0,
       };
