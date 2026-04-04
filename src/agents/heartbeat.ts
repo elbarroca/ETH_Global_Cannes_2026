@@ -1,7 +1,9 @@
 import { getActiveUsers } from "../store/user-store";
-import { runCycle } from "./main-agent";
-import { notifyUser } from "../telegram/bot";
+import { analyzeCycle, commitCycle, runCycle } from "./main-agent";
+import { notifyUser, sendApprovalNotification } from "../telegram/bot";
 import { scheduleNextHeartbeat } from "../hedera/scheduler";
+import { createPendingCycle, getPendingForUser } from "../store/pending-cycles";
+import { getPrisma } from "../config/prisma";
 
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -16,8 +18,49 @@ export async function runHeartbeat(): Promise<void> {
 
   for (const user of users) {
     try {
-      const result = await runCycle(user);
-      notifyUser(user, result);
+      const approvalMode = user.agent.approvalMode ?? "auto";
+
+      if (approvalMode === "auto") {
+        // Existing behavior — full cycle, no pause
+        const result = await runCycle(user);
+        notifyUser(user, result);
+        continue;
+      }
+
+      // Check for existing pending cycle — skip if one exists
+      const existing = await getPendingForUser(user.id);
+      if (existing) {
+        console.log(`[heartbeat] User ${user.id} has pending cycle ${existing.id}, skipping`);
+        continue;
+      }
+
+      // Analyze first
+      const analysis = await analyzeCycle(user);
+      const decision = analysis.compactRecord.d.act;
+
+      // Determine if approval is needed
+      const needsApproval = approvalMode === "always"
+        || (approvalMode === "trades_only" && decision !== "HOLD");
+
+      if (needsApproval) {
+        const timeoutMin = user.agent.approvalTimeoutMin ?? 10;
+        const pending = await createPendingCycle(analysis, "heartbeat", timeoutMin);
+
+        // Send Telegram notification with approval buttons
+        const msgId = await sendApprovalNotification(user, analysis, pending.id);
+        if (msgId) {
+          await getPrisma().pendingCycle.update({
+            where: { id: pending.id },
+            data: { telegramMsgId: msgId },
+          }).catch(() => {});
+        }
+
+        console.log(`[heartbeat] Pending approval for user ${user.id}: ${pending.id}`);
+      } else {
+        // Auto-approve (HOLD in trades_only mode)
+        const result = await commitCycle(analysis, user);
+        notifyUser(user, result);
+      }
     } catch (err) {
       console.error(`[heartbeat] Cycle failed for user ${user.id}:`, err);
     }

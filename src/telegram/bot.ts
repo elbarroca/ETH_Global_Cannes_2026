@@ -4,11 +4,19 @@ import {
   updateUser,
 } from "../store/user-store";
 import { redeemLinkCode } from "../store/link-codes";
-import { runCycle } from "../agents/main-agent";
-import type { UserRecord, CycleResult, CompactCycleRecord } from "../types/index";
+import { analyzeCycle, commitCycle, rejectCycle } from "../agents/main-agent";
+import { createPendingCycle, getPendingCycle, resolvePendingCycle } from "../store/pending-cycles";
+import type { UserRecord, CycleResult, CompactCycleRecord, AnalysisResult } from "../types/index";
+import {
+  formatDebate,
+  formatCycleSummary,
+  formatAnalysisPreview,
+  formatApprovedResult,
+  formatRejectedResult,
+  buildApprovalKeyboard,
+} from "./formatter";
 
 const MIRROR_BASE = "https://testnet.mirrornode.hedera.com/api/v1";
-const HASHSCAN_BASE = "https://hashscan.io/testnet/topic";
 
 let bot: TelegramBot | null = null;
 
@@ -40,44 +48,6 @@ async function fetchHistory(limit: number): Promise<CompactCycleRecord[]> {
   }
 }
 
-function signalEmoji(signal: string): string {
-  if (signal === "BUY") return "🟢";
-  if (signal === "SELL") return "🔴";
-  return "⚪";
-}
-
-function formatDebate(record: CompactCycleRecord): string {
-  const topicId = getTopicId();
-  const specs = (record.s ?? [])
-    .map((s) => `  ${signalEmoji(s.sig)} ${s.n}: ${s.sig} (${s.conf}%)`)
-    .join("\n");
-
-  const alpha = record.adv?.a;
-  const risk = record.adv?.r;
-  const exec = record.adv?.e;
-
-  return [
-    `*Hunt #${record.c}*`,
-    "",
-    "📡 *Specialists:*",
-    specs || "  No data",
-    "",
-    `🟢 *Alpha:* ${alpha?.act ?? "?"} ${alpha?.pct ?? 0}%`,
-    `🔴 *Risk:* ${risk?.obj ?? "?"} (max ${risk?.max ?? 0}%)`,
-    `⚖️ *Executor:* ${exec?.act ?? "?"} ${exec?.pct ?? 0}% (SL ${exec?.sl ?? 0}%)`,
-    "",
-    `📊 Decision: *${record.d?.act ?? "HOLD"}* ${record.d?.asset ?? ""} ${record.d?.pct ?? 0}%`,
-    `💰 NAV: $${(record.nav ?? 0).toLocaleString()}`,
-    "",
-    `🔗 [Proof on Hashscan](${HASHSCAN_BASE}/${topicId})`,
-  ].join("\n");
-}
-
-function formatCycleSummary(record: CompactCycleRecord): string {
-  const d = record.d;
-  return `#${record.c} ${d?.act ?? "?"} ${d?.asset ?? ""} ${d?.pct ?? 0}% | NAV $${(record.nav ?? 0).toFixed(0)}`;
-}
-
 // ── Exported notify function (used by heartbeat) ────────────────────────────
 
 export function notifyUser(user: UserRecord, result: CycleResult): void {
@@ -100,6 +70,40 @@ export function notifyUser(user: UserRecord, result: CycleResult): void {
 
   bot.sendMessage(user.telegram.chatId, msg, { parse_mode: "Markdown" }).catch((err) => {
     console.warn(`[telegram] Failed to notify ${user.id}:`, err);
+  });
+}
+
+// ── Exported: send approval notification (used by heartbeat for non-auto users)
+
+export async function sendApprovalNotification(
+  user: UserRecord,
+  analysis: AnalysisResult,
+  pendingId: string,
+): Promise<number | null> {
+  if (!bot || !user.telegram.chatId) return null;
+
+  const preview = formatAnalysisPreview(analysis, user);
+  const sent = await bot.sendMessage(user.telegram.chatId, preview, {
+    parse_mode: "Markdown",
+    reply_markup: buildApprovalKeyboard(pendingId),
+  });
+  return sent.message_id;
+}
+
+// ── Exported: edit telegram message (used by timeout checker)
+
+export async function editTelegramMessage(
+  chatId: string,
+  messageId: number,
+  text: string,
+): Promise<void> {
+  if (!bot) return;
+  await bot.editMessageText(text, {
+    chat_id: chatId,
+    message_id: messageId,
+    parse_mode: "Markdown",
+  }).catch((err) => {
+    console.warn("[telegram] editMessageText failed:", err);
   });
 }
 
@@ -183,6 +187,7 @@ function registerCommands(telegramBot: TelegramBot): void {
       `HTS Shares: ${user.fund.htsShareBalance}`,
       `Agent: ${user.agent.active ? "● Running" : "○ Paused"}`,
       `Risk: ${user.agent.riskProfile} (max ${user.agent.maxTradePercent}%)`,
+      `Approval: ${user.agent.approvalMode ?? "always"}`,
       `Last hunt: ${lastCycleAgo}`,
       `Total hunts: ${user.agent.lastCycleId}`,
     ].join("\n"), { parse_mode: "Markdown" });
@@ -261,7 +266,7 @@ function registerCommands(telegramBot: TelegramBot): void {
       "  3. MomentumX — RSI/MACD/support-resistance",
       "",
       "💰 Cost: *$0.003* (3 x $0.001 via Arc x402)",
-      "⚡ Pipeline: Hire → Debate → Log → Notify",
+      "⚡ Pipeline: Hire → Debate → *You Approve* → Log",
       "",
       "_Tap below to confirm or skip:_",
     ].join("\n");
@@ -270,7 +275,7 @@ function registerCommands(telegramBot: TelegramBot): void {
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [[
-          { text: "✅ Hire & Execute ($0.003)", callback_data: `hire_confirm_${user.id}` },
+          { text: "✅ Hire & Analyze ($0.003)", callback_data: `hire_confirm_${user.id}` },
           { text: "❌ Skip", callback_data: "hire_skip" },
         ]],
       },
@@ -312,13 +317,13 @@ function registerCallbacks(telegramBot: TelegramBot): void {
     const chatId = query.message?.chat.id;
     if (!data || !chatId) return;
 
+    // ── Hire & Analyze confirm ──────────────────────────────────────────
     if (data.startsWith("hire_confirm_")) {
       const userId = data.replace("hire_confirm_", "");
-      await telegramBot.answerCallbackQuery(query.id, { text: "Starting hunt..." });
+      await telegramBot.answerCallbackQuery(query.id, { text: "Starting analysis..." });
 
-      // Update the message to show progress
       if (query.message) {
-        await telegramBot.editMessageText("⚡ *Hunt running...*\n\nHiring 3 pack members via x402 nanopayments...", {
+        await telegramBot.editMessageText("⚡ *Analyzing...*\n\nHiring 3 pack members via x402 nanopayments...", {
           chat_id: chatId,
           message_id: query.message.message_id,
           parse_mode: "Markdown",
@@ -332,45 +337,148 @@ function registerCallbacks(telegramBot: TelegramBot): void {
           return;
         }
 
-        const result = await runCycle(user);
-        const debate = formatDebate({
-          c: result.cycleId,
-          u: result.userId,
-          t: result.timestamp.toISOString(),
-          rp: user.agent.riskProfile,
-          s: result.specialists.map((sp) => ({
-            n: sp.name,
-            sig: sp.signal,
-            conf: sp.confidence,
-            att: sp.attestationHash,
-          })),
-          adv: {
-            a: {
-              act: (result.debate.alpha.parsed as { action?: string }).action ?? "?",
-              pct: (result.debate.alpha.parsed as { pct?: number }).pct ?? 0,
-              att: result.debate.alpha.attestationHash,
-            },
-            r: {
-              obj: (result.debate.risk.parsed as { challenge?: string }).challenge ?? "?",
-              max: (result.debate.risk.parsed as { max_pct?: number }).max_pct ?? 0,
-              att: result.debate.risk.attestationHash,
-            },
-            e: {
-              act: (result.debate.executor.parsed as { action?: string }).action ?? "?",
-              pct: (result.debate.executor.parsed as { pct?: number }).pct ?? 0,
-              sl: parseFloat(String((result.debate.executor.parsed as { stop_loss?: string }).stop_loss ?? "-5").replace("%", "").replace("-", "")),
-              att: result.debate.executor.attestationHash,
-            },
-          },
-          d: result.decision as { act: string; asset: string; pct: number },
-          nav: user.fund.currentNav,
+        // Phase 1: Analyze only (no on-chain commit yet)
+        const analysis = await analyzeCycle(user);
+
+        // Create pending cycle for approval
+        const timeoutMin = user.agent.approvalTimeoutMin ?? 10;
+        const pending = await createPendingCycle(analysis, "telegram", timeoutMin);
+
+        // Send recommendation with approval buttons
+        const preview = formatAnalysisPreview(analysis, user);
+        const sent = await telegramBot.sendMessage(chatId, preview, {
+          parse_mode: "Markdown",
+          reply_markup: buildApprovalKeyboard(pending.id),
         });
-        await telegramBot.sendMessage(chatId, debate, { parse_mode: "Markdown" });
+
+        // Store telegram message ID for later editing (timeout checker needs it)
+        const { getPrisma } = await import("../config/prisma");
+        await getPrisma().pendingCycle.update({
+          where: { id: pending.id },
+          data: { telegramMsgId: sent.message_id },
+        }).catch(() => {});
+
       } catch (err) {
-        console.error("[telegram] Hunt failed:", err);
-        await telegramBot.sendMessage(chatId, "❌ Hunt failed. Check server logs for details.");
+        console.error("[telegram] Analysis failed:", err);
+        await telegramBot.sendMessage(chatId, "❌ Analysis failed. Check server logs for details.");
       }
-    } else if (data === "hire_skip") {
+      return;
+    }
+
+    // ── Approve pending cycle ───────────────────────────────────────────
+    if (data.startsWith("approve_")) {
+      const pendingId = data.replace("approve_", "");
+      await telegramBot.answerCallbackQuery(query.id, { text: "Approving..." });
+
+      try {
+        const pending = await getPendingCycle(pendingId);
+        if (!pending || pending.status !== "PENDING_APPROVAL") {
+          await telegramBot.answerCallbackQuery(query.id, { text: "Already resolved" });
+          return;
+        }
+
+        // Verify ownership
+        const user = await getUserByChatId(chatId.toString());
+        if (!user || user.id !== pending.userId) {
+          await telegramBot.sendMessage(chatId, "❌ User mismatch.");
+          return;
+        }
+
+        // Edit message to show progress
+        if (query.message) {
+          await telegramBot.editMessageText("⚡ *Approving — logging to HCS & 0G...*", {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            parse_mode: "Markdown",
+          }).catch(() => {});
+        }
+
+        // Phase 2: Commit to HCS, 0G, Supabase
+        const analysis: AnalysisResult = {
+          userId: pending.userId,
+          cycleId: pending.cycleNumber,
+          specialists: pending.specialists,
+          debate: pending.debate,
+          compactRecord: pending.compactRecord,
+        };
+        const result = await commitCycle(analysis, user);
+
+        // Mark as resolved
+        await resolvePendingCycle(pendingId, {
+          status: "APPROVED",
+          resolvedBy: "user",
+        });
+
+        // Show approved result
+        const approvedMsg = formatApprovedResult(result, user);
+        if (query.message) {
+          await telegramBot.editMessageText(approvedMsg, {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            parse_mode: "Markdown",
+          }).catch(() => {});
+        } else {
+          await telegramBot.sendMessage(chatId, approvedMsg, { parse_mode: "Markdown" });
+        }
+      } catch (err) {
+        console.error("[telegram] Approval failed:", err);
+        await telegramBot.sendMessage(chatId, "❌ Approval failed. Check server logs.");
+      }
+      return;
+    }
+
+    // ── Reject pending cycle ────────────────────────────────────────────
+    if (data.startsWith("reject_")) {
+      const pendingId = data.replace("reject_", "");
+      await telegramBot.answerCallbackQuery(query.id, { text: "Rejecting..." });
+
+      try {
+        const pending = await getPendingCycle(pendingId);
+        if (!pending || pending.status !== "PENDING_APPROVAL") {
+          await telegramBot.answerCallbackQuery(query.id, { text: "Already resolved" });
+          return;
+        }
+
+        const user = await getUserByChatId(chatId.toString());
+        if (!user || user.id !== pending.userId) {
+          await telegramBot.sendMessage(chatId, "❌ User mismatch.");
+          return;
+        }
+
+        const analysis: AnalysisResult = {
+          userId: pending.userId,
+          cycleId: pending.cycleNumber,
+          specialists: pending.specialists,
+          debate: pending.debate,
+          compactRecord: pending.compactRecord,
+        };
+
+        await rejectCycle(analysis, user, "user_rejected");
+        await resolvePendingCycle(pendingId, {
+          status: "REJECTED",
+          resolvedBy: "user",
+          rejectReason: "user_rejected",
+        });
+
+        const rejectedMsg = formatRejectedResult(analysis);
+        if (query.message) {
+          await telegramBot.editMessageText(rejectedMsg, {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            parse_mode: "Markdown",
+          }).catch(() => {});
+        } else {
+          await telegramBot.sendMessage(chatId, rejectedMsg, { parse_mode: "Markdown" });
+        }
+      } catch (err) {
+        console.error("[telegram] Rejection failed:", err);
+        await telegramBot.sendMessage(chatId, "❌ Rejection failed. Check server logs.");
+      }
+      return;
+    }
+
+    // ── Hire skip ───────────────────────────────────────────────────────
+    if (data === "hire_skip") {
       await telegramBot.answerCallbackQuery(query.id, { text: "Skipped" });
       if (query.message) {
         await telegramBot.editMessageText("⏭️ Hunt skipped. Use /run when ready.", {

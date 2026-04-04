@@ -23,6 +23,7 @@ model User {
   actions            AgentAction[]
   cycles             Cycle[]
   hiredAgents        UserHiredAgent[]
+  pendingCycles      PendingCycle[]
 
   @@index([walletAddress], map: "idx_users_wallet")
   @@map("users")
@@ -114,4 +115,26 @@ model UserHiredAgent {
   @@index([userId], map: "idx_user_hired_agents_user")
   @@index([agentId], map: "idx_user_hired_agents_agent")
   @@map("user_hired_agents")
+}
+
+model PendingCycle {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String    @map("user_id")
+  cycleNumber   Int       @map("cycle_number")
+  status        String    @default("PENDING_APPROVAL")
+  origin        String    @default("ui")
+  specialists   Json      @default("[]")
+  debate        Json      @default("{}")
+  compactRecord Json      @default("{}") @map("compact_record")
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  resolvedAt    DateTime? @map("resolved_at") @db.Timestamptz(6)
+  resolvedBy    String?   @map("resolved_by")
+  modifiedPct   Int?      @map("modified_pct")
+  telegramMsgId Int?      @map("telegram_msg_id")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user          User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId, status], map: "idx_pending_cycles_user_status")
+  @@index([expiresAt], map: "idx_pending_cycles_expires")
+  @@map("pending_cycles")
 }

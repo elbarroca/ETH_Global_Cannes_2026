@@ -5,6 +5,7 @@ import { loadStore } from "./store/user-store";
 import { loadRegistry } from "./marketplace/registry";
 import { startBot } from "./telegram/bot";
 import { startHeartbeatLoop } from "./agents/heartbeat";
+import { startTimeoutChecker } from "./agents/timeout-checker";
 
 const REQUIRED_ENV = [
   "OPERATOR_ID",
@@ -46,6 +47,10 @@ async function main(): Promise<void> {
   // Start heartbeat cycle loop
   startHeartbeatLoop();
   console.log("Heartbeat started. Running hunts every 5 minutes.");
+
+  // Start timeout checker for expired pending cycles
+  startTimeoutChecker();
+  console.log("Timeout checker started. Checking every 60 seconds.");
   console.log("=== AlphaDawg running ===");
 }
 

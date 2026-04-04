@@ -27,6 +27,8 @@ export interface UserRecord {
     maxTradePercent: number;
     lastCycleId: number;
     lastCycleAt: string | null;
+    approvalMode: "always" | "trades_only" | "auto";
+    approvalTimeoutMin: number;
   };
   fund: {
     depositedUsdc: number;
@@ -155,6 +157,44 @@ export async function getCycleHistory(
 
 export async function triggerCycle(userId: string): Promise<CycleResult> {
   return apiFetch(`/api/cycle/run/${userId}`, { method: "POST" });
+}
+
+// ── Pending cycle (two-phase approval flow) ──────────────────
+
+export interface PendingCycleResponse {
+  pendingId: string;
+  cycleNumber: number;
+  status: string;
+  specialists: SpecialistResult[];
+  debate: {
+    alpha: DebateStage;
+    risk: DebateStage;
+    executor: DebateStage;
+  };
+  compactRecord: CompactCycleRecord;
+  expiresAt: string;
+}
+
+export async function analyzeCycle(userId: string): Promise<PendingCycleResponse> {
+  return apiFetch(`/api/cycle/analyze/${userId}`, { method: "POST" });
+}
+
+export async function approveCycle(pendingId: string, modifiedPct?: number): Promise<CycleResult> {
+  return apiFetch(`/api/cycle/approve/${pendingId}`, {
+    method: "POST",
+    body: JSON.stringify({ modifiedPct }),
+  });
+}
+
+export async function rejectCycle(pendingId: string, reason?: string): Promise<{ status: string; pendingId: string }> {
+  return apiFetch(`/api/cycle/reject/${pendingId}`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function getPendingCycle(userId: string): Promise<PendingCycleResponse | null> {
+  return apiFetch<PendingCycleResponse | null>(`/api/cycle/pending/${userId}`).catch(() => null);
 }
 
 export async function getStats(): Promise<PlatformStats> {

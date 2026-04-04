@@ -13,6 +13,7 @@ import type {
   CycleResult,
   CompactCycleRecord,
   DebateResult,
+  AnalysisResult,
 } from "../types/index";
 
 const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
@@ -67,14 +68,15 @@ function buildCompactRecord(
   };
 }
 
-export async function runCycle(user: UserRecord): Promise<CycleResult> {
-  const start = Date.now();
+// ── Phase 1: Analyze (hire specialists + adversarial debate) ─────────────────
+
+export async function analyzeCycle(user: UserRecord): Promise<AnalysisResult> {
   const cycleId = user.agent.lastCycleId + 1;
 
-  console.log(`[cycle] Starting for user ${user.id} (risk: ${user.agent.riskProfile})`);
+  console.log(`[cycle] Analyzing for user ${user.id} (risk: ${user.agent.riskProfile})`);
   console.log(`[cycle] Proxy wallet: ${user.proxyWallet.address} (Circle: ${user.proxyWallet.walletId})`);
 
-  // Log cycle start (non-fatal — Prisma may not be configured)
+  // Log cycle start (non-fatal)
   try {
     await logAction({
       userId: user.id,
@@ -133,8 +135,30 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     console.warn("[cycle] logAction debate failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 3. Log to Hedera HCS (non-fatal — stub seqNum/hashscanUrl if not configured)
-  const record = buildCompactRecord(cycleId, user, specialists, debate);
+  // 3. Build compact record (but do NOT commit to HCS/0G yet)
+  const compactRecord = buildCompactRecord(cycleId, user, specialists, debate);
+
+  return { userId: user.id, cycleId, specialists, debate, compactRecord };
+}
+
+// ── Phase 2: Commit (log to HCS, 0G, Supabase — only after approval) ────────
+
+export async function commitCycle(
+  analysis: AnalysisResult,
+  user: UserRecord,
+  modifiedPct?: number,
+): Promise<CycleResult> {
+  const start = Date.now();
+  const { cycleId, specialists, debate } = analysis;
+  const record = { ...analysis.compactRecord };
+
+  // Apply modified percentage if user changed it
+  if (modifiedPct !== undefined) {
+    record.d.pct = modifiedPct;
+    record.adv.e.pct = modifiedPct;
+  }
+
+  // 1. Log to Hedera HCS (non-fatal)
   let seqNum = 0;
   let hashscanUrl = "";
   try {
@@ -146,29 +170,21 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     hashscanUrl = `https://hashscan.io/testnet/topic/${TOPIC_ID || "unconfigured"}`;
   }
 
-  // 3b. Store cycle result to 0G decentralized storage (non-fatal)
+  // 2. Store cycle result to 0G decentralized storage (non-fatal)
   let storageHash: string | undefined;
   try {
     storageHash = await storeMemory(user.id, record);
     console.log(`[cycle] Stored to 0G: ${storageHash}`);
-    await logAction({
-      userId: user.id,
-      actionType: "STORAGE_UPLOADED",
-      payload: { storageHash },
-    });
+    await logAction({ userId: user.id, actionType: "STORAGE_UPLOADED", payload: { storageHash } });
   } catch (err) {
     console.warn("[cycle] 0G storage failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 3c. Update iNFT metadata on 0G Chain (non-fatal)
+  // 3. Update iNFT metadata on 0G Chain (non-fatal)
   if (user.inftTokenId && storageHash) {
     try {
       await updateAgentMetadata(user.inftTokenId, storageHash);
-      await logAction({
-        userId: user.id,
-        actionType: "INFT_UPDATED",
-        payload: { inftTokenId: user.inftTokenId, storageHash },
-      });
+      await logAction({ userId: user.id, actionType: "INFT_UPDATED", payload: { inftTokenId: user.inftTokenId, storageHash } });
     } catch (err) {
       console.warn("[cycle] iNFT update failed (non-fatal):", err instanceof Error ? err.message : String(err));
     }
@@ -180,38 +196,40 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
 
   // 5. Save full cycle record to Supabase (non-fatal)
-  try { await logCycleRecord(user.id, cycleId, {
-    specialists: specialists.map((s) => ({
-      name: s.name,
-      signal: s.signal,
-      confidence: s.confidence,
-      attestation: s.attestationHash,
-    })),
-    alpha: {
-      action: String(alphaParsed.action ?? "HOLD"),
-      pct: Number(alphaParsed.pct ?? 0),
-      attestation: debate.alpha.attestationHash,
-    },
-    risk: {
-      challenge: String(riskParsed.challenge ?? "none"),
-      maxPct: Number(riskParsed.max_pct ?? 0),
-      attestation: debate.risk.attestationHash,
-    },
-    executor: {
-      action: String(execParsed.action ?? "HOLD"),
-      pct: Number(execParsed.pct ?? 0),
-      stopLoss: String(execParsed.stop_loss ?? "-5%"),
-      attestation: debate.executor.attestationHash,
-    },
-    decision: String(execParsed.action ?? "HOLD"),
-    asset: "ETH",
-    decisionPct: Number(execParsed.pct ?? 0),
-    hcsSeqNum: seqNum,
-    hashscanUrl,
-    storageHash,
-    totalCostUsd: 0.003,
-    navAfter: user.fund.currentNav,
-  }); } catch (err) {
+  try {
+    await logCycleRecord(user.id, cycleId, {
+      specialists: specialists.map((s) => ({
+        name: s.name,
+        signal: s.signal,
+        confidence: s.confidence,
+        attestation: s.attestationHash,
+      })),
+      alpha: {
+        action: String(alphaParsed.action ?? "HOLD"),
+        pct: modifiedPct ?? Number(alphaParsed.pct ?? 0),
+        attestation: debate.alpha.attestationHash,
+      },
+      risk: {
+        challenge: String(riskParsed.challenge ?? "none"),
+        maxPct: Number(riskParsed.max_pct ?? 0),
+        attestation: debate.risk.attestationHash,
+      },
+      executor: {
+        action: String(execParsed.action ?? "HOLD"),
+        pct: modifiedPct ?? Number(execParsed.pct ?? 0),
+        stopLoss: String(execParsed.stop_loss ?? "-5%"),
+        attestation: debate.executor.attestationHash,
+      },
+      decision: String(execParsed.action ?? "HOLD"),
+      asset: "ETH",
+      decisionPct: modifiedPct ?? Number(execParsed.pct ?? 0),
+      hcsSeqNum: seqNum,
+      hashscanUrl,
+      storageHash,
+      totalCostUsd: 0.003,
+      navAfter: user.fund.currentNav,
+    });
+  } catch (err) {
     console.warn("[cycle] logCycleRecord failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
@@ -224,8 +242,6 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   });
 
   // 7. Update specialist reputations (non-fatal)
-  // NOTE: Uses executor decision as proxy for correctness. True accuracy requires
-  // comparing against actual price movement in subsequent cycles.
   try {
     const decision = String(execParsed.action ?? "HOLD");
     await evaluateCycleSignals(
@@ -248,7 +264,6 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     console.warn("[cycle] logAction CYCLE_COMPLETED failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 9. Return result
   return {
     userId: user.id,
     cycleId,
@@ -259,4 +274,39 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     hashscanUrl,
     timestamp: new Date(),
   };
+}
+
+// ── Rejection path (no on-chain logging) ─────────────────────────────────────
+
+export async function rejectCycle(
+  analysis: AnalysisResult,
+  user: UserRecord,
+  reason: string,
+): Promise<void> {
+  console.log(`[cycle] Rejected cycle ${analysis.cycleId} for user ${user.id}: ${reason}`);
+
+  try {
+    await logAction({
+      userId: user.id,
+      actionType: "CYCLE_REJECTED",
+      payload: { cycleNumber: analysis.cycleId, reason },
+    });
+  } catch (err) {
+    console.warn("[cycle] logAction CYCLE_REJECTED failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
+
+  // Keep cycle numbering consistent
+  await updateUser(user.id, {
+    agent: {
+      lastCycleId: analysis.cycleId,
+      lastCycleAt: new Date().toISOString(),
+    },
+  });
+}
+
+// ── Backward-compat wrapper (used by heartbeat auto-mode) ────────────────────
+
+export async function runCycle(user: UserRecord): Promise<CycleResult> {
+  const analysis = await analyzeCycle(user);
+  return commitCycle(analysis, user);
 }
