@@ -131,23 +131,22 @@ export async function updateAgentMetadata(
   tokenId: number,
   storageRootHash: string,
 ): Promise<string> {
-  if (tokenId === 0) return "";
+  if (tokenId === 0) {
+    throw new Error("updateAgentMetadata called with tokenId=0 — pass a valid minted tokenId");
+  }
 
   const contract = getSignerContract();
   const newHash = keccak256(toUtf8Bytes(storageRootHash));
   const newURI = `0g-storage://${storageRootHash}`;
 
-  try {
-    const tx = await contract.updateMetadata(tokenId, newHash, newURI);
-    const receipt = await tx.wait();
+  // Throws on failure — commitCycle wraps this in try/catch and sets
+  // proofs.inft = false so the UI can flag the cycle as degraded honestly.
+  const tx = await contract.updateMetadata(tokenId, newHash, newURI);
+  const receipt = await tx.wait();
 
-    const cycles = await contract.cycleCount(tokenId);
-    console.log(`[iNFT] Updated tokenId=${tokenId} cycles=${cycles}`);
-    return receipt.hash;
-  } catch (err) {
-    console.error(`[iNFT] Update failed: ${(err instanceof Error ? err.message : String(err)).slice(0, 120)}`);
-    return "";
-  }
+  const cycles = await contract.cycleCount(tokenId);
+  console.log(`[iNFT] Updated tokenId=${tokenId} cycles=${cycles}`);
+  return receipt.hash;
 }
 
 // ── UPDATE RISK PROFILE ───────────────────────────────────────────

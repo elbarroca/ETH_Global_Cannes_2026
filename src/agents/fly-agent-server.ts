@@ -1,0 +1,259 @@
+// Single-agent server for Fly.io deployment
+// Each Fly.io app runs ONE agent with x402 paywall + 0G sealed inference
+// AGENT_NAME env var determines which agent this instance serves
+
+import "dotenv/config";
+import express from "express";
+import { sealedInference } from "../og/inference";
+import { OG_PROVIDER } from "../config/og-compute";
+import { PROMPTS, parseDualOutput } from "./prompts";
+import { fetchSentimentData } from "./data/sentiment-data";
+import { fetchWhaleData } from "./data/whale-data";
+import { fetchMomentumData } from "./data/momentum-data";
+import { fetchMemecoinData } from "./data/memecoin-data";
+import { fetchTwitterData } from "./data/twitter-data";
+import { fetchDefiYieldData } from "./data/defi-yield-data";
+import { fetchNewsData } from "./data/news-data";
+import { fetchOnchainForensicsData } from "./data/onchain-forensics-data";
+import { fetchOptionsData } from "./data/options-data";
+import { fetchMacroData } from "./data/macro-data";
+import { callSpecialist } from "./hire-specialist";
+import { selectForRole, type RiskProfile, type MarketVolatility, type DebateRole } from "./role-manifests";
+import { buildSpecialistContext } from "./adversarial";
+import type { CallSpecialistResult, SpecialistResult } from "../types/index";
+
+const AGENT_NAME = process.env.AGENT_NAME;
+if (!AGENT_NAME) {
+  console.error("AGENT_NAME env var required. Set to: sentiment, whale, momentum, alpha, risk, executor, etc.");
+  process.exit(1);
+}
+
+const PORT = parseInt(process.env.PORT ?? "8080", 10);
+
+// Map agent names to their prompts
+const PROMPT_MAP: Record<string, string> = {
+  "sentiment": PROMPTS.sentiment.content,
+  "whale": PROMPTS.whale.content,
+  "momentum": PROMPTS.momentum.content,
+  "memecoin-hunter": PROMPTS.memecoin.content,
+  "twitter-alpha": PROMPTS.twitter.content,
+  "defi-yield": PROMPTS.defiYield.content,
+  "news-scanner": PROMPTS.news.content,
+  "onchain-forensics": PROMPTS.forensics.content,
+  "options-flow": PROMPTS.options.content,
+  "macro-correlator": PROMPTS.macro.content,
+  "alpha": PROMPTS.alpha.content,
+  "risk": PROMPTS.risk.content,
+  "executor": PROMPTS.executor.content,
+};
+
+// Map specialist agents to their data fetchers
+const DATA_FETCHERS: Record<string, () => Promise<string>> = {
+  "sentiment": fetchSentimentData,
+  "whale": fetchWhaleData,
+  "momentum": fetchMomentumData,
+  "memecoin-hunter": fetchMemecoinData,
+  "twitter-alpha": fetchTwitterData,
+  "defi-yield": fetchDefiYieldData,
+  "news-scanner": fetchNewsData,
+  "onchain-forensics": fetchOnchainForensicsData,
+  "options-flow": fetchOptionsData,
+  "macro-correlator": fetchMacroData,
+};
+
+const LOCAL_FALLBACKS: Record<string, (data: string) => { signal: string; confidence: number }> = {
+  "sentiment": (d) => { const v = Number(JSON.parse(d).fear_greed_value ?? 50); return v >= 65 ? { signal: "BUY", confidence: Math.min(v, 80) } : v <= 35 ? { signal: "SELL", confidence: Math.min(100 - v, 80) } : { signal: "HOLD", confidence: 50 }; },
+  "whale": () => ({ signal: "HOLD", confidence: 50 }),
+  "momentum": (d) => { const r = Number(JSON.parse(d).rsi_14 ?? 50); return r < 35 ? { signal: "BUY", confidence: 65 } : r > 65 ? { signal: "SELL", confidence: 65 } : { signal: "HOLD", confidence: 50 }; },
+};
+
+const app = express();
+app.use(express.json());
+
+// Health check
+app.get("/healthz", (_req, res) => {
+  res.json({ agent: AGENT_NAME, status: "ok", provider: OG_PROVIDER });
+});
+
+// Main analysis endpoint — works for both specialists AND debate agents
+app.all("/analyze", async (req, res) => {
+  const prompt = PROMPT_MAP[AGENT_NAME];
+  if (!prompt) {
+    res.status(404).json({ error: `No prompt for agent: ${AGENT_NAME}` });
+    return;
+  }
+
+  try {
+    let userMessage: string;
+
+    if (DATA_FETCHERS[AGENT_NAME]) {
+      // Specialist: fetch real data, then run 0G inference
+      const rawData = await DATA_FETCHERS[AGENT_NAME]();
+      userMessage = `Current market data:\n${rawData}`;
+    } else {
+      // Debate agent: use the provided context from request body
+      const body = req.body as { userMessage?: string; systemPrompt?: string; task?: string };
+      userMessage = body.userMessage ?? body.task ?? JSON.stringify(req.body);
+    }
+
+    // 0G sealed inference (TEE-verified)
+    const result = await sealedInference(OG_PROVIDER, prompt, userMessage);
+    const { reasoning, parsed } = parseDualOutput(result.content, { signal: "HOLD", confidence: 50 });
+
+    let rawSnapshot: unknown;
+    if (DATA_FETCHERS[AGENT_NAME]) {
+      try { rawSnapshot = JSON.parse(userMessage.replace("Current market data:\n", "")); } catch { rawSnapshot = null; }
+    }
+
+    res.json({
+      name: AGENT_NAME,
+      content: result.content,
+      ...parsed,
+      reasoning,
+      rawDataSnapshot: rawSnapshot,
+      attestationHash: result.attestationHash,
+      teeVerified: result.teeVerified,
+    });
+  } catch (err) {
+    console.error(`[${AGENT_NAME}] Inference failed:`, err);
+
+    // Local fallback for specialists
+    const fallbackFn = LOCAL_FALLBACKS[AGENT_NAME];
+    if (fallbackFn && DATA_FETCHERS[AGENT_NAME]) {
+      try {
+        const rawData = await DATA_FETCHERS[AGENT_NAME]();
+        const fallback = fallbackFn(rawData);
+        res.json({
+          name: AGENT_NAME,
+          ...fallback,
+          reasoning: `[FALLBACK] 0G inference failed: ${err instanceof Error ? err.message : String(err)}`,
+          attestationHash: "local-fallback",
+          teeVerified: false,
+        });
+        return;
+      } catch { /* fall through */ }
+    }
+
+    res.status(500).json({
+      name: AGENT_NAME,
+      signal: "HOLD",
+      confidence: 50,
+      reasoning: `[ERROR] ${err instanceof Error ? err.message : String(err)}`,
+      attestationHash: "error",
+      teeVerified: false,
+    });
+  }
+});
+
+// ── Hierarchical hiring endpoint — debate agents only ────────────────────────
+// When this container runs as a debate agent (alpha/risk/executor), it exposes
+// /hire-and-analyze. The orchestrator (main-agent.ts) posts a user goal + wallet
+// index, and this container autonomously:
+//   1. Selects specialists from its role manifest
+//   2. Hires them in parallel via x402 (using the user's hot wallet for signing)
+//   3. Builds a specialist context string
+//   4. Runs its own 0G sealed inference over the context + debate chain
+//   5. Returns the enriched response with specialists_hired metadata
+//
+// This enables the "agent hiring economy" narrative: each debate agent has real
+// economic agency and pays real nanopayments for the intelligence it uses.
+
+const DEBATE_ROLES = new Set<string>(["alpha", "risk", "executor"]);
+
+if (DEBATE_ROLES.has(AGENT_NAME)) {
+  app.post("/hire-and-analyze", async (req, res) => {
+    const body = req.body as {
+      userGoal?: string;
+      userWalletIndex?: number | null;
+      riskProfile?: RiskProfile;
+      marketVolatility?: MarketVolatility;
+      alphaThesis?: string;
+      alphaParsed?: Record<string, unknown>;
+      riskChallenge?: string;
+      riskParsed?: Record<string, unknown>;
+      maxTradePercent?: number;
+    };
+
+    const prompt = PROMPT_MAP[AGENT_NAME];
+    if (!prompt) {
+      res.status(404).json({ error: `No prompt for agent: ${AGENT_NAME}` });
+      return;
+    }
+
+    const role = AGENT_NAME as DebateRole;
+    const userGoal = body.userGoal ?? "Grow portfolio, balanced risk";
+    const riskProfile = body.riskProfile ?? "balanced";
+    const marketVolatility = body.marketVolatility ?? "medium";
+    const maxTradePercent = body.maxTradePercent ?? 10;
+
+    try {
+      // 1. Select specialists for this role
+      const specIds = selectForRole(role, { riskProfile, userGoal, marketVolatility });
+      console.log(`[${AGENT_NAME}] Hiring specialists: ${specIds.length > 0 ? specIds.join(", ") : "(none)"}`);
+
+      // 2. Hire them in parallel via x402 (user's wallet signs payments)
+      const hireTask = `Analyze for ${AGENT_NAME} debate. User goal: "${userGoal}". Risk profile: ${riskProfile}.`;
+      const hireResults = await Promise.allSettled(
+        specIds.map((id) => callSpecialist(id, hireTask, body.userWalletIndex ?? null)),
+      );
+      const hiredSpecs: CallSpecialistResult[] = hireResults
+        .filter((r): r is PromiseFulfilledResult<CallSpecialistResult> => r.status === "fulfilled")
+        .map((r) => r.value);
+
+      // 3. Build context string. callSpecialist returns a CallSpecialistResult which
+      //    is a subset of SpecialistResult — cast via unknown is safe because buildSpecialistContext
+      //    only reads fields that both types have.
+      const specContext = hiredSpecs.length > 0
+        ? buildSpecialistContext(hiredSpecs as unknown as SpecialistResult[])
+        : "(none — no specialists hired for this role)";
+
+      // 4. Compose the role-specific debate message
+      let userMessage: string;
+      if (role === "alpha") {
+        userMessage = `User goal: "${userGoal}"\n\nSpecialist signals (you hired these):\n${specContext}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.`;
+      } else if (role === "risk") {
+        userMessage = `User goal: "${userGoal}"\n\nAlpha's thesis: "${body.alphaThesis ?? "(no thesis provided)"}"\nAlpha proposes: ${JSON.stringify(body.alphaParsed ?? {})}\n\nDefensive specialists (you hired these):\n${specContext}\n\nMax allowed: ${maxTradePercent}%. Challenge Alpha based on YOUR defensive data.`;
+      } else {
+        // executor
+        userMessage = `User goal: "${userGoal}"\n\nAlpha argues: "${body.alphaThesis ?? ""}"\nAlpha: ${JSON.stringify(body.alphaParsed ?? {})}\n\nRisk challenges: "${body.riskChallenge ?? ""}"\nRisk: ${JSON.stringify(body.riskParsed ?? {})}\n\n${hiredSpecs.length > 0 ? `Tiebreakers (you hired):\n${specContext}\n\n` : ""}Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.`;
+      }
+
+      // 5. Run 0G sealed inference locally (inside this container)
+      const result = await sealedInference(OG_PROVIDER, prompt, userMessage);
+      const { reasoning, parsed } = parseDualOutput(result.content, { signal: "HOLD", confidence: 50 });
+
+      res.json({
+        name: AGENT_NAME,
+        content: result.content,
+        reasoning,
+        parsed,
+        attestationHash: result.attestationHash,
+        teeVerified: result.teeVerified,
+        specialists_hired: hiredSpecs.map((s) => ({
+          name: s.name,
+          signal: s.signal,
+          confidence: s.confidence,
+          reasoning: s.reasoning,
+          attestation: s.attestationHash,
+          teeVerified: s.teeVerified,
+          paymentTxHash: s.paymentTxHash,
+          priceUsd: s.priceUsd,
+          rawDataSnapshot: s.rawDataSnapshot,
+        })),
+        total_cost_usd: hiredSpecs.reduce((sum, s) => sum + s.priceUsd, 0),
+      });
+    } catch (err) {
+      console.error(`[${AGENT_NAME}] hire-and-analyze failed:`, err);
+      res.status(500).json({
+        error: err instanceof Error ? err.message : String(err),
+        name: AGENT_NAME,
+      });
+    }
+  });
+
+  console.log(`[fly] ${AGENT_NAME}: /hire-and-analyze endpoint enabled (debate role)`);
+}
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[fly] ${AGENT_NAME} agent on :${PORT} (0G provider: ${OG_PROVIDER})`);
+});
