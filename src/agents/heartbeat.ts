@@ -1,6 +1,7 @@
 import { getActiveUsers } from "../store/user-store.js";
 import { runCycle } from "./main-agent.js";
 import { notifyUser } from "../telegram/bot.js";
+import { scheduleNextHeartbeat } from "../hedera/scheduler.js";
 
 const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -20,6 +21,14 @@ export async function runHeartbeat(): Promise<void> {
     } catch (err) {
       console.error(`[heartbeat] Cycle failed for user ${user.id}:`, err);
     }
+  }
+
+  // Schedule next heartbeat on Hedera (proof of cadence — non-fatal)
+  try {
+    const { scheduleId } = await scheduleNextHeartbeat(300);
+    console.log(`[heartbeat] Scheduled next on Hedera: ${scheduleId}`);
+  } catch (err) {
+    console.warn("[heartbeat] Scheduler failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
   console.log("[heartbeat] Done.");

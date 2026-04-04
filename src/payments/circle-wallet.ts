@@ -2,7 +2,12 @@ import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-
 import { createPublicClient, encodeFunctionData, http, parseUnits } from "viem";
 import { baseSepolia } from "viem/chains";
 
+// Arc Testnet USDC (pre-deployed at fixed address)
+const USDC_ARC = process.env.USDC_ARC_ADDRESS ?? "0x3600000000000000000000000000000000000000";
+// Legacy Base Sepolia USDC (kept for swap routing if needed)
 const USDC_BASE_SEPOLIA = process.env.USDC_BASE_SEPOLIA_ADDRESS ?? "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
+const CIRCLE_BLOCKCHAIN = "ARC-TESTNET" as const;
 
 // Uniswap v3 SwapRouter02 on Base Sepolia
 const UNISWAP_ROUTER = "0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4";
@@ -84,7 +89,7 @@ export async function createProxyWallet(
   const circle = getClient();
   const response = await circle.createWallets({
     walletSetId: getWalletSetId(),
-    blockchains: ["BASE-SEPOLIA"],
+    blockchains: [CIRCLE_BLOCKCHAIN],
     count: 1,
     accountType: "EOA",
     metadata: [{ name: `VaultMind-${userId}`, refId: userId }],
@@ -120,7 +125,7 @@ export async function agentTransfer(
   // With walletId, the wallet knows its chain — cast to satisfy the complex overload.
   const response = await circle.createTransaction({
     walletId,
-    tokenAddress: USDC_BASE_SEPOLIA,
+    tokenAddress: USDC_ARC,
     destinationAddress: toAddress,
     amount: [usdcAmount],
     fee: { type: "level", config: { feeLevel: "MEDIUM" } },

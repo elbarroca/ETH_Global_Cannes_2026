@@ -20,6 +20,8 @@ export interface UserRecord {
     htsShareBalance: number;
     currentNav: number;
   };
+  hotWalletIndex: number | null;
+  hotWalletAddress: string | null;
   inftTokenId: number | null;
   createdAt: string;
   updatedAt: string;

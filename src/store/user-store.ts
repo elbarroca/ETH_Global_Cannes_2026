@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { getDb } from "../config/database.js";
+import { deriveUserAddress } from "../config/wallets.js";
 import type { UserRecord } from "../types/index.js";
 
 // ── Row ↔ UserRecord mapping ───────────────────────────────────────
@@ -11,6 +12,8 @@ interface UserRow {
   telegram: UserRecord["telegram"];
   agent: UserRecord["agent"];
   fund: UserRecord["fund"];
+  hot_wallet_index: number | null;
+  hot_wallet_address: string | null;
   inft_token_id: number | null;
   created_at: string;
   updated_at: string;
@@ -24,6 +27,8 @@ function rowToUser(row: UserRow): UserRecord {
     telegram: row.telegram,
     agent: row.agent,
     fund: row.fund,
+    hotWalletIndex: row.hot_wallet_index,
+    hotWalletAddress: row.hot_wallet_address,
     inftTokenId: row.inft_token_id,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
@@ -66,9 +71,19 @@ export async function createUser(
     currentNav: 0,
   };
 
+  // Derive HD hot wallet for x402 signing — auto-increment index from sequence
+  const [{ nextval: hotWalletIndex }] = await sql`SELECT nextval('hot_wallet_index_seq')`;
+  const hwIndex = Number(hotWalletIndex);
+  let hotWalletAddress: string | null = null;
+  try {
+    hotWalletAddress = deriveUserAddress(hwIndex);
+  } catch {
+    // AGENT_MNEMONIC not set — hot wallet will be null (x402 payments disabled)
+  }
+
   const rows = await sql`
-    INSERT INTO users (id, wallet_address, proxy_wallet, telegram, agent, fund, created_at, updated_at)
-    VALUES (${id}, ${walletAddress.toLowerCase()}, ${sql.json(proxyWallet)}, ${sql.json(telegram)}, ${sql.json(agent)}, ${sql.json(fund)}, ${now}, ${now})
+    INSERT INTO users (id, wallet_address, proxy_wallet, telegram, agent, fund, hot_wallet_index, hot_wallet_address, created_at, updated_at)
+    VALUES (${id}, ${walletAddress.toLowerCase()}, ${sql.json(proxyWallet)}, ${sql.json(telegram)}, ${sql.json(agent)}, ${sql.json(fund)}, ${hwIndex}, ${hotWalletAddress}, ${now}, ${now})
     RETURNING *
   `;
 

@@ -235,7 +235,7 @@ function registerCommands(telegramBot: TelegramBot): void {
     ].join("\n"), { parse_mode: "Markdown" });
   });
 
-  // /run — Trigger manual cycle
+  // /run — Show hire preview with inline buttons
   telegramBot.onText(/\/run/, async (msg) => {
     const chatId = msg.chat.id.toString();
     const user = await getUserByChatId(chatId);
@@ -244,48 +244,37 @@ function registerCommands(telegramBot: TelegramBot): void {
       return;
     }
 
-    await telegramBot.sendMessage(msg.chat.id, "⚡ Running cycle...");
-
-    try {
-      const result = await runCycle(user);
-      const debate = formatDebate({
-        c: result.cycleId,
-        u: result.userId,
-        t: result.timestamp.toISOString(),
-        rp: user.agent.riskProfile,
-        s: result.specialists.map((sp) => ({
-          n: sp.name,
-          sig: sp.signal,
-          conf: sp.confidence,
-          att: sp.attestationHash,
-        })),
-        adv: {
-          a: {
-            act: (result.debate.alpha.parsed as { action?: string }).action ?? "?",
-            pct: (result.debate.alpha.parsed as { allocation_pct?: number }).allocation_pct ?? 0,
-            att: result.debate.alpha.attestationHash,
-          },
-          r: {
-            obj: (result.debate.risk.parsed as { objection?: string }).objection ?? "?",
-            max: (result.debate.risk.parsed as { max_safe_pct?: number }).max_safe_pct ?? 0,
-            att: result.debate.risk.attestationHash,
-          },
-          e: {
-            act: (result.debate.executor.parsed as { action?: string }).action ?? "?",
-            pct: (result.debate.executor.parsed as { pct?: number }).pct ?? 0,
-            sl: (result.debate.executor.parsed as { stop_loss_pct?: number }).stop_loss_pct ?? 0,
-            att: result.debate.executor.attestationHash,
-          },
-        },
-        d: result.decision as { act: string; asset: string; pct: number },
-        nav: user.fund.currentNav,
-      });
-      await telegramBot.sendMessage(msg.chat.id, debate, { parse_mode: "Markdown" });
-    } catch (err) {
-      await telegramBot.sendMessage(msg.chat.id,
-        `❌ Cycle failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+    if (!user.agent.active) {
+      await telegramBot.sendMessage(msg.chat.id, "⏸️ Agent is paused. Use /resume first.");
+      return;
     }
+
+    const preview = [
+      "🧠 *VaultMind — Hire Specialists?*",
+      "",
+      `Risk: *${user.agent.riskProfile}* (max ${user.agent.maxTradePercent}%)`,
+      `NAV: *$${user.fund.currentNav.toLocaleString()}*`,
+      "",
+      "📡 *Swarm Preview:*",
+      "  1. SentimentBot — social/fear-greed analysis",
+      "  2. WhaleEye — large wallet flow tracking",
+      "  3. MomentumX — RSI/MACD/support-resistance",
+      "",
+      "💰 Cost: *$0.003* (3 x $0.001 via Arc x402)",
+      "⚡ Pipeline: Hire → Debate → Log → Notify",
+      "",
+      "_Tap below to confirm or skip:_",
+    ].join("\n");
+
+    await telegramBot.sendMessage(msg.chat.id, preview, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [[
+          { text: "✅ Hire & Execute ($0.003)", callback_data: `hire_confirm_${user.id}` },
+          { text: "❌ Skip", callback_data: "hire_skip" },
+        ]],
+      },
+    });
   });
 
   // /stop — Pause agent
@@ -315,6 +304,84 @@ function registerCommands(telegramBot: TelegramBot): void {
   });
 }
 
+// ── Callback handler for inline buttons ────────────────────────────────────
+
+function registerCallbacks(telegramBot: TelegramBot): void {
+  telegramBot.on("callback_query", async (query) => {
+    const data = query.data;
+    const chatId = query.message?.chat.id;
+    if (!data || !chatId) return;
+
+    if (data.startsWith("hire_confirm_")) {
+      const userId = data.replace("hire_confirm_", "");
+      await telegramBot.answerCallbackQuery(query.id, { text: "Starting cycle..." });
+
+      // Update the message to show progress
+      if (query.message) {
+        await telegramBot.editMessageText("⚡ *Cycle running...*\n\nHiring 3 specialists via x402 nanopayments...", {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+          parse_mode: "Markdown",
+        }).catch(() => {});
+      }
+
+      try {
+        const user = await getUserByChatId(chatId.toString());
+        if (!user || user.id !== userId) {
+          await telegramBot.sendMessage(chatId, "❌ User mismatch. Try /run again.");
+          return;
+        }
+
+        const result = await runCycle(user);
+        const debate = formatDebate({
+          c: result.cycleId,
+          u: result.userId,
+          t: result.timestamp.toISOString(),
+          rp: user.agent.riskProfile,
+          s: result.specialists.map((sp) => ({
+            n: sp.name,
+            sig: sp.signal,
+            conf: sp.confidence,
+            att: sp.attestationHash,
+          })),
+          adv: {
+            a: {
+              act: (result.debate.alpha.parsed as { action?: string }).action ?? "?",
+              pct: (result.debate.alpha.parsed as { pct?: number }).pct ?? 0,
+              att: result.debate.alpha.attestationHash,
+            },
+            r: {
+              obj: (result.debate.risk.parsed as { challenge?: string }).challenge ?? "?",
+              max: (result.debate.risk.parsed as { max_pct?: number }).max_pct ?? 0,
+              att: result.debate.risk.attestationHash,
+            },
+            e: {
+              act: (result.debate.executor.parsed as { action?: string }).action ?? "?",
+              pct: (result.debate.executor.parsed as { pct?: number }).pct ?? 0,
+              sl: parseFloat(String((result.debate.executor.parsed as { stop_loss?: string }).stop_loss ?? "-5").replace("%", "").replace("-", "")),
+              att: result.debate.executor.attestationHash,
+            },
+          },
+          d: result.decision as { act: string; asset: string; pct: number },
+          nav: user.fund.currentNav,
+        });
+        await telegramBot.sendMessage(chatId, debate, { parse_mode: "Markdown" });
+      } catch (err) {
+        console.error("[telegram] Cycle failed:", err);
+        await telegramBot.sendMessage(chatId, "❌ Cycle failed. Check server logs for details.");
+      }
+    } else if (data === "hire_skip") {
+      await telegramBot.answerCallbackQuery(query.id, { text: "Skipped" });
+      if (query.message) {
+        await telegramBot.editMessageText("⏭️ Cycle skipped. Use /run when ready.", {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+        }).catch(() => {});
+      }
+    }
+  });
+}
+
 // ── Start bot ───────────────────────────────────────────────────────────────
 
 export function startBot(): void {
@@ -326,5 +393,6 @@ export function startBot(): void {
 
   bot = new TelegramBot(token, { polling: true });
   registerCommands(bot);
+  registerCallbacks(bot);
   console.log("[telegram] Bot started (polling mode)");
 }
