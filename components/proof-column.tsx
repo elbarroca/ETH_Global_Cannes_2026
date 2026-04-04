@@ -12,8 +12,8 @@ export function ProofColumn({ cycle }: { cycle: CycleResult }) {
   return (
     <div className="space-y-4">
       {/* Payment proofs */}
-      <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-        <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">
+      <div className="bg-void-900 rounded-xl p-4 border border-void-800">
+        <h4 className="text-[11px] font-medium text-void-600 uppercase tracking-wider mb-3">
           Specialist Payments
         </h4>
         {specialists.length > 0 ? (
@@ -21,22 +21,22 @@ export function ProofColumn({ cycle }: { cycle: CycleResult }) {
             {specialists.map((s, i) => (
               <div key={i} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500">#{i + 1}</span>
-                  <span className="text-xs font-mono text-slate-400 truncate max-w-[120px]">
+                  <span className="text-xs text-void-600">#{i + 1}</span>
+                  <span className="text-xs font-mono text-void-500 truncate max-w-[120px]">
                     {s.attestationHash.slice(0, 12)}…
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span
                     className={`text-xs ${
-                      s.teeVerified ? "text-green-400" : "text-yellow-400"
+                      s.teeVerified ? "text-green-400" : "text-gold-400"
                     }`}
                   >
                     {s.teeVerified ? "✓" : "⚠"}
                   </span>
                   <button
                     onClick={() => copyToClipboard(s.attestationHash)}
-                    className="text-xs text-slate-600 hover:text-slate-400 transition-colors"
+                    className="text-xs text-void-600 hover:text-void-400 transition-colors"
                   >
                     📋
                   </button>
@@ -45,28 +45,28 @@ export function ProofColumn({ cycle }: { cycle: CycleResult }) {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-slate-600">No payment data</p>
+          <p className="text-xs text-void-600">No payment data</p>
         )}
       </div>
 
       {/* TEE Attestations */}
-      <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-        <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">
+      <div className="bg-void-900 rounded-xl p-4 border border-void-800">
+        <h4 className="text-[11px] font-medium text-void-600 uppercase tracking-wider mb-3">
           TEE Attestations
         </h4>
         <div className="space-y-2">
           {specialists.map((s, i) => (
             <div key={i} className="flex items-center gap-2">
               <span
-                className={`text-sm ${s.teeVerified ? "text-green-400" : "text-yellow-400"}`}
+                className={`text-sm ${s.teeVerified ? "text-green-400" : "text-gold-400"}`}
               >
                 {s.teeVerified ? "✅" : "⚠️"}
               </span>
-              <span className="text-xs text-slate-400 capitalize">{s.name}</span>
+              <span className="text-xs text-void-400 capitalize">{s.name}</span>
             </div>
           ))}
           {specialists.length === 0 && (
-            <p className="text-xs text-slate-600">No attestations</p>
+            <p className="text-xs text-void-600">No attestations</p>
           )}
         </div>
       </div>
@@ -76,7 +76,7 @@ export function ProofColumn({ cycle }: { cycle: CycleResult }) {
         href={cycle.hashscanUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 w-full py-3 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 rounded-xl text-indigo-300 text-sm font-medium transition-colors"
+        className="flex items-center justify-center gap-2 w-full py-3 bg-teal-950/50 hover:bg-teal-900/50 border border-teal-800/30 rounded-xl text-teal-300 text-sm font-medium transition-colors"
       >
         📋 View on Hashscan ↗
       </a>

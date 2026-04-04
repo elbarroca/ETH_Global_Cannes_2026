@@ -1,78 +1,53 @@
 @import "tailwindcss";
 
-:root {
-  --background: #0f172a;
-  --foreground: #e2e8f0;
-  --vault-primary: #6366f1;
-  --vault-accent: #818cf8;
-  --vault-success: #22c55e;
-  --vault-danger: #ef4444;
-  --vault-warning: #f59e0b;
-  --vault-surface: rgba(30, 41, 59, 0.7);
-  --vault-glass: rgba(255, 255, 255, 0.05);
-  --vault-border: rgba(255, 255, 255, 0.1);
+/* Color scales — use @theme (NOT inline) for direct hex values */
+@theme {
+  /* Void (backgrounds, surfaces, depth) */
+  --color-void-950: #0C0A09;
+  --color-void-900: #1C1917;
+  --color-void-850: #1F1E1B;
+  --color-void-800: #292524;
+  --color-void-700: #44403C;
+  --color-void-600: #57534E;
+  --color-void-500: #78716C;
+  --color-void-400: #A8A29E;
+  --color-void-300: #D6D3D1;
+  --color-void-200: #E7E5E4;
+  --color-void-100: #F5F5F4;
+
+  /* Blood Red (primary action, wolf body, CTAs) */
+  --color-blood-50: #FEF2F2;
+  --color-blood-100: #FEE2E2;
+  --color-blood-200: #FECACA;
+  --color-blood-300: #FCA5A5;
+  --color-blood-400: #F87171;
+  --color-blood-500: #EF4444;
+  --color-blood-600: #DC2626;
+  --color-blood-700: #B91C1C;
+  --color-blood-800: #991B1B;
+  --color-blood-900: #7F1D1D;
+
+  /* Gold (eyes, highlights, important data, profits) */
+  --color-gold-50: #FFFBEB;
+  --color-gold-100: #FEF3C7;
+  --color-gold-200: #FDE68A;
+  --color-gold-300: #FCD34D;
+  --color-gold-400: #FBBF24;
+  --color-gold-500: #F59E0B;
+  --color-gold-600: #D97706;
+  --color-gold-700: #B45309;
 }
 
+/* Variable references — @theme inline is correct for var() refs */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-vault-primary: var(--vault-primary);
-  --color-vault-accent: var(--vault-accent);
-  --color-vault-success: var(--vault-success);
-  --color-vault-danger: var(--vault-danger);
-  --color-vault-warning: var(--vault-warning);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
-}
-
-/* Glassmorphism card */
-.glass-card {
-  background: var(--vault-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--vault-border);
-  border-radius: 16px;
-}
-
-/* Gradient border effect */
-.gradient-border {
-  position: relative;
-  background: var(--vault-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 16px;
-}
-
-.gradient-border::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 16px;
-  padding: 1px;
-  background: linear-gradient(135deg, var(--vault-primary), var(--vault-accent), transparent);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  -webkit-mask-composite: xor;
-  pointer-events: none;
-}
-
-/* Glow effect for active states */
-.glow-primary {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3), 0 0 60px rgba(99, 102, 241, 0.1);
-}
-
-.glow-success {
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
-}
-
-.glow-danger {
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  background-color: #0C0A09;
+  color: #D6D3D1;
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 /* Pulse animation for live indicator */
@@ -83,4 +58,94 @@ body {
 
 .pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Hunt button active state */
+@keyframes huntPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
+}
+
+.hunting {
+  animation: huntPulse 1.5s ease-in-out infinite;
+}
+
+/* Sealed badge entrance */
+@keyframes sealPop {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.sealed-enter {
+  animation: sealPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Streaming text gold cursor */
+@keyframes blink {
+  50% { border-color: transparent; }
+}
+
+.streaming-text {
+  overflow: hidden;
+  border-right: 2px solid #FBBF24;
+  animation: blink 0.8s step-end infinite;
+}
+
+/* Payment row entrance */
+@keyframes slideIn {
+  from { transform: translateX(-8px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.payment-enter {
+  animation: slideIn 0.25s ease-out;
+}
+
+/* Gold profit flash */
+@keyframes goldFlash {
+  0% { background-color: #1C1917; }
+  30% { background-color: rgba(251, 191, 36, 0.08); }
+  100% { background-color: #1C1917; }
+}
+
+.profit-flash {
+  animation: goldFlash 0.6s ease;
+}
+
+/* Wolf eyes loading */
+@keyframes eyePulse {
+  0%, 100% { fill: #FBBF24; }
+  50% { fill: #FDE68A; filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.6)); }
+}
+
+.wolf-eyes-loading .eye {
+  animation: eyePulse 1.2s ease-in-out infinite;
+}
+
+/* Agent card hover */
+.agent-card {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.agent-card:hover {
+  border-color: #44403C;
+  background-color: #1F1E1B;
+}
+
+/* Agent computing glow */
+.agent-computing {
+  border-color: #7F1D1D;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.08);
+  transition: all 0.3s ease;
+}
+
+/* Hashscan verification pulse */
+@keyframes tealPulse {
+  0% { color: #5EEAD4; }
+  50% { color: #99F6E4; text-shadow: 0 0 8px rgba(94, 234, 212, 0.3); }
+  100% { color: #5EEAD4; }
+}
+
+.verify-pulse {
+  animation: tealPulse 0.4s ease;
 }

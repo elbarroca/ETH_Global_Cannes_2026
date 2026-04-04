@@ -4,7 +4,7 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# VaultMind — Agent Registry
+# AlphaDawg — Agent Registry
 
 > 7 specialist Claude Code agents + 2 slash commands. Each agent owns a domain, knows the verified SDK patterns, and can be delegated to autonomously.
 

@@ -85,15 +85,15 @@ export default function VerifyPage() {
   const cycle = MOCK_CYCLE;
 
   return (
-    <main className="max-w-6xl mx-auto px-4 py-5 space-y-4">
+    <main className="max-w-7xl mx-auto px-5 py-5 space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">
-            0G verification — cycle #{cycle.id}
+          <h1 className="text-lg font-bold text-void-100">
+            0G verification — hunt #{cycle.id}
           </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            Every inference runs inside a TEE hardware enclave on 0G Compute
+          <p className="text-sm text-void-500 mt-0.5">
+            Every inference sealed inside TEE hardware on 0G Compute
           </p>
         </div>
         <ZeroGBadge label="6 sealed inference calls" />
@@ -107,13 +107,13 @@ export default function VerifyPage() {
             onClick={() => setSelected(a.key)}
             className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
               selected === a.key
-                ? "bg-purple-50 border-purple-500 text-purple-700"
-                : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                ? "bg-blood-900/30 border-2 border-blood-600 text-void-200"
+                : "bg-void-900 border-void-800 text-void-500 hover:border-void-700"
             }`}
           >
             <span className="text-xl">{a.emoji}</span>
             <span className="text-xs font-medium leading-tight">{a.key}</span>
-            <span className="text-xs text-gray-400">{a.type}</span>
+            <span className="text-xs text-void-500">{a.type}</span>
           </button>
         ))}
       </div>
@@ -127,12 +127,12 @@ export default function VerifyPage() {
               <span className="text-3xl">{agent.emoji}</span>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-void-200">
                     {agent.key}
                   </span>
                   <Badge variant="gray">{agent.type}</Badge>
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">{agent.skill}</p>
+                <p className="text-xs text-void-500 mt-0.5">{agent.skill}</p>
               </div>
             </div>
             <SealedBadge />
@@ -143,27 +143,27 @@ export default function VerifyPage() {
             {/* Left: Agent details */}
             <div className="space-y-3">
               <DetailBlock label="0G Compute Provider">
-                <span className="font-mono text-sm text-gray-700">
+                <span className="font-mono text-sm text-void-200">
                   {agent.provider}
                 </span>
               </DetailBlock>
               <DetailBlock label="Model">
-                <span className="font-mono text-sm text-gray-700">
+                <span className="font-mono text-sm text-void-200">
                   {agent.model}
                 </span>
               </DetailBlock>
               <DetailBlock label="iNFT Identity">
                 {agent.inftId === "Platform infra" ? (
-                  <span className="text-sm text-gray-500">Platform infra</span>
+                  <span className="text-sm text-void-500">Platform infra</span>
                 ) : (
-                  <span className="font-mono text-sm text-purple-600">
+                  <span className="font-mono text-sm text-gold-400">
                     {agent.inftId} on 0G Chain
                   </span>
                 )}
               </DetailBlock>
               <DetailBlock label="Execution Environment">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-700">
+                  <span className="text-sm text-void-200">
                     Intel TDX + NVIDIA H100 TEE
                   </span>
                   <Badge variant="green">Hardware isolated</Badge>
@@ -175,29 +175,29 @@ export default function VerifyPage() {
             <div>
               <CodeBlock className="space-y-2">
                 <div>
-                  <div className="text-xs uppercase tracking-wider text-gray-400 mb-1">
+                  <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
                     Attestation hash
                   </div>
-                  <div className="text-purple-600 break-all">
+                  <div className="text-gold-400 break-all">
                     {agent.attestation}
                   </div>
                 </div>
-                <hr className="border-gray-200" />
-                <div className="space-y-1 text-gray-500">
+                <hr className="border-void-800" />
+                <div className="space-y-1 text-void-500">
                   <div>Signature: Ed25519</div>
                   <div>Key generated inside TEE</div>
                   <div>Private key never leaves enclave</div>
                   <div>
                     Timestamp:{" "}
-                    <span className="text-gray-700">
+                    <span className="text-void-200">
                       {cycle.timestamp}
                     </span>
                   </div>
                 </div>
-                <hr className="border-gray-200" />
+                <hr className="border-void-800" />
                 <a
                   href="#"
-                  className="text-purple-600 hover:text-purple-700 transition-colors"
+                  className="text-gold-400 hover:text-void-300 transition-colors"
                 >
                   Verify on 0G Explorer →
                 </a>
@@ -206,16 +206,16 @@ export default function VerifyPage() {
           </div>
 
           {/* Explanation block */}
-          <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
-            <p className="text-xs text-gray-600 leading-relaxed">
+          <div className="bg-void-850 border border-void-800 rounded-xl p-4">
+            <p className="text-xs text-void-400 leading-relaxed">
               This attestation cryptographically proves that{" "}
-              <strong className="text-gray-800">{agent.key}</strong>
+              <strong className="text-void-300">{agent.key}</strong>
               's analysis was executed inside a hardware-isolated TEE on 0G Compute. The
               model (
-              <span className="font-mono text-purple-600">
+              <span className="font-mono text-gold-400">
                 {agent.model}
               </span>
-              ) ran on input data that nobody — not the server operator, not VaultMind,
+              ) ran on input data that nobody — not the server operator, not AlphaDawg,
               not anyone — could see or modify during processing. The output was signed by
               a key generated inside the enclave. If anyone had tampered with the input,
               the model, or the output, the attestation hash would not match. You can
@@ -228,16 +228,16 @@ export default function VerifyPage() {
       {/* Memory card */}
       <Card>
         <CardBody className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-800">
-            0G storage — agent memory used this cycle
+          <h3 className="text-sm font-semibold text-void-200">
+            0G storage — pack memory used this hunt
           </h3>
           <div className="space-y-2.5">
             {cycle.memory.map((m) => (
               <div key={m.cycleRef} className="flex gap-2">
-                <span className="font-mono text-xs text-purple-600 shrink-0 pt-0.5">
+                <span className="font-mono text-xs text-gold-400 shrink-0 pt-0.5">
                   #{m.cycleRef}
                 </span>
-                <p className="text-xs text-gray-500 leading-relaxed">
+                <p className="text-xs text-void-500 leading-relaxed">
                   {m.text}
                 </p>
               </div>
@@ -245,7 +245,7 @@ export default function VerifyPage() {
           </div>
           <a
             href="#"
-            className="text-xs text-purple-600 hover:text-purple-700 transition-colors"
+            className="text-xs text-gold-400 hover:text-void-300 transition-colors"
           >
             View full memory on 0G Storage →
           </a>
@@ -264,7 +264,7 @@ function DetailBlock({
 }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-wider text-gray-400 mb-1">{label}</div>
+      <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">{label}</div>
       <div>{children}</div>
     </div>
   );

@@ -16,21 +16,27 @@ export interface UserRecord {
   id: string;
   walletAddress: string;
   linkCode?: string;
-  telegram?: {
-    chatId?: string;
+  telegram: {
+    chatId: string | null;
+    username: string | null;
     verified: boolean;
-    notifyPreference: string;
+    notifyPreference: "every_cycle" | "trades_only" | "daily";
   };
   agent: {
     active: boolean;
     riskProfile: "conservative" | "balanced" | "aggressive";
-    maxPct: number;
-    fundShares: number;
-    nav: number;
-    depositedUsdc: number;
-    cyclesRun: number;
-    lastCycleAt?: string;
+    maxTradePercent: number;
+    lastCycleId: number;
+    lastCycleAt: string | null;
   };
+  fund: {
+    depositedUsdc: number;
+    htsShareBalance: number;
+    currentNav: number;
+  };
+  hotWalletIndex: number | null;
+  hotWalletAddress: string | null;
+  inftTokenId: number | null;
 }
 
 export interface SpecialistResult {

@@ -9,7 +9,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`bg-white border border-gray-200 rounded-2xl ${className}`}
+      className={`bg-void-900 border border-void-800 rounded-2xl ${className}`}
     >
       {children}
     </div>
@@ -25,7 +25,7 @@ export function CardHeader({
 }) {
   return (
     <div
-      className={`flex items-center justify-between px-4 py-3 border-b border-gray-100 ${className}`}
+      className={`flex items-center justify-between px-4 py-3 border-b border-void-800 ${className}`}
     >
       {children}
     </div>
@@ -47,7 +47,7 @@ export function MetricCard({
   label,
   value,
   sub,
-  subColor = "text-gray-400",
+  subColor = "text-void-500",
 }: {
   emoji: string;
   label: string;
@@ -56,12 +56,12 @@ export function MetricCard({
   subColor?: string;
 }) {
   return (
-    <div className="bg-gray-50 rounded-xl p-3.5">
-      <div className="flex items-center gap-1.5 text-gray-400 text-xs mb-2">
+    <div className="bg-void-900 border border-void-800 rounded-xl p-3.5">
+      <div className="flex items-center gap-1.5 text-void-600 text-[11px] mb-2">
         <span>{emoji}</span>
         <span className="uppercase tracking-wider">{label}</span>
       </div>
-      <div className="text-lg font-semibold text-gray-900">
+      <div className="text-[22px] font-bold text-void-100">
         {value}
       </div>
       {sub && <div className={`text-xs mt-0.5 ${subColor}`}>{sub}</div>}
@@ -78,7 +78,7 @@ export function CodeBlock({
 }) {
   return (
     <div
-      className={`bg-gray-50 rounded-lg p-3 text-xs font-mono text-gray-700 leading-relaxed ${className}`}
+      className={`bg-void-950 border border-void-800 rounded-[10px] p-3 text-xs font-mono text-void-400 leading-relaxed ${className}`}
     >
       {children}
     </div>

@@ -1,6 +1,6 @@
-# VaultMind
+# AlphaDawg
 
-### The Agent Economy for Provable Investment Alpha
+### Your AI Pack Hunts Alpha
 
 > Your personal AI agent hires specialists, debates every trade adversarially, and proves every decision on-chain. Zero black boxes. Full mathematical proof.
 
@@ -14,7 +14,7 @@ AI hedge funds and trading bots are **black boxes**. You deposit money, cross yo
 
 ## The Solution
 
-VaultMind is a **glass box with mathematical proof**.
+AlphaDawg is a **glass box with mathematical proof**.
 
 You deposit USDC. A personal AI agent:
 
@@ -40,12 +40,12 @@ graph LR
 | Chain | Role | Components |
 |:------|:-----|:-----------|
 | **Arc** (Circle) | Money | x402 nanopayments ($0.001/specialist), USDC deposits, gas-free agent-to-agent commerce |
-| **0G** | Brain | Sealed Inference (TEE), Storage (agent memory), Chain (iNFT identity), Compute marketplace |
+| **0G** | Brain | Sealed Inference (TEE), Storage (pack memory), Chain (iNFT identity), Compute marketplace |
 | **Hedera** | Truth | HCS (immutable audit), HTS (fund tokens + KYC + fees), Scheduled Tx, Mirror Node |
 
 ---
 
-## The Cycle — What Happens Every 5 Minutes
+## The Hunt — What Happens Every 5 Minutes
 
 ```mermaid
 graph TD
@@ -64,9 +64,9 @@ graph TD
     Log --> Telegram[Telegram + Dashboard]
 ```
 
-### Step 1 — Hire Specialists ($0.003 total)
+### Step 1 — Hire Pack Members ($0.003 total)
 
-The Main Agent queries the Marketplace for the top 3 specialists by reputation, then hires each via x402 nanopayment:
+The Lead Dawg queries the Pack for the top 3 specialists by reputation, then hires each via x402 nanopayment:
 
 | Specialist | Request | Payment | Returns |
 |:-----------|:--------|:--------|:--------|
@@ -74,7 +74,7 @@ The Main Agent queries the Marketplace for the top 3 specialists by reputation, 
 | Whale | `GET /analyze` → `402` | $0.001 via Arc | `{ analysis, attestationHash, paymentId }` |
 | Momentum | `GET /analyze` → `402` | $0.001 via Arc | `{ analysis, attestationHash, paymentId }` |
 
-### Step 2 — Adversarial Debate (TEE sealed)
+### Step 2 — The Challenge (TEE sealed)
 
 All three specialist reports are fed into a sequential debate inside hardware enclaves:
 
@@ -86,17 +86,17 @@ All three specialist reports are fed into a sequential debate inside hardware en
 
 ### Step 3-4 — Execute + Log
 
-Parse Executor decision → Log cycle record to Hedera HCS (~400 bytes) → `freeze` → `sign` → `execute`
+Parse Executor decision → Log hunt record to Hedera HCS (~400 bytes) → `freeze` → `sign` → `execute`
 
 ### Step 5-6 — Remember + Notify
 
 Store memory to 0G Storage → Send summary + Hashscan proof link to Telegram
 
-### Per Cycle Cost
+### Per Hunt Cost
 
 | Item | Count | Cost |
 |:-----|:------|:-----|
-| Specialist hires (x402) | 3 | $0.003 |
+| Pack hires (x402) | 3 | $0.003 |
 | 0G inference calls | 6 | ~0.003 0G |
 | HCS message | 1 | $0.0008 |
 | 0G Storage write | 1 | negligible |
@@ -118,24 +118,24 @@ graph LR
 | Step | Action | Detail |
 |:-----|:-------|:-------|
 | 1. Connect Wallet | User visits dashboard, connects MetaMask/WalletConnect | Backend creates `UserRecord` in memory |
-| 2. Connect Telegram | Dashboard shows unique deep-link `t.me/VaultMindBot?start={wallet}` | Bot captures `chat.id`, binds to wallet. No hardcoded IDs. |
-| 3. Deposit USDC | User deposits to HD-derived proxy wallet | Fund shares (HTS) minted proportionally. First cycle triggers immediately. |
+| 2. Connect Telegram | Dashboard shows unique deep-link `t.me/AlphaDawgBot?start={wallet}` | Bot captures `chat.id`, binds to wallet. No hardcoded IDs. |
+| 3. Deposit USDC | User deposits to HD-derived proxy wallet | Fund shares (HTS) minted proportionally. First hunt triggers immediately. |
 
 ---
 
 ## Proxy Wallet Architecture
 
-Only the Main Agent orchestrator holds the signing key. Specialists and adversarial agents are **inference-only** — they never touch private keys.
+Only the Lead Dawg orchestrator holds the signing key. Pack members and adversarial agents are **inference-only** — they never touch private keys.
 
 ```mermaid
 graph TD
     Seed[Master Seed BIP-39] --> W0[Proxy Wallet A]
     Seed --> W1[Proxy Wallet B]
     Seed --> WN[Proxy Wallet N]
-    Agent[Main Agent] -.->|signs for| W0
+    Agent[Lead Dawg] -.->|signs for| W0
     Agent -.->|signs for| W1
     Agent -.->|signs for| WN
-    Specs[Specialists] -.-x|no keys| W0
+    Specs[Pack Members] -.-x|no keys| W0
     Adv[Alpha / Risk / Executor] -.-x|no keys| W0
 ```
 
@@ -145,20 +145,20 @@ graph TD
 | **Proxy Wallet A** (`m/44'/60'/0'/0/0`) | Derived | User A's isolated funds |
 | **Proxy Wallet B** (`m/44'/60'/0'/0/1`) | Derived | User B's isolated funds |
 | **Proxy Wallet N** (`m/44'/60'/0'/0/N`) | Derived | User N's isolated funds |
-| **Main Agent** | Signs for all wallets | ONLY component with signing access |
-| Specialists | No keys | Inference only |
+| **Lead Dawg** | Signs for all wallets | ONLY component with signing access |
+| Pack Members | No keys | Inference only |
 | Alpha / Risk / Executor | No keys | Inference only |
 
 ---
 
-## Marketplace — Reputation System
+## Pack — Reputation System
 
-Specialists compete on accuracy. Good agents rise. Bad agents sink. The adversarial layer weights signals by reputation.
+Pack members compete on accuracy. Good agents rise. Bad agents sink. The challenge layer weights signals by reputation.
 
 ```mermaid
 graph TD
     Register[Agent Registers] --> Start[Reputation: 500]
-    Start --> Hired[Hired for Cycle]
+    Start --> Hired[Hired for Hunt]
     Hired --> Predict[Predicts: bullish / bearish / neutral]
     Predict --> Outcome{Market Outcome}
     Outcome -->|Correct| Up[Rep +15 to +25]
@@ -173,9 +173,9 @@ graph TD
 **How it works:**
 
 1. Agent registers with endpoint, price, and tags → starts at **reputation 500**
-2. Hired each cycle → predicts bullish / bearish / neutral
+2. Hired each hunt → predicts bullish / bearish / neutral
 3. After market outcome: **correct** = +15 to +25 rep, **wrong** = -20 to -25 rep
-4. Re-ranked for next cycle based on new score
+4. Re-ranked for next hunt based on new score
 
 **Reputation tiers:**
 
@@ -185,23 +185,23 @@ graph TD
 | **Normal** | 300–700 | Standard weight |
 | **Noise** | < 300 | Mentioned but not trusted — Risk flags over-reliance |
 
-The adversarial layer sees reputation scores alongside each specialist's analysis:
+The challenge layer sees reputation scores alongside each specialist's analysis:
 
 - **Alpha** weights high-rep specialists heavily when building bullish thesis
 - **Risk** flags if Alpha is over-relying on low-rep specialists
 - **Executor** cross-references: do high-rep and low-rep agents agree or disagree?
 
-Reputation history is stored in **0G Storage** (Merkle-verified, can't be faked) and deltas are logged in **Hedera HCS** alongside cycle records.
+Reputation history is stored in **0G Storage** (Merkle-verified, can't be faked) and deltas are logged in **Hedera HCS** alongside hunt records.
 
 ---
 
-## Adversarial Debate — Chain of Thought
+## The Challenge — Chain of Thought
 
 This is the core product. Three agents with opposing mandates, all running in TEE enclaves.
 
 ```mermaid
 graph LR
-    Reports[3 Specialist Reports] --> Alpha
+    Reports[3 Pack Reports] --> Alpha
     Alpha -->|argues FOR| Risk
     Risk -->|argues AGAINST| Executor
     Executor -->|decides| Decision[Decision JSON]
@@ -231,14 +231,14 @@ One Hashscan link proves the entire debate happened inside sealed enclaves.
 
 ## Proof — What Gets Logged to Hedera
 
-Every cycle produces one compact HCS message (~400 bytes):
+Every hunt produces one compact HCS message (~400 bytes):
 
 ```mermaid
 graph TD
-    Cycle[Cycle Record] --> Specs[Specialists: 3x attestation + paymentId]
-    Cycle --> Adv[Adversarial: Alpha + Risk + Executor attestations]
-    Cycle --> Trade[Trade: action, stop_loss, tx_hash]
-    Cycle --> NAV[NAV: portfolio value]
+    Hunt[Hunt Record] --> Specs[Pack: 3x attestation + paymentId]
+    Hunt --> Adv[Challenge: Alpha + Risk + Executor attestations]
+    Hunt --> Trade[Trade: action, stop_loss, tx_hash]
+    Hunt --> NAV[NAV: portfolio value]
     Specs --> HCS[Hedera HCS]
     Adv --> HCS
     Trade --> HCS
@@ -270,60 +270,19 @@ graph TD
 ## Project Structure
 
 ```
-vaultmind/
+alphadawg/
 ├── src/
 │   ├── config/              Chain clients + wallet derivation
-│   │   ├── hedera.ts        Client.forTestnet().setOperator()
-│   │   ├── og-compute.ts    createZGComputeNetworkBroker()
-│   │   ├── og-storage.ts    Indexer init
-│   │   ├── arc.ts           viem account for x402
-│   │   └── wallets.ts       HD proxy wallet derivation
-│   │
-│   ├── state/               In-memory dynamic state
-│   │   └── user-store.ts    Map-based UserStore (N users)
-│   │
-│   ├── marketplace/         Specialist economy
-│   │   ├── registry.ts      Registration + discovery
-│   │   └── reputation.ts    ELO scoring + accuracy
-│   │
-│   ├── hedera/              Truth layer
-│   │   ├── hcs.ts           logCycle(), getHistory()
-│   │   ├── hts.ts           Fund token (mint/burn/fees)
-│   │   └── scheduler.ts     Scheduled Transactions
-│   │
-│   ├── og/                  Brain layer
-│   │   ├── inference.ts     sealedInference() — core function
-│   │   ├── storage.ts       Agent memory (upload/download)
-│   │   └── verify.ts        TEE attestation verification
-│   │
-│   ├── payments/            Money layer
-│   │   ├── x402-server.ts   Specialist paywall (seller)
-│   │   └── x402-client.ts   Agent payment client (buyer)
-│   │
-│   ├── agents/              The swarm
-│   │   ├── main-agent.ts    Per-user cycle orchestrator
-│   │   ├── cycle-runner.ts  Async interval manager
-│   │   ├── adversarial.ts   Alpha → Risk → Executor
-│   │   ├── specialist-server.ts  3 Express apps
-│   │   └── prompts.ts       6 system prompts (7B-optimized)
-│   │
+│   ├── hedera/              Truth layer (HCS audit, HTS tokens)
+│   ├── og/                  Brain layer (sealed inference, storage)
+│   ├── payments/            Money layer (x402 nanopayments)
+│   ├── agents/              The pack (orchestrator, debate, specialists)
 │   ├── telegram/bot.ts      Dynamic Telegram binding
 │   ├── dashboard/           Next.js 16.2 App Router
 │   └── index.ts             Boot
-│
 ├── openclaw/                7 OpenClaw agent workspaces
-│   ├── main-agent/          SOUL.md + AGENTS.md + HEARTBEAT.md
-│   ├── sentiment-agent/     SOUL.md
-│   ├── whale-agent/         SOUL.md
-│   ├── momentum-agent/      SOUL.md
-│   ├── alpha-agent/         SOUL.md
-│   ├── risk-agent/          SOUL.md
-│   └── executor-agent/      SOUL.md
-│
-└── scripts/                 One-time setup
-    ├── setup-topic.ts       HCS audit topic
-    ├── setup-token.ts       HTS fund token
-    └── setup-og-account.ts  0G broker funding
+├── scripts/                 One-time setup (HCS topic, HTS token, 0G)
+└── app/                     Next.js pages (dashboard, pack, history, deposit, verify)
 ```
 
 ---
@@ -333,8 +292,8 @@ vaultmind/
 ### 1. Install
 
 ```bash
-git clone https://github.com/your-org/vaultmind.git
-cd vaultmind
+git clone https://github.com/elbarroca/ETH_Global_Cannes_2026.git
+cd cannes2026
 npm install
 ```
 
@@ -356,7 +315,7 @@ npx ts-node scripts/setup-og-account.ts  # → Funds 0G broker
 ### 4. Run
 
 ```bash
-# Terminal 1: Start specialist marketplace
+# Terminal 1: Start specialist pack
 npx ts-node src/agents/specialist-server.ts
 
 # Terminal 2: Start the full system
@@ -370,7 +329,7 @@ npm run dev
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" localhost:4001/analyze  # → 402
-# Visit dashboard → connect wallet → connect Telegram → deposit → watch cycles
+# Visit dashboard → connect wallet → connect Telegram → deposit → watch hunts
 ```
 
 ---
@@ -379,7 +338,7 @@ curl -s -o /dev/null -w "%{http_code}" localhost:4001/analyze  # → 402
 
 | Bounty | Prize | What We Use |
 |:-------|:------|:------------|
-| **Arc** | $6K | Nanopayments, agent-to-agent USDC, gas-free marketplace |
+| **Arc** | $6K | Nanopayments, agent-to-agent USDC, gas-free pack |
 | **Hedera AI** | $6K | HTS fund token, HCS audit trail, Scheduled Tx, HCS-14 identity |
 | **0G DeFi** | $6K | Sealed Inference, TEE attestation, Storage memory, Chain settlement |
 | **0G OpenClaw** | $6K | 7 SOUL.md agents, iNFT identity, 0G full stack |
@@ -390,84 +349,16 @@ curl -s -o /dev/null -w "%{http_code}" localhost:4001/analyze  # → 402
 
 ---
 
-## Data Flow — End to End
-
-```mermaid
-graph TD
-    User[User deposits USDC] --> Proxy[Proxy Wallet]
-    Proxy --> Mint[HTS Mint fund shares]
-    Proxy --> Hire[Main Agent hires 3 specialists]
-    Hire -->|x402 on Arc| S1[Sentiment]
-    Hire -->|x402 on Arc| S2[Whale]
-    Hire -->|x402 on Arc| S3[Momentum]
-    S1 --> Alpha
-    S2 --> Alpha
-    S3 --> Alpha
-    Alpha --> Risk
-    Risk --> Executor
-    Executor --> Trade[Execute Trade]
-    Executor --> HCS[Log to Hedera HCS]
-    Executor --> Memory[Store in 0G Storage]
-    HCS --> Hashscan[Hashscan Proof Link]
-    Hashscan --> Telegram
-    Hashscan --> Dashboard
-```
-
----
-
-## Security Model
-
-| Component | Access Level | Why |
-|:----------|:-------------|:----|
-| Main Agent (orchestrator) | Master seed, signs transactions | Only component that moves money |
-| Specialist agents | Inference only, no keys | Receive data, return analysis |
-| Alpha / Risk / Executor | Inference only, no keys | Receive data, return decisions |
-| User proxy wallets | Derived from master, isolated per user | Funds can't cross between users |
-| 0G Sealed Inference | TEE enclave, hardware-isolated | Nobody sees data during processing |
-| HCS Audit Trail | Append-only, submit-key protected | Only our agent can write |
-
----
-
 ## Dashboard Views
 
 | Page | What It Shows |
 |:-----|:--------------|
-| **Landing** | Connect wallet button, global stats (users, cycles, hires) |
-| **Onboard** | 3-step progress: Wallet → Telegram → Deposit |
-| **Dashboard** | 3-column live debate view (specialists / debate / proof) |
-| **Marketplace** | Specialist leaderboard, reputation scores, accuracy history |
-| **History** | Past cycles from Mirror Node REST API |
-| **Invest** | Deposit/withdraw USDC, fund share balance |
-
----
-
-## Testing
-
-```bash
-npx ts-node scripts/setup-topic.ts         # Hedera HCS
-npx ts-node scripts/setup-token.ts         # Hedera HTS
-npx ts-node scripts/setup-og-account.ts    # 0G broker
-npx ts-node src/og/test-inference.ts       # 0G inference + TEE
-npx ts-node src/agents/specialist-server.ts # Start specialists
-curl localhost:4001/analyze                 # → HTTP 402
-npx ts-node src/index.ts                   # Full cycle
-```
-
----
-
-## Architecture Decisions
-
-| Decision | Chosen | Why |
-|:---------|:-------|:----|
-| Payment rail | x402 on Arc | Only viable gas-free micropayment infra |
-| AI inference | 0G Sealed Inference | TEE attestation = provable AI |
-| Audit trail | Hedera HCS | $0.0008/msg, no Solidity, sub-second finality |
-| Fund token | Hedera HTS (SDK) | Native KYC/freeze/fees, zero contracts |
-| Agent framework | OpenClaw | SOUL.md personalities, Telegram native |
-| User state | In-memory Map | Zero deps, swappable to Redis |
-| Chat IDs | Dynamic Telegram deep-link | N users, no hardcoding |
-| Wallets | HD-derived proxy wallets | One seed, isolated per user |
-| Marketplace | Open registry + ELO reputation | Self-correcting quality |
+| **Landing** | Connect wallet, hero, global stats |
+| **Dashboard** | 3-column live hunt view (pack / challenge / proof) |
+| **Pack** | Specialist leaderboard, reputation, hire agents |
+| **History** | Hunt log from Mirror Node REST API |
+| **Deposit** | Deposit/withdraw USDC, DAWG token balance |
+| **Verify** | 0G TEE attestation explorer |
 
 ---
 

@@ -6,9 +6,10 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
-import { getUser, type UserRecord } from "@/lib/api";
+import { getUser, onboard, type UserRecord } from "@/lib/api";
 import { useAccount } from "wagmi";
 
 interface UserContextValue {
@@ -29,11 +30,29 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserRecord | null>(null);
   const [linkCode, setLinkCode] = useState<string | null>(null);
 
+  const onboardingRef = useRef(false);
+
   const refetch = useCallback(async () => {
     if (!address) { setUser(null); return; }
     const fetched = await getUser(address);
-    setUser(fetched);
-    if (fetched?.linkCode) setLinkCode(fetched.linkCode);
+    if (fetched) {
+      setUser(fetched);
+      if (fetched.linkCode) setLinkCode(fetched.linkCode);
+      return;
+    }
+    // Auto-onboard on first connect (testnet — "mock" signature skips verification)
+    if (!onboardingRef.current) {
+      onboardingRef.current = true;
+      try {
+        const created = await onboard(address, "mock", "AlphaDawg sign-in");
+        setUser(created);
+        if (created.linkCode) setLinkCode(created.linkCode);
+      } catch (err) {
+        console.warn("[user-context] Auto-onboard failed:", err);
+      } finally {
+        onboardingRef.current = false;
+      }
+    }
   }, [address]);
 
   useEffect(() => {
