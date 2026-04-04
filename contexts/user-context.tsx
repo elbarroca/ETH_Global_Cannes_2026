@@ -33,6 +33,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [linkCode, setLinkCode] = useState<string | null>(null);
 
   const onboardingRef = useRef(false);
+  const linkCodeFetchedRef = useRef(false);
 
   const telegramVerified = user?.telegram?.verified ?? false;
 
@@ -40,7 +41,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     if (!address) return;
     try {
       const result = await onboard(address, "mock", "AlphaDawg sign-in");
-      if (result.telegramLinkCode) setLinkCode(result.telegramLinkCode);
+      if (result.telegramLinkCode) {
+        setLinkCode(result.telegramLinkCode);
+        linkCodeFetchedRef.current = true;
+      }
     } catch (err) {
       console.warn("[user-context] Failed to refresh link code:", err);
       throw err; // Re-throw so modal can show error state
@@ -55,18 +59,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
       // Clear linkCode once telegram is verified
       if (fetched.telegram?.verified) {
         setLinkCode(null);
-      } else if (!linkCode && !onboardingRef.current) {
-        // Returning user without Telegram — generate a link code for the modal
+        linkCodeFetchedRef.current = false;
+      } else if (!linkCodeFetchedRef.current && !onboardingRef.current) {
+        // Returning user without Telegram — generate a link code ONCE
+        linkCodeFetchedRef.current = true;
         try {
           const result = await onboard(address, "mock", "AlphaDawg sign-in");
           if (result.telegramLinkCode) setLinkCode(result.telegramLinkCode);
-        } catch { /* non-fatal */ }
+        } catch {
+          linkCodeFetchedRef.current = false; // Reset on failure so retry is possible
+        }
       }
       return;
     }
     // Auto-onboard on first connect (testnet — "mock" signature skips verification)
     if (!onboardingRef.current) {
       onboardingRef.current = true;
+      linkCodeFetchedRef.current = true;
       try {
         const result = await onboard(address, "mock", "AlphaDawg sign-in");
         if (result.telegramLinkCode) setLinkCode(result.telegramLinkCode);
@@ -75,7 +84,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (fullUser) setUser(fullUser);
       } catch (err) {
         console.warn("[user-context] Auto-onboard failed:", err);
-        onboardingRef.current = false; // Only reset on failure so retry is possible
+        onboardingRef.current = false;
+        linkCodeFetchedRef.current = false;
       }
     }
   }, [address]);

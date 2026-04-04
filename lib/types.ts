@@ -34,6 +34,28 @@ export interface Cycle {
   storageHash?: string;
   inftTokenId?: number;
   rebuttalTriggered?: boolean;
+  swap?: {
+    txHash: string;
+    explorerUrl: string;
+    method: "uniswap_v3" | "direct_transfer" | "skipped";
+    amountIn?: string;
+    tokenIn?: string;
+    tokenOut?: string;
+  };
+  debateTranscripts?: DebateTranscriptView[];
+}
+
+export interface DebateTranscriptView {
+  turnNumber: number;
+  phase: string;
+  fromAgent: string;
+  toAgent: string | null;
+  messageContent: string;
+  responseContent: string | null;
+  attestationHash: string | null;
+  teeVerified: boolean;
+  durationMs: number | null;
+  createdAt: string;
 }
 
 export interface FundState {

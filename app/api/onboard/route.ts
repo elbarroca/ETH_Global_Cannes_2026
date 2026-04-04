@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     // Return existing user
     const existing = await getUserByWallet(walletAddress);
     if (existing) {
-      const linkCode = generateLinkCode(existing.id);
+      const linkCode = await generateLinkCode(existing.id);
       return NextResponse.json({
         userId: existing.id,
         proxyWalletAddress: existing.proxyWallet.address,
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await createUser(walletAddress, proxyWallet, newUserId);
-    const linkCode = generateLinkCode(user.id);
+    const linkCode = await generateLinkCode(user.id);
 
     // Mint iNFT agent identity on 0G Chain (non-fatal)
     let inftTokenId: number | null = null;

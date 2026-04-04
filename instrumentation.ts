@@ -20,8 +20,10 @@ export async function register() {
       console.warn("[instrumentation] Specialist startup failed (non-fatal):", err instanceof Error ? err.message : String(err));
     }
 
-    // Start Telegram bot (polling mode — works inside Next.js process)
-    if (process.env.TELEGRAM_BOT_TOKEN) {
+    // Telegram bot runs in the backend process (`npm run backend`) to avoid
+    // polling conflicts when both Next.js and Express are running.
+    // To start the bot in Next.js only mode, set NEXT_START_BOT=true in .env.
+    if (process.env.TELEGRAM_BOT_TOKEN && process.env.NEXT_START_BOT === "true") {
       try {
         const { startBot } = await import("./src/telegram/bot");
         startBot();
