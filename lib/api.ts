@@ -165,3 +165,18 @@ export async function getStats(): Promise<PlatformStats> {
     totalValueLocked: 0,
   }));
 }
+
+export interface LeaderboardAgent {
+  name: string;
+  reputation: number;
+  accuracy: number;
+  totalHires: number;
+  tags: string[];
+  price: string;
+  active: boolean;
+}
+
+export async function getLeaderboard(): Promise<LeaderboardAgent[]> {
+  const data = await apiFetch<{ agents: LeaderboardAgent[] }>("/api/marketplace/leaderboard");
+  return data.agents;
+}

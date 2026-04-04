@@ -1,41 +1,31 @@
 import { wrapFetchWithPayment } from "@x402/fetch";
 import { x402Client } from "@x402/core/client";
-import { ExactEvmScheme } from "@x402/evm/exact/client";
-import { createWalletClient, createPublicClient, http, defineChain } from "viem";
-import type { Account } from "viem";
+import { registerBatchScheme, GatewayClient } from "@circle-fin/x402-batching/client";
+import { privateKeyToAccount } from "viem/accounts";
+import type { Hex } from "viem";
 
-const arcTestnet = defineChain({
-  id: 2655,
-  name: "Arc Testnet",
-  nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
-  rpcUrls: { default: { http: ["https://rpc.testnet.arc.network"] } },
-  testnet: true,
-});
+// ── Payment fetch (wraps fetch with Circle Gateway nanopayments) ──────
 
-const NETWORK = "eip155:2655" as const;
+export function createPaymentFetch(privateKey: Hex): typeof fetch {
+  const account = privateKeyToAccount(privateKey);
 
-export function createPaymentFetch(viemAccount: Account): typeof fetch {
-  const walletClient = createWalletClient({
-    account: viemAccount,
-    chain: arcTestnet,
-    transport: http(),
-  });
-
-  const publicClient = createPublicClient({
-    chain: arcTestnet,
-    transport: http(),
-  });
-
-  // Build ClientEvmSigner manually to satisfy the type
   const signer = {
-    address: viemAccount.address,
-    signTypedData: (msg: Parameters<typeof walletClient.signTypedData>[0]) =>
-      walletClient.signTypedData(msg),
-    readContract: (args: Parameters<typeof publicClient.readContract>[0]) =>
-      publicClient.readContract(args),
+    address: account.address,
+    signTypedData: (params: Parameters<typeof account.signTypedData>[0]) =>
+      account.signTypedData(params),
   };
 
-  const client = new x402Client().register(NETWORK, new ExactEvmScheme(signer));
+  const client = new x402Client();
+  registerBatchScheme(client, { signer });
 
   return wrapFetchWithPayment(fetch, client) as typeof fetch;
+}
+
+// ── Gateway client (for deposit/withdraw/balance management) ──────────
+
+export function createGatewayClient(privateKey: Hex): GatewayClient {
+  return new GatewayClient({
+    chain: "arcTestnet",
+    privateKey,
+  });
 }

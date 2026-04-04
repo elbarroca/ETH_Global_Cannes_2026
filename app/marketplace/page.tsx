@@ -1,24 +1,60 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge, ZeroGBadge } from "@/components/ui/badge";
 import { MOCK_AGENTS } from "@/lib/mock-data";
+import { getLeaderboard } from "@/lib/api";
 import type { Agent } from "@/lib/types";
 
+const NAME_MAP: Record<string, string> = {
+  sentiment: "SentimentBot",
+  whale: "WhaleEye",
+  momentum: "MomentumX",
+};
+
+const EMOJI_MAP: Record<string, string> = {
+  sentiment: "\uD83E\uDDE0",
+  whale: "\uD83D\uDC0B",
+  momentum: "\uD83D\uDCC8",
+};
+
 export default function MarketplacePage() {
-  const [agents, setAgents] = useState<Agent[]>(MOCK_AGENTS);
+  const [packAgents, setPackAgents] = useState<Agent[]>([]);
+  const [loadingPack, setLoadingPack] = useState(true);
   const [hiring, setHiring] = useState<string | null>(null);
 
-  const active = agents.filter((a) => a.isActive);
-  const community = agents.filter((a) => !a.isActive);
+  const communityAgents = MOCK_AGENTS.filter((a) => !a.isActive);
+
+  useEffect(() => {
+    getLeaderboard()
+      .then((entries) => {
+        const mapped: Agent[] = entries.map((e) => ({
+          name: NAME_MAP[e.name] ?? e.name,
+          emoji: EMOJI_MAP[e.name] ?? "\uD83E\uDD16",
+          skill: e.tags.join(", ") || "Analysis",
+          accuracy: e.accuracy,
+          timesHired: e.totalHires,
+          pricePerQuery: parseFloat(e.price.replace("$", "")) || 0.001,
+          inftId: `#${String(e.totalHires).padStart(4, "0")}`,
+          model: "glm-5-chat",
+          provider: "0G Sealed TEE",
+          creator: "AlphaDawg",
+          isActive: e.active,
+        }));
+        setPackAgents(mapped);
+      })
+      .catch(() => {
+        setPackAgents(MOCK_AGENTS.filter((a) => a.isActive));
+      })
+      .finally(() => setLoadingPack(false));
+  }, []);
+
+  const active = packAgents.filter((a) => a.isActive);
 
   async function handleHire(name: string) {
     setHiring(name);
     await new Promise((r) => setTimeout(r, 1000));
-    setAgents((prev) =>
-      prev.map((a) => (a.name === name ? { ...a, isActive: true } : a))
-    );
     setHiring(null);
   }
 
@@ -40,11 +76,17 @@ export default function MarketplacePage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {active.map((agent) => (
-            <ActiveAgentCard key={agent.name} agent={agent} />
-          ))}
-        </div>
+        {loadingPack ? (
+          <div className="text-sm text-void-500 py-8 text-center">Loading pack...</div>
+        ) : active.length === 0 ? (
+          <div className="text-sm text-void-500 py-8 text-center">No active specialists. Run a hunt to register them.</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {active.map((agent) => (
+              <ActiveAgentCard key={agent.name} agent={agent} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Marketplace */}
@@ -64,7 +106,7 @@ export default function MarketplacePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {community.map((agent) => (
+          {communityAgents.map((agent) => (
             <CommunityAgentCard
               key={agent.name}
               agent={agent}
@@ -175,7 +217,7 @@ function CommunityAgentCard({
             disabled={hiring}
             className="px-3 py-1 bg-blood-600 hover:bg-blood-700 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors"
           >
-            {hiring ? "Hiring…" : "Hire"}
+            {hiring ? "Hiring\u2026" : "Hire"}
           </button>
         </div>
       </CardBody>

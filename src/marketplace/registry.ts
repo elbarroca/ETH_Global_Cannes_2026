@@ -24,6 +24,17 @@ interface DiscoverOptions {
 
 // In-memory registry for fast lookups
 const agents = new Map<string, AgentRecord>();
+let registryLoaded = false;
+let registryLoadPromise: Promise<void> | null = null;
+
+async function ensureLoaded(): Promise<void> {
+  if (registryLoaded) return;
+  if (registryLoadPromise) return registryLoadPromise;
+  registryLoadPromise = loadRegistry().then(() => {
+    registryLoaded = true;
+  });
+  return registryLoadPromise;
+}
 
 // ── Load from Prisma on boot ─────────────────────────────────
 
@@ -47,6 +58,7 @@ export async function loadRegistry(): Promise<void> {
 
   // Auto-register built-in specialists if missing
   await registerBuiltins();
+  registryLoaded = true;
 }
 
 // ── Register a specialist (upsert) ──────────────────────────
@@ -78,7 +90,8 @@ export async function registerSpecialist(
 
 // ── Discover specialists by criteria ────────────────────────
 
-export function discoverSpecialists(options: DiscoverOptions = {}): AgentRecord[] {
+export async function discoverSpecialists(options: DiscoverOptions = {}): Promise<AgentRecord[]> {
+  await ensureLoaded();
   const { tags, minReputation = 0, maxHires = 10 } = options;
   const matches: AgentRecord[] = [];
 
@@ -124,7 +137,7 @@ export async function hireFromMarketplace(
   userId: string,
   options: DiscoverOptions = {},
 ): Promise<SpecialistResult[]> {
-  const discovered = discoverSpecialists(options);
+  const discovered = await discoverSpecialists(options);
   if (discovered.length === 0) {
     throw new Error("No specialists found matching criteria");
   }

@@ -1,10 +1,6 @@
 import "dotenv/config";
 import express from "express";
-import { paymentMiddleware, x402ResourceServer } from "@x402/express";
-import { HTTPFacilitatorClient } from "@x402/core/server";
-import { ExactEvmScheme } from "@x402/evm/exact/server";
-
-const NETWORK = "eip155:2655" as const;
+import { createGatewayMiddleware } from "@circle-fin/x402-batching/server";
 
 export function createSpecialistServer(
   name: string,
@@ -15,33 +11,14 @@ export function createSpecialistServer(
 ): void {
   const app = express();
 
-  const facilitatorClient = new HTTPFacilitatorClient({
-    url: process.env.X402_FACILITATOR_URL ?? "https://x402.org/facilitator",
+  // Circle Gateway nanopayments — gas-free batched settlement
+  // Handles scheme registration, facilitator sync, and extra metadata automatically
+  const gateway = createGatewayMiddleware({
+    sellerAddress: payTo,
+    description: `${name} specialist analysis`,
   });
 
-  const server = new x402ResourceServer(facilitatorClient).register(
-    NETWORK,
-    new ExactEvmScheme()
-  );
-
-  app.use(
-    paymentMiddleware(
-      {
-        "GET /analyze": {
-          accepts: {
-            scheme: "exact",
-            payTo,
-            price,
-            network: NETWORK,
-          },
-          description: `${name} specialist analysis`,
-        },
-      },
-      server
-    )
-  );
-
-  app.get("/analyze", async (_req, res) => {
+  app.get("/analyze", gateway.require(price), async (_req, res) => {
     try {
       const result = await handler();
       res.json(result);

@@ -127,7 +127,7 @@ export function mapCompactRecordToCycle(record: CompactCycleRecord): Cycle {
       chain: "arc" as const,
     })),
     hcs: {
-      topicId: "0.0.unknown",
+      topicId: process.env.NEXT_PUBLIC_HCS_TOPIC_ID ?? "0.0.unknown",
       sequenceNumber: record.c,
       timestamp: new Date(record.t).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
     },
