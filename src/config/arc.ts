@@ -1,9 +1,13 @@
-import { mnemonicToAccount } from "viem/accounts";
+import { deriveUserAccount } from "./wallets.js";
+import { createPaymentFetch } from "../payments/x402-client.js";
 
-// BIP-44 derivation: index 0 = main agent (buyer/signer)
-// Read env at call time, not module load — avoids crash if AGENT_MNEMONIC is unset
+// Per-user x402 payment client — signs with THIS user's HD-derived hot wallet
+export function getUserPaymentFetch(hotWalletIndex: number): typeof fetch {
+  const account = deriveUserAccount(hotWalletIndex);
+  return createPaymentFetch(account);
+}
+
+// Legacy: global buyer for fallback (index 0)
 export function getBuyerAccount() {
-  const mnemonic = process.env.AGENT_MNEMONIC;
-  if (!mnemonic) throw new Error("AGENT_MNEMONIC not set");
-  return mnemonicToAccount(mnemonic, { addressIndex: 0 });
+  return deriveUserAccount(0);
 }

@@ -53,7 +53,7 @@ function getSoulContent(): string {
       _soulContent = readFileSync("./openclaw/main-agent/SOUL.md", "utf-8");
     } catch {
       _soulContent =
-        "VaultMind Main Agent — autonomous investment agent with adversarial debate, " +
+        "AlphaDawg Main Agent — autonomous investment agent with adversarial debate, " +
         "TEE-verified inference, and on-chain audit trail.";
     }
   }

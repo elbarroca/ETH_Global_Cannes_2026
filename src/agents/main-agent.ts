@@ -4,6 +4,7 @@ import { runAdversarialDebate } from "./adversarial.js";
 import { logCycle } from "../hedera/hcs.js";
 import { storeMemory } from "../og/storage.js";
 import { updateAgentMetadata } from "../og/inft.js";
+import { getUserPaymentFetch } from "../config/arc.js";
 import type {
   UserRecord,
   SpecialistResult,
@@ -19,13 +20,6 @@ const SPECIALIST_URLS = [
   "http://localhost:4002/analyze",
   "http://localhost:4003/analyze",
 ];
-
-// STUB — replace when Dev B delivers x402-client.ts
-function createPaymentFetch(_account: unknown): typeof fetch {
-  return async (input: RequestInfo | URL, init?: RequestInit) => {
-    return fetch(input, init);
-  };
-}
 
 async function hire(fetchFn: typeof fetch, url: string): Promise<SpecialistResult> {
   const res = await fetchFn(url);
@@ -99,8 +93,19 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     payload: { cycleNumber: cycleId, riskProfile: user.agent.riskProfile },
   });
 
-  // 1. Hire specialists (with payment stub — Circle holds keys, no local wallet needed)
-  const payFetch = createPaymentFetch(null);
+  // 1. Hire specialists via x402 nanopayments on Arc (per-user HD wallet)
+  let payFetch: typeof fetch;
+  try {
+    if (user.hotWalletIndex != null) {
+      payFetch = getUserPaymentFetch(user.hotWalletIndex);
+    } else {
+      console.warn("[cycle] No hot wallet for user, using bare fetch");
+      payFetch = fetch;
+    }
+  } catch (err) {
+    console.warn("[cycle] x402 setup failed, using bare fetch:", err instanceof Error ? err.message : String(err));
+    payFetch = fetch;
+  }
   let specialists: SpecialistResult[];
   try {
     const results: SpecialistResult[] = [];

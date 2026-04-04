@@ -23,7 +23,7 @@ function validateEnv(): void {
 }
 
 async function main(): Promise<void> {
-  console.log("=== VaultMind booting... ===");
+  console.log("=== AlphaDawg booting... ===");
   console.log(`Node ${process.version}`);
   validateEnv();
   console.log(`Operator: ${process.env.OPERATOR_ID}`);
@@ -42,8 +42,8 @@ async function main(): Promise<void> {
 
   // Start heartbeat cycle loop
   startHeartbeatLoop();
-  console.log("Heartbeat started. Running cycles every 5 minutes.");
-  console.log("=== VaultMind running ===");
+  console.log("Heartbeat started. Running hunts every 5 minutes.");
+  console.log("=== AlphaDawg running ===");
 }
 
 main().catch((err: unknown) => {

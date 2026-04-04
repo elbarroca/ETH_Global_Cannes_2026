@@ -39,7 +39,7 @@ export async function scheduleNextHeartbeat(
       .setScheduledTransaction(innerTx)
       .setAdminKey(operatorKey.publicKey)
       .setPayerAccountId(getOperatorId())
-      .setScheduleMemo("VaultMind heartbeat")
+      .setScheduleMemo("AlphaDawg heartbeat")
       .setExpirationTime(expirationTime)
       .setWaitForExpiry(true)
       .freezeWith(client)

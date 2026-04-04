@@ -92,7 +92,7 @@ export async function createProxyWallet(
     blockchains: [CIRCLE_BLOCKCHAIN],
     count: 1,
     accountType: "EOA",
-    metadata: [{ name: `VaultMind-${userId}`, refId: userId }],
+    metadata: [{ name: `AlphaDawg-${userId}`, refId: userId }],
   });
 
   const wallet = response.data?.wallets?.[0];

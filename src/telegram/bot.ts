@@ -57,7 +57,7 @@ function formatDebate(record: CompactCycleRecord): string {
   const exec = record.adv?.e;
 
   return [
-    `*Cycle #${record.c}*`,
+    `*Hunt #${record.c}*`,
     "",
     "📡 *Specialists:*",
     specs || "  No data",
@@ -91,7 +91,7 @@ export function notifyUser(user: UserRecord, result: CycleResult): void {
   if (pref === "daily") return; // daily digest not yet implemented — suppress per-cycle
 
   const msg = [
-    `📊 *Cycle #${result.cycleId} Complete*`,
+    `📊 *Hunt #${result.cycleId} Complete*`,
     `💰 Hired 3 specialists ($0.003)`,
     `⚖️ Decision: *${action}* ${(result.decision as { asset?: string })?.asset ?? ""} ${(result.decision as { pct?: number })?.pct ?? 0}%`,
     `✅ TEE verified: ${result.specialists.filter((s) => s.teeVerified).length}/${result.specialists.length}`,
@@ -124,7 +124,7 @@ function registerCommands(telegramBot: TelegramBot): void {
             },
           });
           await telegramBot.sendMessage(msg.chat.id,
-            "✅ *Wallet linked!* Your VaultMind agent is now connected.\n\nUse /status to check your agent.",
+            "✅ *Wallet linked!* Your AlphaDawg agent is now connected.\n\nUse /status to check your agent.",
             { parse_mode: "Markdown" },
           );
         } catch {
@@ -145,15 +145,15 @@ function registerCommands(telegramBot: TelegramBot): void {
     }
 
     await telegramBot.sendMessage(msg.chat.id, [
-      "🧠 *VaultMind*",
+      "🧠 *AlphaDawg*",
       "",
       "Your AI agent hires specialists, debates adversarially, and proves every decision on-chain.",
       "",
       "*Commands:*",
       "/status — Current NAV + agent state",
-      "/why — Last cycle's full debate",
-      "/history — Last 10 cycles",
-      "/run — Trigger cycle now",
+      "/why — Last hunt's full debate",
+      "/history — Last 10 hunts",
+      "/run — Trigger hunt now",
       "/stop — Pause agent",
       "/resume — Resume agent",
       "",
@@ -176,15 +176,15 @@ function registerCommands(telegramBot: TelegramBot): void {
       : "never";
 
     await telegramBot.sendMessage(msg.chat.id, [
-      "📊 *VaultMind Status*",
+      "📊 *AlphaDawg Status*",
       "",
       `NAV: *$${user.fund.currentNav.toLocaleString()}*`,
       `Deposited: $${user.fund.depositedUsdc}`,
       `HTS Shares: ${user.fund.htsShareBalance}`,
       `Agent: ${user.agent.active ? "● Running" : "○ Paused"}`,
       `Risk: ${user.agent.riskProfile} (max ${user.agent.maxTradePercent}%)`,
-      `Last cycle: ${lastCycleAgo}`,
-      `Total cycles: ${user.agent.lastCycleId}`,
+      `Last hunt: ${lastCycleAgo}`,
+      `Total hunts: ${user.agent.lastCycleId}`,
     ].join("\n"), { parse_mode: "Markdown" });
   });
 
@@ -197,12 +197,12 @@ function registerCommands(telegramBot: TelegramBot): void {
       return;
     }
 
-    await telegramBot.sendMessage(msg.chat.id, "⏳ Fetching last cycle...");
+    await telegramBot.sendMessage(msg.chat.id, "⏳ Fetching last hunt...");
     const history = await fetchHistory(30);
     const userCycles = history.filter((r) => r.u === user.id);
 
     if (userCycles.length === 0) {
-      await telegramBot.sendMessage(msg.chat.id, "No cycles found yet. Use /run to trigger one.");
+      await telegramBot.sendMessage(msg.chat.id, "No hunts found yet. Use /run to trigger one.");
       return;
     }
 
@@ -223,13 +223,13 @@ function registerCommands(telegramBot: TelegramBot): void {
     const userCycles = history.filter((r) => r.u === user.id).slice(0, 10);
 
     if (userCycles.length === 0) {
-      await telegramBot.sendMessage(msg.chat.id, "No cycles found. Use /run to trigger one.");
+      await telegramBot.sendMessage(msg.chat.id, "No hunts found. Use /run to trigger one.");
       return;
     }
 
     const lines = userCycles.map(formatCycleSummary);
     await telegramBot.sendMessage(msg.chat.id, [
-      `📜 *Last ${userCycles.length} Cycles*`,
+      `📜 *Last ${userCycles.length} Hunts*`,
       "",
       ...lines,
     ].join("\n"), { parse_mode: "Markdown" });
@@ -250,12 +250,12 @@ function registerCommands(telegramBot: TelegramBot): void {
     }
 
     const preview = [
-      "🧠 *VaultMind — Hire Specialists?*",
+      "🧠 *AlphaDawg — Hire Specialists?*",
       "",
       `Risk: *${user.agent.riskProfile}* (max ${user.agent.maxTradePercent}%)`,
       `NAV: *$${user.fund.currentNav.toLocaleString()}*`,
       "",
-      "📡 *Swarm Preview:*",
+      "📡 *Pack Preview:*",
       "  1. SentimentBot — social/fear-greed analysis",
       "  2. WhaleEye — large wallet flow tracking",
       "  3. MomentumX — RSI/MACD/support-resistance",
@@ -287,7 +287,7 @@ function registerCommands(telegramBot: TelegramBot): void {
     }
 
     await updateUser(user.id, { agent: { active: false } });
-    await telegramBot.sendMessage(msg.chat.id, "⏸️ Agent *paused*. No more cycles until /resume.", { parse_mode: "Markdown" });
+    await telegramBot.sendMessage(msg.chat.id, "⏸️ Agent *paused*. No more hunts until /resume.", { parse_mode: "Markdown" });
   });
 
   // /resume — Resume agent
@@ -300,7 +300,7 @@ function registerCommands(telegramBot: TelegramBot): void {
     }
 
     await updateUser(user.id, { agent: { active: true } });
-    await telegramBot.sendMessage(msg.chat.id, "▶️ Agent *resumed*. Cycles will run every 5 minutes.", { parse_mode: "Markdown" });
+    await telegramBot.sendMessage(msg.chat.id, "▶️ Agent *resumed*. Hunts will run every 5 minutes.", { parse_mode: "Markdown" });
   });
 }
 
@@ -314,11 +314,11 @@ function registerCallbacks(telegramBot: TelegramBot): void {
 
     if (data.startsWith("hire_confirm_")) {
       const userId = data.replace("hire_confirm_", "");
-      await telegramBot.answerCallbackQuery(query.id, { text: "Starting cycle..." });
+      await telegramBot.answerCallbackQuery(query.id, { text: "Starting hunt..." });
 
       // Update the message to show progress
       if (query.message) {
-        await telegramBot.editMessageText("⚡ *Cycle running...*\n\nHiring 3 specialists via x402 nanopayments...", {
+        await telegramBot.editMessageText("⚡ *Hunt running...*\n\nHiring 3 pack members via x402 nanopayments...", {
           chat_id: chatId,
           message_id: query.message.message_id,
           parse_mode: "Markdown",
@@ -367,13 +367,13 @@ function registerCallbacks(telegramBot: TelegramBot): void {
         });
         await telegramBot.sendMessage(chatId, debate, { parse_mode: "Markdown" });
       } catch (err) {
-        console.error("[telegram] Cycle failed:", err);
-        await telegramBot.sendMessage(chatId, "❌ Cycle failed. Check server logs for details.");
+        console.error("[telegram] Hunt failed:", err);
+        await telegramBot.sendMessage(chatId, "❌ Hunt failed. Check server logs for details.");
       }
     } else if (data === "hire_skip") {
       await telegramBot.answerCallbackQuery(query.id, { text: "Skipped" });
       if (query.message) {
-        await telegramBot.editMessageText("⏭️ Cycle skipped. Use /run when ready.", {
+        await telegramBot.editMessageText("⏭️ Hunt skipped. Use /run when ready.", {
           chat_id: chatId,
           message_id: query.message.message_id,
         }).catch(() => {});

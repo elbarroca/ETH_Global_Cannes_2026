@@ -1,62 +1,35 @@
 import "dotenv/config";
 import { createSpecialistServer } from "../payments/x402-server.js";
+import { sealedInference } from "../og/inference.js";
+import { PROMPTS, safeJsonParse } from "./prompts.js";
+import { deriveSpecialistAddress } from "../config/wallets.js";
 
-// ─── STUBS — replace with Dev A's real modules when available ───────────────
+const PROVIDER = process.env.OG_PROVIDER_ADDRESS!;
 
-async function sealedInference(
-  system: string,
-  user: string
-): Promise<{ content: string; attestationHash: string; teeVerified: boolean }> {
-  // STUB: replace with import from "../og/inference.js"
-  return {
-    content: JSON.stringify({ signal: "BUY", confidence: 72, reasoning: "mock data" }),
-    attestationHash: "stub_" + Date.now(),
-    teeVerified: false,
-  };
-}
-
-const PROMPTS = {
-  sentiment:
-    "You are a crypto sentiment analyst. Return ONLY JSON: {signal, confidence, reasoning}",
-  whale:
-    "You are a whale tracker. Return ONLY JSON: {signal, confidence, topMovement}",
-  momentum:
-    "You are a momentum scanner. Return ONLY JSON: {signal, confidence, trend}",
-};
-
-function safeJsonParse<T>(raw: string, fallback: T): T {
-  try {
-    return JSON.parse(
-      raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-    ) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-// ─── Market context ──────────────────────────────────────────────────────────
-
-const MARKET_CONTEXT = `Current date: ${new Date().toISOString()}.
+function getMarketContext(): string {
+  return `Current date: ${new Date().toISOString()}.
 BTC ~$67,000. ETH ~$3,400. Market sentiment: mixed.
 Funding rates slightly elevated. Volume declining.`;
+}
 
 // ─── Start all specialists ───────────────────────────────────────────────────
 
 export async function startSpecialists(): Promise<void> {
-  const payTo = process.env.SPECIALIST_WALLET_ADDRESS;
-  if (!payTo) throw new Error("SPECIALIST_WALLET_ADDRESS not set in .env");
-
   const specs = [
-    { name: "sentiment", port: 4001, prompt: PROMPTS.sentiment },
-    { name: "whale", port: 4002, prompt: PROMPTS.whale },
-    { name: "momentum", port: 4003, prompt: PROMPTS.momentum },
+    { name: "sentiment", port: 4001, specIndex: 0, prompt: PROMPTS.sentiment.content },
+    { name: "whale", port: 4002, specIndex: 1, prompt: PROMPTS.whale.content },
+    { name: "momentum", port: 4003, specIndex: 2, prompt: PROMPTS.momentum.content },
   ];
 
   for (const s of specs) {
+    // Each specialist derives its own payTo wallet from the master seed
+    const payTo = deriveSpecialistAddress(s.specIndex);
+    console.log(`[specialist] ${s.name} payTo: ${payTo}`);
+
     createSpecialistServer(s.name, s.port, payTo, "$0.001", async () => {
-      const result = await sealedInference(s.prompt, MARKET_CONTEXT);
+      const result = await sealedInference(PROVIDER, s.prompt, getMarketContext());
       const parsed = safeJsonParse(result.content, {
-        signal: "HOLD",
+        signal: "HOLD" as const,
         confidence: 0,
       });
       return {
