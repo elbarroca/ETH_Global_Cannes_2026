@@ -1,0 +1,35 @@
+{
+  "name": "VaultMind",
+  "version": "1.0.0",
+  "agents": {
+    "main-agent": {
+      "heartbeat": {
+        "every": "5m"
+      }
+    },
+    "sentiment-agent": {
+      "type": "specialist",
+      "port": 4001
+    },
+    "whale-agent": {
+      "type": "specialist",
+      "port": 4002
+    },
+    "momentum-agent": {
+      "type": "specialist",
+      "port": 4003
+    },
+    "alpha-agent": {
+      "type": "debater",
+      "stage": 1
+    },
+    "risk-agent": {
+      "type": "debater",
+      "stage": 2
+    },
+    "executor-agent": {
+      "type": "debater",
+      "stage": 3
+    }
+  }
+}
