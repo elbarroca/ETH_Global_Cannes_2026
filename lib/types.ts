@@ -132,6 +132,9 @@ export interface CycleDetail {
   id: string;
   userId: string;
   cycleNumber: number;
+  goal?: string | null;
+  /** Canonical x402 payment graph — same shape as RichCycleRecord.payments. */
+  payments?: unknown;
   specialists: unknown;
   alphaAction: string | null;
   alphaPct: number | null;
@@ -151,6 +154,15 @@ export interface CycleDetail {
   storageHash: string | null;
   totalCostUsd: number | null;
   navAfter: number | null;
+  swapTxHash?: string | null;
+  swapExplorerUrl?: string | null;
+  swapChain?: string | null;
+  swapAmount?: string | null;
+  swapAssetIn?: string | null;
+  swapAssetOut?: string | null;
+  debateDurationMs?: number | null;
+  debateTurns?: number | null;
+  narrative?: unknown;
   createdAt: string;
 }
 

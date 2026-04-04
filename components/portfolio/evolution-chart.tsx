@@ -11,6 +11,7 @@
 // cycle number, action, asset, pct, and nav.
 
 interface EvolutionPoint {
+  cycleId?: string;
   cycleNumber: number;
   timestamp: string;
   action: string;
