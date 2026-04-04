@@ -82,11 +82,40 @@ export interface DebateStageResult {
   teeVerified: boolean;
 }
 
+export type DebatePhase = "intelligence" | "opening" | "rebuttal" | "decision" | "execution";
+
+export interface DebateTranscriptEntry {
+  turnNumber: number;
+  phase: DebatePhase;
+  fromAgent: string;
+  toAgent?: string;
+  messageContent: string;
+  responseContent?: string;
+  attestationHash?: string;
+  teeVerified?: boolean;
+  durationMs: number;
+}
+
 export interface DebateResult {
   alpha: DebateStageResult;
   risk: DebateStageResult;
   executor: DebateStageResult;
   rebuttalTriggered?: boolean;
+  transcripts?: DebateTranscriptEntry[];
+  totalDurationMs?: number;
+  totalTurns?: number;
+}
+
+export interface ArcSwapResult {
+  success: boolean;
+  txHash?: string;
+  chain: "arc-testnet";
+  explorerUrl?: string;
+  method: "uniswap_v3" | "direct_transfer" | "skipped";
+  reason?: string;
+  amountIn?: string;
+  tokenIn?: string;
+  tokenOut?: string;
 }
 
 export interface CycleResult {
@@ -99,6 +128,7 @@ export interface CycleResult {
   hashscanUrl: string;
   storageHash?: string;
   inftTokenId?: number;
+  swapResult?: ArcSwapResult;
   timestamp: Date;
 }
 

@@ -118,7 +118,7 @@ function registerCommands(telegramBot: TelegramBot): void {
 
     // Try to link via code
     if (linkCode) {
-      const userId = redeemLinkCode(linkCode);
+      const userId = await redeemLinkCode(linkCode);
       if (userId) {
         try {
           await updateUser(userId, {

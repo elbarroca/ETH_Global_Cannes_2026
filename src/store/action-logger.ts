@@ -23,7 +23,10 @@ type ActionType =
   | "CYCLE_TIMED_OUT"
   | "AGENT_HIRED"
   | "AGENT_FIRED"
-  | "TRADE_EXECUTED";
+  | "TRADE_EXECUTED"
+  | "SWAP_EXECUTED"
+  | "SWAP_FAILED"
+  | "DEBATE_TRANSCRIPT_LOGGED";
 
 interface LogActionInput {
   userId: string;
