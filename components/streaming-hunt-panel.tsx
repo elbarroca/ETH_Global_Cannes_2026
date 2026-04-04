@@ -30,19 +30,23 @@ function formatElapsed(startedAt: number | null): string {
 export function StreamingHuntPanel({ userId }: { userId: string | null }) {
   const [goal, setGoal] = useState("Find the best ETH entry this week — I want to accumulate");
   const stream = useStreamingCycle(userId);
-  const { refreshAgentBalance } = useUser();
+  const { refreshAgentBalance, refetch } = useUser();
 
-  // When a cycle stream finishes (running transitions true → false), refresh
-  // the agent's on-chain balance once so the nav pill reflects the post-cycle
-  // total without waiting for the next ticker poll. Uses a ref to detect the
-  // transition so we don't refetch on every render.
+  // When a cycle stream finishes (running transitions true → false):
+  //   1. Refresh the agent's on-chain balance so the nav pill reflects the
+  //      post-cycle total without waiting for the next ticker poll.
+  //   2. Refetch the user record so the cached `user.agent.lastCycleId` is
+  //      current — the /verify page falls back to this when no ?cycle= param
+  //      is present, and a stale value was rendering "No cycle data found".
+  // Uses a ref to detect the transition so we don't refetch on every render.
   const wasRunningRef = useRef(false);
   useEffect(() => {
     if (wasRunningRef.current && !stream.running) {
       void refreshAgentBalance();
+      void refetch();
     }
     wasRunningRef.current = stream.running;
-  }, [stream.running, refreshAgentBalance]);
+  }, [stream.running, refreshAgentBalance, refetch]);
 
   const start = async () => {
     if (!userId || stream.running) return;

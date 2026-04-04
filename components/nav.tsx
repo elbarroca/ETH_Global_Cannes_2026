@@ -12,6 +12,7 @@ import { arcAddressUrl, inftTokenUrl } from "@/lib/links";
 const TABS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/marketplace", label: "Pack" },
+  { href: "/portfolio", label: "Portfolio" },
   { href: "/history", label: "History" },
   { href: "/deposit", label: "Deposit" },
   { href: "/verify", label: "Verify" },

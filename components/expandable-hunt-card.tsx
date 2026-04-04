@@ -108,17 +108,26 @@ function CompactView({
         </div>
       )}
 
-      {/* Specialist signals strip — each chip now shows an inline tx ↗ link
-          when the specialist hire produced a real Arc settlement hash (starts
-          with 0x). Hardcoded "paid" / "no-payment" strings render without a
-          link so legacy rows still display but don't mislead. */}
+      {/* Specialist signals strip — each chip shows payment status:
+          · 0x... hash  → "tx ↗" link to Arc explorer (direct settlement)
+          · UUID (abc1-234…) → "batched 🔒" chip (Circle Gateway deferred settlement)
+          · "paid"/"no-payment" → no chip (legacy/failed rows)
+
+          Circle Gateway uses batched settlement: individual $0.001 hires are
+          authorized and Gateway-debited immediately (real payment), but the
+          on-chain Arc transaction lands later as one batch. The UUID is the
+          settlement receipt that can be resolved to the eventual tx. */}
       {cycle.specialists.length > 0 && (
         <div className="flex items-center gap-2 mt-2.5 overflow-x-auto pb-1">
           {cycle.specialists.map((s, i) => {
             const sigColor =
               (s.signal ?? "HOLD") === "BUY" ? "text-[#39FF7A]" : (s.signal ?? "HOLD") === "SELL" ? "text-[#FF5A5A]" : "text-[#FFCC00]";
-            const realTxHash = s.paymentTxHash?.startsWith("0x") ? s.paymentTxHash : null;
-            const txUrl = realTxHash ? arcTxUrl(realTxHash) : null;
+            const txHash = s.paymentTxHash ?? "";
+            const isDirect = txHash.startsWith("0x");
+            const isBatched =
+              !isDirect &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(txHash);
+            const txUrl = isDirect ? arcTxUrl(txHash) : null;
             return (
               <div
                 key={i}
@@ -131,17 +140,25 @@ function CompactView({
                 {s.attestation && s.attestation !== "mock-s" && (
                   <span className="w-1 h-1 rounded-full bg-gold-400" title="TEE attested" />
                 )}
-                {txUrl && realTxHash && (
+                {txUrl && (
                   <a
                     href={txUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={stop}
-                    title={`Real Arc x402 settlement: ${realTxHash}`}
+                    title={`Arc x402 settlement: ${txHash}`}
                     className="text-[9px] font-mono text-teal-400 hover:text-teal-300 underline decoration-dotted"
                   >
                     tx ↗
                   </a>
+                )}
+                {isBatched && (
+                  <span
+                    title={`Circle Gateway settlement receipt: ${txHash}`}
+                    className="text-[9px] font-mono text-teal-400/80 cursor-help"
+                  >
+                    batched
+                  </span>
                 )}
               </div>
             );
