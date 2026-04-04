@@ -15,19 +15,18 @@ interface Position {
   sharePct: number;
 }
 
-// Fixed palette — the order is chosen so adjacent slices have visibly
-// different hues on the dark theme (USDC teal, ETH gold, SYNTH purple, …).
+// Muted, warm-leaning palette — matches @theme void + dawg (no neon rainbow).
 const PALETTE: Record<string, string> = {
-  USDC: "#5EEAD4",
-  USD: "#5EEAD4",
-  ETH: "#FFC700",
-  WETH: "#FFC700",
-  SYNTH: "#C497FF",
-  UNI: "#FF6B9D",
-  LINK: "#4E8BFF",
-  AAVE: "#B47AFF",
+  USDC: "#3D8A82",
+  USD: "#3D8A82",
+  ETH: "#C9A227",
+  WETH: "#9A7B1A",
+  SYNTH: "#6B5B8C",
+  UNI: "#8B5A6B",
+  LINK: "#5A6B8B",
+  AAVE: "#7A6B8C",
 };
-const FALLBACK = "#94A3B8";
+const FALLBACK = "#5C594F";
 
 function colorFor(symbol: string): string {
   return PALETTE[symbol.toUpperCase()] ?? FALLBACK;
@@ -110,15 +109,15 @@ export function PortfolioPie({
     <div className="flex flex-col md:flex-row items-center gap-6">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Portfolio composition">
         {/* Outer ring accent */}
-        <circle cx={cx} cy={cy} r={radius + 4} fill="none" stroke="#1F1B18" strokeWidth="2" />
+        <circle cx={cx} cy={cy} r={radius + 4} fill="none" stroke="#17150F" strokeWidth="1" opacity={0.9} />
         {slices.map((s, i) => (
           <path
             key={`${s.position.symbol}-${i}`}
             d={s.path}
             fill={s.color}
-            stroke="#000"
-            strokeWidth="1.5"
-            opacity={0.92}
+            stroke="#070605"
+            strokeWidth="1"
+            opacity={0.88}
           >
             <title>
               {s.position.symbol} · {s.position.sharePct.toFixed(1)}% · $
@@ -127,13 +126,13 @@ export function PortfolioPie({
           </path>
         ))}
         {/* Center hole with total NAV */}
-        <circle cx={cx} cy={cy} r={radius * 0.45} fill="#0C0A09" stroke="#332A24" strokeWidth="1" />
+        <circle cx={cx} cy={cy} r={radius * 0.45} fill="#070605" stroke="#17150F" strokeWidth="1" />
         <text
           x={cx}
           y={cy - 4}
           textAnchor="middle"
-          className="fill-void-500"
-          style={{ fontSize: 10, letterSpacing: 1.5 }}
+          className="fill-void-600"
+          style={{ fontSize: 9, letterSpacing: 2 }}
         >
           TOTAL NAV
         </text>
@@ -141,31 +140,31 @@ export function PortfolioPie({
           x={cx}
           y={cy + 16}
           textAnchor="middle"
-          className="fill-gold-400 font-mono font-bold"
-          style={{ fontSize: 22 }}
+          className="fill-dawg-400 font-mono font-semibold"
+          style={{ fontSize: 21 }}
         >
           ${totalUsd.toFixed(2)}
         </text>
       </svg>
 
-      <ul className="space-y-2 min-w-[200px]">
+      <ul className="space-y-2.5 min-w-[200px] w-full max-w-xs">
         {slices.map((s) => (
           <li
             key={s.position.symbol}
-            className="flex items-center justify-between gap-4 text-sm"
+            className="flex items-center justify-between gap-4 text-sm border-b border-void-800/50 pb-2.5 last:border-0 last:pb-0"
           >
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
               <span
-                className="inline-block w-3 h-3 rounded-sm"
+                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0 ring-1 ring-black/40"
                 style={{ backgroundColor: s.color }}
               />
-              <span className="font-semibold text-void-200">{s.position.symbol}</span>
+              <span className="font-medium text-void-300 truncate">{s.position.symbol}</span>
             </div>
-            <div className="text-right font-mono tabular-nums">
-              <div className="text-void-100 text-sm">
+            <div className="text-right font-mono tabular-nums shrink-0">
+              <div className="text-void-200 text-sm">
                 {s.position.sharePct.toFixed(1)}%
               </div>
-              <div className="text-void-500 text-[10px]">
+              <div className="text-void-600 text-[10px]">
                 ${s.position.usdValue.toFixed(2)}
               </div>
             </div>

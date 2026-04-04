@@ -8,36 +8,13 @@ import { PortfolioPie } from "@/components/portfolio/portfolio-pie";
 import { EvolutionChart } from "@/components/portfolio/evolution-chart";
 import { AttributionLog } from "@/components/portfolio/attribution-log";
 import { useUser } from "@/contexts/user-context";
+import type { PortfolioResponse } from "@/lib/portfolio-types";
 
-interface PortfolioResponse {
-  current: {
-    usdcDeposited: number;
-    positions: Array<{
-      symbol: string;
-      amount: number;
-      usdValue: number;
-      sharePct: number;
-    }>;
-    totalUsd: number;
-  };
-  evolution: Array<{
-    cycleNumber: number;
-    timestamp: string;
-    action: string;
-    asset: string;
-    pct: number;
-    navAfter: number;
-    swapTxHash: string | null;
-    attribution: {
-      specialist: string | null;
-      confidence: number | null;
-      signal: string | null;
-    };
-  }>;
-  totalNav: number;
-  cycleCount: number;
-  swapCount: number;
-}
+/** KPI values: one accent (NAV), rest neutral for calmer scan. */
+const KPI_STYLES = {
+  nav: "text-dawg-400",
+  default: "text-void-200",
+} as const;
 
 export default function PortfolioPage() {
   const { userId, isConnected } = useUser();
@@ -52,9 +29,6 @@ export default function PortfolioPage() {
     }
     setLoading(true);
     setError(null);
-    // Poll every 10s so the page auto-refreshes during a live cycle without
-    // requiring the user to reload. Uses `cache: "no-store"` so Vercel edge
-    // caching never serves a stale snapshot.
     let cancelled = false;
     const load = async () => {
       try {
@@ -82,20 +56,18 @@ export default function PortfolioPage() {
 
   if (!isConnected || !userId) {
     return (
-      <main className="max-w-7xl mx-auto px-5 py-8 space-y-4">
-        <h1 className="text-lg font-bold text-void-100">Portfolio</h1>
-        <Card>
-          <CardBody className="text-center py-12 space-y-2">
-            <p className="text-void-400 text-sm">Connect your wallet to view your portfolio.</p>
-          </CardBody>
-        </Card>
+      <main className="max-w-screen-2xl mx-auto px-5 py-8">
+        <div className="rounded-2xl border border-void-800 bg-void-950/60 px-6 py-12 text-center">
+          <h1 className="font-pixel text-lg text-dawg-400/90 uppercase tracking-wider mb-2">Portfolio</h1>
+          <p className="text-void-500 text-sm">Connect your wallet to view positions and hunt history.</p>
+        </div>
       </main>
     );
   }
 
   if (loading && !data) {
     return (
-      <main className="max-w-7xl mx-auto flex justify-center px-5 py-16">
+      <main className="max-w-screen-2xl mx-auto flex justify-center px-5 py-20">
         <DawgSpinner size={56} label="Loading portfolio…" />
       </main>
     );
@@ -103,102 +75,93 @@ export default function PortfolioPage() {
 
   if (error || !data) {
     return (
-      <main className="max-w-7xl mx-auto px-5 py-8 space-y-4">
-        <h1 className="text-lg font-bold text-void-100">Portfolio</h1>
-        <Card>
-          <CardBody className="py-8 space-y-2 text-center">
-            <p className="text-sm text-blood-300">Failed to load portfolio data.</p>
-            {error && <p className="text-xs text-void-500 font-mono">{error}</p>}
-          </CardBody>
-        </Card>
+      <main className="max-w-screen-2xl mx-auto px-5 py-8">
+        <h1 className="font-pixel text-lg text-void-200 mb-4">Portfolio</h1>
+        <div className="rounded-2xl border border-blood-900/30 bg-blood-950/10 px-6 py-8 text-center">
+          <p className="text-sm text-blood-300/90">Failed to load portfolio data.</p>
+          {error && <p className="text-xs text-void-500 font-mono mt-2">{error}</p>}
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="max-w-7xl mx-auto px-5 py-6 space-y-5">
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-lg font-bold text-void-100">Portfolio</h1>
-          <p className="text-sm text-void-500 mt-0.5">
-            Your agent&apos;s on-chain positions, evolution, and hunt attribution.
-          </p>
+    <main className="max-w-screen-2xl mx-auto px-5 py-6 space-y-6">
+      <header className="rounded-2xl border border-void-800/90 bg-void-950/70 px-5 py-6 sm:px-8 sm:py-7">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-void-600">
+              Portfolio
+            </p>
+            <h1 className="font-pixel text-[26px] sm:text-[30px] leading-tight text-dawg-400/95 uppercase tracking-wide">
+              Holdings &amp; hunts
+            </h1>
+            <p className="text-sm text-void-500 leading-relaxed">
+              Allocation, NAV over cycles, and attribution. Arc swap hashes open in ArcScan when present.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <Badge variant="gray">{data.cycleCount} hunts</Badge>
+            <Badge variant="gray">{data.swapCount} swaps</Badge>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="amber">{data.cycleCount} hunts</Badge>
-          <Badge variant="green">{data.swapCount} swaps</Badge>
-        </div>
-      </div>
+      </header>
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard
-          label="Total NAV"
-          value={`$${data.totalNav.toFixed(2)}`}
-          accent="gold-400"
-        />
-        <KpiCard
-          label="USDC"
-          value={`$${data.current.usdcDeposited.toFixed(2)}`}
-          accent="teal-300"
-        />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard label="Total NAV" value={`$${data.totalNav.toFixed(2)}`} valueClass={KPI_STYLES.nav} />
+        <KpiCard label="USDC" value={`$${data.current.usdcDeposited.toFixed(2)}`} valueClass={KPI_STYLES.default} />
         <KpiCard
           label="Token positions"
           value={String(data.current.positions.filter((p) => p.symbol !== "USDC").length)}
-          accent="void-100"
+          valueClass={KPI_STYLES.default}
         />
-        <KpiCard
-          label="Executed swaps"
-          value={String(data.swapCount)}
-          accent="emerald-300"
-        />
+        <KpiCard label="Executed swaps" value={String(data.swapCount)} valueClass={KPI_STYLES.default} />
       </div>
 
-      {/* Pie chart + legend */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-            <span className="w-2 h-2 rounded-full bg-dawg-500" />
-            Current allocation
-          </div>
-          <Badge variant="gray">snapshot</Badge>
-        </CardHeader>
-        <CardBody>
-          <PortfolioPie
-            positions={data.current.positions}
-            totalUsd={data.current.totalUsd}
-          />
-        </CardBody>
-      </Card>
+      <section>
+        <Card className="border-void-800/80 bg-void-950/40 overflow-hidden">
+          <CardHeader className="border-void-800/80 bg-black/20">
+            <div className="flex items-center gap-2 text-sm font-medium text-void-300">
+              <span className="h-px w-6 bg-dawg-500/60" aria-hidden />
+              Current allocation
+            </div>
+            <Badge variant="gray">live</Badge>
+          </CardHeader>
+          <CardBody className="pt-4 pb-6">
+            <PortfolioPie positions={data.current.positions} totalUsd={data.current.totalUsd} />
+          </CardBody>
+        </Card>
+      </section>
 
-      {/* Evolution chart */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            NAV evolution per hunt
-          </div>
-          <Badge variant="gray">last {data.evolution.length} cycles</Badge>
-        </CardHeader>
-        <CardBody>
-          <EvolutionChart evolution={data.evolution} />
-        </CardBody>
-      </Card>
+      <section>
+        <Card className="border-void-800/80 bg-void-950/40 overflow-hidden">
+          <CardHeader className="border-void-800/80 bg-black/20">
+            <div className="flex items-center gap-2 text-sm font-medium text-void-300">
+              <span className="h-px w-6 bg-dawg-500/60" aria-hidden />
+              NAV evolution per hunt
+            </div>
+            <Badge variant="gray">{data.evolution.length} cycles</Badge>
+          </CardHeader>
+          <CardBody className="pt-2 pb-5">
+            <EvolutionChart evolution={data.evolution} />
+          </CardBody>
+        </Card>
+      </section>
 
-      {/* Attribution log */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-            <span className="w-2 h-2 rounded-full bg-purple-500" />
-            Per-hunt attribution
-          </div>
-          <Badge variant="gray">who drove each position</Badge>
-        </CardHeader>
-        <CardBody>
-          <AttributionLog evolution={data.evolution} />
-        </CardBody>
-      </Card>
+      <section>
+        <Card className="border-void-800/80 bg-void-950/40 overflow-hidden">
+          <CardHeader className="border-void-800/80 bg-black/20">
+            <div className="flex items-center gap-2 text-sm font-medium text-void-300">
+              <span className="h-px w-6 bg-dawg-500/60" aria-hidden />
+              Per-hunt attribution
+            </div>
+            <Badge variant="gray">Arc tx · verify</Badge>
+          </CardHeader>
+          <CardBody className="pt-2 pb-5">
+            <AttributionLog evolution={data.evolution} />
+          </CardBody>
+        </Card>
+      </section>
     </main>
   );
 }
@@ -206,17 +169,17 @@ export default function PortfolioPage() {
 function KpiCard({
   label,
   value,
-  accent,
+  valueClass,
 }: {
   label: string;
   value: string;
-  accent: string;
+  valueClass: string;
 }) {
   return (
-    <Card>
-      <CardBody className="py-3 px-4 space-y-1">
+    <Card className="border-void-800/70 bg-void-950/50 hover:border-void-700/90 transition-colors">
+      <CardBody className="py-3.5 px-4 space-y-1">
         <div className="text-[10px] uppercase tracking-wider text-void-600">{label}</div>
-        <div className={`text-xl font-bold font-mono tabular-nums text-${accent}`}>{value}</div>
+        <div className={`text-xl font-semibold font-mono tabular-nums ${valueClass}`}>{value}</div>
       </CardBody>
     </Card>
   );

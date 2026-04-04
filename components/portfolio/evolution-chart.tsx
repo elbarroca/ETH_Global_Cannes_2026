@@ -26,10 +26,11 @@ interface EvolutionPoint {
   };
 }
 
+/** Muted semantic dots — readable on void without neon clash. */
 const ACTION_COLORS: Record<string, string> = {
-  BUY: "#39FF7A",
-  SELL: "#FF5A5A",
-  HOLD: "#FFC700",
+  BUY: "#4A9D6E",
+  SELL: "#C45C5C",
+  HOLD: "#B8952E",
 };
 
 export function EvolutionChart({ evolution }: { evolution: EvolutionPoint[] }) {
@@ -39,7 +40,7 @@ export function EvolutionChart({ evolution }: { evolution: EvolutionPoint[] }) {
 
   if (points.length < 2) {
     return (
-      <div className="flex items-center justify-center h-[220px] border border-void-800 rounded-lg text-xs text-void-600">
+      <div className="flex items-center justify-center h-[220px] border border-void-800/70 rounded-xl text-xs text-void-600 bg-black/20">
         Need at least 2 committed hunts to draw the evolution chart.
       </div>
     );
@@ -102,8 +103,9 @@ export function EvolutionChart({ evolution }: { evolution: EvolutionPoint[] }) {
                 x2={width - padR}
                 y1={y}
                 y2={y}
-                stroke="#1F1B18"
-                strokeDasharray="2 4"
+                stroke="#17150F"
+                strokeOpacity={0.65}
+                strokeDasharray="2 5"
               />
               <text
                 x={padL - 6}
@@ -124,7 +126,7 @@ export function EvolutionChart({ evolution }: { evolution: EvolutionPoint[] }) {
           x2={width - padR}
           y1={height - padB}
           y2={height - padB}
-          stroke="#332A24"
+          stroke="#1F1C16"
           strokeWidth="1"
         />
         {[points[0], points[Math.floor(points.length / 2)], points[points.length - 1]].map(
@@ -143,20 +145,23 @@ export function EvolutionChart({ evolution }: { evolution: EvolutionPoint[] }) {
         )}
 
         {/* Connecting line */}
-        <path d={pathD} fill="none" stroke="#FFC700" strokeWidth="2" opacity={0.9} />
+        <path d={pathD} fill="none" stroke="#9A8540" strokeWidth="1.75" opacity={0.85} />
 
         {/* Per-cycle points, colored by action */}
         {points.map((p) => {
           const x = xScale(p.cycleNumber);
           const y = yScale(p.navAfter);
-          const color = ACTION_COLORS[p.action.toUpperCase()] ?? "#94A3B8";
+          const color = ACTION_COLORS[p.action.toUpperCase()] ?? "#5C594F";
           return (
             <g key={p.cycleNumber}>
-              <circle cx={x} cy={y} r={5} fill={color} stroke="#000" strokeWidth="1.5">
+              <circle cx={x} cy={y} r={4.5} fill={color} stroke="#070605" strokeWidth="1">
                 <title>
                   Hunt #{p.cycleNumber} · {p.action} {p.pct}% {p.asset} · NAV $
                   {p.navAfter.toFixed(2)}
                   {p.attribution.specialist ? ` · driven by ${p.attribution.specialist}` : ""}
+                  {p.swapTxHash
+                    ? ` · Arc tx ${p.swapTxHash.slice(0, 10)}…${p.swapTxHash.slice(-4)}`
+                    : " · no swap tx (HOLD / no execution)"}
                 </title>
               </circle>
             </g>
@@ -165,18 +170,18 @@ export function EvolutionChart({ evolution }: { evolution: EvolutionPoint[] }) {
       </svg>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mt-2 px-4 text-[11px] text-void-500">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 px-1 text-[10px] uppercase tracking-wider text-void-600">
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#39FF7A]" />
-          BUY
+          <span className="w-2 h-2 rounded-full bg-[#4A9D6E]" />
+          Buy
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#FF5A5A]" />
-          SELL
+          <span className="w-2 h-2 rounded-full bg-[#C45C5C]" />
+          Sell
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#FFC700]" />
-          HOLD
+          <span className="w-2 h-2 rounded-full bg-[#B8952E]" />
+          Hold
         </span>
       </div>
     </div>

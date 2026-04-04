@@ -7,29 +7,10 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/portfolio/[userId]
  *
- * Returns a consolidated view of the user's current + historical holdings
- * suitable for rendering the Portfolio page: pie chart of current positions,
- * evolution line chart of NAV movements per swap, and per-hunt attribution
- * so users can see which specialists drove each position.
- *
- * Data sources (all already in Prisma / user record — no new tables needed):
- *
- *   - current: `user.fund.depositedUsdc` (USDC on Arc) + `user.fund.holdings`
- *              (token symbol → amount, atomically-updated by commitCycle).
- *              Token-to-USD conversion uses a simple static table for demo
- *              purposes — real pricing plumbing is a follow-up.
- *   - evolution: `prisma.cycle.findMany` filtered to rows with a non-null
- *                swapTxHash, ordered by cycleNumber. Each row is one point on
- *                the evolution chart. Attribution is computed per row from
- *                the JSONB `specialists` column — the top-confidence
- *                specialist whose signal matched the final decision.
- *   - totalNav: current deposited USDC + the last known `nav_after` from the
- *               most recent cycle (which already includes token marks).
+ * Holdings snapshot, NAV evolution, and per-hunt attribution for /portfolio.
+ * Nanopayments and debate flow live on the dashboard hunt accordion instead.
  */
 
-// Demo pricing — good enough to land the chart story for judges. A real
-// implementation would call CoinGecko per-token or reuse the cached feed in
-// src/agents/data/cached-fetch.ts. Unknown symbols fall through as 0.
 const DEMO_PRICES_USD: Record<string, number> = {
   USDC: 1,
   USD: 1,
@@ -49,15 +30,16 @@ interface PortfolioPosition {
   symbol: string;
   amount: number;
   usdValue: number;
-  sharePct: number; // 0-100
+  sharePct: number;
 }
 
 interface EvolutionPoint {
+  cycleId: string;
   cycleNumber: number;
   timestamp: string;
-  action: string; // BUY | SELL | HOLD
-  asset: string; // ticker
-  pct: number; // decision percentage
+  action: string;
+  asset: string;
+  pct: number;
   navAfter: number;
   swapTxHash: string | null;
   attribution: {
@@ -80,8 +62,6 @@ function resolveAttribution(
   if (!Array.isArray(specialistsJson) || !decision) {
     return { specialist: null, confidence: null, signal: null };
   }
-  // Pick the highest-confidence specialist whose signal matches the final
-  // decision — that's the "which agent drove this position" answer.
   const matching = (specialistsJson as StoredSpecialist[])
     .filter((s) => typeof s?.signal === "string" && s.signal.toUpperCase() === decision.toUpperCase())
     .sort((a, b) => (Number(b?.confidence) || 0) - (Number(a?.confidence) || 0));
@@ -109,7 +89,6 @@ export async function GET(
 
     const prisma = getPrisma();
 
-    // ── Current positions ───────────────────────────────────────────
     const depositedUsdc = user.fund?.depositedUsdc ?? 0;
     const holdings =
       (user.fund as unknown as { holdings?: Record<string, number> }).holdings ?? {};
@@ -131,27 +110,15 @@ export async function GET(
         p.sharePct = (p.usdValue / totalUsd) * 100;
       }
     }
-    // Sort biggest-first so the pie chart reads clockwise from the largest
-    // slice, which is the conventional orientation.
     positions.sort((a, b) => b.usdValue - a.usdValue);
 
-    // ── Evolution: one point per successful cycle swap ──────────────
     const cycles = await prisma.cycle.findMany({
       where: { userId: user.id },
       orderBy: { cycleNumber: "asc" },
-      select: {
-        cycleNumber: true,
-        createdAt: true,
-        decision: true,
-        asset: true,
-        decisionPct: true,
-        navAfter: true,
-        swapTxHash: true,
-        specialists: true,
-      },
     });
 
     const evolution: EvolutionPoint[] = cycles.map((c) => ({
+      cycleId: c.id,
       cycleNumber: c.cycleNumber,
       timestamp: c.createdAt.toISOString(),
       action: c.decision ?? "HOLD",
@@ -162,7 +129,6 @@ export async function GET(
       attribution: resolveAttribution(c.specialists, c.decision),
     }));
 
-    // ── Totals ──────────────────────────────────────────────────────
     const lastNavAfter = cycles.length > 0 ? (cycles[cycles.length - 1].navAfter ?? 0) : 0;
     const totalNav = Math.max(totalUsd, lastNavAfter);
 
