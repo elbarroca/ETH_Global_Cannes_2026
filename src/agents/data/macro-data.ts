@@ -1,6 +1,7 @@
 // Fetches REAL macro economic data — FRED API (DXY, 10Y yield, VIX)
 
 import { cachedFetch } from "./cached-fetch";
+import { injectUniverseInto } from "./universe-injector";
 
 const FRED_BASE = "https://api.stlouisfed.org/fred/series/observations";
 
@@ -93,5 +94,10 @@ export async function fetchMacroData(): Promise<string> {
   results.regime = classifyRegime(dxy, vix, yield10y);
 
   results.source = "fred_api";
+
+  // EVM universe for picks — macro-correlator maps regime to beta plays
+  // (risk-on → ARB/OP/UNI/LDO, risk-off → WETH/DAI).
+  await injectUniverseInto(results);
+
   return JSON.stringify(results);
 }

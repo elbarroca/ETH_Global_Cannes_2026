@@ -1,6 +1,7 @@
 // Fetches REAL on-chain forensics — Etherscan whale tracking + supply data
 
 import { cachedFetch } from "./cached-fetch";
+import { injectUniverseInto } from "./universe-injector";
 
 function getEtherscanBase(): string {
   return process.env.ETHERSCAN_API_URL ?? "https://api.etherscan.io/api";
@@ -111,6 +112,9 @@ export async function fetchOnchainForensicsData(): Promise<string> {
   } catch {
     results.eth_supply = 120_450_000;
   }
+
+  // EVM universe for picks — forensics maps smart-money flows to tickers.
+  await injectUniverseInto(results);
 
   return JSON.stringify(results);
 }

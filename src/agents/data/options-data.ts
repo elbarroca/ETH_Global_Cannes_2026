@@ -1,6 +1,7 @@
 // Fetches REAL options data — Deribit public API (BTC options + historical vol)
 
 import { cachedFetch } from "./cached-fetch";
+import { injectUniverseInto } from "./universe-injector";
 
 const DERIBIT_BOOK_URL = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option";
 const DERIBIT_HVOL_URL = "https://www.deribit.com/api/v2/public/get_historical_volatility?currency=BTC";
@@ -133,6 +134,10 @@ export async function fetchOptionsData(): Promise<string> {
     results.historical_vol_latest = 48.5;
     results.vol_trend = "stable";
   }
+
+  // EVM universe for picks — options-flow maps BTC/ETH vol regime to EVM
+  // beta plays (WETH + ARB/OP/UNI/AAVE/LDO).
+  await injectUniverseInto(results);
 
   return JSON.stringify(results);
 }

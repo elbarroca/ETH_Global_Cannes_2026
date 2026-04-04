@@ -1,9 +1,14 @@
 // Fetches REAL memecoin data — DexScreener boosted tokens + new profiles
+// Filtered to EVM chains only (the execution router cannot swap Solana/SUI/etc).
 
 import { cachedFetch } from "./cached-fetch";
+import { injectUniverseInto } from "./universe-injector";
 
 const DEXSCREENER_BOOSTS_URL = "https://api.dexscreener.com/token-boosts/latest/v1";
 const DEXSCREENER_PROFILES_URL = "https://api.dexscreener.com/token-profiles/latest/v1";
+
+/** DexScreener chain IDs that our execution router can actually swap against. */
+const EVM_CHAINS = new Set(["ethereum", "base", "arbitrum", "optimism", "polygon"]);
 
 interface DexScreenerToken {
   url: string;
@@ -27,10 +32,13 @@ interface DexScreenerProfile {
 export async function fetchMemecoinData(): Promise<string> {
   const results: Record<string, unknown> = { fetched_at: new Date().toISOString() };
 
-  // Top boosted tokens (paid boosts = attention signal)
+  // Top boosted tokens (paid boosts = attention signal).
+  // Filter to EVM chains only — Solana/SUI/etc boosts can't be swapped through
+  // our router so surfacing them just encourages hallucinated picks.
   try {
     const boosts = await cachedFetch<DexScreenerToken[]>(DEXSCREENER_BOOSTS_URL, 60_000);
-    results.top_boosted = boosts.slice(0, 5).map((t) => ({
+    const evmBoosts = boosts.filter((t) => EVM_CHAINS.has((t.chainId ?? "").toLowerCase()));
+    results.top_boosted = evmBoosts.slice(0, 5).map((t) => ({
       chain: t.chainId,
       address: t.tokenAddress,
       url: t.url,
@@ -39,18 +47,20 @@ export async function fetchMemecoinData(): Promise<string> {
     }));
   } catch {
     results.top_boosted = [
-      { chain: "solana", address: "0xmock1", url: "https://dexscreener.com/solana/mock1", boost_amount: 500, description: "PEPE 2.0 — community meme" },
+      { chain: "ethereum", address: "0xmock1", url: "https://dexscreener.com/ethereum/mock1", boost_amount: 500, description: "PEPE 2.0 — community meme" },
       { chain: "ethereum", address: "0xmock2", url: "https://dexscreener.com/ethereum/mock2", boost_amount: 350, description: "WOJAK token" },
       { chain: "base", address: "0xmock3", url: "https://dexscreener.com/base/mock3", boost_amount: 280, description: "DEGEN on Base" },
-      { chain: "solana", address: "0xmock4", url: "https://dexscreener.com/solana/mock4", boost_amount: 200, description: "BONK revival" },
-      { chain: "arbitrum", address: "0xmock5", url: "https://dexscreener.com/arbitrum/mock5", boost_amount: 150, description: "ARB meme token" },
+      { chain: "arbitrum", address: "0xmock4", url: "https://dexscreener.com/arbitrum/mock4", boost_amount: 200, description: "ARB-native meme revival" },
+      { chain: "arbitrum", address: "0xmock5", url: "https://dexscreener.com/arbitrum/mock5", boost_amount: 150, description: "Arbitrum meme token" },
     ];
   }
 
-  // New token profiles (freshly listed tokens)
+  // New token profiles (freshly listed tokens) — EVM chains only for the
+  // same reason as boosts above.
   try {
     const profiles = await cachedFetch<DexScreenerProfile[]>(DEXSCREENER_PROFILES_URL, 60_000);
-    results.new_profiles = profiles.slice(0, 5).map((p) => ({
+    const evmProfiles = profiles.filter((p) => EVM_CHAINS.has((p.chainId ?? "").toLowerCase()));
+    results.new_profiles = evmProfiles.slice(0, 5).map((p) => ({
       chain: p.chainId,
       address: p.tokenAddress,
       url: p.url,
@@ -58,11 +68,15 @@ export async function fetchMemecoinData(): Promise<string> {
     }));
   } catch {
     results.new_profiles = [
-      { chain: "solana", address: "0xnew1", url: "https://dexscreener.com/solana/new1", description: "AI Agent meme token" },
+      { chain: "base", address: "0xnew1", url: "https://dexscreener.com/base/new1", description: "AI Agent meme token" },
       { chain: "base", address: "0xnew2", url: "https://dexscreener.com/base/new2", description: "Based cat token" },
       { chain: "ethereum", address: "0xnew3", url: "https://dexscreener.com/ethereum/new3", description: "ETH meme revival" },
     ];
   }
+
+  // Attach the broader EVM universe so memecoin-hunter can actually pick
+  // tradeable ERC-20s (DexScreener data is sentiment only).
+  await injectUniverseInto(results);
 
   return JSON.stringify(results);
 }

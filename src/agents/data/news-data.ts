@@ -1,6 +1,7 @@
 // Fetches REAL crypto news sentiment — CryptoPanic API
 
 import { cachedFetch } from "./cached-fetch";
+import { injectUniverseInto } from "./universe-injector";
 
 interface CryptoPanicPost {
   kind: string;
@@ -86,6 +87,9 @@ export async function fetchNewsData(): Promise<string> {
     ];
     results.source = "mock";
   }
+
+  // EVM universe for picks — news-scanner maps headlines to tradeable tickers.
+  await injectUniverseInto(results);
 
   return JSON.stringify(results);
 }
