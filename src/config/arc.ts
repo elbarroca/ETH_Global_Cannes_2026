@@ -3,7 +3,7 @@ import { createPaymentFetch, createGatewayClient } from "../payments/x402-client
 import { bytesToHex } from "viem";
 import type { GatewayClient } from "@circle-fin/x402-batching/client";
 
-function getUserPrivateKey(hotWalletIndex: number): `0x${string}` {
+export function getUserPrivateKey(hotWalletIndex: number): `0x${string}` {
   const account = deriveUserAccount(hotWalletIndex);
   const hdKey = account.getHdKey();
   if (!hdKey.privateKey) throw new Error("HD key has no private key");
