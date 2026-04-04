@@ -118,6 +118,9 @@ model MarketplaceAgent {
   dataSources     String[]          @default([]) @map("data_sources")
   openclawAgentId String?           @map("openclaw_agent_id")
   walletAddress   String?           @map("wallet_address")
+  storageRootHash String?           @map("storage_root_hash")
+  storageUri      String?           @map("storage_uri")
+  mintTxHash      String?           @map("mint_tx_hash")
 
   @@map("marketplace_agents")
 }

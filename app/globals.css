@@ -368,6 +368,80 @@ body {
   to { transform: translateX(-50%); }
 }
 
+/* ───────── Reusable LED / glow utilities ─────────
+ *
+ * These are intentionally NOT scoped to .nasdaq-led — they can be applied
+ * on any element across the app to pull it into the Marketsite aesthetic.
+ *
+ * Pairing guide:
+ *   • `.font-pixel`          → swap to VT323 dot-matrix font
+ *   • `.glow-dawg/green/red` → add the LED bloom without changing font
+ *   • `.glow-card`           → soft yellow rim around a dark panel
+ *
+ * Combine e.g. `font-pixel glow-dawg-strong` for a full LED headline,
+ * or keep sans-serif and just add `glow-dawg` for a subtle lit accent.
+ */
+
+.font-pixel {
+  font-family: var(--font-vt323), 'VT323', 'Courier New', monospace;
+  letter-spacing: 0.04em;
+}
+
+.glow-dawg {
+  text-shadow:
+    0 0 1px rgba(255, 204, 0, 0.95),
+    0 0 6px rgba(255, 199, 0, 0.55),
+    0 0 14px rgba(255, 199, 0, 0.25);
+}
+.glow-dawg-strong {
+  text-shadow:
+    0 0 2px rgba(255, 224, 102, 1),
+    0 0 10px rgba(255, 199, 0, 0.85),
+    0 0 24px rgba(255, 199, 0, 0.4);
+}
+.glow-green {
+  text-shadow:
+    0 0 1px rgba(57, 255, 122, 0.95),
+    0 0 8px rgba(16, 185, 129, 0.6),
+    0 0 18px rgba(16, 185, 129, 0.28);
+}
+.glow-red {
+  text-shadow:
+    0 0 1px rgba(255, 90, 90, 0.95),
+    0 0 8px rgba(239, 68, 68, 0.6),
+    0 0 18px rgba(239, 68, 68, 0.28);
+}
+.glow-teal {
+  text-shadow:
+    0 0 1px rgba(94, 234, 212, 0.95),
+    0 0 8px rgba(20, 184, 166, 0.55),
+    0 0 18px rgba(20, 184, 166, 0.25);
+}
+.glow-purple {
+  text-shadow:
+    0 0 1px rgba(196, 151, 255, 0.95),
+    0 0 8px rgba(168, 85, 247, 0.55),
+    0 0 18px rgba(168, 85, 247, 0.25);
+}
+.glow-void {
+  text-shadow:
+    0 0 6px rgba(246, 243, 228, 0.35),
+    0 0 14px rgba(246, 243, 228, 0.18);
+}
+
+.glow-card {
+  box-shadow:
+    0 0 0 1px rgba(255, 199, 0, 0.14),
+    0 0 28px -6px rgba(255, 199, 0, 0.18),
+    inset 0 0 30px -12px rgba(255, 199, 0, 0.06);
+}
+.glow-card-strong {
+  box-shadow:
+    0 0 0 1px rgba(255, 199, 0, 0.38),
+    0 0 46px -6px rgba(255, 199, 0, 0.32),
+    inset 0 0 36px -8px rgba(255, 199, 0, 0.1);
+}
+
 /* ───────── Reduced motion ───────── */
 
 @media (prefers-reduced-motion: reduce) {

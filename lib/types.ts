@@ -163,6 +163,10 @@ export interface Agent {
   walletAddress?: string;
   /** Real ERC-7857 token ID on the VaultMindAgent contract. NULL if not minted. */
   inftTokenId?: number | null;
+  /** 0G Storage root hash for this agent's memory blob. */
+  storageRootHash?: string | null;
+  /** Full 0g-storage:// URI — equal to what's bound on-chain in encryptedURIs. */
+  storageUri?: string | null;
   /** ISO timestamp of the most recent SPECIALIST_HIRED row. */
   lastHireAt?: string | null;
 }

@@ -51,11 +51,17 @@ export async function getHotWalletUsdBalance(address: `0x${string}`): Promise<nu
 }
 
 /**
- * Ensure the hot wallet holds at least `requiredUsd` USDC, pulling from the
- * Circle proxy wallet if needed. Throws only if the transfer provably fails
- * (Circle rejects or balance never increases). Non-fatal otherwise — the
- * caller should catch and fall back to a degraded "insufficient funds" swap
- * result.
+ * Bridge `requiredUsd` USDC from the Circle proxy wallet to the hot wallet.
+ *
+ * IMPORTANT: this ALWAYS pulls from the proxy, regardless of whether the hot
+ * wallet already has sufficient balance. This is deliberate — the hot wallet
+ * may hold pre-funded demo USDC that isn't the user's deposit, and we want
+ * every swap to be debited against the user's actual custody. Any residue in
+ * the hot wallet is separate from user accounting.
+ *
+ * Throws only if the transfer provably fails (Circle rejects or balance
+ * never increases). Non-fatal otherwise — the caller should catch and fall
+ * back to a degraded "insufficient funds" swap result.
  */
 export async function prepareSwapFunds(
   user: UserRecord,
@@ -71,20 +77,9 @@ export async function prepareSwapFunds(
   const hotAddress = user.hotWalletAddress as `0x${string}`;
   const beforeUsd = await getHotWalletUsdBalance(hotAddress);
 
-  // Already funded? Shortcut — no Circle call needed.
-  if (beforeUsd >= requiredUsd) {
-    return {
-      skipped: true,
-      toAddress: hotAddress,
-      transferredUsd: 0,
-      beforeUsd,
-      afterUsd: beforeUsd,
-    };
-  }
-
-  const shortfallUsd = requiredUsd - beforeUsd;
-  // Add a tiny buffer so rounding errors don't cause a second shortfall.
-  const transferUsd = Math.ceil(shortfallUsd * 100) / 100 + 0.01;
+  // We always bridge the full swap amount + a small buffer for rounding.
+  // This guarantees the proxy wallet is the source of truth for user spend.
+  const transferUsd = Math.ceil(requiredUsd * 10000) / 10000 + 0.0001;
 
   // Guard: don't try to move more than the proxy actually holds.
   const proxyBalances = await getProxyBalance(user.proxyWallet.walletId).catch(() => []);
@@ -93,9 +88,10 @@ export async function prepareSwapFunds(
     const proxyUsd = parseFloat(proxyUsdc.amount);
     if (proxyUsd < transferUsd) {
       throw new Error(
-        `proxy wallet has only $${proxyUsd.toFixed(4)} — cannot cover $${transferUsd.toFixed(4)} swap funding (hot wallet has $${beforeUsd.toFixed(4)})`,
+        `proxy wallet has only $${proxyUsd.toFixed(4)} — cannot cover $${transferUsd.toFixed(4)} swap funding`,
       );
     }
+    console.log(`[fund-swap] Circle proxy balance: $${proxyUsd.toFixed(4)} — pulling $${transferUsd.toFixed(4)}`);
   }
 
   console.log(
@@ -109,10 +105,12 @@ export async function prepareSwapFunds(
   );
   console.log(`[fund-swap] Circle tx=${tx.txId} state=${tx.state}`);
 
-  // Poll Arc until the balance actually increases. We trust Arc RPC as the
-  // source of truth; Circle's tx state can flip to "CONFIRMED" slightly
-  // before the on-chain balance updates.
-  const targetWei = parseUnits(requiredUsd.toString(), USDC_DECIMALS);
+  // Poll Arc until the balance actually increases beyond the prior level.
+  // We trust Arc RPC as the source of truth.
+  const targetWei = parseUnits(
+    (beforeUsd + requiredUsd).toString(),
+    USDC_DECIMALS,
+  );
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   let afterUsd = beforeUsd;
 
@@ -122,7 +120,9 @@ export async function prepareSwapFunds(
     const bal = await client.getBalance({ address: hotAddress });
     afterUsd = Number(formatUnits(bal, USDC_DECIMALS));
     if (bal >= targetWei) {
-      console.log(`[fund-swap] hot wallet funded: $${afterUsd.toFixed(4)} (target $${requiredUsd.toFixed(4)})`);
+      console.log(
+        `[fund-swap] hot wallet received $${(afterUsd - beforeUsd).toFixed(6)} — before $${beforeUsd.toFixed(4)} after $${afterUsd.toFixed(4)}`,
+      );
       return {
         skipped: false,
         circleTxId: tx.txId,
@@ -136,7 +136,7 @@ export async function prepareSwapFunds(
   }
 
   throw new Error(
-    `Circle transfer ${tx.txId} did not land within ${POLL_TIMEOUT_MS / 1000}s — hot wallet still at $${afterUsd.toFixed(4)} (target $${requiredUsd.toFixed(4)})`,
+    `Circle transfer ${tx.txId} did not land within ${POLL_TIMEOUT_MS / 1000}s — hot wallet still at $${afterUsd.toFixed(4)} (expected increase from $${beforeUsd.toFixed(4)})`,
   );
 }
 

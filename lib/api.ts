@@ -366,6 +366,10 @@ export interface LeaderboardAgent {
   recentHires?: number;
   /** Real ERC-7857 token ID on the VaultMindAgent contract. NULL if not minted. */
   inftTokenId?: number | null;
+  /** 0G Storage Merkle root for this specialist's memory blob (soul + metadata). */
+  storageRootHash?: string | null;
+  /** Full `0g-storage://{rootHash}` URI — mirrors what's stored on-chain in encryptedURIs[tokenId]. */
+  storageUri?: string | null;
 }
 
 export async function getLeaderboard(): Promise<LeaderboardAgent[]> {
