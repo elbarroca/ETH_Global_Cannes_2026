@@ -4,7 +4,7 @@ import type { UserRecord } from "@/src/types/index";
 
 function sanitizeUser(user: UserRecord) {
   const { proxyWallet, ...rest } = user;
-  return { ...rest, proxyWalletAddress: proxyWallet.address };
+  return { ...rest, proxyWallet: { address: proxyWallet.address }, proxyWalletAddress: proxyWallet.address };
 }
 
 export async function GET(

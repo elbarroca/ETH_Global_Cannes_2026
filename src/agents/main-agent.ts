@@ -122,6 +122,9 @@ export async function analyzeCycle(user: UserRecord): Promise<AnalysisResult> {
       maxHires: 3,
     });
     if (specialists.length === 0) throw new Error("No specialists returned");
+    if (specialists.length < 3) {
+      console.warn(`[cycle] Only ${specialists.length}/3 specialists responded — proceeding with partial results`);
+    }
 
     // Sort by reputation (highest first) — debate agents weight higher-rep specialists more heavily
     specialists.sort((a, b) => (b.reputation ?? 500) - (a.reputation ?? 500));
@@ -134,7 +137,7 @@ export async function analyzeCycle(user: UserRecord): Promise<AnalysisResult> {
       { name: "momentum", signal: "BUY", confidence: 70, attestationHash: "mock-m", teeVerified: false, reasoning: "[MOCK] Marketplace unavailable" },
     ];
   }
-  console.log(`[cycle] Specialists: ${specialists.map((s) => `${s.name}=${s.signal}`).join(", ")}`);
+  console.log(`[cycle] Specialists (${specialists.length}): ${specialists.map((s) => `${s.name}=${s.signal}`).join(", ")}`);
 
   // 2. Adversarial debate
   const debate = await runAdversarialDebate(
