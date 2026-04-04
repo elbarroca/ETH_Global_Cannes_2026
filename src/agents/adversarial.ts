@@ -15,7 +15,7 @@ function delay(ms: number): Promise<void> {
 
 function buildSpecialistContext(specialists: SpecialistResult[]): string {
   return specialists
-    .map((s) => `${s.name}: ${s.signal} (confidence: ${s.confidence}%)`)
+    .map((s) => `${s.name}: ${s.signal} (confidence: ${s.confidence}%, reputation: ${s.reputation ?? 500})`)
     .join("\n");
 }
 

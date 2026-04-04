@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { loadStore } from "./store/user-store.js";
+import { loadRegistry } from "./marketplace/registry.js";
 import { startBot } from "./telegram/bot.js";
 import { startApiServer } from "./api/server.js";
 import { startHeartbeatLoop } from "./agents/heartbeat.js";
@@ -33,6 +34,10 @@ async function main(): Promise<void> {
   // User store backed by Supabase — connection is lazy, no explicit load needed
   loadStore();
   console.log("User store ready (Supabase).");
+
+  // Load marketplace registry from Prisma (auto-registers built-in specialists)
+  await loadRegistry();
+  console.log("Marketplace registry loaded.");
 
   // Start Telegram bot
   startBot();

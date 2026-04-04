@@ -44,9 +44,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
     if (!onboardingRef.current) {
       onboardingRef.current = true;
       try {
-        const created = await onboard(address, "mock", "AlphaDawg sign-in");
-        setUser(created);
-        if (created.linkCode) setLinkCode(created.linkCode);
+        const result = await onboard(address, "mock", "AlphaDawg sign-in");
+        if (result.telegramLinkCode) setLinkCode(result.telegramLinkCode);
+        // Fetch full user record after onboard
+        const fullUser = await getUser(address);
+        if (fullUser) setUser(fullUser);
       } catch (err) {
         console.warn("[user-context] Auto-onboard failed:", err);
       } finally {

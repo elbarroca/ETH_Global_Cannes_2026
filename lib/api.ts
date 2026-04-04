@@ -45,34 +45,67 @@ export interface SpecialistResult {
   confidence: number;
   attestationHash: string;
   teeVerified: boolean;
+  reputation?: number;
+  rawDataSnapshot?: unknown;
+}
+
+export interface DebateStage {
+  content: string;
+  parsed: Record<string, unknown>;
+  attestationHash: string;
+  teeVerified: boolean;
 }
 
 export interface CycleResult {
   cycleId: number;
-  hashscanUrl: string;
-  specialists?: SpecialistResult[];
-  debate?: {
-    alpha?: { parsed?: { action: string; asset: string; pct: number; thesis?: string } };
-    risk?: { parsed?: { maxSafePct: number; objection?: string } };
-    executor?: {
-      parsed?: { action: string; asset: string; pct: number; sl?: number; reasoning?: string };
-    };
+  specialists: SpecialistResult[];
+  debate: {
+    alpha: DebateStage;
+    risk: DebateStage;
+    executor: DebateStage;
   };
-  timestamp?: string;
+  decision: Record<string, unknown>;
+  seqNum: number;
+  hashscanUrl: string;
+  timestamp: string;
+}
+
+export interface CompactCycleRecord {
+  c: number;
+  u: string;
+  t: string;
+  rp: string;
+  s: Array<{ n: string; sig: string; conf: number; att: string }>;
+  adv: {
+    a: { act: string; pct: number; att: string };
+    r: { obj: string; max: number; att: string };
+    e: { act: string; pct: number; sl: number; att: string };
+  };
+  d: { act: string; asset: string; pct: number };
+  nav: number;
+}
+
+export interface OnboardResponse {
+  userId: string;
+  proxyWalletAddress: string;
+  telegramLinkCode: string;
+  inftTokenId?: number | null;
+  existing: boolean;
 }
 
 export interface PlatformStats {
-  tvl: number;
-  cyclesRun: number;
+  totalUsers: number;
   activeAgents: number;
+  totalCyclesRun: number;
+  totalValueLocked: number;
 }
 
 export async function onboard(
   walletAddress: string,
   signature: string,
   message: string
-): Promise<UserRecord> {
-  return apiFetch("/api/onboard", {
+): Promise<OnboardResponse> {
+  return apiFetch<OnboardResponse>("/api/onboard", {
     method: "POST",
     body: JSON.stringify({ walletAddress, signature, message }),
   });
@@ -127,8 +160,9 @@ export async function triggerCycle(userId: string): Promise<CycleResult> {
 
 export async function getStats(): Promise<PlatformStats> {
   return apiFetch<PlatformStats>("/api/stats").catch(() => ({
-    tvl: 0,
-    cyclesRun: 0,
+    totalUsers: 0,
     activeAgents: 0,
+    totalCyclesRun: 0,
+    totalValueLocked: 0,
   }));
 }

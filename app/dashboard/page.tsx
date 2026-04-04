@@ -4,13 +4,14 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardBody, MetricCard, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
 import { MOCK_FUND, MOCK_CYCLE } from "@/lib/mock-data";
+import { mapCycleResultToCycle } from "@/lib/cycle-mapper";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/user-context";
 import { triggerCycle, getLatestCycle, type CycleResult } from "@/lib/api";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, userId } = useUser();
+  const { user, userId, linkCode } = useUser();
   const [running, setRunning] = useState(false);
   const [latestCycle, setLatestCycle] = useState<CycleResult | null>(null);
 
@@ -20,7 +21,7 @@ export default function DashboardPage() {
     nav: user.fund.currentNav,
     totalCycles: user.agent.lastCycleId,
   } : MOCK_FUND;
-  const cycle = MOCK_CYCLE;
+  const cycle = latestCycle ? mapCycleResultToCycle(latestCycle) : MOCK_CYCLE;
 
   useEffect(() => {
     if (userId) {
@@ -117,8 +118,29 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-2">
           <div className="flex items-center gap-2 text-sm text-void-400">
             <span>📱</span>
-            <span>Telegram: Connected</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            {user?.telegram?.verified ? (
+              <>
+                <span>Telegram: Connected</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              </>
+            ) : linkCode ? (
+              <>
+                <span>Link Telegram:</span>
+                <a
+                  href={`https://t.me/AlphaDawgBot?start=${linkCode}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:underline font-mono text-xs"
+                >
+                  t.me/AlphaDawgBot?start={linkCode}
+                </a>
+              </>
+            ) : (
+              <>
+                <span>Telegram: Not linked</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-void-600" />
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="gray">0G Sealed</Badge>

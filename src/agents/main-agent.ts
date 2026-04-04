@@ -5,6 +5,8 @@ import { logCycle } from "../hedera/hcs.js";
 import { storeMemory } from "../og/storage.js";
 import { updateAgentMetadata } from "../og/inft.js";
 import { getUserPaymentFetch } from "../config/arc.js";
+import { hireFromMarketplace } from "../marketplace/registry.js";
+import { evaluateCycleSignals } from "../marketplace/reputation.js";
 import type {
   UserRecord,
   SpecialistResult,
@@ -14,20 +16,6 @@ import type {
 } from "../types/index.js";
 
 const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
-
-const SPECIALIST_URLS = [
-  "http://localhost:4001/analyze",
-  "http://localhost:4002/analyze",
-  "http://localhost:4003/analyze",
-];
-
-async function hire(fetchFn: typeof fetch, url: string): Promise<SpecialistResult> {
-  const res = await fetchFn(url);
-  if (!res.ok) {
-    throw new Error(`Specialist ${url} returned ${res.status}`);
-  }
-  return (await res.json()) as SpecialistResult;
-}
 
 function buildCompactRecord(
   cycleId: number,
@@ -108,38 +96,14 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   }
   let specialists: SpecialistResult[];
   try {
-    const results: SpecialistResult[] = [];
-    for (const [i, url] of SPECIALIST_URLS.entries()) {
-      const t0 = Date.now();
-      try {
-        const sp = await hire(payFetch, url);
-        results.push(sp);
-        await logAction({
-          userId: user.id,
-          actionType: "SPECIALIST_HIRED",
-          agentName: sp.name,
-          attestationHash: sp.attestationHash,
-          teeVerified: sp.teeVerified,
-          paymentAmount: "$0.001",
-          paymentNetwork: "arc",
-          durationMs: Date.now() - t0,
-          payload: { signal: sp.signal, confidence: sp.confidence },
-        });
-      } catch (err) {
-        await logAction({
-          userId: user.id,
-          actionType: "SPECIALIST_HIRED",
-          agentName: `specialist-${i}`,
-          status: "failed",
-          payload: { error: String(err) },
-          durationMs: Date.now() - t0,
-        });
-        throw err;
-      }
-    }
-    specialists = results;
+    specialists = await hireFromMarketplace(payFetch, user.id, {
+      tags: ["sentiment", "whale", "momentum"],
+      minReputation: 300,
+      maxHires: 3,
+    });
+    if (specialists.length === 0) throw new Error("No specialists returned");
   } catch (err) {
-    console.warn("[cycle] Specialist hiring failed, using mock data:", err);
+    console.warn("[cycle] Marketplace hiring failed, using mock data:", err);
     specialists = [
       { name: "sentiment", signal: "BUY", confidence: 65, attestationHash: "mock-s", teeVerified: false },
       { name: "whale", signal: "HOLD", confidence: 50, attestationHash: "mock-w", teeVerified: false },
@@ -268,7 +232,20 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     },
   });
 
-  // 7. Log completion
+  // 7. Update specialist reputations (non-fatal)
+  // NOTE: Uses executor decision as proxy for correctness. True accuracy requires
+  // comparing against actual price movement in subsequent cycles.
+  try {
+    const decision = String(execParsed.action ?? "HOLD");
+    await evaluateCycleSignals(
+      specialists.map((s) => ({ name: s.name, signal: s.signal })),
+      decision === "BUY" ? 1.0 : decision === "SELL" ? -1.0 : 0.0,
+    );
+  } catch (err) {
+    console.warn("[cycle] Reputation update failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
+
+  // 8. Log completion
   await logAction({
     userId: user.id,
     actionType: "CYCLE_COMPLETED",
@@ -276,7 +253,7 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     payload: { decision: execParsed.action ?? "HOLD", seqNum, cycleNumber: cycleId },
   });
 
-  // 8. Return result
+  // 9. Return result
   return {
     userId: user.id,
     cycleId,
