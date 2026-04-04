@@ -26,6 +26,9 @@ export async function POST(
         decision: result.decision,
         seqNum: result.seqNum,
         hashscanUrl: result.hashscanUrl,
+        storageHash: result.storageHash,
+        inftTokenId: result.inftTokenId,
+        swapResult: result.swapResult,
         timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp,
       });
     }

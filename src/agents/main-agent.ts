@@ -388,6 +388,7 @@ export async function commitCycle(
     hashscanUrl,
     storageHash,
     inftTokenId: user.inftTokenId ?? undefined,
+    swapResult,
     timestamp: new Date(),
   };
 }

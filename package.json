@@ -31,7 +31,11 @@
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
     "setup:gateway": "npx tsx scripts/setup-gateway.ts",
-    "validate:x402": "npx tsx scripts/validate-x402.ts"
+    "validate:x402": "npx tsx scripts/validate-x402.ts",
+    "deploy:arc-swap": "./node_modules/.bin/hardhat compile && npx tsx scripts/deploy-arc-swap-router.ts",
+    "backfill:inft": "npx tsx scripts/backfill-inft.ts",
+    "demo:auto-approve": "npx tsx scripts/set-demo-auto-approve.ts",
+    "setup:specialist-wallets": "npx tsx scripts/assign-specialist-wallets.ts"
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.1",

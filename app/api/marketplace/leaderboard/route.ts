@@ -19,6 +19,7 @@ export async function GET() {
         tags: spec?.tags ?? [],
         price: spec?.price ?? "$0.001",
         active: !!spec,
+        walletAddress: spec?.walletAddress,
       };
     });
 

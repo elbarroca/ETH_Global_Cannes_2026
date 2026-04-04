@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
       totalHires: h.agent.totalHires,
       correctCalls: h.agent.correctCalls,
       hiredAt: h.hiredAt,
+      walletAddress: h.agent.walletAddress ?? null,
     }));
 
     return NextResponse.json({ agents });

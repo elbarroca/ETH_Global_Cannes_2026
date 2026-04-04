@@ -64,6 +64,7 @@ export async function POST(
         hashscanUrl: result.hashscanUrl,
         storageHash: result.storageHash,
         inftTokenId: result.inftTokenId,
+        swapResult: result.swapResult,
         timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp,
       });
     } catch (commitErr) {

@@ -2,6 +2,7 @@
 
 import { getPrisma } from "../config/prisma";
 import { logAction } from "../store/action-logger";
+import { deriveSpecialistAddress } from "../config/wallets";
 import type { SpecialistResult } from "../types/index";
 
 interface AgentRecord {
@@ -14,6 +15,7 @@ interface AgentRecord {
   totalHires: number;
   correctCalls: number;
   active: boolean;
+  walletAddress?: string;
 }
 
 interface DiscoverOptions {
@@ -53,6 +55,7 @@ export async function loadRegistry(): Promise<void> {
       totalHires: row.totalHires,
       correctCalls: row.correctCalls,
       active: row.active,
+      walletAddress: row.walletAddress ?? undefined,
     });
   }
   console.log(`[registry] Loaded ${agents.size} agents from database`);
@@ -69,12 +72,13 @@ export async function registerSpecialist(
   endpoint: string,
   tags: string[],
   price = "$0.001",
+  walletAddress?: string,
 ): Promise<void> {
   const prisma = getPrisma();
   const row = await prisma.marketplaceAgent.upsert({
     where: { name },
-    update: { endpoint, tags, price, active: true },
-    create: { name, endpoint, tags, price },
+    update: { endpoint, tags, price, active: true, ...(walletAddress ? { walletAddress } : {}) },
+    create: { name, endpoint, tags, price, ...(walletAddress ? { walletAddress } : {}) },
   });
   agents.set(name, {
     id: row.id,
@@ -86,6 +90,7 @@ export async function registerSpecialist(
     totalHires: row.totalHires,
     correctCalls: row.correctCalls,
     active: row.active,
+    walletAddress: row.walletAddress ?? undefined,
   });
 }
 
@@ -235,21 +240,27 @@ export async function incrementAgentHires(name: string): Promise<void> {
 
 async function registerBuiltins(): Promise<void> {
   const builtins = [
-    { name: "sentiment", endpoint: "http://localhost:4001/analyze", tags: ["sentiment"] },
-    { name: "whale", endpoint: "http://localhost:4002/analyze", tags: ["whale"] },
-    { name: "momentum", endpoint: "http://localhost:4003/analyze", tags: ["momentum"] },
-    { name: "memecoin-hunter", endpoint: "http://localhost:4004/analyze", tags: ["memecoin", "degen", "new-pairs"] },
-    { name: "twitter-alpha", endpoint: "http://localhost:4005/analyze", tags: ["social", "twitter", "narrative"] },
-    { name: "defi-yield", endpoint: "http://localhost:4006/analyze", tags: ["defi", "yield", "tvl"] },
-    { name: "news-scanner", endpoint: "http://localhost:4007/analyze", tags: ["news", "regulatory", "listings"] },
-    { name: "onchain-forensics", endpoint: "http://localhost:4008/analyze", tags: ["onchain", "forensics", "wallets"] },
-    { name: "options-flow", endpoint: "http://localhost:4009/analyze", tags: ["options", "derivatives", "volatility"] },
-    { name: "macro-correlator", endpoint: "http://localhost:4010/analyze", tags: ["macro", "correlation", "tradfi"] },
+    { name: "sentiment", endpoint: "http://localhost:4001/analyze", tags: ["sentiment"], specIndex: 0 },
+    { name: "whale", endpoint: "http://localhost:4002/analyze", tags: ["whale"], specIndex: 1 },
+    { name: "momentum", endpoint: "http://localhost:4003/analyze", tags: ["momentum"], specIndex: 2 },
+    { name: "memecoin-hunter", endpoint: "http://localhost:4004/analyze", tags: ["memecoin", "degen", "new-pairs"], specIndex: 3 },
+    { name: "twitter-alpha", endpoint: "http://localhost:4005/analyze", tags: ["social", "twitter", "narrative"], specIndex: 4 },
+    { name: "defi-yield", endpoint: "http://localhost:4006/analyze", tags: ["defi", "yield", "tvl"], specIndex: 5 },
+    { name: "news-scanner", endpoint: "http://localhost:4007/analyze", tags: ["news", "regulatory", "listings"], specIndex: 6 },
+    { name: "onchain-forensics", endpoint: "http://localhost:4008/analyze", tags: ["onchain", "forensics", "wallets"], specIndex: 7 },
+    { name: "options-flow", endpoint: "http://localhost:4009/analyze", tags: ["options", "derivatives", "volatility"], specIndex: 8 },
+    { name: "macro-correlator", endpoint: "http://localhost:4010/analyze", tags: ["macro", "correlation", "tradfi"], specIndex: 9 },
   ];
   for (const b of builtins) {
     if (!agents.has(b.name)) {
-      await registerSpecialist(b.name, b.endpoint, b.tags);
-      console.log(`[registry] Registered built-in: ${b.name}`);
+      let wallet: string | undefined;
+      try {
+        wallet = deriveSpecialistAddress(b.specIndex);
+      } catch {
+        // AGENT_MNEMONIC not set — skip wallet derivation (non-fatal)
+      }
+      await registerSpecialist(b.name, b.endpoint, b.tags, "$0.001", wallet);
+      console.log(`[registry] Registered built-in: ${b.name}${wallet ? ` (wallet: ${wallet.slice(0, 10)}...)` : ""}`);
     }
   }
 }

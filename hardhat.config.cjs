@@ -13,6 +13,12 @@ const HEDERA_EVM_KEY = process.env.HEDERA_EVM_PRIVATE_KEY
     : `0x${process.env.HEDERA_EVM_PRIVATE_KEY}`
   : undefined;
 
+const ARC_KEY = process.env.ARC_DEPLOYER_PRIVATE_KEY
+  ? process.env.ARC_DEPLOYER_PRIVATE_KEY.startsWith("0x")
+    ? process.env.ARC_DEPLOYER_PRIVATE_KEY
+    : `0x${process.env.ARC_DEPLOYER_PRIVATE_KEY}`
+  : undefined;
+
 /** @type {import("hardhat/config").HardhatUserConfig} */
 module.exports = {
   solidity: {
@@ -33,6 +39,11 @@ module.exports = {
       url: "https://testnet.hashio.io/api",
       chainId: 296,
       accounts: HEDERA_EVM_KEY ? [HEDERA_EVM_KEY] : [],
+    },
+    "arc-testnet": {
+      url: process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.network",
+      chainId: 5042002,
+      accounts: ARC_KEY ? [ARC_KEY] : [],
     },
   },
 };

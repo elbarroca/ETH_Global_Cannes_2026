@@ -111,7 +111,7 @@ export interface ArcSwapResult {
   txHash?: string;
   chain: "arc-testnet";
   explorerUrl?: string;
-  method: "uniswap_v3" | "direct_transfer" | "skipped";
+  method: "uniswap_v3" | "direct_transfer" | "mock_swap" | "native_transfer" | "skipped";
   reason?: string;
   amountIn?: string;
   tokenIn?: string;

@@ -17,7 +17,7 @@ export const arcTestnet = defineChain({
 export const ARC_TOKENS = {
   USDC: (process.env.ARC_USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000") as `0x${string}`,
   EURC: "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a" as `0x${string}`,
-  WETH: (process.env.ARC_WETH_ADDRESS ?? "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  WETH: (process.env.ARC_WETH_ADDRESS ?? "0x0000000000000000000000000000000000000001") as `0x${string}`,
 } as const;
 
 // Uniswap V3 SwapRouter on Arc testnet (set via env when deployed)

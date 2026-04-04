@@ -31,16 +31,25 @@ function getRpcUrl(): string {
   return process.env.OG_RPC_URL ?? "https://evmrpc-testnet.0g.ai";
 }
 
+// 0G Chain (16602) has no ENS — create provider with ENS disabled
+function createOgProvider(): ethers.JsonRpcProvider {
+  const network = new ethers.Network("0g-testnet", 16602);
+  // Set a dummy ENS address to prevent "network does not support ENS" error
+  network.attachPlugin(new ethers.EnsPlugin("0x0000000000000000000000000000000000000000"));
+  const provider = new ethers.JsonRpcProvider(getRpcUrl(), network, { staticNetwork: network });
+  return provider;
+}
+
 function getSignerContract(): ethers.Contract {
   const key = process.env.OG_PRIVATE_KEY!;
   const pk = key.startsWith("0x") ? key : `0x${key}`;
-  const provider = new ethers.JsonRpcProvider(getRpcUrl());
+  const provider = createOgProvider();
   const wallet = new ethers.Wallet(pk, provider);
   return new ethers.Contract(getContractAddress(), ABI, wallet);
 }
 
 function getReadContract(): ethers.Contract {
-  const provider = new ethers.JsonRpcProvider(getRpcUrl());
+  const provider = createOgProvider();
   return new ethers.Contract(getContractAddress(), ABI, provider);
 }
 
