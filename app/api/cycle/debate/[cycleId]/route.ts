@@ -1,19 +1,37 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/src/config/prisma";
 
-// GET /api/cycle/debate/[cycleId] — returns debate transcripts for a cycle
+// GET /api/cycle/debate/[cycleId]?userId=xxx — returns debate transcripts for a cycle
+// Requires userId query param to verify ownership
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ cycleId: string }> },
 ): Promise<NextResponse> {
   const { cycleId } = await params;
+  const url = new URL(request.url);
+  const userId = url.searchParams.get("userId");
 
   if (!cycleId) {
     return NextResponse.json({ error: "Missing cycleId" }, { status: 400 });
   }
 
+  if (!userId) {
+    return NextResponse.json({ error: "Missing userId query parameter" }, { status: 401 });
+  }
+
   try {
     const prisma = getPrisma();
+
+    // Verify the cycle belongs to this user
+    const cycle = await prisma.cycle.findFirst({
+      where: { id: cycleId, userId },
+      select: { id: true },
+    });
+
+    if (!cycle) {
+      return NextResponse.json({ error: "Cycle not found or not owned by user" }, { status: 403 });
+    }
+
     const transcripts = await prisma.debateTranscript.findMany({
       where: { cycleId },
       orderBy: { turnNumber: "asc" },

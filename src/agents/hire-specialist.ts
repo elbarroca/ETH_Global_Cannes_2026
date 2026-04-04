@@ -64,7 +64,7 @@ export async function hireSpecialist(
       const parseResult = parseDualOutput<Record<string, unknown>>(content, SPECIALIST_FALLBACK as Record<string, unknown>);
       parsed = parseResult.parsed;
       reasoning = parseResult.reasoning;
-      teeVerified = true; // OpenClaw Gateway verified
+      teeVerified = false; // OpenClaw Gateway response — not a TEE attestation
     } else if (result.status === "error") {
       console.warn(`[hire] sessions_send to ${specialistId} failed: ${result.error}`);
       reasoning = `[GATEWAY_ERROR] ${result.error}`;

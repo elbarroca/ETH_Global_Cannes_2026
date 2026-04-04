@@ -4,6 +4,10 @@ const GATEWAY_PORT = parseInt(process.env.OPENCLAW_GATEWAY_PORT ?? "18789", 10);
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN ?? "";
 const GATEWAY_URL = `http://127.0.0.1:${GATEWAY_PORT}`;
 
+if (!GATEWAY_TOKEN) {
+  console.warn("[openclaw] OPENCLAW_GATEWAY_TOKEN not set — gateway requests will be unauthenticated");
+}
+
 export interface SessionsSendResult {
   content: string;
   runId?: string;

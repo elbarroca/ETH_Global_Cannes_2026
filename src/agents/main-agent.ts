@@ -259,8 +259,9 @@ export async function commitCycle(
   }
 
   // 5. Save full cycle record to Supabase (non-fatal)
+  let cycleDbUuid: string | null = null;
   try {
-    await logCycleRecord(user.id, cycleId, {
+    cycleDbUuid = await logCycleRecord(user.id, cycleId, {
       specialists: specialists.map((s) => ({
         name: s.name,
         signal: s.signal,
@@ -299,17 +300,15 @@ export async function commitCycle(
     console.warn("[cycle] logCycleRecord failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 6. Persist debate transcripts (non-fatal)
-  if (debate.transcripts && debate.transcripts.length > 0) {
+  // 6. Persist debate transcripts (non-fatal — requires valid cycle UUID from step 5)
+  if (debate.transcripts && debate.transcripts.length > 0 && cycleDbUuid) {
     try {
       const prisma = getPrisma();
-      // Use the cycle DB ID if we have it, fallback to cycle number as string
-      const cycleDbId = String(cycleId);
       await Promise.all(
         debate.transcripts.map((t) =>
           prisma.debateTranscript.create({
             data: {
-              cycleId: cycleDbId,
+              cycleId: cycleDbUuid,
               userId: user.id,
               turnNumber: t.turnNumber,
               phase: t.phase,
