@@ -15,11 +15,16 @@ function sanitizeUser(user: UserRecord) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, riskProfile, notifyPreference } = (await request.json()) as {
+    const body = (await request.json()) as {
       userId?: string;
       riskProfile?: string;
       notifyPreference?: string;
+      approvalMode?: string;
+      cycleCount?: number;
+      cyclePeriodMs?: number;
     };
+
+    const { userId, riskProfile, notifyPreference, approvalMode, cycleCount, cyclePeriodMs } = body;
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
@@ -35,18 +40,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `notifyPreference must be one of: ${validNotify.join(", ")}` }, { status: 400 });
     }
 
+    const validApproval = ["always", "trades_only", "auto"];
+    if (approvalMode && !validApproval.includes(approvalMode)) {
+      return NextResponse.json({ error: `approvalMode must be one of: ${validApproval.join(", ")}` }, { status: 400 });
+    }
+
     const patch: {
       agent?: Partial<UserRecord["agent"]>;
       telegram?: Partial<UserRecord["telegram"]>;
     } = {};
 
+    // Agent config
+    const agentPatch: Partial<UserRecord["agent"]> = {};
+
     if (riskProfile) {
-      patch.agent = {
-        riskProfile: riskProfile as UserRecord["agent"]["riskProfile"],
-        maxTradePercent: deriveMaxTrade(riskProfile),
-      };
+      agentPatch.riskProfile = riskProfile as UserRecord["agent"]["riskProfile"];
+      agentPatch.maxTradePercent = deriveMaxTrade(riskProfile);
     }
 
+    if (approvalMode) {
+      agentPatch.approvalMode = approvalMode as UserRecord["agent"]["approvalMode"];
+    }
+
+    if (cycleCount != null && cycleCount >= 0) {
+      agentPatch.cycleCount = cycleCount;
+      agentPatch.cyclesRemaining = cycleCount;
+    }
+
+    if (cyclePeriodMs != null && cyclePeriodMs > 0) {
+      agentPatch.cyclePeriodMs = cyclePeriodMs;
+    }
+
+    if (Object.keys(agentPatch).length > 0) {
+      patch.agent = agentPatch;
+    }
+
+    // Telegram config
     if (notifyPreference) {
       patch.telegram = {
         notifyPreference: notifyPreference as UserRecord["telegram"]["notifyPreference"],

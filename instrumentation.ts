@@ -1,5 +1,5 @@
 // Next.js instrumentation — runs once on server startup
-// Auto-starts specialist servers, marketplace registry, and Telegram bot
+// Auto-starts specialist servers, marketplace registry, Telegram bot, and heartbeat loop
 
 export async function register() {
   // Only run on the server (not during build or in the browser)
@@ -29,6 +29,15 @@ export async function register() {
       } catch (err) {
         console.warn("[instrumentation] Telegram bot failed (non-fatal):", err instanceof Error ? err.message : String(err));
       }
+    }
+
+    // Start heartbeat loop — auto-hunts for active users on their configured schedule
+    try {
+      const { startHeartbeatLoop } = await import("./src/agents/heartbeat");
+      startHeartbeatLoop();
+      console.log("[instrumentation] Heartbeat loop started (hunts run on per-user schedule)");
+    } catch (err) {
+      console.warn("[instrumentation] Heartbeat startup failed (non-fatal):", err instanceof Error ? err.message : String(err));
     }
   }
 }

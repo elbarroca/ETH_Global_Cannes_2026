@@ -14,13 +14,18 @@ async function getDecimals(): Promise<number> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, amount } = (await req.json()) as { userId?: string; amount?: number };
+    const { userId, amount, txHash } = (await req.json()) as { userId?: string; amount?: number; txHash?: string };
 
     if (!userId || amount == null) {
       return NextResponse.json({ error: "userId and amount are required" }, { status: 400 });
     }
     if (amount <= 0) {
       return NextResponse.json({ error: "amount must be positive" }, { status: 400 });
+    }
+
+    // Log the on-chain tx hash for audit trail
+    if (txHash) {
+      console.log(`[deposit] User ${userId} deposited $${amount} USDC, txHash: ${txHash}`);
     }
 
     const user = await getUserById(userId);

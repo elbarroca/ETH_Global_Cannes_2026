@@ -68,7 +68,7 @@ export function ExecuteTradeModal({
                 </div>
                 <div className="flex justify-between text-void-500">
                   <span>Network</span>
-                  <Badge variant="blue">Base Sepolia</Badge>
+                  <Badge variant="blue">Arc Testnet</Badge>
                 </div>
                 <div className="flex justify-between text-void-500">
                   <span>Wallet</span>

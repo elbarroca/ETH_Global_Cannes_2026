@@ -4,45 +4,138 @@ import { useState } from "react";
 import { Card, CardBody } from "@/components/ui/card";
 import { useUser } from "@/contexts/user-context";
 import { deposit, withdraw } from "@/lib/api";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { parseUnits } from "viem";
 
 type Tab = "deposit" | "withdraw";
 const QUICK_AMOUNTS = [1, 10, 50, 100];
 
+// USDC on Arc testnet — ERC-20 transfer ABI
+const USDC_ARC_ADDRESS = (process.env.NEXT_PUBLIC_USDC_ARC_ADDRESS ??
+  "0x3600000000000000000000000000000000000000") as `0x${string}`;
+
+const ERC20_TRANSFER_ABI = [
+  {
+    name: "transfer",
+    type: "function",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;
+
 export default function DepositPage() {
   const { user, userId, refetch } = useUser();
+  const { address, isConnected } = useAccount();
   const [tab, setTab] = useState<Tab>("deposit");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<"idle" | "wallet" | "confirming" | "recording">("idle");
+
+  const { writeContract, data: txHash, isPending: isWritePending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash: txHash,
+  });
 
   const deposited = user?.fund?.depositedUsdc ?? 0;
   const nav = user?.fund?.currentNav ?? 0;
   const shares = user?.fund?.htsShareBalance ?? 0;
+  const proxyAddress = user?.proxyWallet?.address;
 
-  async function handleSubmit() {
+  async function handleDeposit() {
+    if (!amount || parseFloat(amount) <= 0 || !userId || !proxyAddress) return;
+    setError(null);
+
+    const parsedAmount = parseFloat(amount);
+    const usdcUnits = parseUnits(parsedAmount.toString(), 6); // USDC = 6 decimals
+
+    try {
+      setStep("wallet");
+
+      // Step 1: Send USDC from connected wallet → proxy wallet via on-chain transfer
+      writeContract({
+        address: USDC_ARC_ADDRESS,
+        abi: ERC20_TRANSFER_ABI,
+        functionName: "transfer",
+        args: [proxyAddress as `0x${string}`, usdcUnits],
+      }, {
+        onSuccess: async (hash) => {
+          setStep("confirming");
+          // We wait for the tx receipt via the hook, then record the deposit
+          // The useEffect below handles the post-confirmation flow
+        },
+        onError: (err) => {
+          setError(err instanceof Error ? err.message : "Wallet transaction failed");
+          setStep("idle");
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Transaction failed");
+      setStep("idle");
+    }
+  }
+
+  // When tx confirms on-chain, record the deposit server-side
+  if (isConfirmed && step === "confirming" && txHash) {
+    setStep("recording");
+    (async () => {
+      try {
+        await deposit(userId!, parseFloat(amount), txHash);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+        setAmount("");
+        await refetch();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to record deposit");
+      } finally {
+        setStep("idle");
+      }
+    })();
+  }
+
+  async function handleWithdraw() {
     if (!amount || parseFloat(amount) <= 0 || !userId) return;
     setLoading(true);
     setError(null);
     try {
-      if (tab === "deposit") {
-        await deposit(userId, parseFloat(amount));
-      } else {
-        await withdraw(userId, parseFloat(amount));
-      }
+      await withdraw(userId, parseFloat(amount));
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
       setAmount("");
       await refetch();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Transaction failed");
+      setError(err instanceof Error ? err.message : "Withdrawal failed");
     } finally {
       setLoading(false);
     }
   }
 
+  async function handleSubmit() {
+    if (tab === "deposit") {
+      await handleDeposit();
+    } else {
+      await handleWithdraw();
+    }
+  }
+
+  const isProcessing = loading || isWritePending || isConfirming || step === "recording";
+
   const pnl = nav - deposited;
   const pnlPct = deposited > 0 ? (pnl / deposited) * 100 : 0;
+
+  const statusText = step === "wallet"
+    ? "Confirm in wallet…"
+    : step === "confirming"
+      ? "Waiting for on-chain confirmation…"
+      : step === "recording"
+        ? "Recording deposit…"
+        : loading
+          ? "Processing…"
+          : null;
 
   return (
     <main className="max-w-7xl mx-auto px-5 py-5">
@@ -66,6 +159,21 @@ export default function DepositPage() {
                 </button>
               ))}
             </div>
+
+            {/* Proxy wallet info */}
+            {tab === "deposit" && proxyAddress && (
+              <div className="bg-void-900 border border-void-800 rounded-lg px-3 py-2 space-y-1">
+                <p className="text-[10px] uppercase tracking-wider text-void-600">
+                  Funds sent to your AlphaDawg Trading Wallet
+                </p>
+                <p className="text-xs font-mono text-void-400 break-all">
+                  {proxyAddress}
+                </p>
+                <p className="text-[10px] text-void-600">
+                  USDC on Arc Testnet · Managed by Circle MPC
+                </p>
+              </div>
+            )}
 
             {/* Amount input */}
             <div className="space-y-2">
@@ -103,28 +211,36 @@ export default function DepositPage() {
             {/* Submit button */}
             <button
               onClick={handleSubmit}
-              disabled={loading || !amount}
+              disabled={isProcessing || !amount || !isConnected}
               className="w-full py-3 bg-blood-600 hover:bg-blood-700 disabled:opacity-50 text-white font-medium rounded-xl transition-colors"
             >
-              {loading ? (
+              {isProcessing ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Processing…
+                  {statusText ?? "Processing…"}
                 </span>
               ) : success ? (
                 "✓ Done!"
               ) : tab === "deposit" ? (
-                "Deposit via Nanopayments"
+                "Deposit from Wallet"
               ) : (
                 "Withdraw to wallet"
               )}
             </button>
 
+            {!isConnected && tab === "deposit" && (
+              <p className="text-center text-xs text-gold-400">
+                Connect your wallet to deposit
+              </p>
+            )}
+
             {error && (
               <p className="text-center text-xs text-blood-300">{error}</p>
             )}
             <p className="text-center text-xs text-void-600">
-              Gas-free via Circle Nanopayments on Arc
+              {tab === "deposit"
+                ? "Transfers USDC from your wallet to your trading wallet on Arc Testnet"
+                : "Withdraws USDC from your trading wallet back to you"}
             </p>
           </CardBody>
         </Card>

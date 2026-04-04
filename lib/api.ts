@@ -15,6 +15,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export interface UserRecord {
   id: string;
   walletAddress: string;
+  proxyWallet?: { address: string };
   telegram: {
     chatId: string | null;
     username: string | null;
@@ -133,10 +134,10 @@ export async function configure(
   });
 }
 
-export async function deposit(userId: string, amount: number): Promise<UserRecord> {
+export async function deposit(userId: string, amount: number, txHash?: string): Promise<UserRecord> {
   return apiFetch("/api/deposit", {
     method: "POST",
-    body: JSON.stringify({ userId, amount }),
+    body: JSON.stringify({ userId, amount, txHash }),
   });
 }
 

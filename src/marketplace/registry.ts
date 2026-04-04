@@ -147,48 +147,70 @@ export async function hireFromMarketplace(
   const prisma = getPrisma();
 
   for (const agent of discovered) {
-    const t0 = Date.now();
-    try {
-      const res = await payFetch(agent.endpoint);
-      if (!res.ok) throw new Error(`${agent.name} returned ${res.status}`);
-      const data = (await res.json()) as SpecialistResult;
+    const MAX_RETRIES = 2;
+    let lastError: unknown = null;
 
-      // Attach reputation to result
-      const result: SpecialistResult = {
-        ...data,
-        name: agent.name,
-        reputation: agent.reputation,
-      };
-      results.push(result);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      const t0 = Date.now();
+      try {
+        const res = await payFetch(agent.endpoint);
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          throw new Error(`${agent.name} returned ${res.status}: ${body.slice(0, 200)}`);
+        }
+        const data = (await res.json()) as SpecialistResult;
 
-      // Increment totalHires in DB + memory
-      agent.totalHires += 1;
-      await prisma.marketplaceAgent.update({
-        where: { id: agent.id },
-        data: { totalHires: { increment: 1 } },
-      });
+        // Attach reputation to result
+        const result: SpecialistResult = {
+          ...data,
+          name: agent.name,
+          reputation: agent.reputation,
+        };
+        results.push(result);
 
-      await logAction({
-        userId,
-        actionType: "SPECIALIST_HIRED",
-        agentName: agent.name,
-        attestationHash: data.attestationHash,
-        teeVerified: data.teeVerified,
-        paymentAmount: agent.price,
-        paymentNetwork: "arc",
-        durationMs: Date.now() - t0,
-        payload: { signal: data.signal, confidence: data.confidence, reputation: agent.reputation },
-      });
-    } catch (err) {
+        // Increment totalHires in DB + memory
+        agent.totalHires += 1;
+        await prisma.marketplaceAgent.update({
+          where: { id: agent.id },
+          data: { totalHires: { increment: 1 } },
+        });
+
+        await logAction({
+          userId,
+          actionType: "SPECIALIST_HIRED",
+          agentName: agent.name,
+          attestationHash: data.attestationHash,
+          teeVerified: data.teeVerified,
+          paymentAmount: agent.price,
+          paymentNetwork: "arc",
+          durationMs: Date.now() - t0,
+          payload: { signal: data.signal, confidence: data.confidence, reputation: agent.reputation },
+        });
+
+        lastError = null;
+        break; // Success — no retry needed
+      } catch (err) {
+        lastError = err;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.warn(`[registry] Attempt ${attempt}/${MAX_RETRIES} to hire ${agent.name} failed: ${errMsg}`);
+
+        if (attempt < MAX_RETRIES) {
+          // Wait 1s before retry
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+    }
+
+    if (lastError) {
       await logAction({
         userId,
         actionType: "SPECIALIST_HIRED",
         agentName: agent.name,
         status: "failed",
-        payload: { error: String(err) },
-        durationMs: Date.now() - t0,
-      });
-      console.warn(`[registry] Failed to hire ${agent.name}:`, err instanceof Error ? err.message : String(err));
+        payload: { error: String(lastError), retries: MAX_RETRIES },
+        durationMs: 0,
+      }).catch(() => {});
+      console.warn(`[registry] All ${MAX_RETRIES} attempts to hire ${agent.name} failed`);
     }
   }
 
