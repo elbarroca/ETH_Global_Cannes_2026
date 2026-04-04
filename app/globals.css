@@ -1,22 +1,30 @@
 @import "tailwindcss";
 
-/* Color scales — use @theme (NOT inline) for direct hex values */
-@theme {
-  /* Void (backgrounds, surfaces, depth) */
-  --color-void-950: #0C0A09;
-  --color-void-900: #1C1917;
-  --color-void-850: #1F1E1B;
-  --color-void-800: #292524;
-  --color-void-700: #44403C;
-  --color-void-600: #57534E;
-  --color-void-500: #78716C;
-  --color-void-400: #A8A29E;
-  --color-void-300: #D6D3D1;
-  --color-void-200: #E7E5E4;
-  --color-void-100: #F5F5F4;
+/* ─────────────────────────────────────────────────────────────────────
+ * AlphaDawg — TV-grade dark theme
+ *
+ * Optimized for large-display showcase (judges viewing from across the
+ * room). True blacks for OLED contrast, high-contrast cream text, and a
+ * Nasdaq Marketsite pixelated LED treatment for the top ticker card.
+ * ──────────────────────────────────────────────────────────────────── */
 
-  /* Blood Red (primary action, wolf body, CTAs) */
-  --color-blood-50: #FEF2F2;
+@theme {
+  /* Void palette — 950 is pure black (TV bezel / page void),
+     100 is a warm off-white for primary text. Mid values were bumped
+     brighter than a typical dev theme so labels remain legible at 10ft. */
+  --color-void-950: #000000;
+  --color-void-900: #070605;
+  --color-void-850: #0E0C0A;
+  --color-void-800: #17150F;
+  --color-void-700: #2A2720;
+  --color-void-600: #5C594F;
+  --color-void-500: #7C7A6F;
+  --color-void-400: #9B9684;
+  --color-void-300: #B8B3A0;
+  --color-void-200: #D5D1C2;
+  --color-void-100: #F6F3E4;
+
+  --color-blood-50:  #FEF2F2;
   --color-blood-100: #FEE2E2;
   --color-blood-200: #FECACA;
   --color-blood-300: #FCA5A5;
@@ -27,8 +35,7 @@
   --color-blood-800: #991B1B;
   --color-blood-900: #7F1D1D;
 
-  /* Gold (eyes, highlights, important data, profits) */
-  --color-gold-50: #FFFBEB;
+  --color-gold-50:  #FFFBEB;
   --color-gold-100: #FEF3C7;
   --color-gold-200: #FDE68A;
   --color-gold-300: #FCD34D;
@@ -37,152 +44,131 @@
   --color-gold-600: #D97706;
   --color-gold-700: #B45309;
 
-  /* Dawg (brand primary — matches logo yellow; used for CTAs, active states) */
-  --color-dawg-50:  #FFF9DB;
-  --color-dawg-100: #FFF3B0;
+  --color-dawg-50:  #FFFBEB;
+  --color-dawg-100: #FEF3C7;
   --color-dawg-200: #FFEA7A;
   --color-dawg-300: #FFDD47;
-  --color-dawg-400: #FFCE1A;
+  --color-dawg-400: #FFD633;
   --color-dawg-500: #FFC700;
-  --color-dawg-600: #E6B300;
-  --color-dawg-700: #BF9500;
-  --color-dawg-800: #997700;
-  --color-dawg-900: #665000;
+  --color-dawg-600: #D9A800;
+  --color-dawg-700: #B38900;
+  --color-dawg-800: #8C6B00;
+  --color-dawg-900: #664D00;
 }
 
-/* Variable references — @theme inline is correct for var() refs */
 @theme inline {
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains-mono);
+  --font-pixel: var(--font-vt323);
 }
 
 body {
-  background-color: #0C0A09;
-  color: #D6D3D1;
+  background:
+    radial-gradient(ellipse 1100px 700px at 85% -10%, rgba(255, 199, 0, 0.07), transparent 62%),
+    radial-gradient(ellipse 800px 500px at 5% 108%, rgba(255, 199, 0, 0.04), transparent 62%),
+    #000000;
+  background-attachment: fixed;
+  color: #F6F3E4;
   font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Pulse animation for live indicator */
+/* ───────── Motion ───────── */
+
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
-
 .pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
-/* Hunt button active state — yellow pulse matching dawg primary */
 @keyframes huntPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 199, 0, 0.45); }
-  50% { box-shadow: 0 0 0 12px rgba(255, 199, 0, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 199, 0, 0.55); }
+  50% { box-shadow: 0 0 0 14px rgba(255, 199, 0, 0); }
 }
-
 .hunting {
   animation: huntPulse 1.5s ease-in-out infinite;
 }
 
-/* Sealed badge entrance */
 @keyframes sealPop {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
-
 .sealed-enter {
   animation: sealPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Streaming text gold cursor */
 @keyframes blink {
   50% { border-color: transparent; }
 }
-
 .streaming-text {
   overflow: hidden;
-  border-right: 2px solid #FBBF24;
+  border-right: 2px solid #FFC700;
   animation: blink 0.8s step-end infinite;
 }
 
-/* Payment row entrance */
 @keyframes slideIn {
   from { transform: translateX(-8px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
-
 .payment-enter {
   animation: slideIn 0.25s ease-out;
 }
 
-/* Gold profit flash */
 @keyframes goldFlash {
-  0% { background-color: #1C1917; }
-  30% { background-color: rgba(251, 191, 36, 0.08); }
-  100% { background-color: #1C1917; }
+  0%   { background-color: transparent; }
+  30%  { background-color: rgba(255, 199, 0, 0.22); }
+  100% { background-color: transparent; }
 }
-
 .profit-flash {
   animation: goldFlash 0.6s ease;
 }
 
-/* Wolf eyes loading */
 @keyframes eyePulse {
   0%, 100% { fill: #FBBF24; }
-  50% { fill: #FDE68A; filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.6)); }
+  50% { fill: #FFD633; filter: drop-shadow(0 0 6px rgba(255, 199, 0, 0.6)); }
 }
-
 .wolf-eyes-loading .eye {
   animation: eyePulse 1.2s ease-in-out infinite;
 }
 
-/* Agent card hover */
 .agent-card {
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
-
 .agent-card:hover {
-  border-color: #44403C;
-  background-color: #1F1E1B;
+  border-color: rgba(255, 199, 0, 0.4);
+  background-color: #141210;
+  box-shadow: 0 4px 22px -8px rgba(255, 199, 0, 0.25);
 }
 
-/* Agent computing glow */
 .agent-computing {
-  border-color: #7F1D1D;
-  box-shadow: 0 0 20px rgba(220, 38, 38, 0.08);
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 22px rgba(239, 68, 68, 0.18);
   transition: all 0.3s ease;
 }
 
-/* Hashscan verification pulse */
 @keyframes tealPulse {
-  0% { color: #5EEAD4; }
-  50% { color: #99F6E4; text-shadow: 0 0 8px rgba(94, 234, 212, 0.3); }
-  100% { color: #5EEAD4; }
+  0%   { color: #2DD4BF; }
+  50%  { color: #5EEAD4; text-shadow: 0 0 10px rgba(94, 234, 212, 0.55); }
+  100% { color: #2DD4BF; }
 }
-
 .verify-pulse {
   animation: tealPulse 0.4s ease;
 }
 
-/* =========================================================================
-   DAWG MOTION SYSTEM
-   ========================================================================= */
-
-/* Landing-page entrance — subtle fade-in-up for staggered reveals */
 @keyframes fadeInUp {
   0%   { opacity: 0; transform: translateY(8px); }
   100% { opacity: 1; transform: translateY(0); }
 }
-
 .fade-in-up {
   opacity: 0;
   animation: fadeInUp 400ms ease-out forwards;
 }
 
-/* Primary CTA shine sweep — diagonal highlight slides across the button */
 @keyframes shineSweep {
   0%   { transform: translateX(-120%) skewX(-18deg); }
   100% { transform: translateX(240%) skewX(-18deg); }
 }
-
 .shine-sweep {
   position: relative;
   overflow: hidden;
@@ -195,7 +181,7 @@ body {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0.55) 50%,
     transparent 100%
   );
   transform: translateX(-120%) skewX(-18deg);
@@ -205,15 +191,12 @@ body {
   animation: shineSweep 1200ms ease-out;
 }
 
-/* Logo hover — whole-image tilt + lift (the logo is a raster, so we animate
-   the element itself rather than individual ears) */
 @keyframes dawgTilt {
   0%, 100% { transform: rotate(0deg) scale(1); }
   25%      { transform: rotate(-5deg) scale(1.05); }
   60%      { transform: rotate(3deg)  scale(1.04); }
   80%      { transform: rotate(-1deg) scale(1.02); }
 }
-
 .dawg-logo-animated {
   transition: transform 180ms ease-out;
   transform-origin: center bottom;
@@ -222,21 +205,14 @@ body {
   animation: dawgTilt 800ms ease-in-out;
 }
 
-/* =========================================================================
-   DAWG LOADER — coin flip + blast
-   ========================================================================= */
-
-/* Container perspective so rotateY reads as a real coin flip */
 .dawg-loader-stage {
   perspective: 900px;
 }
-
 .dawg-coin {
   transform-style: preserve-3d;
-  filter: drop-shadow(0 6px 14px rgba(255, 199, 0, 0.28));
+  filter: drop-shadow(0 6px 14px rgba(255, 199, 0, 0.32));
 }
 
-/* Continuous spin while loading */
 @keyframes coinFlip {
   0%   { transform: rotateY(0deg); }
   100% { transform: rotateY(360deg); }
@@ -245,7 +221,6 @@ body {
   animation: coinFlip 1.6s linear infinite;
 }
 
-/* Blast — coin explodes outward when loading completes */
 @keyframes coinBlast {
   0%   { transform: scale(1) rotateY(0deg);      opacity: 1; }
   20%  { transform: scale(0.88) rotateY(40deg);  opacity: 1; }
@@ -256,7 +231,6 @@ body {
   animation: coinBlast 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* Shockwave ring expanding from the coin center */
 @keyframes shockwave {
   0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0.9; border-width: 4px; }
   100% { transform: translate(-50%, -50%) scale(4);   opacity: 0;   border-width: 0px; }
@@ -267,14 +241,13 @@ body {
   left: 50%;
   width: 100%;
   height: 100%;
-  border: 4px solid var(--color-dawg-400);
+  border: 4px solid var(--color-dawg-500);
   border-radius: 9999px;
   transform: translate(-50%, -50%) scale(0.4);
   pointer-events: none;
   animation: shockwave 650ms ease-out forwards;
 }
 
-/* Particle shards radiating out on blast */
 @keyframes particleFly {
   0% {
     transform: translate(-50%, -50%) rotate(var(--dawg-angle, 0deg)) translateX(0) scale(1);
@@ -291,13 +264,12 @@ body {
   left: 50%;
   width: 10px;
   height: 10px;
-  background: var(--color-dawg-400);
+  background: var(--color-dawg-500);
   border-radius: 2px;
   pointer-events: none;
   animation: particleFly 700ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
 }
 
-/* Loader text fade swap */
 @keyframes dawgTextIn {
   0%   { opacity: 0; transform: translateY(6px); }
   100% { opacity: 1; transform: translateY(0); }
@@ -306,9 +278,98 @@ body {
   animation: dawgTextIn 280ms ease-out forwards;
 }
 
-/* =========================================================================
-   REDUCED MOTION — honor accessibility preferences
-   ========================================================================= */
+/* ───────── Nasdaq Marketsite pixel-LED display ─────────
+ *
+ * The dashboard header is styled to evoke the Nasdaq tower in Times
+ * Square — pure black panel, bright yellow bitmap-style text, subtle
+ * CRT scanlines and a soft bloom around glyphs. Everything rendered in
+ * VT323 (dot-matrix) through the `--font-vt323` variable.
+ *
+ * Scoped by class so it only affects the ticker component.
+ */
+.nasdaq-led {
+  background: #000000;
+  font-family: var(--font-vt323), 'VT323', 'Courier New', monospace;
+  color: #FFCC00;
+  text-shadow:
+    0 0 1px rgba(255, 204, 0, 0.95),
+    0 0 6px rgba(255, 199, 0, 0.55),
+    0 0 14px rgba(255, 199, 0, 0.28);
+  letter-spacing: 0.06em;
+}
+
+.nasdaq-led-dim {
+  color: rgba(255, 204, 0, 0.45);
+  text-shadow: 0 0 2px rgba(255, 199, 0, 0.3);
+}
+
+.nasdaq-led-bright {
+  color: #FFE066;
+  text-shadow:
+    0 0 2px rgba(255, 224, 102, 1),
+    0 0 10px rgba(255, 199, 0, 0.8),
+    0 0 22px rgba(255, 199, 0, 0.35);
+}
+
+.nasdaq-led-red {
+  color: #FF3B3B;
+  text-shadow:
+    0 0 2px rgba(255, 59, 59, 0.95),
+    0 0 10px rgba(239, 68, 68, 0.55);
+}
+
+.nasdaq-led-green {
+  color: #39FF7A;
+  text-shadow:
+    0 0 2px rgba(57, 255, 122, 0.95),
+    0 0 10px rgba(16, 185, 129, 0.55);
+}
+
+/* CRT-style horizontal scanline overlay for the LED board. */
+.nasdaq-scanlines {
+  position: relative;
+}
+.nasdaq-scanlines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.35) 3px,
+    rgba(0, 0, 0, 0.35) 3px
+  );
+  mix-blend-mode: multiply;
+  z-index: 1;
+}
+.nasdaq-scanlines > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Faint dot-grid behind the LED text, like a Marketsite panel matrix. */
+.nasdaq-dot-matrix {
+  background-image: radial-gradient(rgba(255, 199, 0, 0.07) 1px, transparent 1px);
+  background-size: 6px 6px;
+}
+
+/* Bloomberg-style horizontal marquee loop (used by the scrolling
+ * bottom strip of the ticker). */
+.nasdaq-ticker-track {
+  display: flex;
+  gap: 2.5rem;
+  animation: nasdaqScroll 60s linear infinite;
+}
+
+@keyframes nasdaqScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ───────── Reduced motion ───────── */
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -321,7 +382,8 @@ body {
   .dawg-coin-spin,
   .dawg-coin-blast,
   .dawg-shockwave,
-  .dawg-particle {
+  .dawg-particle,
+  .nasdaq-ticker-track {
     animation: none !important;
   }
   .fade-in-up {

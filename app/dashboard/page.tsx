@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardHeader, CardBody, MetricCard, CodeBlock } from "@/components/ui/card";
+import { Card, CardHeader, CardBody, CodeBlock } from "@/components/ui/card";
+import { NasdaqHeader } from "@/components/nasdaq-header";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
 import { mapCycleResultToCycle, mapEnrichedResponseToCycle } from "@/lib/cycle-mapper";
 import type { Cycle } from "@/lib/types";
@@ -24,6 +25,7 @@ import { PreconditionModal } from "@/components/precondition-modal";
 import { TelegramModal } from "@/components/telegram-modal";
 import { FundingModal } from "@/components/funding-modal";
 import { NaryoFeed } from "@/components/naryo-feed";
+import { StreamingHuntPanel } from "@/components/streaming-hunt-panel";
 import { SwarmStatusBar } from "@/components/swarm-status-bar";
 import { SwarmActivityTicker } from "@/components/swarm-activity-ticker";
 import { DebateTheater } from "@/components/debate-theater";
@@ -63,6 +65,8 @@ export default function DashboardPage() {
   // totalSpend is an estimate: 3 specialist hires × $0.001 per cycle.
   const fund = user ? {
     nav: user.fund.currentNav,
+    navChange24h: null,
+    deposited: user.fund.depositedUsdc,
     totalCycles: user.agent.lastCycleId,
     totalPayments: user.agent.lastCycleId * 3,
     totalSpend: user.agent.lastCycleId * 0.003,
@@ -256,6 +260,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4">
         <div className="min-w-0 space-y-3">
 
+      {/* Streaming Hunt panel — live SSE-driven view of a cycle as it
+          unfolds. Walks the user through bias → hires → debate → swap in
+          real time. Uses the POST /api/cycle/stream/[userId] endpoint. */}
+      {userId && <StreamingHuntPanel userId={userId} />}
+
       {/* Degraded-cycle banner: only rendered when the last committed cycle
           had a proof failure OR a specialist ran without TEE attestation.
           This replaces the previous silent-degradation behavior so users know
@@ -279,42 +288,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Row 1: Metric cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <MetricCard
-          emoji="💰"
-          label="Fund NAV"
-          value={fund ? `$${fund.nav.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
-          sub={fund ? "24h change —" : "Connect wallet"}
-          subColor={fund ? "text-void-500" : undefined}
-        />
-        <MetricCard
-          emoji="🔄"
-          label="Hunts"
-          value={fund ? fund.totalCycles.toString() : "0"}
-          sub="All sealed"
-        />
-        <MetricCard
-          emoji="💸"
-          label="Pack spend"
-          value={fund ? `$${fund.totalSpend.toFixed(2)}` : "$0.00"}
-          sub={fund ? `${fund.totalPayments} payments` : "0 payments"}
-        />
-        <MetricCard
-          emoji="🎯"
-          label="Win rate"
-          value="—"
-          sub="Pending P&L attribution"
-          subColor="text-void-500"
-        />
-        <MetricCard
-          emoji="🧠"
-          label="0G sealed"
-          value={fund ? fund.totalInferences.toString() : "0"}
-          sub="6 per hunt"
-          subColor="text-void-500"
-        />
-      </div>
+      {/* Nasdaq-style terminal header — big NAV + ticker strip. */}
+      <NasdaqHeader fund={fund} connected={!!user} />
 
       {/* Naryo Multichain Event Stream */}
       <Card>

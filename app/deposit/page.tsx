@@ -7,6 +7,11 @@ import { deposit, withdraw } from "@/lib/api";
 import { useConnection, useWalletClient } from "wagmi";
 import { parseUnits, createPublicClient, http } from "viem";
 import { arcTestnet } from "@/contexts/wagmi-provider";
+import {
+  arcAddressUrl,
+  arcTxUrl,
+  inftTokenUrl,
+} from "@/lib/links";
 
 type Tab = "deposit" | "withdraw";
 const QUICK_AMOUNTS = [1, 10, 50, 100];
@@ -24,7 +29,17 @@ export default function DepositPage() {
   const [tab, setTab] = useState<Tab>("deposit");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  // `lastReceipt` is kept after the flow completes so we can show the user a
+  // persistent success banner with a clickable ArcScan link — the previous
+  // "Done!" state only lived on the disabled button for 3s and looked
+  // identical to a loading state because `disabled:opacity-50` kicked in
+  // once amount was cleared.
+  const [lastReceipt, setLastReceipt] = useState<{
+    txHash: string;
+    amount: string;
+    kind: Tab;
+    at: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"idle" | "wallet" | "confirming" | "recording">("idle");
 
@@ -32,6 +47,7 @@ export default function DepositPage() {
   const nav = user?.fund?.currentNav ?? 0;
   const shares = user?.fund?.htsShareBalance ?? 0;
   const proxyAddress = user?.proxyWallet?.address;
+  const inftTokenId = user?.inftTokenId ?? null;
 
   async function handleDeposit() {
     if (!amount || parseFloat(amount) <= 0 || !userId || !proxyAddress || !walletClient) return;
@@ -58,8 +74,12 @@ export default function DepositPage() {
 
       setStep("recording");
       await deposit(userId, parsedAmount, txHash);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setLastReceipt({
+        txHash,
+        amount: parsedAmount.toFixed(2),
+        kind: "deposit",
+        at: Date.now(),
+      });
       setAmount("");
       await refetch();
     } catch (err: unknown) {
@@ -81,8 +101,12 @@ export default function DepositPage() {
     setError(null);
     try {
       await withdraw(userId, parseFloat(amount));
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setLastReceipt({
+        txHash: "",
+        amount: parseFloat(amount).toFixed(2),
+        kind: "withdraw",
+        at: Date.now(),
+      });
       setAmount("");
       await refetch();
     } catch (err) {
@@ -118,6 +142,47 @@ export default function DepositPage() {
   return (
     <main className="max-w-7xl mx-auto px-5 py-5">
       <div className="max-w-md mx-auto space-y-3">
+        {/* Lead Dawg identity header — who you're funding, all three on-chain
+            anchors visible as single-click links. */}
+        {(inftTokenId != null || proxyAddress) && (
+          <Card>
+            <CardBody className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-wider text-void-500">
+                  Funding your Lead Dawg
+                </span>
+                {inftTokenId != null && (
+                  <a
+                    href={inftTokenUrl(inftTokenId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md border border-gold-400/30 bg-gold-400/10 px-2 py-0.5 font-mono text-[10px] text-gold-400 hover:border-gold-400/50 hover:bg-gold-400/15 transition-colors"
+                    title={`VaultMindAgent iNFT #${inftTokenId} on 0G Chain`}
+                  >
+                    iNFT #{inftTokenId} ↗ 0G Chainscan
+                  </a>
+                )}
+              </div>
+              {proxyAddress && (
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wider text-void-600">
+                    Agent wallet (Circle MPC on Arc)
+                  </p>
+                  <a
+                    href={arcAddressUrl(proxyAddress)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block font-mono text-xs text-void-300 hover:text-dawg-300 underline decoration-dotted truncate"
+                    title={`${proxyAddress}\nClick to view on ArcScan`}
+                  >
+                    {proxyAddress} ↗
+                  </a>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
         {/* Deposit / Withdraw form */}
         <Card>
           <CardBody className="space-y-4">
@@ -201,8 +266,6 @@ export default function DepositPage() {
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   {statusText ?? "Processing..."}
                 </span>
-              ) : success ? (
-                "Done!"
               ) : tab === "deposit" ? (
                 "Deposit from Wallet"
               ) : (
@@ -219,6 +282,48 @@ export default function DepositPage() {
             {error && (
               <p className="text-center text-xs text-blood-300">{error}</p>
             )}
+
+            {/* Success receipt — persists after the flow completes so the user
+                has a clear confirmation with a clickable on-chain verification
+                link. Previously the only signal was a dim "Done!" on the
+                button, which looked identical to the loading state. */}
+            {lastReceipt && !isProcessing && (
+              <div className="border border-emerald-700/40 bg-emerald-950/30 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">
+                      {lastReceipt.kind === "deposit" ? "Deposit confirmed" : "Withdrawal confirmed"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLastReceipt(null)}
+                    className="text-xs text-void-500 hover:text-void-300"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <p className="text-xs text-void-300">
+                  ${lastReceipt.amount} USDC{" "}
+                  {lastReceipt.kind === "deposit" ? "sent to agent wallet" : "returned to your wallet"}
+                </p>
+                {lastReceipt.txHash && (
+                  <a
+                    href={arcTxUrl(lastReceipt.txHash) ?? "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs font-mono text-teal-300 hover:text-teal-200 underline decoration-dotted"
+                    title={lastReceipt.txHash}
+                  >
+                    {lastReceipt.txHash.slice(0, 10)}…{lastReceipt.txHash.slice(-8)}
+                    <span className="text-[10px]">↗ ArcScan</span>
+                  </a>
+                )}
+              </div>
+            )}
+
             <p className="text-center text-xs text-void-600">
               {tab === "deposit"
                 ? "Sends native USDC from your wallet to your agent wallet on Arc Testnet"

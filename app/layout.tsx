@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, VT323 } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/contexts/wagmi-provider";
 import { Nav } from "@/components/nav";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"] });
+// VT323 — dot-matrix / LED bitmap font used for the Nasdaq Marketsite-style
+// ticker board. Single weight (400). Loaded once at the app root so it
+// renders instantly on the dashboard header without FOIT.
+const vt323 = VT323({ variable: "--font-vt323", weight: "400", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
@@ -106,12 +110,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${vt323.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: phantomBlockScript }} />
       </head>
-      <body className="min-h-full flex flex-col bg-void-950 text-void-300">
+      <body className="min-h-full flex flex-col">
         <Providers>
           <Nav />
           <main className="flex-1">{children}</main>

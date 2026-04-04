@@ -658,8 +658,9 @@ function ActiveAgentCard({
         </div>
 
         <div className="flex items-center justify-between border-t border-void-800/80 pt-3 text-[11px] font-mono text-void-600">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <InftPill inftId={agent.inftId} inftTokenId={agent.inftTokenId} />
+            <StoragePill rootHash={agent.storageRootHash} />
             {hireCount != null && hireCount > 0 && (
               <span>· {hireCount} calls</span>
             )}
@@ -721,9 +722,10 @@ function CommunityAgentCard({
             <div className="mt-0.5 truncate text-xs text-void-500">
               {agent.skill}
             </div>
-            <div className="mt-1.5 flex items-center gap-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <ZeroGBadge />
               <InftPill inftId={agent.inftId} inftTokenId={agent.inftTokenId} />
+              <StoragePill rootHash={agent.storageRootHash} />
             </div>
           </div>
         </div>
