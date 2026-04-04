@@ -42,7 +42,7 @@ export function ComputeLog({ actions }: { actions: AgentActionRecord[] }) {
           };
           const agentSuffix = a.agentName ? ` ${a.agentName}` : "";
           const paymentSuffix =
-            a.paymentAmount != null ? ` ($${a.paymentAmount.toFixed(3)})` : "";
+            a.paymentAmount != null ? ` ($${a.paymentAmount})` : "";
 
           return (
             <div

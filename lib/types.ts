@@ -55,7 +55,7 @@ export interface AgentActionRecord {
   payload: unknown;
   attestationHash: string | null;
   teeVerified: boolean;
-  paymentAmount: number | null;
+  paymentAmount: string | null;
   paymentNetwork: string | null;
   paymentTxHash: string | null;
   durationMs: number | null;
