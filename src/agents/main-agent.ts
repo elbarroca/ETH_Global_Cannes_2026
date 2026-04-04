@@ -74,12 +74,16 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   console.log(`[cycle] Starting for user ${user.id} (risk: ${user.agent.riskProfile})`);
   console.log(`[cycle] Proxy wallet: ${user.proxyWallet.address} (Circle: ${user.proxyWallet.walletId})`);
 
-  // Log cycle start
-  await logAction({
-    userId: user.id,
-    actionType: "CYCLE_STARTED",
-    payload: { cycleNumber: cycleId, riskProfile: user.agent.riskProfile },
-  });
+  // Log cycle start (non-fatal — Prisma may not be configured)
+  try {
+    await logAction({
+      userId: user.id,
+      actionType: "CYCLE_STARTED",
+      payload: { cycleNumber: cycleId, riskProfile: user.agent.riskProfile },
+    });
+  } catch (err) {
+    console.warn("[cycle] logAction CYCLE_STARTED failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
 
   // 1. Hire specialists via x402 nanopayments on Arc (per-user HD wallet)
   let payFetch: typeof fetch;
@@ -120,42 +124,27 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   );
   console.log(`[cycle] Debate complete — executor: ${JSON.stringify(debate.executor.parsed)}`);
 
-  // Log debate stages
-  await logAction({
-    userId: user.id,
-    actionType: "DEBATE_ALPHA",
-    agentName: "alpha",
-    attestationHash: debate.alpha.attestationHash,
-    teeVerified: debate.alpha.teeVerified,
-    payload: debate.alpha.parsed as Record<string, unknown>,
-  });
-  await logAction({
-    userId: user.id,
-    actionType: "DEBATE_RISK",
-    agentName: "risk",
-    attestationHash: debate.risk.attestationHash,
-    teeVerified: debate.risk.teeVerified,
-    payload: debate.risk.parsed as Record<string, unknown>,
-  });
-  await logAction({
-    userId: user.id,
-    actionType: "DEBATE_EXECUTOR",
-    agentName: "executor",
-    attestationHash: debate.executor.attestationHash,
-    teeVerified: debate.executor.teeVerified,
-    payload: debate.executor.parsed as Record<string, unknown>,
-  });
+  // Log debate stages (non-fatal)
+  try {
+    await logAction({ userId: user.id, actionType: "DEBATE_ALPHA", agentName: "alpha", attestationHash: debate.alpha.attestationHash, teeVerified: debate.alpha.teeVerified, payload: debate.alpha.parsed as Record<string, unknown> });
+    await logAction({ userId: user.id, actionType: "DEBATE_RISK", agentName: "risk", attestationHash: debate.risk.attestationHash, teeVerified: debate.risk.teeVerified, payload: debate.risk.parsed as Record<string, unknown> });
+    await logAction({ userId: user.id, actionType: "DEBATE_EXECUTOR", agentName: "executor", attestationHash: debate.executor.attestationHash, teeVerified: debate.executor.teeVerified, payload: debate.executor.parsed as Record<string, unknown> });
+  } catch (err) {
+    console.warn("[cycle] logAction debate failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
 
-  // 3. Log to Hedera HCS
+  // 3. Log to Hedera HCS (non-fatal — stub seqNum/hashscanUrl if not configured)
   const record = buildCompactRecord(cycleId, user, specialists, debate);
-  const { seqNum, hashscanUrl } = await logCycle(TOPIC_ID, record);
-  console.log(`[cycle] Logged to HCS: seq=${seqNum} ${hashscanUrl}`);
-
-  await logAction({
-    userId: user.id,
-    actionType: "HCS_LOGGED",
-    payload: { seqNum, hashscanUrl },
-  });
+  let seqNum = 0;
+  let hashscanUrl = "";
+  try {
+    ({ seqNum, hashscanUrl } = await logCycle(TOPIC_ID, record));
+    console.log(`[cycle] Logged to HCS: seq=${seqNum} ${hashscanUrl}`);
+    await logAction({ userId: user.id, actionType: "HCS_LOGGED", payload: { seqNum, hashscanUrl } }).catch(() => {});
+  } catch (err) {
+    console.warn("[cycle] HCS log failed (non-fatal):", err instanceof Error ? err.message : String(err));
+    hashscanUrl = `https://hashscan.io/testnet/topic/${TOPIC_ID || "unconfigured"}`;
+  }
 
   // 3b. Store cycle result to 0G decentralized storage (non-fatal)
   let storageHash: string | undefined;
@@ -190,8 +179,8 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
   const riskParsed = debate.risk.parsed as { challenge?: string; max_pct?: number };
   const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
 
-  // 5. Save full cycle record to Supabase
-  await logCycleRecord(user.id, cycleId, {
+  // 5. Save full cycle record to Supabase (non-fatal)
+  try { await logCycleRecord(user.id, cycleId, {
     specialists: specialists.map((s) => ({
       name: s.name,
       signal: s.signal,
@@ -222,7 +211,9 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     storageHash,
     totalCostUsd: 0.003,
     navAfter: user.fund.currentNav,
-  });
+  }); } catch (err) {
+    console.warn("[cycle] logCycleRecord failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
 
   // 6. Update user
   await updateUser(user.id, {
@@ -245,13 +236,17 @@ export async function runCycle(user: UserRecord): Promise<CycleResult> {
     console.warn("[cycle] Reputation update failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 8. Log completion
-  await logAction({
-    userId: user.id,
-    actionType: "CYCLE_COMPLETED",
-    durationMs: Date.now() - start,
-    payload: { decision: execParsed.action ?? "HOLD", seqNum, cycleNumber: cycleId },
-  });
+  // 8. Log completion (non-fatal)
+  try {
+    await logAction({
+      userId: user.id,
+      actionType: "CYCLE_COMPLETED",
+      durationMs: Date.now() - start,
+      payload: { decision: execParsed.action ?? "HOLD", seqNum, cycleNumber: cycleId },
+    });
+  } catch (err) {
+    console.warn("[cycle] logAction CYCLE_COMPLETED failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
 
   // 9. Return result
   return {

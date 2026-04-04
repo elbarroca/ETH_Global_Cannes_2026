@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge, ZeroGBadge } from "@/components/ui/badge";
 import { MOCK_AGENTS } from "@/lib/mock-data";
-import { getLeaderboard } from "@/lib/api";
+import { getLeaderboard, getMyAgents, hireAgent, fireAgent } from "@/lib/api";
 import type { Agent } from "@/lib/types";
+import type { HiredAgent } from "@/lib/api";
+import { useUser } from "@/contexts/user-context";
 
 const NAME_MAP: Record<string, string> = {
   sentiment: "SentimentBot",
@@ -20,11 +22,31 @@ const EMOJI_MAP: Record<string, string> = {
 };
 
 export default function MarketplacePage() {
-  const [packAgents, setPackAgents] = useState<Agent[]>([]);
+  const { userId } = useUser();
+  const [allAgents, setAllAgents] = useState<Agent[]>([]);
+  const [myAgents, setMyAgents] = useState<HiredAgent[]>([]);
   const [loadingPack, setLoadingPack] = useState(true);
-  const [hiring, setHiring] = useState<string | null>(null);
+  const [loadingMarketplace, setLoadingMarketplace] = useState(true);
+  const [hiringName, setHiringName] = useState<string | null>(null);
+  const [firingName, setFiringName] = useState<string | null>(null);
 
-  const communityAgents = MOCK_AGENTS.filter((a) => !a.isActive);
+  const myAgentNames = new Set(myAgents.map((a) => a.name));
+
+  const fetchMyAgents = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const agents = await getMyAgents(userId);
+      setMyAgents(agents);
+    } catch {
+      setMyAgents([]);
+    } finally {
+      setLoadingPack(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchMyAgents();
+  }, [fetchMyAgents]);
 
   useEffect(() => {
     getLeaderboard()
@@ -42,20 +64,67 @@ export default function MarketplacePage() {
           creator: "AlphaDawg",
           isActive: e.active,
         }));
-        setPackAgents(mapped);
+        setAllAgents(mapped);
       })
       .catch(() => {
-        setPackAgents(MOCK_AGENTS.filter((a) => a.isActive));
+        setAllAgents(MOCK_AGENTS);
       })
-      .finally(() => setLoadingPack(false));
+      .finally(() => setLoadingMarketplace(false));
   }, []);
 
-  const active = packAgents.filter((a) => a.isActive);
+  // Combine leaderboard + mock community agents for marketplace display
+  const communityAgents = MOCK_AGENTS.filter((a) => !a.isActive);
+  const marketplaceAgents = [
+    ...allAgents.filter((a) => !myAgentNames.has(a.name) && !myAgentNames.has(NAME_MAP[a.name] ?? "")),
+    ...communityAgents,
+  ];
 
-  async function handleHire(name: string) {
-    setHiring(name);
-    await new Promise((r) => setTimeout(r, 1000));
-    setHiring(null);
+  // Build "Your Pack" from real hired agents, enriched with display data
+  const packCards: Agent[] = myAgents.map((h) => {
+    const displayName = NAME_MAP[h.name] ?? h.name;
+    const mock = MOCK_AGENTS.find((m) => m.name === displayName);
+    return {
+      name: displayName,
+      emoji: EMOJI_MAP[h.name] ?? mock?.emoji ?? "\uD83E\uDD16",
+      skill: h.tags.join(", ") || mock?.skill || "Analysis",
+      accuracy: h.correctCalls > 0 ? Math.round((h.correctCalls / h.totalHires) * 100) : mock?.accuracy ?? 75,
+      timesHired: h.totalHires,
+      pricePerQuery: parseFloat(h.price.replace("$", "")) || 0.001,
+      inftId: mock?.inftId ?? `#${String(h.totalHires).padStart(4, "0")}`,
+      model: "glm-5-chat",
+      provider: "0G Sealed TEE",
+      creator: "AlphaDawg",
+      isActive: true,
+    };
+  });
+
+  async function handleHire(agentDisplayName: string) {
+    if (!userId) return;
+    // Reverse-map display name to registry name
+    const registryName = Object.entries(NAME_MAP).find(([, v]) => v === agentDisplayName)?.[0] ?? agentDisplayName;
+    setHiringName(agentDisplayName);
+    try {
+      await hireAgent(userId, registryName);
+      await fetchMyAgents();
+    } catch (err) {
+      console.error("[marketplace] Hire failed:", err);
+    } finally {
+      setHiringName(null);
+    }
+  }
+
+  async function handleFire(agentDisplayName: string) {
+    if (!userId) return;
+    const registryName = Object.entries(NAME_MAP).find(([, v]) => v === agentDisplayName)?.[0] ?? agentDisplayName;
+    setFiringName(agentDisplayName);
+    try {
+      await fireAgent(userId, registryName);
+      await fetchMyAgents();
+    } catch (err) {
+      console.error("[marketplace] Fire failed:", err);
+    } finally {
+      setFiringName(null);
+    }
   }
 
   return (
@@ -64,9 +133,7 @@ export default function MarketplacePage() {
       <section className="space-y-3">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-void-100">
-              Your pack
-            </h2>
+            <h2 className="text-lg font-bold text-void-100">Your pack</h2>
             <p className="text-sm text-void-500 mt-0.5">
               Specialists your Lead Dawg currently hires
             </p>
@@ -78,12 +145,19 @@ export default function MarketplacePage() {
 
         {loadingPack ? (
           <div className="text-sm text-void-500 py-8 text-center">Loading pack...</div>
-        ) : active.length === 0 ? (
-          <div className="text-sm text-void-500 py-8 text-center">No active specialists. Run a hunt to register them.</div>
+        ) : packCards.length === 0 ? (
+          <div className="text-sm text-void-500 py-8 text-center border border-dashed border-void-700 rounded-xl">
+            No agents hired yet. Hire specialists from the marketplace below to start hunting.
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {active.map((agent) => (
-              <ActiveAgentCard key={agent.name} agent={agent} />
+            {packCards.map((agent) => (
+              <ActiveAgentCard
+                key={agent.name}
+                agent={agent}
+                firing={firingName === agent.name}
+                onFire={() => handleFire(agent.name)}
+              />
             ))}
           </div>
         )}
@@ -93,9 +167,7 @@ export default function MarketplacePage() {
       <section className="space-y-3">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-void-100">
-              Marketplace
-            </h2>
+            <h2 className="text-lg font-bold text-void-100">Marketplace</h2>
             <p className="text-sm text-void-500 mt-0.5">
               Community-built specialists — minted as iNFTs on 0G
             </p>
@@ -105,22 +177,35 @@ export default function MarketplacePage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {communityAgents.map((agent) => (
-            <CommunityAgentCard
-              key={agent.name}
-              agent={agent}
-              hiring={hiring === agent.name}
-              onHire={() => handleHire(agent.name)}
-            />
-          ))}
-        </div>
+        {loadingMarketplace ? (
+          <div className="text-sm text-void-500 py-8 text-center">Loading marketplace...</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {marketplaceAgents.map((agent) => (
+              <CommunityAgentCard
+                key={agent.name}
+                agent={agent}
+                hired={myAgentNames.has(agent.name) || myAgentNames.has(Object.entries(NAME_MAP).find(([, v]) => v === agent.name)?.[0] ?? "")}
+                hiring={hiringName === agent.name}
+                onHire={() => handleHire(agent.name)}
+              />
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
 }
 
-function ActiveAgentCard({ agent }: { agent: Agent }) {
+function ActiveAgentCard({
+  agent,
+  firing,
+  onFire,
+}: {
+  agent: Agent;
+  firing: boolean;
+  onFire: () => void;
+}) {
   return (
     <Card className="agent-card">
       <CardBody className="space-y-3">
@@ -131,9 +216,7 @@ function ActiveAgentCard({ agent }: { agent: Agent }) {
 
         <div>
           <div className="text-2xl mb-1">{agent.emoji}</div>
-          <div className="font-semibold text-sm text-void-200">
-            {agent.name}
-          </div>
+          <div className="font-semibold text-sm text-void-200">{agent.name}</div>
           <div className="text-xs text-void-500 mt-0.5">{agent.skill}</div>
         </div>
 
@@ -142,18 +225,12 @@ function ActiveAgentCard({ agent }: { agent: Agent }) {
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-green-400 font-medium">
-            {agent.accuracy}% accurate
-          </span>
+          <span className="text-green-400 font-medium">{agent.accuracy}% accurate</span>
           <span className="text-void-500">{agent.timesHired} hires</span>
         </div>
 
         <div className="text-xs text-void-600">
-          Model:{" "}
-          <span className="text-void-400 font-mono">
-            {agent.model}
-          </span>{" "}
-          via 0G Sealed
+          Model: <span className="text-void-400 font-mono">{agent.model}</span> via 0G Sealed
         </div>
 
         <hr className="border-void-800" />
@@ -162,7 +239,16 @@ function ActiveAgentCard({ agent }: { agent: Agent }) {
           <span className="font-mono font-semibold text-void-200">
             ${agent.pricePerQuery.toFixed(3)}/query
           </span>
-          <span className="text-blue-400">Paid via Arc USDC</span>
+          <div className="flex items-center gap-2">
+            <span className="text-blue-400">Paid via Arc USDC</span>
+            <button
+              onClick={onFire}
+              disabled={firing}
+              className="px-2 py-0.5 bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-800/30 text-xs rounded-md disabled:opacity-50 transition-colors"
+            >
+              {firing ? "Firing..." : "Fire"}
+            </button>
+          </div>
         </div>
       </CardBody>
     </Card>
@@ -171,10 +257,12 @@ function ActiveAgentCard({ agent }: { agent: Agent }) {
 
 function CommunityAgentCard({
   agent,
+  hired,
   hiring,
   onHire,
 }: {
   agent: Agent;
+  hired: boolean;
   hiring: boolean;
   onHire: () => void;
 }) {
@@ -187,22 +275,15 @@ function CommunityAgentCard({
         </div>
 
         <div>
-          <div className="font-semibold text-sm text-void-200">
-            {agent.name}
-          </div>
+          <div className="font-semibold text-sm text-void-200">{agent.name}</div>
           <div className="text-xs text-void-500 mt-0.5">{agent.skill}</div>
         </div>
 
-        <div className="text-xs font-mono text-void-500">
-          iNFT {agent.inftId}
-        </div>
-
+        <div className="text-xs font-mono text-void-500">iNFT {agent.inftId}</div>
         <div className="text-xs font-mono text-void-600">{agent.creator}</div>
 
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-green-400 font-medium">
-            {agent.accuracy}% accurate
-          </span>
+          <span className="text-green-400 font-medium">{agent.accuracy}% accurate</span>
           <span className="text-void-500">{agent.timesHired} hires</span>
         </div>
 
@@ -212,13 +293,19 @@ function CommunityAgentCard({
           <span className="text-xs font-mono font-semibold text-gold-400">
             ${agent.pricePerQuery.toFixed(3)}/query
           </span>
-          <button
-            onClick={onHire}
-            disabled={hiring}
-            className="px-3 py-1 bg-blood-600 hover:bg-blood-700 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors"
-          >
-            {hiring ? "Hiring\u2026" : "Hire"}
-          </button>
+          {hired ? (
+            <span className="px-3 py-1 bg-green-900/20 text-green-400 text-xs font-medium rounded-lg border border-green-800/30">
+              Hired
+            </span>
+          ) : (
+            <button
+              onClick={onHire}
+              disabled={hiring}
+              className="px-3 py-1 bg-blood-600 hover:bg-blood-700 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {hiring ? "Hiring..." : "Hire"}
+            </button>
+          )}
         </div>
       </CardBody>
     </Card>

@@ -180,3 +180,36 @@ export async function getLeaderboard(): Promise<LeaderboardAgent[]> {
   const data = await apiFetch<{ agents: LeaderboardAgent[] }>("/api/marketplace/leaderboard");
   return data.agents;
 }
+
+// ── Per-user hired agents ───────────────────────────────────
+
+export interface HiredAgent {
+  name: string;
+  agentId: string;
+  endpoint: string;
+  tags: string[];
+  price: string;
+  reputation: number;
+  totalHires: number;
+  correctCalls: number;
+  hiredAt: string;
+}
+
+export async function getMyAgents(userId: string): Promise<HiredAgent[]> {
+  const data = await apiFetch<{ agents: HiredAgent[] }>(`/api/marketplace/my-agents?userId=${userId}`);
+  return data.agents;
+}
+
+export async function hireAgent(userId: string, agentName: string): Promise<{ agentName: string }> {
+  return apiFetch("/api/marketplace/hire", {
+    method: "POST",
+    body: JSON.stringify({ userId, agentName }),
+  });
+}
+
+export async function fireAgent(userId: string, agentName: string): Promise<{ success: boolean }> {
+  return apiFetch("/api/marketplace/fire", {
+    method: "POST",
+    body: JSON.stringify({ userId, agentName }),
+  });
+}
