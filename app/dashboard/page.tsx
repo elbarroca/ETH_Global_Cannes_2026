@@ -3,29 +3,32 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardBody, MetricCard, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
-import { MOCK_FUND, MOCK_CYCLE } from "@/lib/mock-data";
-import { mapCycleResultToCycle } from "@/lib/cycle-mapper";
+import { mapCycleResultToCycle, mapCompactRecordToCycle } from "@/lib/cycle-mapper";
+import type { Cycle } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/user-context";
-import { triggerCycle, getLatestCycle, type CycleResult } from "@/lib/api";
+import { triggerCycle, getLatestCycle } from "@/lib/api";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, userId, linkCode } = useUser();
   const [running, setRunning] = useState(false);
-  const [latestCycle, setLatestCycle] = useState<CycleResult | null>(null);
+  const [liveCycle, setLiveCycle] = useState<Cycle | null>(null);
 
-  // Use real data when available, fallback to mock
-  const fund = user ? {
-    ...MOCK_FUND,
-    nav: user.fund.currentNav,
-    totalCycles: user.agent.lastCycleId,
-  } : MOCK_FUND;
-  const cycle = latestCycle ? mapCycleResultToCycle(latestCycle) : MOCK_CYCLE;
+  const fund = {
+    nav: user?.fund.currentNav ?? 0,
+    totalCycles: user?.agent.lastCycleId ?? 0,
+    totalSpend: (user?.agent.lastCycleId ?? 0) * 0.003,
+    totalPayments: (user?.agent.lastCycleId ?? 0) * 3,
+    totalInferences: (user?.agent.lastCycleId ?? 0) * 6,
+  };
+  const cycle = liveCycle;
 
   useEffect(() => {
     if (userId) {
-      getLatestCycle(userId).then(setLatestCycle).catch(() => {});
+      getLatestCycle(userId).then((record) => {
+        if (record) setLiveCycle(mapCompactRecordToCycle(record));
+      }).catch(() => {});
     }
   }, [userId]);
 
@@ -34,7 +37,7 @@ export default function DashboardPage() {
     setRunning(true);
     try {
       const result = await triggerCycle(userId);
-      setLatestCycle(result);
+      setLiveCycle(mapCycleResultToCycle(result));
     } catch (err) {
       console.warn("[dashboard] Hunt failed:", err);
     } finally {

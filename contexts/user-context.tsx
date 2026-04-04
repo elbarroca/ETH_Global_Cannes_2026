@@ -37,7 +37,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const fetched = await getUser(address);
     if (fetched) {
       setUser(fetched);
-      if (fetched.linkCode) setLinkCode(fetched.linkCode);
+      // Clear linkCode once telegram is verified
+      if (fetched.telegram?.verified) setLinkCode(null);
       return;
     }
     // Auto-onboard on first connect (testnet — "mock" signature skips verification)
@@ -51,8 +52,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         if (fullUser) setUser(fullUser);
       } catch (err) {
         console.warn("[user-context] Auto-onboard failed:", err);
-      } finally {
-        onboardingRef.current = false;
+        onboardingRef.current = false; // Only reset on failure so retry is possible
       }
     }
   }, [address]);
