@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserById } from "@/src/store/user-store";
-import { analyzeCycle, runCycle } from "@/src/agents/main-agent";
+import { analyzeCycle } from "@/src/agents/main-agent";
 import { createPendingCycle, getPendingForUser } from "@/src/store/pending-cycles";
 
 export async function POST(
@@ -14,23 +14,7 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const approvalMode = user.agent.approvalMode ?? "always";
-
-    if (approvalMode === "auto") {
-      console.log(`[api] Auto-approve cycle for user ${user.id}`);
-      const result = await runCycle(user);
-      return NextResponse.json({
-        cycleId: result.cycleId,
-        specialists: result.specialists,
-        debate: result.debate,
-        decision: result.decision,
-        seqNum: result.seqNum,
-        hashscanUrl: result.hashscanUrl,
-        timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp,
-      });
-    }
-
-    // Two-phase: analyze + pending
+    // Guard: reject if user already has a pending cycle
     const existing = await getPendingForUser(userId);
     if (existing) {
       return NextResponse.json(
@@ -39,7 +23,7 @@ export async function POST(
       );
     }
 
-    console.log(`[api] Analyze cycle for user ${user.id} (approval: ${approvalMode})`);
+    console.log(`[api] Analyze cycle for user ${user.id}`);
     const analysis = await analyzeCycle(user);
     const timeoutMin = user.agent.approvalTimeoutMin ?? 10;
     const pending = await createPendingCycle(analysis, "ui", timeoutMin);

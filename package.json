@@ -16,6 +16,7 @@
     "setup:token": "npx tsx scripts/setup-token.ts",
     "setup:og": "npx tsx scripts/setup-og-account.ts",
     "validate": "npx tsx scripts/validate-all.ts",
+    "validate:approval": "npx tsx scripts/validate-approval-flow.ts",
     "migrate": "npx tsx scripts/migrate.ts",
     "setup:circle": "npx tsx scripts/setup-circle.ts",
     "specialists": "tsx src/agents/specialist-server.ts",
