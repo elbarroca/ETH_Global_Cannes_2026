@@ -278,7 +278,7 @@ export default function DashboardPage() {
       )}
 
       {/* Nasdaq-style terminal header — big NAV + ticker strip. */}
-      <NasdaqHeader fund={fund} connected={!!user} />
+      <NasdaqHeader fund={fund} connected={!!user} userId={userId} />
 
       {/* Naryo Multichain Event Stream */}
       <Card>
