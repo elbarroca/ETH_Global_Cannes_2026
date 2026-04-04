@@ -1,10 +1,11 @@
 import { updateUser } from "../store/user-store";
 import { logAction, logCycleRecord } from "../store/action-logger";
 import { runAdversarialDebate } from "./adversarial";
+import { normalizeCot } from "./prompts";
 import { hireSpecialists } from "./hire-specialist";
 import { selectSpecialists } from "../marketplace/hiring-strategy";
 import { getAgent } from "../config/agent-registry";
-import { logCycle } from "../hedera/hcs";
+import { logCycle, logSwarmEvent } from "../hedera/hcs";
 import { storeMemory } from "../og/storage";
 import { updateAgentMetadata } from "../og/inft";
 import { getUserPaymentFetch, getUserPrivateKey } from "../config/arc";
@@ -12,6 +13,10 @@ import { hireFromMarketplace } from "../marketplace/registry";
 import { evaluateCycleSignals } from "../marketplace/reputation";
 import { executeArcSwap, calculateSwapAmount } from "../execution/arc-swap";
 import { prepareSwapFunds, computeHoldingsUpdate } from "../payments/fund-swap";
+import { getTokenPrice } from "../payments/circle-wallet";
+import { synthesizeCycleNarrative, type CycleNarrative } from "./narrative";
+import { recordPickEntries } from "../marketplace/pick-tracker";
+import { filterTradeablePicks } from "./data/pick-filter";
 import { getPrisma } from "../config/prisma";
 import { getGateway } from "../openclaw/gateway-client";
 import type {
@@ -30,10 +35,24 @@ import type {
   CycleProofs,
   OpenClawGatewayStatus,
   SpecialistPath,
+  SwarmEventRecord,
 } from "../types/index";
 import type { RiskProfile, MarketVolatility, DebateRole } from "./role-manifests";
 
 const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
+
+// Fire-and-forget swarm audit emitter. Every call is caught + logged so a
+// failed HCS write never fails a cycle. Used by analyzeCycle + commitCycle
+// to thread per-event audit messages alongside the existing logCycle aggregate.
+function emitSwarmEvent(event: SwarmEventRecord): void {
+  if (!TOPIC_ID) return;
+  logSwarmEvent(TOPIC_ID, event).catch((err) => {
+    console.warn(
+      `[cycle] logSwarmEvent failed (ev=${event.ev}):`,
+      err instanceof Error ? err.message : String(err),
+    );
+  });
+}
 
 // Hierarchical hiring: delegate debate decisions to Fly.io debate agents.
 // Each debate agent autonomously hires its own specialists via x402 before
@@ -335,6 +354,18 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
   console.log(`[cycle] Analyzing for user ${user.id} (risk: ${user.agent.riskProfile}) goal: "${goal}"`);
   console.log(`[cycle] Proxy wallet: ${user.proxyWallet.address} (Circle: ${user.proxyWallet.walletId})`);
 
+  // Emit the swarm-start event before any specialist is hired. This anchors
+  // the cluster of per-event messages that follow (hires, debate turns, done)
+  // so Hashscan viewers can group them by cycle `c`.
+  emitSwarmEvent({
+    ev: "start",
+    c: cycleId,
+    u: user.id,
+    t: new Date().toISOString(),
+    rp: user.agent.riskProfile,
+    g: goal.slice(0, 120) || undefined,
+  });
+
   // Probe OpenClaw gateway so we can honestly report its status in the CycleResult.
   // This call is cheap — the gateway auto-disables on ECONNREFUSED and subsequent
   // callers short-circuit. Status is display-only; it never gates specialist hiring.
@@ -416,21 +447,36 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
       // Flatten all hired specialists into SpecialistResult[] for downstream code.
       // Each one gets hiredBy tag so we know which debate agent paid for it.
       // picks[] is preserved so the debate layer can see multi-token shortlists.
+      // The 7B model frequently hallucinates off-universe tickers (ADA, SOL, BTC)
+      // despite prompts explicitly forbidding it — filterTradeablePicks enforces
+      // the EVM whitelist at code level and substitutes a WETH fallback when
+      // every pick violates. See pick-filter.ts + Problem 1 in SYSTEM_STATE_AND_FIXES.
       const flatten = (resp: DebateAgentResponse): SpecialistResult[] =>
-        resp.specialists_hired.map((s) => ({
-          name: s.name,
-          signal: s.signal,
-          confidence: s.confidence,
-          reasoning: s.reasoning ?? "",
-          attestationHash: s.attestation,
-          teeVerified: false,
-          reputation: 500,
-          hiredBy: resp.name,
-          paymentTxHash: s.paymentTxHash,
-          priceUsd: s.priceUsd,
-          rawDataSnapshot: s.rawDataSnapshot,
-          picks: s.picks,
-        }));
+        resp.specialists_hired.map((s) => {
+          const filtered = filterTradeablePicks(s.picks, s.signal, s.confidence);
+          const base: SpecialistResult = {
+            name: s.name,
+            signal: s.signal,
+            confidence: s.confidence,
+            reasoning: s.reasoning ?? "",
+            attestationHash: s.attestation,
+            teeVerified: false,
+            reputation: 500,
+            hiredBy: resp.name,
+            paymentTxHash: s.paymentTxHash,
+            priceUsd: s.priceUsd,
+            rawDataSnapshot: s.rawDataSnapshot,
+            picks: filtered.picks,
+          };
+          if (filtered.substituted) {
+            base.picks_substituted = true;
+            base.picks_dropped = filtered.droppedAssets;
+            console.warn(
+              `[cycle] ${s.name} picks filtered: dropped [${filtered.droppedAssets.join(",")}] → fallback ${filtered.picks[0]?.asset ?? "WETH"}`,
+            );
+          }
+          return base;
+        });
 
       specialists = [
         ...flatten(alphaResp),
@@ -457,7 +503,61 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
             method: "hierarchical_x402",
           },
         }).catch(() => {});
+
+        // Emit the swarm-hire event to HCS — preserves hiredBy attribution so
+        // Hashscan viewers can see Alpha hired sentiment, Risk hired whale, etc.
+        emitSwarmEvent({
+          ev: "hire",
+          c: cycleId,
+          by: spec.hiredBy ?? "main",
+          to: spec.name,
+          sig: spec.signal,
+          conf: spec.confidence,
+          cot: normalizeCot(
+            (spec as unknown as { cot?: unknown }).cot,
+            spec.reasoning,
+          ),
+          att: (spec.attestationHash ?? "").slice(0, 16),
+        });
       }
+
+      // Emit synthesized debate-turn events for the hierarchical path.
+      // Unlike the flat path (where runAdversarialDebate emits turns inline),
+      // here the turns already ran remotely on Fly.io — we reconstruct them
+      // from each DebateAgentResponse. Order matches the synthetic transcripts
+      // built by synthesizeDebateResult().
+      let hTurn = 0;
+      emitSwarmEvent({
+        ev: "turn",
+        c: cycleId,
+        t: ++hTurn,
+        ph: "opening",
+        from: "alpha",
+        cot: normalizeCot((alphaResp.parsed as { cot?: unknown }).cot, alphaResp.reasoning),
+        verdict: alphaResp.parsed,
+        att: (alphaResp.attestationHash ?? "").slice(0, 16),
+      });
+      emitSwarmEvent({
+        ev: "turn",
+        c: cycleId,
+        t: ++hTurn,
+        ph: "opening",
+        from: "risk",
+        to: "alpha",
+        cot: normalizeCot((riskResp.parsed as { cot?: unknown }).cot, riskResp.reasoning),
+        verdict: riskResp.parsed,
+        att: (riskResp.attestationHash ?? "").slice(0, 16),
+      });
+      emitSwarmEvent({
+        ev: "turn",
+        c: cycleId,
+        t: ++hTurn,
+        ph: "decision",
+        from: "executor",
+        cot: normalizeCot((executorResp.parsed as { cot?: unknown }).cot, executorResp.reasoning),
+        verdict: executorResp.parsed,
+        att: (executorResp.attestationHash ?? "").slice(0, 16),
+      });
 
       debate = synthesizeDebateResult(alphaResp, riskResp, executorResp);
       hierarchicalSucceeded = true;
@@ -512,7 +612,42 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     }
     specialists.sort((a, b) => (b.reputation ?? 500) - (a.reputation ?? 500));
 
-    debate = await runAdversarialDebate(specialists, user.agent.riskProfile, user.agent.maxTradePercent);
+    // Apply the same EVM whitelist guard to the flat-path picks so the
+    // debate layer only ever sees tradeable tickers regardless of which
+    // hiring path fired. See pick-filter.ts.
+    for (const spec of specialists) {
+      const filtered = filterTradeablePicks(spec.picks, spec.signal, spec.confidence);
+      spec.picks = filtered.picks;
+      if (filtered.substituted) {
+        spec.picks_substituted = true;
+        spec.picks_dropped = filtered.droppedAssets;
+        console.warn(
+          `[cycle] ${spec.name} picks filtered (flat path): dropped [${filtered.droppedAssets.join(",")}] → fallback ${filtered.picks[0]?.asset ?? "WETH"}`,
+        );
+      }
+    }
+
+    // Emit one swarm-hire event per fulfilled specialist in the flat path.
+    // The hiring agent is "main" because this path hires up-front before any
+    // debate agent has spoken. `normalizeCot` falls back to splitting the
+    // specialist's reasoning when the model omits `cot`.
+    for (const sp of specialists) {
+      emitSwarmEvent({
+        ev: "hire",
+        c: cycleId,
+        by: "main",
+        to: sp.name,
+        sig: sp.signal,
+        conf: sp.confidence,
+        cot: normalizeCot(
+          (sp as unknown as { cot?: unknown }).cot,
+          sp.reasoning,
+        ),
+        att: (sp.attestationHash ?? "").slice(0, 16),
+      });
+    }
+
+    debate = await runAdversarialDebate(specialists, user.agent.riskProfile, user.agent.maxTradePercent, cycleId);
     specialistPath = "direct_x402";
     console.log(`[cycle] Flat debate complete — executor: ${JSON.stringify(debate.executor.parsed)}`);
   }
@@ -706,10 +841,13 @@ export async function commitCycle(
 
         // 1c. On success, update the user's DB accounting: the deposited
         //     USDC drops by `swapAmount`, and the holdings map gets the
-        //     estimated token amount (USD / current price — we track USD
-        //     equivalent since a proper quoter isn't wired for all tokens).
+        //     real token amount derived from the current CoinGecko price.
+        //     Falls back to swapAmount/100 only if the price lookup fails
+        //     (e.g. the ticker isn't in COINGECKO_IDS).
         if (swapResult.success) {
-          const approximateTokenAmount = swapAmount / 100; // rough placeholder — proper quoter TODO
+          const tokenPriceUsd = await getTokenPrice(finalAsset).catch(() => null);
+          const approximateTokenAmount =
+            tokenPriceUsd && tokenPriceUsd > 0 ? swapAmount / tokenPriceUsd : swapAmount / 100;
           holdingsUpdate = computeHoldingsUpdate(user, finalAsset, swapAmount, approximateTokenAmount);
           try {
             await updateUser(user.id, {
@@ -762,10 +900,51 @@ export async function commitCycle(
     };
   }
 
-  // 2. Store the FULL rich record to 0G decentralized storage — this is the
-  // source of truth for the UI payment graph + "verify on 0G" independent
-  // check. HCS gets only the CID pointer. Order matters: 0G first, HCS
-  // second — otherwise HCS can't carry the `sh` field.
+  // ── Synthesize the augmented-layer narrative (pre-0G) ─────────────────
+  // The narrative is the user-facing "what did the agents discuss" summary.
+  // It's built BEFORE 0G storage so it can be injected into the rich record
+  // and persisted permanently alongside the debate transcript. After storage,
+  // the narrative is also:
+  //   · emitted as a `cycle_narrative` SSE event by the streaming route
+  //     (via the logAction audit row below)
+  //   · returned in CycleResult.narrative (consumed by the API / UI)
+  const narrative: CycleNarrative = synthesizeCycleNarrative({
+    goal,
+    specialists,
+    debate,
+    swap: swapResult,
+    finalAsset,
+    finalPct,
+    newHoldings: holdingsUpdate?.newHoldings ?? {},
+    newDepositedUsdc: holdingsUpdate?.newDepositedUsdc ?? user.fund.depositedUsdc,
+    tokensAcquired: (holdingsUpdate?.newHoldings?.[finalAsset] ?? 0) -
+      ((user.fund as unknown as { holdings?: Record<string, number> }).holdings?.[finalAsset] ?? 0),
+    usdcSpent: holdingsUpdate?.usdcSpent ?? null,
+    overrideApplied: (debate.executor.parsed as Record<string, unknown>).override_applied === true,
+    overrideReason: ((debate.executor.parsed as Record<string, unknown>).override_reason as string) ?? null,
+  });
+  richRecord.narrative = narrative;
+
+  // Log the narrative as a dedicated audit row so the SSE stream can pick it
+  // up and surface it to the client without having to re-synthesize.
+  await logAction({
+    userId: user.id,
+    actionType: "CYCLE_COMPLETED",
+    agentName: "narrative",
+    payload: {
+      stage: "narrative_ready",
+      headline: narrative.headline,
+      confluence: narrative.marketplaceContext.confluenceScore,
+      overrideApplied: narrative.augmentedDebate.overrideApplied,
+      finalReasoning: narrative.finalReasoning,
+    },
+  }).catch(() => {});
+
+  // 2. Store the FULL rich record (now including the narrative) to 0G
+  // decentralized storage — this is the source of truth for the UI payment
+  // graph + "verify on 0G" independent check. HCS gets only the CID pointer.
+  // Order matters: 0G first, HCS second — otherwise HCS can't carry the `sh`
+  // field.
   let storageHash: string | undefined;
   try {
     storageHash = await storeMemory(user.id, richRecord);
@@ -796,6 +975,21 @@ export async function commitCycle(
     console.warn("[cycle] HCS log failed:", msg);
     degradedReasons.push(`HCS log failed: ${msg.slice(0, 80)}`);
   }
+
+  // Emit the capstone swarm-done event — closes the per-cycle message cluster
+  // on Hashscan with the final decision + 0G CID pointer so verifiers can hop
+  // straight from the done event to the rich record in 0G Storage.
+  emitSwarmEvent({
+    ev: "done",
+    c: cycleId,
+    d: {
+      act: compactRecord.d.act,
+      asset: compactRecord.d.asset,
+      pct: compactRecord.d.pct,
+    },
+    sh: storageHash,
+    nav: user.fund.currentNav,
+  });
 
   // 3b. Emit CycleCompleted event on Hedera EVM for Naryo (non-fatal — gated
   // behind NARYO_AUDIT_CONTRACT_ADDRESS env var; absence counts as "disabled",
@@ -903,6 +1097,25 @@ export async function commitCycle(
     console.warn("[cycle] logCycleRecord failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
+  // 5b. Record every specialist pick with an entry price snapshot. A later
+  //     evaluator job (src/marketplace/pick-tracker.ts evaluatePickPerformance)
+  //     scores these picks Δt later by comparing exit price vs entry price,
+  //     then updates the specialist's marketplace reputation. This is the
+  //     foundation of the hire/fire loop (see SYSTEM_STATE_AND_FIXES.md §2.5).
+  if (cycleDbUuid) {
+    await recordPickEntries({
+      cycleId: cycleDbUuid,
+      cycleNumber: cycleId,
+      userId: user.id,
+      specialists,
+    }).catch((err) => {
+      console.warn(
+        "[cycle] recordPickEntries failed (non-fatal):",
+        err instanceof Error ? err.message : String(err),
+      );
+    });
+  }
+
   // 6. Persist debate transcripts (non-fatal — requires valid cycle UUID from step 5)
   if (debate.transcripts && debate.transcripts.length > 0 && cycleDbUuid) {
     try {
@@ -993,6 +1206,7 @@ export async function commitCycle(
     proofs,
     degraded,
     degradedReasons,
+    narrative,
   };
 }
 

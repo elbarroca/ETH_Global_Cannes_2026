@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createSpecialistServer } from "../payments/x402-server";
 import { sealedInference } from "../og/inference";
-import { PROMPTS, parseDualOutput } from "./prompts";
+import { PROMPTS, parseDualOutput, normalizeCot } from "./prompts";
 import { deriveSpecialistAddress } from "../config/wallets";
 import { fetchSentimentData } from "./data/sentiment-data";
 import { fetchWhaleData } from "./data/whale-data";
@@ -54,9 +54,18 @@ export async function startSpecialists(): Promise<void> {
       let rawSnapshot: unknown;
       try { rawSnapshot = JSON.parse(rawData); } catch { rawSnapshot = rawData; }
 
+      // Normalize cot[] before returning so downstream consumers (swarm
+      // audit, debate context builder) get a stable string[] shape even
+      // when the 7B model emits cot as a string, forgets it, or nests it.
+      const normalizedCot = normalizeCot(
+        (parsed as { cot?: unknown }).cot,
+        reasoning || (parsed as { reasoning?: string }).reasoning,
+      );
+
       return {
         name: s.name,
         ...parsed,
+        cot: normalizedCot,
         reasoning: reasoning || (parsed as { reasoning?: string }).reasoning || "",
         rawDataSnapshot: rawSnapshot,
         attestationHash: result.attestationHash,

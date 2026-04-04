@@ -1,6 +1,7 @@
 // Fetches REAL DeFi yield data — DeFi Llama pools API
 
 import { cachedFetch } from "./cached-fetch";
+import { injectUniverseInto } from "./universe-injector";
 
 const DEFI_LLAMA_POOLS_URL = "https://yields.llama.fi/pools";
 
@@ -82,6 +83,10 @@ export async function fetchDefiYieldData(): Promise<string> {
     ];
     results.source = "mock";
   }
+
+  // EVM universe for picks — defi-yield specialist maps protocol TVL to
+  // governance tokens (UNI/AAVE/CRV/COMP/MKR/LDO/SUSHI/1INCH/SNX).
+  await injectUniverseInto(results);
 
   return JSON.stringify(results);
 }
