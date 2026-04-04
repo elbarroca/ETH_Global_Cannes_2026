@@ -35,7 +35,8 @@
     "deploy:arc-swap": "./node_modules/.bin/hardhat compile && npx tsx scripts/deploy-arc-swap-router.ts",
     "backfill:inft": "npx tsx scripts/backfill-inft.ts",
     "demo:auto-approve": "npx tsx scripts/set-demo-auto-approve.ts",
-    "setup:specialist-wallets": "npx tsx scripts/assign-specialist-wallets.ts"
+    "setup:specialist-wallets": "npx tsx scripts/assign-specialist-wallets.ts",
+    "setup:icons": "npx tsx scripts/generate-icons.ts"
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.1",
@@ -95,6 +96,7 @@
     "eslint-config-next": "16.2.2",
     "hardhat": "^2.28.6",
     "hardhat-gas-reporter": "^1.0.10",
+    "sharp": "^0.34.5",
     "solidity-coverage": "^0.8.17",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",

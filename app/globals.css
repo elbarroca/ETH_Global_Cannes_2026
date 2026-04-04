@@ -36,6 +36,18 @@
   --color-gold-500: #F59E0B;
   --color-gold-600: #D97706;
   --color-gold-700: #B45309;
+
+  /* Dawg (brand primary — matches logo yellow; used for CTAs, active states) */
+  --color-dawg-50:  #FFF9DB;
+  --color-dawg-100: #FFF3B0;
+  --color-dawg-200: #FFEA7A;
+  --color-dawg-300: #FFDD47;
+  --color-dawg-400: #FFCE1A;
+  --color-dawg-500: #FFC700;
+  --color-dawg-600: #E6B300;
+  --color-dawg-700: #BF9500;
+  --color-dawg-800: #997700;
+  --color-dawg-900: #665000;
 }
 
 /* Variable references — @theme inline is correct for var() refs */
@@ -60,10 +72,10 @@ body {
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
-/* Hunt button active state */
+/* Hunt button active state — yellow pulse matching dawg primary */
 @keyframes huntPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
-  50% { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 199, 0, 0.45); }
+  50% { box-shadow: 0 0 0 12px rgba(255, 199, 0, 0); }
 }
 
 .hunting {
@@ -148,4 +160,177 @@ body {
 
 .verify-pulse {
   animation: tealPulse 0.4s ease;
+}
+
+/* =========================================================================
+   DAWG MOTION SYSTEM
+   ========================================================================= */
+
+/* Landing-page entrance — subtle fade-in-up for staggered reveals */
+@keyframes fadeInUp {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 400ms ease-out forwards;
+}
+
+/* Primary CTA shine sweep — diagonal highlight slides across the button */
+@keyframes shineSweep {
+  0%   { transform: translateX(-120%) skewX(-18deg); }
+  100% { transform: translateX(240%) skewX(-18deg); }
+}
+
+.shine-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.shine-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  transform: translateX(-120%) skewX(-18deg);
+  animation: shineSweep 1800ms ease-out 600ms;
+}
+.shine-sweep:hover::after {
+  animation: shineSweep 1200ms ease-out;
+}
+
+/* Logo ear wiggle on hover */
+@keyframes earWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25%      { transform: rotate(-6deg); }
+  60%      { transform: rotate(4deg); }
+  80%      { transform: rotate(-2deg); }
+}
+
+.dawg-logo-animated .dawg-ears {
+  transform-origin: 130px 82px;
+  transform-box: fill-box;
+}
+.dawg-logo-animated:hover .dawg-ears {
+  animation: earWiggle 800ms ease-in-out;
+}
+
+/* Logo glasses glint — subtle highlight sweep every few seconds */
+@keyframes glintBlink {
+  0%, 85%, 100% { opacity: 0; transform: translateX(0); }
+  88%           { opacity: 0.6; }
+  95%           { opacity: 0; transform: translateX(16px); }
+}
+
+/* =========================================================================
+   DAWG LOADER — coin flip + blast
+   ========================================================================= */
+
+/* Container perspective so rotateY reads as a real coin flip */
+.dawg-loader-stage {
+  perspective: 900px;
+}
+
+.dawg-coin {
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 6px 14px rgba(255, 199, 0, 0.28));
+}
+
+/* Continuous spin while loading */
+@keyframes coinFlip {
+  0%   { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
+.dawg-coin-spin {
+  animation: coinFlip 1.6s linear infinite;
+}
+
+/* Blast — coin explodes outward when loading completes */
+@keyframes coinBlast {
+  0%   { transform: scale(1) rotateY(0deg);      opacity: 1; }
+  20%  { transform: scale(0.88) rotateY(40deg);  opacity: 1; }
+  60%  { transform: scale(1.9) rotateY(540deg);  opacity: 0.85; }
+  100% { transform: scale(2.8) rotateY(720deg);  opacity: 0; }
+}
+.dawg-coin-blast {
+  animation: coinBlast 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Shockwave ring expanding from the coin center */
+@keyframes shockwave {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0.9; border-width: 4px; }
+  100% { transform: translate(-50%, -50%) scale(4);   opacity: 0;   border-width: 0px; }
+}
+.dawg-shockwave {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border: 4px solid var(--color-dawg-400);
+  border-radius: 9999px;
+  transform: translate(-50%, -50%) scale(0.4);
+  pointer-events: none;
+  animation: shockwave 650ms ease-out forwards;
+}
+
+/* Particle shards radiating out on blast */
+@keyframes particleFly {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--dawg-angle, 0deg)) translateX(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(var(--dawg-angle, 0deg)) translateX(140px) scale(0.2);
+    opacity: 0;
+  }
+}
+.dawg-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  background: var(--color-dawg-400);
+  border-radius: 2px;
+  pointer-events: none;
+  animation: particleFly 700ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+/* Loader text fade swap */
+@keyframes dawgTextIn {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.dawg-text-in {
+  animation: dawgTextIn 280ms ease-out forwards;
+}
+
+/* =========================================================================
+   REDUCED MOTION — honor accessibility preferences
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .dawg-coin-spin,
+  .dawg-coin-blast,
+  .dawg-shockwave,
+  .dawg-particle {
+    animation: none !important;
+  }
+  .fade-in-up {
+    opacity: 1;
+  }
 }

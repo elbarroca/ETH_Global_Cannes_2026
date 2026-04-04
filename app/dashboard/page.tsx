@@ -308,15 +308,15 @@ export default function DashboardPage() {
             <button
               onClick={handleHunt}
               disabled={running || approving}
-              className={`flex items-center gap-2 px-6 py-3 bg-blood-600 hover:bg-blood-700 disabled:opacity-60 text-white text-sm font-bold rounded-xl transition-colors ${running ? "hunting" : ""}`}
+              className={`shine-sweep flex items-center gap-2 px-6 py-3 bg-dawg-500 hover:bg-dawg-400 disabled:opacity-60 text-void-950 text-sm font-bold rounded-xl transition-colors ${running ? "hunting" : ""}`}
             >
               {running ? (
                 <>
-                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Analyzing\u2026
+                  <span className="w-3.5 h-3.5 border-2 border-void-950 border-t-transparent rounded-full animate-spin" />
+                  Analyzing…
                 </>
               ) : (
-                "\uD83D\uDC3A Hunt"
+                "🐺 Hunt"
               )}
             </button>
           )}
@@ -451,7 +451,7 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={() => router.push("/deposit")}
-                  className="px-3 py-1.5 bg-blood-600 hover:bg-blood-700 text-white text-xs font-medium rounded-lg transition-colors"
+                  className="px-3 py-1.5 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-xs font-bold rounded-lg transition-colors"
                 >
                   {user.fund.depositedUsdc > 0 ? "Manage" : "Deposit"}
                 </button>
@@ -508,7 +508,7 @@ export default function DashboardPage() {
       {/* Chat FAB */}
       <button
         onClick={() => setChatOpen((prev) => !prev)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 bg-blood-600 hover:bg-blood-700 text-white text-2xl rounded-full shadow-lg transition-all flex items-center justify-center"
+        className="fixed bottom-6 right-6 z-40 w-14 h-14 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-2xl rounded-full shadow-lg shadow-dawg-500/30 transition-all flex items-center justify-center"
       >
         {chatOpen ? "✕" : "🐺"}
       </button>

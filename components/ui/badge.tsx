@@ -53,8 +53,8 @@ export function SealedBadge({ onClick }: { onClick?: () => void }) {
 
 export function LiveBadge() {
   return (
-    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-mono bg-blood-900/50 text-blood-300 border border-blood-800/30">
-      <span className="w-1.5 h-1.5 rounded-full bg-blood-500 animate-pulse" />
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-mono bg-dawg-500/15 text-dawg-300 border border-dawg-500/30">
+      <span className="w-1.5 h-1.5 rounded-full bg-dawg-400 animate-pulse" />
       live
     </span>
   );

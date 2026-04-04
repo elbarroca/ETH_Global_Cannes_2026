@@ -91,7 +91,7 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
             href={deepLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-3 px-5 bg-blood-600 hover:bg-blood-700 active:bg-blood-800 text-white font-semibold rounded-xl transition-colors"
+            className="flex items-center justify-center gap-2 w-full py-3 px-5 bg-dawg-500 hover:bg-dawg-400 active:bg-dawg-600 text-void-950 font-bold rounded-xl transition-colors"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.14-.357.14-.488.003l.006-.043.21-2.958 5.32-4.81c.232-.202-.054-.316-.36-.114l-6.575 4.142-2.832-.886c-.613-.192-.626-.613.13-.908l11.076-4.268c.512-.196.96.126.794.907l.219-.037z"/>

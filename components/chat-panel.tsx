@@ -174,7 +174,7 @@ export function ChatPanel({ userId, onClose }: ChatPanelProps) {
           <button
             type="submit"
             disabled={sending || !input.trim()}
-            className="px-4 py-2.5 bg-blood-600 hover:bg-blood-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition-colors"
+            className="px-4 py-2.5 bg-dawg-500 hover:bg-dawg-400 disabled:opacity-40 text-void-950 text-sm font-bold rounded-xl transition-colors"
           >
             Send
           </button>

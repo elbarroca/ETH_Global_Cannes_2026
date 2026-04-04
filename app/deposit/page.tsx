@@ -129,7 +129,7 @@ export default function DepositPage() {
                   onClick={() => setTab(t)}
                   className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
                     tab === t
-                      ? "bg-blood-600 text-white"
+                      ? "bg-dawg-500 text-void-950"
                       : "text-void-500 hover:text-void-300"
                   }`}
                 >
@@ -186,11 +186,15 @@ export default function DepositPage() {
               </div>
             </div>
 
-            {/* Submit button */}
+            {/* Submit button — yellow for deposit (primary), red for withdraw (destructive) */}
             <button
               onClick={handleSubmit}
               disabled={isProcessing || !amount || !isConnected}
-              className="w-full py-3 bg-blood-600 hover:bg-blood-700 disabled:opacity-50 text-white font-medium rounded-xl transition-colors"
+              className={`shine-sweep w-full py-3 disabled:opacity-50 font-semibold rounded-xl transition-colors ${
+                tab === "deposit"
+                  ? "bg-dawg-500 hover:bg-dawg-400 text-void-950"
+                  : "bg-blood-600 hover:bg-blood-700 text-white"
+              }`}
             >
               {isProcessing ? (
                 <span className="flex items-center justify-center gap-2">

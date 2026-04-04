@@ -341,7 +341,7 @@ function CommunityAgentCard({
             <button
               onClick={onHire}
               disabled={hiring}
-              className="px-3 py-1 bg-blood-600 hover:bg-blood-700 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors"
+              className="px-3 py-1 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-xs font-bold rounded-lg disabled:opacity-50 transition-colors"
             >
               {hiring ? "Hiring..." : "Hire"}
             </button>

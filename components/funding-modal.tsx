@@ -51,7 +51,7 @@ export function FundingModal({ proxyAddress, onNavigate }: FundingModalProps) {
         {/* CTA */}
         <button
           onClick={() => onNavigate("/deposit")}
-          className="flex items-center justify-center gap-2 w-full py-3.5 px-5 bg-blood-600 hover:bg-blood-700 active:bg-blood-800 text-white font-semibold rounded-xl transition-colors"
+          className="shine-sweep flex items-center justify-center gap-2 w-full py-3.5 px-5 bg-dawg-500 hover:bg-dawg-400 active:bg-dawg-600 text-void-950 font-bold rounded-xl transition-colors"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-6-6h12" />

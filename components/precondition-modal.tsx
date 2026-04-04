@@ -28,7 +28,7 @@ export function PreconditionModal({
           <div className="flex gap-3">
             <button
               onClick={() => onNavigate(ctaHref)}
-              className="flex-1 px-4 py-3 bg-blood-600 hover:bg-blood-700 text-white text-sm font-bold rounded-xl transition-colors"
+              className="flex-1 px-4 py-3 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-sm font-bold rounded-xl transition-colors"
             >
               {ctaLabel}
             </button>

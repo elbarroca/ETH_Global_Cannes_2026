@@ -1,6 +1,9 @@
 "use client";
 
-import { DynamicContextProvider } from "@dynamic-labs/sdk-react-core";
+import {
+  DynamicContextProvider,
+  DynamicUserProfile,
+} from "@dynamic-labs/sdk-react-core";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { DynamicWagmiConnector } from "@dynamic-labs/wagmi-connector";
 import {
@@ -123,6 +126,40 @@ function ChainGuard({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+// Non-EVM or Solana-first wallets that should NEVER appear in the picker.
+//
+// Dynamic's wallet-book registers Phantom as FOUR separate entries
+// (`phantom`, `phantomevm`, `phantombtc`, `phantomledger`) — which is why
+// a naive key filter lets duplicates through. All variants share
+// `group: "phantom"` / `chainGroup: "phantom"`, so we match on those fields
+// to catch every flavor in one rule. Same logic for other Solana-first
+// wallets that ship EVM modes and confuse EVM-only users.
+const BLOCKED_WALLET_GROUPS = new Set([
+  "phantom",
+  "solflare",
+  "backpack",
+  "glow",
+  "coin98",
+  "exodus",
+]);
+
+function isBlockedWallet(wallet: {
+  key?: string;
+  name?: string;
+  group?: string;
+  chainGroup?: string;
+}): boolean {
+  const fields = [
+    wallet.group,
+    wallet.chainGroup,
+    wallet.key,
+    wallet.name,
+  ].map((f) => (f ?? "").toLowerCase());
+  return fields.some((f) =>
+    Array.from(BLOCKED_WALLET_GROUPS).some((blocked) => f.includes(blocked)),
+  );
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <DynamicContextProvider
@@ -131,6 +168,17 @@ export function Providers({ children }: { children: ReactNode }) {
         walletConnectors: [EthereumWalletConnectors],
         initialAuthenticationMode: "connect-only",
         overrides: { evmNetworks: [ARC_TESTNET_NETWORK] },
+        walletsFilter: (wallets) =>
+          wallets
+            .filter((w) => !isBlockedWallet(w))
+            .map((w) => ({
+              ...w,
+              // Also strip blocked wallets from any grouped-wallet containers
+              // (some Dynamic views expand groups inline).
+              groupedWallets: w.groupedWallets?.filter(
+                (gw) => !isBlockedWallet(gw),
+              ),
+            })),
       }}
     >
       <WagmiProvider config={wagmiConfig}>
@@ -139,6 +187,10 @@ export function Providers({ children }: { children: ReactNode }) {
             <ChainGuard>
               <UserProvider>
                 <AuthGuard>{children}</AuthGuard>
+                {/* Renders the settings modal opened by `setShowDynamicUserProfile`
+                    from components/wallet-connect.tsx. Without this the custom
+                    wallet-menu button in <Nav /> has nothing to open. */}
+                <DynamicUserProfile />
               </UserProvider>
             </ChainGuard>
           </DynamicWagmiConnector>
