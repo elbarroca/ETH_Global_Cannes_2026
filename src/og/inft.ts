@@ -125,6 +125,79 @@ export async function mintAgentNFT(
   return { tokenId, txHash: receipt.hash };
 }
 
+// ── MINT SPECIALIST — one iNFT per marketplace specialist ─────────
+//
+// This is a sibling to mintAgentNFT used for specialist backfill. Unlike
+// user iNFTs (which are minted during onboarding and owned by the user's
+// wallet), specialist iNFTs represent the identity of a marketplace agent:
+//   · owner = the specialist's own HD-derived wallet (self-owning)
+//   · agentWallet = same address (satisfies walletToToken binding)
+//   · soulContent = the specialist's SOUL.md personality blob (caller-loaded)
+//   · metadata = JSON blob with {name, tags, walletAddress, type} — hashed
+//   · riskProfile = "specialist" (distinct from user profiles)
+//
+// The contract enforces `walletToToken[wallet] == 0` so calling this twice
+// for the same wallet will revert. Callers should pre-check via
+// `getAgentByWallet()` to make the operation idempotent.
+
+export async function mintSpecialistNFT(
+  agentName: string,
+  agentWallet: string,
+  soulContent: string,
+  metadata: {
+    name: string;
+    tags: string[];
+    walletAddress: string;
+    skill?: string;
+    specialistType?: string;
+  },
+): Promise<{ tokenId: number; txHash: string }> {
+  const contract = getSignerContract();
+
+  const soulHash = keccak256(toUtf8Bytes(soulContent));
+  const metadataHash = keccak256(toUtf8Bytes(JSON.stringify(metadata)));
+  const encryptedURI = `0g-storage://specialist/${agentName}/genesis`;
+  const addr = ethers.getAddress(agentWallet);
+
+  console.log(`[iNFT] Minting specialist "${agentName}" → ${addr.slice(0, 10)}...`);
+
+  const tx = await contract.mintAgent(
+    addr, // to — specialist owns its own NFT
+    addr, // agentWallet — binding target (must match `to` so specialist is self-owning)
+    encryptedURI,
+    metadataHash,
+    soulHash,
+    "specialist",
+  );
+
+  const receipt = await tx.wait();
+
+  let tokenId = 0;
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog({
+        topics: log.topics as string[],
+        data: log.data,
+      });
+      if (parsed?.name === "AgentMinted") {
+        tokenId = Number(parsed.args[0]);
+        break;
+      }
+    } catch {
+      // Skip non-matching logs.
+    }
+  }
+
+  if (tokenId === 0) {
+    throw new Error(
+      `Specialist mint (${agentName}) completed but AgentMinted event not found in tx ${receipt.hash}`,
+    );
+  }
+
+  console.log(`[iNFT] Minted specialist "${agentName}" tokenId=${tokenId} tx=${receipt.hash}`);
+  return { tokenId, txHash: receipt.hash };
+}
+
 // ── UPDATE METADATA — called after each cycle ─────────────────────
 
 export async function updateAgentMetadata(

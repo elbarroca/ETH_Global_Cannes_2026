@@ -11,6 +11,7 @@ import { getUserPaymentFetch, getUserPrivateKey } from "../config/arc";
 import { hireFromMarketplace } from "../marketplace/registry";
 import { evaluateCycleSignals } from "../marketplace/reputation";
 import { executeArcSwap, calculateSwapAmount } from "../execution/arc-swap";
+import { prepareSwapFunds, computeHoldingsUpdate } from "../payments/fund-swap";
 import { getPrisma } from "../config/prisma";
 import { getGateway } from "../openclaw/gateway-client";
 import type {
@@ -574,27 +575,119 @@ export async function commitCycle(
 
   // 1. Execute Arc swap FIRST if executor decided to trade — so the swap tx
   // hash lands in the rich record before we upload it to 0G. Non-fatal.
+  //
+  // The swap pipeline runs three sub-steps:
+  //   1a. prepareSwapFunds() — bridge USDC from Circle proxy → hot wallet
+  //   1b. executeArcSwap()   — sign Uniswap V3 exactInputSingle from hot wallet
+  //   1c. computeHoldingsUpdate() + updateUser() — decrement deposited, bump holdings
+  //
+  // Each sub-step writes an agent_action row so the SSE stream can emit
+  // funds_transferring / funds_ready / swap_executed / holdings_updated events.
   let swapResult: ArcSwapResult | undefined;
+  let holdingsUpdate: ReturnType<typeof computeHoldingsUpdate> | undefined;
   const finalAction = String(execParsed.action ?? "HOLD");
   const finalPct = modifiedPct ?? Number(execParsed.pct ?? 0);
+  const finalAsset = String((execParsed as { asset?: string }).asset ?? "ETH");
+
   if (finalAction !== "HOLD" && finalPct > 0 && user.fund.depositedUsdc > 0 && user.hotWalletIndex != null) {
-    try {
-      const userKey = getUserPrivateKey(user.hotWalletIndex);
-      const swapAmount = calculateSwapAmount(user.fund.depositedUsdc, finalPct);
-      if (swapAmount > 0) {
+    const swapAmount = calculateSwapAmount(user.fund.depositedUsdc, finalPct);
+
+    if (swapAmount > 0) {
+      try {
+        // 1a. Bridge funds from proxy wallet (where user deposits live) to
+        //     the agent's hot wallet (which signs the Arc swap).
+        await logAction({
+          userId: user.id,
+          actionType: "PAYMENT_SENT",
+          agentName: "fund-swap",
+          payload: { stage: "funds_transferring", fromProxy: user.proxyWallet.address, toHot: user.hotWalletAddress, amountUsd: swapAmount },
+        }).catch(() => {});
+
+        const prep = await prepareSwapFunds(user, swapAmount);
+        console.log(`[cycle] Swap funds prepared: ${prep.skipped ? "already-funded" : `bridged $${prep.transferredUsd.toFixed(4)} via Circle tx ${prep.circleTxId?.slice(0, 10)}…`}`);
+
+        await logAction({
+          userId: user.id,
+          actionType: "PAYMENT_SENT",
+          agentName: "fund-swap",
+          paymentNetwork: "arc",
+          paymentAmount: `$${prep.transferredUsd.toFixed(6)}`,
+          payload: {
+            stage: "funds_ready",
+            skipped: prep.skipped,
+            circleTxId: prep.circleTxId,
+            beforeUsd: prep.beforeUsd,
+            afterUsd: prep.afterUsd,
+          },
+        }).catch(() => {});
+
+        // 1b. Sign + send the actual Uniswap V3 exactInputSingle from hot wallet.
+        const userKey = getUserPrivateKey(user.hotWalletIndex);
         swapResult = await executeArcSwap({
           userPrivateKey: userKey,
           amountUsd: swapAmount,
         });
         console.log(`[cycle] Arc swap: ${swapResult.success ? swapResult.txHash : swapResult.reason} (method: ${swapResult.method})`);
+
         await logAction({
           userId: user.id,
           actionType: swapResult.success ? "SWAP_EXECUTED" : "SWAP_FAILED",
-          payload: swapResult,
+          agentName: "arc-swap",
+          paymentNetwork: "arc",
+          paymentTxHash: swapResult.txHash,
+          paymentAmount: `$${swapAmount.toFixed(4)}`,
+          payload: {
+            ...swapResult,
+            asset: finalAsset,
+            amountUsd: swapAmount,
+          },
+        }).catch(() => {});
+
+        // 1c. On success, update the user's DB accounting: the deposited
+        //     USDC drops by `swapAmount`, and the holdings map gets the
+        //     estimated token amount (USD / current price — we track USD
+        //     equivalent since a proper quoter isn't wired for all tokens).
+        if (swapResult.success) {
+          const approximateTokenAmount = swapAmount / 100; // rough placeholder — proper quoter TODO
+          holdingsUpdate = computeHoldingsUpdate(user, finalAsset, swapAmount, approximateTokenAmount);
+          try {
+            await updateUser(user.id, {
+              fund: {
+                depositedUsdc: holdingsUpdate.newDepositedUsdc,
+                // `holdings` is a new sub-field under user.fund — Prisma stores
+                // the whole fund JSON blob via JSONB merge, so this upserts.
+                ...(({ holdings: holdingsUpdate.newHoldings } as unknown) as Record<string, never>),
+              },
+            });
+            await logAction({
+              userId: user.id,
+              actionType: "CYCLE_COMPLETED",
+              agentName: "holdings-updater",
+              payload: {
+                stage: "holdings_updated",
+                asset: finalAsset,
+                usdcSpent: holdingsUpdate.usdcSpent,
+                newDepositedUsdc: holdingsUpdate.newDepositedUsdc,
+                newHoldings: holdingsUpdate.newHoldings,
+              },
+            }).catch(() => {});
+            console.log(
+              `[cycle] Holdings updated: -$${holdingsUpdate.usdcSpent.toFixed(4)} USDC, +${approximateTokenAmount.toFixed(6)} ${finalAsset}; deposited now $${holdingsUpdate.newDepositedUsdc.toFixed(4)}`,
+            );
+          } catch (err) {
+            console.warn("[cycle] holdings update failed (non-fatal):", err instanceof Error ? err.message : String(err));
+          }
+        }
+      } catch (err) {
+        console.warn("[cycle] Arc swap pipeline failed (non-fatal):", err instanceof Error ? err.message : String(err));
+        await logAction({
+          userId: user.id,
+          actionType: "SWAP_FAILED",
+          agentName: "arc-swap",
+          status: "failed",
+          payload: { stage: "pipeline_error", message: err instanceof Error ? err.message : String(err) },
         }).catch(() => {});
       }
-    } catch (err) {
-      console.warn("[cycle] Arc swap failed (non-fatal):", err instanceof Error ? err.message : String(err));
     }
   }
 

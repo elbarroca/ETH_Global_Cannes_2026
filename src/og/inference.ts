@@ -31,10 +31,25 @@ function releaseSlot(): void {
 
 // ── Sealed inference on 0G Compute Network (TEE-verified) ───────────────────
 
+export interface PriorMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * Sealed inference on 0G Compute. Each call runs inside a TEE enclave and
+ * returns a response with an attestation hash that can be verified on-chain.
+ *
+ * Optional `history` folds prior turns in between the system prompt and the
+ * current user message, enabling multi-turn conversations (e.g. the Lead Dawg
+ * chat modal). Specialist and debate callers pass no history — their prompts
+ * are single-turn by design.
+ */
 export async function sealedInference(
   providerAddress: string,
   systemPrompt: string,
   userMessage: string,
+  history: PriorMessage[] = [],
 ): Promise<InferenceResult> {
   await acquireSlot();
 
@@ -56,6 +71,7 @@ export async function sealedInference(
         model,
         messages: [
           { role: "system", content: systemPrompt },
+          ...history,
           { role: "user", content: userMessage },
         ],
         temperature: 0.7,
