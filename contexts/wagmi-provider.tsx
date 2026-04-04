@@ -3,7 +3,13 @@
 import { DynamicContextProvider } from "@dynamic-labs/sdk-react-core";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { DynamicWagmiConnector } from "@dynamic-labs/wagmi-connector";
-import { createConfig, http, WagmiProvider, useConnection, useSwitchChain } from "wagmi";
+import {
+  createConfig,
+  http,
+  WagmiProvider,
+  useConnection,
+  useSwitchChain,
+} from "wagmi";
 import { defineChain } from "viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect } from "react";
@@ -43,7 +49,10 @@ if (typeof window !== "undefined") {
   window.fetch = (input, init) => {
     if (typeof input === "string" && input.includes("arc-testnet.drpc.org")) {
       input = ARC_RPC;
-    } else if (input instanceof Request && input.url.includes("arc-testnet.drpc.org")) {
+    } else if (
+      input instanceof Request &&
+      input.url.includes("arc-testnet.drpc.org")
+    ) {
       input = new Request(ARC_RPC, input);
     }
     return _fetch(input, init);
@@ -87,13 +96,19 @@ function ChainGuard({ children }: { children: ReactNode }) {
       try {
         await window.ethereum?.request({
           method: "wallet_addEthereumChain",
-          params: [{
-            chainId: `0x${arcTestnet.id.toString(16)}`,
-            chainName: "Arc Testnet",
-            rpcUrls: [ARC_RPC],
-            nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 18 },
-            blockExplorerUrls: ["https://testnet.arcscan.app"],
-          }],
+          params: [
+            {
+              chainId: `0x${arcTestnet.id.toString(16)}`,
+              chainName: "Arc Testnet",
+              rpcUrls: [ARC_RPC],
+              nativeCurrency: {
+                name: "USD Coin",
+                symbol: "USDC",
+                decimals: 18,
+              },
+              blockExplorerUrls: ["https://testnet.arcscan.app"],
+            },
+          ],
         });
       } catch {
         // User rejected or already added — ignore
