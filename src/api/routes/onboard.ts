@@ -43,7 +43,7 @@ export function onboardRoutes(): Router {
       // Check existing user
       const existing = await getUserByWallet(walletAddress);
       if (existing) {
-        const linkCode = generateLinkCode(existing.id);
+        const linkCode = await generateLinkCode(existing.id);
         res.json({
           userId: existing.id,
           proxyWalletAddress: existing.proxyWallet.address,
@@ -79,7 +79,7 @@ export function onboardRoutes(): Router {
       }
 
       const user = await createUser(walletAddress, proxyWallet, newUserId);
-      const linkCode = generateLinkCode(user.id);
+      const linkCode = await generateLinkCode(user.id);
 
       // Mint iNFT for the agent (non-fatal)
       let inftTokenId: number | null = null;

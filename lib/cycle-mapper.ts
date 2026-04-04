@@ -5,12 +5,26 @@ const EMOJI_MAP: Record<string, string> = {
   sentiment: "🧠",
   whale: "🐋",
   momentum: "📈",
+  "memecoin-hunter": "🎰",
+  "twitter-alpha": "🐦",
+  "defi-yield": "🌾",
+  "news-scanner": "📰",
+  "onchain-forensics": "🔍",
+  "options-flow": "📊",
+  "macro-correlator": "🌍",
 };
 
 const NAME_MAP: Record<string, string> = {
   sentiment: "SentimentBot",
   whale: "WhaleEye",
   momentum: "MomentumX",
+  "memecoin-hunter": "Memecoin Hunter",
+  "twitter-alpha": "Twitter Alpha",
+  "defi-yield": "DeFi Yield",
+  "news-scanner": "News Scanner",
+  "onchain-forensics": "On-Chain Forensics",
+  "options-flow": "Options Flow",
+  "macro-correlator": "Macro Correlator",
 };
 
 function truncateHash(hash: string): string {

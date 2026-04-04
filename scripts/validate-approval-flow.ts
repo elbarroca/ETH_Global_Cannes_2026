@@ -181,16 +181,16 @@ async function testLinkCodes(): Promise<void> {
   try {
     const { generateLinkCode, redeemLinkCode } = await import("../src/store/link-codes.js");
 
-    // Generate
-    const code = generateLinkCode(testUserId);
+    // Generate (now async — DB-backed)
+    const code = await generateLinkCode(testUserId);
     if (code && code.length === 6) {
       ok("generateLinkCode()", `code=${code} (6 chars)`);
     } else {
       fail("generateLinkCode()", `expected 6-char code, got: ${code}`);
     }
 
-    // Redeem
-    const redeemed = redeemLinkCode(code);
+    // Redeem (now async — DB-backed)
+    const redeemed = await redeemLinkCode(code);
     if (redeemed === testUserId) {
       ok("redeemLinkCode()", `userId=${redeemed}`);
     } else {
@@ -198,7 +198,7 @@ async function testLinkCodes(): Promise<void> {
     }
 
     // Double-redeem should fail (single-use)
-    const doubleRedeem = redeemLinkCode(code);
+    const doubleRedeem = await redeemLinkCode(code);
     if (doubleRedeem === null) {
       ok("Double redemption blocked", "returns null");
     } else {
@@ -206,8 +206,8 @@ async function testLinkCodes(): Promise<void> {
     }
 
     // Case insensitive
-    const code2 = generateLinkCode(testUserId);
-    const lower = redeemLinkCode(code2.toLowerCase());
+    const code2 = await generateLinkCode(testUserId);
+    const lower = await redeemLinkCode(code2.toLowerCase());
     if (lower === testUserId) {
       ok("Case-insensitive redemption", "works");
     } else {

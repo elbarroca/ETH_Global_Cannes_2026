@@ -1,12 +1,16 @@
 import { updateUser } from "../store/user-store";
 import { logAction, logCycleRecord } from "../store/action-logger";
 import { runAdversarialDebate } from "./adversarial";
+import { hireSpecialists } from "./hire-specialist";
+import { selectSpecialists } from "../marketplace/hiring-strategy";
 import { logCycle } from "../hedera/hcs";
 import { storeMemory } from "../og/storage";
 import { updateAgentMetadata } from "../og/inft";
-import { getUserPaymentFetch } from "../config/arc";
+import { getUserPaymentFetch, getUserPrivateKey } from "../config/arc";
 import { hireFromMarketplace } from "../marketplace/registry";
 import { evaluateCycleSignals } from "../marketplace/reputation";
+import { executeArcSwap, calculateSwapAmount } from "../execution/arc-swap";
+import { getPrisma } from "../config/prisma";
 import type {
   UserRecord,
   SpecialistResult,
@@ -14,6 +18,7 @@ import type {
   CompactCycleRecord,
   DebateResult,
   AnalysisResult,
+  ArcSwapResult,
 } from "../types/index";
 
 const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
@@ -99,38 +104,50 @@ export async function analyzeCycle(user: UserRecord): Promise<AnalysisResult> {
     console.warn("[cycle] logAction CYCLE_STARTED failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 1. Hire specialists via x402 nanopayments on Arc (per-user HD wallet)
-  let payFetch: typeof fetch;
-  try {
-    if (user.hotWalletIndex != null) {
-      payFetch = getUserPaymentFetch(user.hotWalletIndex);
-    } else {
-      console.warn("[cycle] No hot wallet for user, using bare fetch");
-      payFetch = fetch;
-    }
-  } catch (err) {
-    console.warn("[cycle] x402 setup failed, using bare fetch:", err instanceof Error ? err.message : String(err));
-    payFetch = fetch;
-  }
-  // Dynamic specialist selection: prioritize by reputation, always hire all 3
-  // but order determines which specialist's signal gets more weight in debate context
+  // 1. Hire specialists via x402 nanopayments + OpenClaw sessions_send
+  // Dynamic selection: choose specialists based on market context + user profile
+  const selectedIds = selectSpecialists({
+    userRiskProfile: user.agent.riskProfile,
+    // TODO: Pass real market volatility + news count when available
+    marketVolatility: "medium",
+    recentNewsCount: 0,
+    portfolioExposure: 0,
+  });
+  console.log(`[cycle] Selected specialists: ${selectedIds.join(", ")}`);
+
   let specialists: SpecialistResult[];
   try {
-    specialists = await hireFromMarketplace(payFetch, user.id, {
-      tags: ["sentiment", "whale", "momentum"],
-      minReputation: 0, // Accept all specialists — prefer real data over mock fallback
-      maxHires: 3,
-    });
-    if (specialists.length === 0) throw new Error("No specialists returned");
-    if (specialists.length < 3) {
-      console.warn(`[cycle] Only ${specialists.length}/3 specialists responded — proceeding with partial results`);
+    // Primary path: OpenClaw Gateway (sessions_send) + x402 payment
+    specialists = await hireSpecialists(
+      selectedIds,
+      `Analyze current market conditions for ETH. Risk profile: ${user.agent.riskProfile}. Max allocation: ${user.agent.maxTradePercent}%. Provide your signal (BUY/SELL/HOLD), confidence (0-100), and reasoning.`,
+      user.id,
+      user.hotWalletIndex,
+    );
+
+    if (specialists.length === 0) {
+      // Fallback: try legacy marketplace hiring
+      console.warn("[cycle] OpenClaw hiring returned 0 results, trying legacy marketplace...");
+      let payFetch: typeof fetch;
+      try {
+        payFetch = user.hotWalletIndex != null ? getUserPaymentFetch(user.hotWalletIndex) : fetch;
+      } catch {
+        payFetch = fetch;
+      }
+      specialists = await hireFromMarketplace(payFetch, user.id, {
+        tags: ["sentiment", "whale", "momentum"],
+        minReputation: 0,
+        maxHires: 3,
+      });
     }
+
+    if (specialists.length === 0) throw new Error("No specialists returned from any path");
 
     // Sort by reputation (highest first) — debate agents weight higher-rep specialists more heavily
     specialists.sort((a, b) => (b.reputation ?? 500) - (a.reputation ?? 500));
     console.log(`[cycle] Specialist priority: ${specialists.map((s) => `${s.name}(rep:${s.reputation ?? 500})`).join(" > ")}`);
   } catch (err) {
-    console.warn("[cycle] ⚠️ DEGRADED: Marketplace hiring failed, using mock data:", err instanceof Error ? err.message : String(err));
+    console.warn("[cycle] DEGRADED: All hiring paths failed, using mock data:", err instanceof Error ? err.message : String(err));
     specialists = [
       { name: "sentiment", signal: "BUY", confidence: 65, attestationHash: "mock-s", teeVerified: false, reasoning: "[MOCK] Marketplace unavailable" },
       { name: "whale", signal: "HOLD", confidence: 50, attestationHash: "mock-w", teeVerified: false, reasoning: "[MOCK] Marketplace unavailable" },
@@ -216,9 +233,35 @@ export async function commitCycle(
   const riskParsed = debate.risk.parsed as { challenge?: string; objection?: string; max_pct?: number };
   const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
 
+  // 4b. Execute Arc swap if executor decided to trade (non-fatal)
+  let swapResult: ArcSwapResult | undefined;
+  const finalAction = String(execParsed.action ?? "HOLD");
+  const finalPct = modifiedPct ?? Number(execParsed.pct ?? 0);
+  if (finalAction !== "HOLD" && finalPct > 0 && user.fund.depositedUsdc > 0 && user.hotWalletIndex != null) {
+    try {
+      const userKey = getUserPrivateKey(user.hotWalletIndex);
+      const swapAmount = calculateSwapAmount(user.fund.depositedUsdc, finalPct);
+      if (swapAmount > 0) {
+        swapResult = await executeArcSwap({
+          userPrivateKey: userKey,
+          amountUsd: swapAmount,
+        });
+        console.log(`[cycle] Arc swap: ${swapResult.success ? swapResult.txHash : swapResult.reason} (method: ${swapResult.method})`);
+        await logAction({
+          userId: user.id,
+          actionType: swapResult.success ? "SWAP_EXECUTED" : "SWAP_FAILED",
+          payload: swapResult,
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn("[cycle] Arc swap failed (non-fatal):", err instanceof Error ? err.message : String(err));
+    }
+  }
+
   // 5. Save full cycle record to Supabase (non-fatal)
+  let cycleDbUuid: string | null = null;
   try {
-    await logCycleRecord(user.id, cycleId, {
+    cycleDbUuid = await logCycleRecord(user.id, cycleId, {
       specialists: specialists.map((s) => ({
         name: s.name,
         signal: s.signal,
@@ -257,7 +300,38 @@ export async function commitCycle(
     console.warn("[cycle] logCycleRecord failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
-  // 6. Update user
+  // 6. Persist debate transcripts (non-fatal — requires valid cycle UUID from step 5)
+  if (debate.transcripts && debate.transcripts.length > 0 && cycleDbUuid) {
+    try {
+      const prisma = getPrisma();
+      await Promise.all(
+        debate.transcripts.map((t) =>
+          prisma.debateTranscript.create({
+            data: {
+              cycleId: cycleDbUuid,
+              userId: user.id,
+              turnNumber: t.turnNumber,
+              phase: t.phase,
+              fromAgent: t.fromAgent,
+              toAgent: t.toAgent ?? null,
+              messageContent: t.messageContent,
+              responseContent: t.responseContent ?? null,
+              attestationHash: t.attestationHash ?? null,
+              teeVerified: t.teeVerified ?? false,
+              durationMs: t.durationMs,
+            },
+          }).catch((err: unknown) => {
+            console.warn(`[cycle] Transcript turn ${t.turnNumber} save failed:`, err instanceof Error ? err.message : String(err));
+          }),
+        ),
+      );
+      console.log(`[cycle] Saved ${debate.transcripts.length} debate transcript turns`);
+    } catch (err) {
+      console.warn("[cycle] Debate transcript persistence failed (non-fatal):", err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  // 7. Update user
   await updateUser(user.id, {
     agent: {
       lastCycleId: cycleId,

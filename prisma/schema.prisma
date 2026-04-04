@@ -56,8 +56,17 @@ model Cycle {
   storageHash      String?       @map("storage_hash")
   totalCostUsd     Float?        @map("total_cost_usd")
   navAfter         Float?        @map("nav_after")
+  swapTxHash       String?       @map("swap_tx_hash")
+  swapChain        String?       @default("arc-testnet") @map("swap_chain")
+  swapAmount       String?       @map("swap_amount")
+  swapAssetIn      String?       @map("swap_asset_in")
+  swapAssetOut     String?       @map("swap_asset_out")
+  swapExplorerUrl  String?       @map("swap_explorer_url")
+  debateDurationMs Int?          @map("debate_duration_ms")
+  debateTurns      Int?          @map("debate_turns")
   createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   actions          AgentAction[]
+  transcripts      DebateTranscript[]
   user             User          @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([userId, cycleNumber], map: "idx_cycles_user_cycle")
@@ -103,7 +112,33 @@ model MarketplaceAgent {
   updatedAt    DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
   hiredBy      UserHiredAgent[]
 
+  specialistType  String?           @default("analysis") @map("specialist_type")
+  dataSources     String[]          @default([]) @map("data_sources")
+  openclawAgentId String?           @map("openclaw_agent_id")
+  walletAddress   String?           @map("wallet_address")
+
   @@map("marketplace_agents")
+}
+
+model DebateTranscript {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cycleId         String   @map("cycle_id") @db.Uuid
+  userId          String   @map("user_id")
+  turnNumber      Int      @map("turn_number")
+  phase           String   // intelligence, opening, rebuttal, decision, execution
+  fromAgent       String   @map("from_agent")
+  toAgent         String?  @map("to_agent")
+  messageContent  String   @map("message_content")
+  responseContent String?  @map("response_content")
+  attestationHash String?  @map("attestation_hash")
+  teeVerified     Boolean? @default(false) @map("tee_verified")
+  durationMs      Int?     @map("duration_ms")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  cycle           Cycle    @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  @@index([cycleId, turnNumber], map: "idx_debate_transcripts_cycle_turn")
+  @@index([userId, createdAt], map: "idx_debate_transcripts_user")
+  @@map("debate_transcripts")
 }
 
 model UserHiredAgent {

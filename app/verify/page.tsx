@@ -8,18 +8,25 @@ import { useUser } from "@/contexts/user-context";
 import { getCycleDetail } from "@/lib/api";
 import type { CycleDetail, AgentActionRecord } from "@/lib/types";
 
-type AgentKey = "SentimentBot" | "WhaleEye" | "MomentumX" | "Alpha" | "Risk" | "Executor";
+type AgentKey = "SentimentBot" | "WhaleEye" | "MomentumX" | "MemecoinHunter" | "TwitterAlpha" | "DeFiYield" | "NewsScanner" | "OnChainForensics" | "OptionsFlow" | "MacroCorrelator" | "Alpha" | "Risk" | "Executor";
 
 const AGENT_META: Record<AgentKey, { emoji: string; type: "Specialist" | "Adversarial"; skill: string }> = {
   SentimentBot: { emoji: "🧠", type: "Specialist", skill: "Twitter + Reddit sentiment" },
   WhaleEye: { emoji: "🐋", type: "Specialist", skill: "Whale wallet movements" },
   MomentumX: { emoji: "📈", type: "Specialist", skill: "RSI, MACD, volume analysis" },
+  MemecoinHunter: { emoji: "🎰", type: "Specialist", skill: "DexScreener new pairs + rug detection" },
+  TwitterAlpha: { emoji: "🐦", type: "Specialist", skill: "CT narrative + influencer sentiment" },
+  DeFiYield: { emoji: "🌾", type: "Specialist", skill: "DeFi Llama APY + TVL tracking" },
+  NewsScanner: { emoji: "📰", type: "Specialist", skill: "Breaking news + regulatory signals" },
+  OnChainForensics: { emoji: "🔍", type: "Specialist", skill: "Wallet flows + smart money tracking" },
+  OptionsFlow: { emoji: "📊", type: "Specialist", skill: "Deribit options + IV analysis" },
+  MacroCorrelator: { emoji: "🌍", type: "Specialist", skill: "DXY/SPX/VIX correlation + regime detection" },
   Alpha: { emoji: "🟢", type: "Adversarial", skill: "Argues FOR the trade" },
   Risk: { emoji: "🔴", type: "Adversarial", skill: "Argues AGAINST the trade" },
   Executor: { emoji: "🟡", type: "Adversarial", skill: "Makes the final call" },
 };
 
-const AGENT_KEYS: AgentKey[] = ["SentimentBot", "WhaleEye", "MomentumX", "Alpha", "Risk", "Executor"];
+const AGENT_KEYS: AgentKey[] = ["SentimentBot", "WhaleEye", "MomentumX", "MemecoinHunter", "TwitterAlpha", "DeFiYield", "NewsScanner", "OnChainForensics", "OptionsFlow", "MacroCorrelator", "Alpha", "Risk", "Executor"];
 
 const PROVIDER_ADDRESS = process.env.NEXT_PUBLIC_OG_PROVIDER_ADDRESS ?? "0x9f2b...4a1c";
 const INFT_CONTRACT = process.env.NEXT_PUBLIC_INFT_CONTRACT ?? "0x73e3016D0D3Bf2985c55860cd2A51FF017c2c874";
@@ -36,13 +43,25 @@ function getAttestationForAgent(
     SentimentBot: "SPECIALIST_HIRED",
     WhaleEye: "SPECIALIST_HIRED",
     MomentumX: "SPECIALIST_HIRED",
+    MemecoinHunter: "SPECIALIST_HIRED",
+    TwitterAlpha: "SPECIALIST_HIRED",
+    DeFiYield: "SPECIALIST_HIRED",
+    NewsScanner: "SPECIALIST_HIRED",
+    OnChainForensics: "SPECIALIST_HIRED",
+    OptionsFlow: "SPECIALIST_HIRED",
+    MacroCorrelator: "SPECIALIST_HIRED",
     Alpha: "DEBATE_ALPHA",
     Risk: "DEBATE_RISK",
     Executor: "DEBATE_EXECUTOR",
   };
 
   // For specialists, also match by agent name
-  const nameMap: Record<string, string> = { SentimentBot: "sentiment", WhaleEye: "whale", MomentumX: "momentum" };
+  const nameMap: Record<string, string> = {
+    SentimentBot: "sentiment", WhaleEye: "whale", MomentumX: "momentum",
+    MemecoinHunter: "memecoin-hunter", TwitterAlpha: "twitter-alpha", DeFiYield: "defi-yield",
+    NewsScanner: "news-scanner", OnChainForensics: "onchain-forensics", OptionsFlow: "options-flow",
+    MacroCorrelator: "macro-correlator",
+  };
   const action = key in nameMap
     ? actions.find((a) => a.actionType === actionTypeMap[key] && a.agentName === nameMap[key])
     : actions.find((a) => a.actionType === actionTypeMap[key]);
@@ -52,8 +71,14 @@ function getAttestationForAgent(
   switch (key) {
     case "SentimentBot":
     case "WhaleEye":
-    case "MomentumX": {
-      // Parse specialist attestations from the JSON column
+    case "MomentumX":
+    case "MemecoinHunter":
+    case "TwitterAlpha":
+    case "DeFiYield":
+    case "NewsScanner":
+    case "OnChainForensics":
+    case "OptionsFlow":
+    case "MacroCorrelator": {
       const specs = Array.isArray(cycle.specialists) ? cycle.specialists as Array<{ name?: string; attestation?: string }> : [];
       const specName = nameMap[key];
       const spec = specs.find((s) => s.name === specName);
@@ -62,6 +87,7 @@ function getAttestationForAgent(
     case "Alpha": return cycle.alphaAttestation ?? "—";
     case "Risk": return cycle.riskAttestation ?? "—";
     case "Executor": return cycle.execAttestation ?? "—";
+    default: return "—";
   }
 }
 
@@ -70,6 +96,13 @@ function getTeeVerified(key: AgentKey, actions: AgentActionRecord[]): boolean {
     SentimentBot: "SPECIALIST_HIRED",
     WhaleEye: "SPECIALIST_HIRED",
     MomentumX: "SPECIALIST_HIRED",
+    MemecoinHunter: "SPECIALIST_HIRED",
+    TwitterAlpha: "SPECIALIST_HIRED",
+    DeFiYield: "SPECIALIST_HIRED",
+    NewsScanner: "SPECIALIST_HIRED",
+    OnChainForensics: "SPECIALIST_HIRED",
+    OptionsFlow: "SPECIALIST_HIRED",
+    MacroCorrelator: "SPECIALIST_HIRED",
     Alpha: "DEBATE_ALPHA",
     Risk: "DEBATE_RISK",
     Executor: "DEBATE_EXECUTOR",

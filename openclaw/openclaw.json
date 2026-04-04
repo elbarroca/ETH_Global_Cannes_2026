@@ -1,35 +1,174 @@
 {
   "name": "AlphaDawg",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "agents": {
-    "main-agent": {
+    "defaults": {
+      "model": { "primary": "anthropic/claude-sonnet-4-6" },
       "heartbeat": {
-        "every": "5m"
+        "every": "5m",
+        "isolatedSession": true,
+        "lightContext": true,
+        "target": "last"
       }
     },
-    "sentiment-agent": {
-      "type": "specialist",
-      "port": 4001
+    "list": [
+      {
+        "id": "main-orchestrator",
+        "default": true,
+        "identity": { "name": "AlphaDawg Orchestrator", "emoji": "🐾" },
+        "workspace": "./openclaw/main-agent",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "subagents": {
+          "allowAgents": [
+            "sentiment", "whale", "momentum",
+            "alpha", "risk", "executor",
+            "memecoin-hunter", "twitter-alpha", "defi-yield",
+            "news-scanner", "onchain-forensics", "options-flow", "macro-correlator"
+          ]
+        }
+      },
+      {
+        "id": "sentiment",
+        "identity": { "name": "SentimentBot", "emoji": "🧠" },
+        "workspace": "./openclaw/sentiment-agent",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "whale",
+        "identity": { "name": "WhaleEye", "emoji": "🐋" },
+        "workspace": "./openclaw/whale-agent",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "momentum",
+        "identity": { "name": "MomentumX", "emoji": "📈" },
+        "workspace": "./openclaw/momentum-agent",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "alpha",
+        "identity": { "name": "Alpha Synthesizer", "emoji": "🔥" },
+        "workspace": "./openclaw/alpha-agent",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "risk",
+        "identity": { "name": "Risk Challenger", "emoji": "🛡️" },
+        "workspace": "./openclaw/risk-agent",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "executor",
+        "identity": { "name": "Executor Judge", "emoji": "⚖️" },
+        "workspace": "./openclaw/executor-agent",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "memecoin-hunter",
+        "identity": { "name": "Memecoin Hunter", "emoji": "🎰" },
+        "workspace": "./openclaw/memecoin-hunter",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "twitter-alpha",
+        "identity": { "name": "Twitter Alpha Scanner", "emoji": "🐦" },
+        "workspace": "./openclaw/twitter-alpha",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "defi-yield",
+        "identity": { "name": "DeFi Yield Specialist", "emoji": "🌾" },
+        "workspace": "./openclaw/defi-yield",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "news-scanner",
+        "identity": { "name": "News Scanner", "emoji": "📰" },
+        "workspace": "./openclaw/news-scanner",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "onchain-forensics",
+        "identity": { "name": "On-Chain Forensics", "emoji": "🔍" },
+        "workspace": "./openclaw/onchain-forensics",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "options-flow",
+        "identity": { "name": "Options Flow Analyst", "emoji": "📊" },
+        "workspace": "./openclaw/options-flow",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      },
+      {
+        "id": "macro-correlator",
+        "identity": { "name": "Macro Correlator", "emoji": "🌍" },
+        "workspace": "./openclaw/macro-correlator",
+        "model": { "primary": "anthropic/claude-sonnet-4-6" },
+        "sandbox": { "mode": "all", "scope": "agent" },
+        "tools": { "allow": ["read", "sessions_send"], "deny": ["write", "exec", "edit", "gateway", "cron"] }
+      }
+    ]
+  },
+  "tools": {
+    "agentToAgent": {
+      "enabled": true,
+      "allow": [
+        "main-orchestrator", "alpha", "risk", "executor",
+        "sentiment", "whale", "momentum",
+        "memecoin-hunter", "twitter-alpha", "defi-yield",
+        "news-scanner", "onchain-forensics", "options-flow", "macro-correlator"
+      ]
+    }
+  },
+  "session": {
+    "agentToAgent": {
+      "maxPingPongTurns": 5
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "botToken": "${TELEGRAM_BOT_TOKEN}",
+      "groupPolicy": "denylist"
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "port": 18789,
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
     },
-    "whale-agent": {
-      "type": "specialist",
-      "port": 4002
+    "tools": {
+      "allow": ["sessions_send", "sessions_list", "sessions_history"]
     },
-    "momentum-agent": {
-      "type": "specialist",
-      "port": 4003
-    },
-    "alpha-agent": {
-      "type": "debater",
-      "stage": 1
-    },
-    "risk-agent": {
-      "type": "debater",
-      "stage": 2
-    },
-    "executor-agent": {
-      "type": "debater",
-      "stage": 3
+    "reload": {
+      "mode": "hybrid"
     }
   }
 }

@@ -20,6 +20,8 @@ import {
 import { HuntCard } from "@/components/hunt-card";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreconditionModal } from "@/components/precondition-modal";
+import { TelegramModal } from "@/components/telegram-modal";
+import { FundingModal } from "@/components/funding-modal";
 
 const ANALYZE_STAGES = [
   "Hiring specialists from marketplace...",
@@ -33,7 +35,7 @@ const COMMIT_STAGES = [
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, userId, linkCode } = useUser();
+  const { user, userId, linkCode, telegramVerified, refreshLinkCode } = useUser();
   const [running, setRunning] = useState(false);
   const [approving, setApproving] = useState(false);
   const [liveCycle, setLiveCycle] = useState<Cycle | null>(null);
@@ -203,6 +205,19 @@ export default function DashboardPage() {
 
   return (
     <main className="max-w-7xl mx-auto px-5 py-5 space-y-3">
+      {/* Unskippable Telegram verification modal */}
+      {user && !telegramVerified && (
+        <TelegramModal linkCode={linkCode} onRefresh={refreshLinkCode} />
+      )}
+
+      {/* Unskippable funding modal — shown after Telegram is verified but no USDC deposited */}
+      {user && telegramVerified && user.fund.depositedUsdc === 0 && user.proxyWallet?.address && (
+        <FundingModal
+          proxyAddress={user.proxyWallet.address}
+          onNavigate={(href) => router.push(href)}
+        />
+      )}
+
       {/* Row 1: Metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <MetricCard
@@ -365,42 +380,69 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Row 4: Status bar */}
-      <Card>
-        <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-2">
-          <div className="flex items-center gap-2 text-sm text-void-400">
-            <span>📱</span>
-            {user?.telegram?.verified ? (
-              <>
-                <span>Telegram: Connected</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              </>
-            ) : linkCode ? (
-              <>
-                <span>Link Telegram:</span>
-                <a
-                  href={`https://t.me/AlphaDawgBot?start=${linkCode}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:underline font-mono text-xs"
+      {/* Row 4: Agent Wallet + Status bar */}
+      {user?.proxyWallet?.address && (
+        <Card>
+          <div className="px-4 py-3 space-y-3">
+            {/* Agent wallet row */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blood-900/50 border border-blood-600/30 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-blood-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-void-200">Agent Wallet</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-void-800 text-void-500 rounded">Circle MPC</span>
+                  </div>
+                  <span className="font-mono text-xs text-void-500">
+                    {user.proxyWallet.address.slice(0, 6)}...{user.proxyWallet.address.slice(-4)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className={`text-lg font-bold font-mono ${user.fund.depositedUsdc > 0 ? "text-gold-400" : "text-void-600"}`}>
+                    ${user.fund.depositedUsdc.toFixed(2)}
+                  </p>
+                  <p className="text-[10px] text-void-600">USDC on Arc</p>
+                </div>
+                <button
+                  onClick={() => router.push("/deposit")}
+                  className="px-3 py-1.5 bg-blood-600 hover:bg-blood-700 text-white text-xs font-medium rounded-lg transition-colors"
                 >
-                  t.me/AlphaDawgBot?start={linkCode}
-                </a>
-              </>
-            ) : (
-              <>
-                <span>Telegram: Not linked</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-void-600" />
-              </>
-            )}
+                  {user.fund.depositedUsdc > 0 ? "Manage" : "Deposit"}
+                </button>
+              </div>
+            </div>
+
+            {/* Status indicators */}
+            <div className="flex items-center justify-between border-t border-void-800/50 pt-2 flex-wrap gap-2">
+              <div className="flex items-center gap-3 text-xs text-void-500">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${user.telegram?.verified ? "bg-emerald-500" : "bg-void-600"}`} />
+                  <span>Telegram</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${user.agent.active ? "bg-emerald-500" : "bg-void-600"}`} />
+                  <span>Agent {user.agent.active ? "Active" : "Paused"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-void-600">|</span>
+                  <span>{user.agent.riskProfile} / max {user.agent.maxTradePercent}%</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="gray">0G Sealed</Badge>
+                <Badge variant="gray">Hedera HCS</Badge>
+                <Badge variant="gray">Arc Nano</Badge>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="gray">0G Sealed</Badge>
-            <Badge variant="gray">Hedera HCS</Badge>
-            <Badge variant="gray">Arc Nano</Badge>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
       {/* Precondition Modal */}
       {precondition && (
         <PreconditionModal

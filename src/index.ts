@@ -6,6 +6,7 @@ import { loadRegistry } from "./marketplace/registry";
 import { startBot } from "./telegram/bot";
 import { startHeartbeatLoop } from "./agents/heartbeat";
 import { startTimeoutChecker } from "./agents/timeout-checker";
+import { getGateway } from "./openclaw/gateway-client";
 
 const REQUIRED_ENV = [
   "OPERATOR_ID",
@@ -40,6 +41,20 @@ async function main(): Promise<void> {
   // Load marketplace registry from Prisma (auto-registers built-in specialists)
   await loadRegistry();
   console.log("Marketplace registry loaded.");
+
+  // Check OpenClaw Gateway connectivity (non-fatal)
+  try {
+    const gateway = getGateway();
+    const isUp = await gateway.ping();
+    if (isUp) {
+      const agents = await gateway.listAgents();
+      console.log(`OpenClaw Gateway connected (${agents.length} agents registered).`);
+    } else {
+      console.warn("OpenClaw Gateway not reachable — falling back to direct 0G inference.");
+    }
+  } catch {
+    console.warn("OpenClaw Gateway check failed — falling back to direct 0G inference.");
+  }
 
   // Start Telegram bot
   startBot();

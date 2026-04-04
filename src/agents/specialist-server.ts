@@ -6,6 +6,13 @@ import { deriveSpecialistAddress } from "../config/wallets";
 import { fetchSentimentData } from "./data/sentiment-data";
 import { fetchWhaleData } from "./data/whale-data";
 import { fetchMomentumData } from "./data/momentum-data";
+import { fetchMemecoinData } from "./data/memecoin-data";
+import { fetchTwitterData } from "./data/twitter-data";
+import { fetchDefiYieldData } from "./data/defi-yield-data";
+import { fetchNewsData } from "./data/news-data";
+import { fetchOnchainForensicsData } from "./data/onchain-forensics-data";
+import { fetchOptionsData } from "./data/options-data";
+import { fetchMacroData } from "./data/macro-data";
 
 const PROVIDER = process.env.OG_PROVIDER_ADDRESS!;
 
@@ -36,6 +43,47 @@ function computeLocalFallback(
         if (rsi > 65) return { signal: "SELL", confidence: 65 };
         return { signal: "HOLD", confidence: 50 };
       }
+      case "memecoin-hunter": {
+        const newPairs = Number(data.new_pairs_count ?? 0);
+        if (newPairs > 50) return { signal: "BUY", confidence: 55 };
+        return { signal: "HOLD", confidence: 45 };
+      }
+      case "twitter-alpha": {
+        const score = Number(data.crypto_sentiment_score ?? 50);
+        if (score > 70) return { signal: "BUY", confidence: Math.min(score, 75) };
+        if (score < 30) return { signal: "SELL", confidence: Math.min(100 - score, 75) };
+        return { signal: "HOLD", confidence: 50 };
+      }
+      case "defi-yield": {
+        const apy = Number(data.avg_stable_apy ?? 3);
+        if (apy > 6) return { signal: "BUY", confidence: 60 };
+        return { signal: "HOLD", confidence: 50 };
+      }
+      case "news-scanner": {
+        const bull = Number(data.bullish_count ?? 0);
+        const bear = Number(data.bearish_count ?? 0);
+        if (bull > bear * 2) return { signal: "BUY", confidence: 60 };
+        if (bear > bull * 2) return { signal: "SELL", confidence: 60 };
+        return { signal: "HOLD", confidence: 45 };
+      }
+      case "onchain-forensics": {
+        const direction = String(data.smart_money_direction ?? "neutral");
+        if (direction === "accumulating") return { signal: "BUY", confidence: 65 };
+        if (direction === "distributing") return { signal: "SELL", confidence: 65 };
+        return { signal: "HOLD", confidence: 50 };
+      }
+      case "options-flow": {
+        const pcRatio = Number(data.put_call_ratio ?? 1);
+        if (pcRatio < 0.7) return { signal: "BUY", confidence: 60 };
+        if (pcRatio > 1.3) return { signal: "SELL", confidence: 60 };
+        return { signal: "HOLD", confidence: 50 };
+      }
+      case "macro-correlator": {
+        const vix = Number(data.vix ?? 20);
+        if (vix > 30) return { signal: "SELL", confidence: 65 };
+        if (vix < 15) return { signal: "BUY", confidence: 55 };
+        return { signal: "HOLD", confidence: 50 };
+      }
       default:
         return { signal: "HOLD", confidence: 40 };
     }
@@ -51,6 +99,13 @@ export async function startSpecialists(): Promise<void> {
     { name: "sentiment", port: 4001, specIndex: 0, prompt: PROMPTS.sentiment.content, fetchData: fetchSentimentData },
     { name: "whale", port: 4002, specIndex: 1, prompt: PROMPTS.whale.content, fetchData: fetchWhaleData },
     { name: "momentum", port: 4003, specIndex: 2, prompt: PROMPTS.momentum.content, fetchData: fetchMomentumData },
+    { name: "memecoin-hunter", port: 4004, specIndex: 3, prompt: PROMPTS.memecoin.content, fetchData: fetchMemecoinData },
+    { name: "twitter-alpha", port: 4005, specIndex: 4, prompt: PROMPTS.twitter.content, fetchData: fetchTwitterData },
+    { name: "defi-yield", port: 4006, specIndex: 5, prompt: PROMPTS.defiYield.content, fetchData: fetchDefiYieldData },
+    { name: "news-scanner", port: 4007, specIndex: 6, prompt: PROMPTS.news.content, fetchData: fetchNewsData },
+    { name: "onchain-forensics", port: 4008, specIndex: 7, prompt: PROMPTS.forensics.content, fetchData: fetchOnchainForensicsData },
+    { name: "options-flow", port: 4009, specIndex: 8, prompt: PROMPTS.options.content, fetchData: fetchOptionsData },
+    { name: "macro-correlator", port: 4010, specIndex: 9, prompt: PROMPTS.macro.content, fetchData: fetchMacroData },
   ];
 
   for (const s of specs) {
@@ -99,7 +154,8 @@ export async function startSpecialists(): Promise<void> {
     });
   }
 
-  console.log("Specialists started on :4001, :4002, :4003 (real data mode)");
+  const portRange = specs.map((s) => `:${s.port}`).join(", ");
+  console.log(`Specialists started on ${portRange} (real data mode — ${specs.length} agents)`);
 }
 
 // ─── Run directly (only when invoked via `npm run specialists`) ──────────────

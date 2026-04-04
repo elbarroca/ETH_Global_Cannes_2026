@@ -217,6 +217,20 @@ export async function hireFromMarketplace(
   return results;
 }
 
+// ── Increment hire count for an agent ─────────────────────
+
+export async function incrementAgentHires(name: string): Promise<void> {
+  const agent = agents.get(name);
+  if (!agent) return;
+
+  agent.totalHires += 1;
+  const prisma = getPrisma();
+  await prisma.marketplaceAgent.update({
+    where: { id: agent.id },
+    data: { totalHires: { increment: 1 } },
+  }).catch(() => {});
+}
+
 // ── Auto-register built-in specialists ──────────────────────
 
 async function registerBuiltins(): Promise<void> {
@@ -224,6 +238,13 @@ async function registerBuiltins(): Promise<void> {
     { name: "sentiment", endpoint: "http://localhost:4001/analyze", tags: ["sentiment"] },
     { name: "whale", endpoint: "http://localhost:4002/analyze", tags: ["whale"] },
     { name: "momentum", endpoint: "http://localhost:4003/analyze", tags: ["momentum"] },
+    { name: "memecoin-hunter", endpoint: "http://localhost:4004/analyze", tags: ["memecoin", "degen", "new-pairs"] },
+    { name: "twitter-alpha", endpoint: "http://localhost:4005/analyze", tags: ["social", "twitter", "narrative"] },
+    { name: "defi-yield", endpoint: "http://localhost:4006/analyze", tags: ["defi", "yield", "tvl"] },
+    { name: "news-scanner", endpoint: "http://localhost:4007/analyze", tags: ["news", "regulatory", "listings"] },
+    { name: "onchain-forensics", endpoint: "http://localhost:4008/analyze", tags: ["onchain", "forensics", "wallets"] },
+    { name: "options-flow", endpoint: "http://localhost:4009/analyze", tags: ["options", "derivatives", "volatility"] },
+    { name: "macro-correlator", endpoint: "http://localhost:4010/analyze", tags: ["macro", "correlation", "tradfi"] },
   ];
   for (const b of builtins) {
     if (!agents.has(b.name)) {
