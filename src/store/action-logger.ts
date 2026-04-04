@@ -16,7 +16,14 @@ type ActionType =
   | "STORAGE_UPLOADED"
   | "INFT_UPDATED"
   | "TELEGRAM_NOTIFIED"
-  | "CYCLE_COMPLETED";
+  | "CYCLE_COMPLETED"
+  | "PENDING_APPROVAL"
+  | "CYCLE_APPROVED"
+  | "CYCLE_REJECTED"
+  | "CYCLE_TIMED_OUT"
+  | "AGENT_HIRED"
+  | "AGENT_FIRED"
+  | "TRADE_EXECUTED";
 
 interface LogActionInput {
   userId: string;
@@ -59,9 +66,9 @@ export async function logCycleRecord(
   cycleNumber: number,
   data: {
     specialists: Prisma.InputJsonValue;
-    alpha?: { action: string; pct: number; attestation: string };
-    risk?: { challenge: string; maxPct: number; attestation: string };
-    executor?: { action: string; pct: number; stopLoss: string; attestation: string };
+    alpha?: { action: string; pct: number; attestation: string; reasoning?: string };
+    risk?: { challenge: string; maxPct: number; attestation: string; reasoning?: string };
+    executor?: { action: string; pct: number; stopLoss: string; attestation: string; reasoning?: string };
     decision?: string;
     asset?: string;
     decisionPct?: number;
@@ -88,6 +95,9 @@ export async function logCycleRecord(
       execPct: data.executor?.pct,
       execStopLoss: data.executor?.stopLoss,
       execAttestation: data.executor?.attestation,
+      alphaReasoning: data.alpha?.reasoning,
+      riskReasoning: data.risk?.reasoning,
+      execReasoning: data.executor?.reasoning,
       decision: data.decision,
       asset: data.asset,
       decisionPct: data.decisionPct,

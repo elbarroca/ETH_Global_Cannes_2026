@@ -829,7 +829,7 @@ async function testFullPipeline(): Promise<void> {
     const pending = await createPendingCycle(analysis, "ui", 10);
     ok("Step 2: createPendingCycle()", `pendingId=${pending.id}`);
 
-    // Step 3: Simulate user clicking "Approve"
+    // Step 3: Simulate user clicking "Approve" — PRODUCTION ORDER: resolve THEN commit
     const fetched = await getPendingCycle(pending.id);
     if (!fetched || fetched.status !== "PENDING_APPROVAL") {
       fail("Step 3: fetch pending", "not found or already resolved");
@@ -843,6 +843,30 @@ async function testFullPipeline(): Promise<void> {
       return;
     }
 
+    // Step 3a: Resolve FIRST (atomic gate — production order)
+    const resolved = await resolvePendingCycle(pending.id, {
+      status: "APPROVED",
+      resolvedBy: "user",
+    });
+    if (resolved) {
+      ok("Step 3a: resolvePendingCycle() BEFORE commit", `status=${resolved.status}`);
+    } else {
+      fail("Step 3a: resolvePendingCycle()", "returned null — race condition?");
+      return;
+    }
+
+    // Step 3b: Second resolve must return null (race protection)
+    const doubleResolve = await resolvePendingCycle(pending.id, {
+      status: "APPROVED",
+      resolvedBy: "user",
+    });
+    if (doubleResolve === null) {
+      ok("Step 3b: concurrent resolve blocked", "returns null (race protection works)");
+    } else {
+      fail("Step 3b: concurrent resolve", `expected null, got ${doubleResolve?.status}`);
+    }
+
+    // Step 3c: Commit AFTER resolve (production order)
     const result = await commitCycle(
       {
         userId: fetched.userId,
@@ -853,18 +877,7 @@ async function testFullPipeline(): Promise<void> {
       },
       freshUser,
     );
-    ok("Step 3: commitCycle()", `seqNum=${result.seqNum}, hashscan=${result.hashscanUrl.slice(0, 50)}...`);
-
-    // Step 4: Resolve pending
-    const resolved = await resolvePendingCycle(pending.id, {
-      status: "APPROVED",
-      resolvedBy: "user",
-    });
-    if (resolved) {
-      ok("Step 4: resolvePendingCycle()", `status=${resolved.status}`);
-    } else {
-      fail("Step 4: resolvePendingCycle()", "returned null");
-    }
+    ok("Step 3c: commitCycle() AFTER resolve", `seqNum=${result.seqNum}, hashscan=${result.hashscanUrl.slice(0, 50)}...`);
 
     // Verify final state
     const finalUser = await getUserById(testUserId);

@@ -36,32 +36,46 @@ export async function checkExpiredPendingCycles(): Promise<void> {
       const autoAction = getTimeoutAction(user.agent.riskProfile);
 
       if (autoAction === "approve") {
-        const result = await commitCycle(analysis, user);
-
-        await resolvePendingCycle(pending.id, {
+        // Atomically resolve FIRST to prevent double-commit
+        const resolved = await resolvePendingCycle(pending.id, {
           status: "TIMED_OUT",
           resolvedBy: "timeout",
         });
-
-        // Edit Telegram message if it exists
-        if (user.telegram.chatId && pending.telegramMsgId) {
-          await editTelegramMessage(
-            user.telegram.chatId,
-            pending.telegramMsgId,
-            formatTimedOutResult(analysis, "approved"),
-          );
+        if (!resolved) {
+          console.log(`[timeout] Pending ${pending.id} already resolved, skipping`);
+          continue;
         }
 
-        notifyUser(user, result);
-        console.log(`[timeout] Auto-approved cycle ${pending.cycleNumber} for user ${user.id}`);
-      } else {
-        await rejectCycle(analysis, user, "timeout_rejected");
+        try {
+          const result = await commitCycle(analysis, user);
 
-        await resolvePendingCycle(pending.id, {
+          if (user.telegram.chatId && pending.telegramMsgId) {
+            await editTelegramMessage(
+              user.telegram.chatId,
+              pending.telegramMsgId,
+              formatTimedOutResult(analysis, "approved"),
+            );
+          }
+
+          notifyUser(user, result);
+          console.log(`[timeout] Auto-approved cycle ${pending.cycleNumber} for user ${user.id}`);
+        } catch (commitErr) {
+          // commitCycle failed AFTER resolve — advance lastCycleId to prevent reuse
+          console.error(`[timeout] commitCycle failed for pending ${pending.id}, cleaning up:`, commitErr);
+          await rejectCycle(analysis, user, "commit_failed").catch(() => {});
+        }
+      } else {
+        const resolved = await resolvePendingCycle(pending.id, {
           status: "TIMED_OUT",
           resolvedBy: "timeout",
           rejectReason: "timeout_rejected",
         });
+        if (!resolved) {
+          console.log(`[timeout] Pending ${pending.id} already resolved, skipping`);
+          continue;
+        }
+
+        await rejectCycle(analysis, user, "timeout_rejected");
 
         if (user.telegram.chatId && pending.telegramMsgId) {
           await editTelegramMessage(

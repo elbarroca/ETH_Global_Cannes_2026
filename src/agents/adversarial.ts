@@ -1,12 +1,12 @@
 import { sealedInference } from "../og/inference";
-import { PROMPTS, safeJsonParse } from "./prompts";
+import { PROMPTS, parseDualOutput } from "./prompts";
 import type { SpecialistResult, DebateResult } from "../types/index";
 
 const PROVIDER = process.env.OG_PROVIDER_ADDRESS!;
 const DELAY_MS = 2000;
 
-const ALPHA_FALLBACK = { action: "HOLD", asset: "ETH", pct: 0, argument: "Parse failed — defaulting to HOLD" };
-const RISK_FALLBACK = { max_pct: 0, risks: ["parse failure"], challenge: "Parse failed — blocking trade" };
+const ALPHA_FALLBACK = { action: "HOLD", asset: "ETH", pct: 0, thesis: "Parse failed — defaulting to HOLD" };
+const RISK_FALLBACK = { max_pct: 0, risks: ["parse failure"], objection: "Parse failed — blocking trade" };
 const EXECUTOR_FALLBACK = { action: "HOLD", asset: "ETH", pct: 0, stop_loss: "-5%", reasoning: "Parse failed — defaulting to HOLD" };
 
 function delay(ms: number): Promise<void> {
@@ -18,6 +18,11 @@ function buildSpecialistContext(specialists: SpecialistResult[]): string {
   return specialists
     .map((s) => {
       const lines = [`${s.name}: ${s.signal} (confidence: ${s.confidence}%, reputation: ${s.reputation ?? 500})`];
+
+      // Include specialist reasoning if available
+      if (s.reasoning) {
+        lines.push(`  reasoning: "${s.reasoning}"`);
+      }
 
       // Extract key data points from rawDataSnapshot so debate agents can reason about actual data
       const snap = s.rawDataSnapshot as Record<string, unknown> | undefined;
@@ -55,20 +60,21 @@ async function inferWithRetry(
   systemPrompt: string,
   userMessage: string,
   fallback: Record<string, unknown>,
-): Promise<{ content: string; parsed: Record<string, unknown>; attestationHash: string; teeVerified: boolean }> {
+): Promise<{ content: string; parsed: Record<string, unknown>; reasoning: string; attestationHash: string; teeVerified: boolean }> {
   const result = await sealedInference(PROVIDER, systemPrompt, userMessage);
   const EMPTY: Record<string, unknown> = {};
-  let parsed = safeJsonParse<Record<string, unknown>>(result.content, EMPTY);
+  const { reasoning, parsed } = parseDualOutput<Record<string, unknown>>(result.content, EMPTY);
 
   // Retry once with emphasis if parse returned empty fallback
   if (isEmptyParse(parsed)) {
     await delay(DELAY_MS); // Rate-limit protection before retry
-    const emphasisMsg = `${userMessage}\n\nIMPORTANT: Return ONLY valid JSON. No explanations.`;
+    const emphasisMsg = `${userMessage}\n\nIMPORTANT: Write 2-3 sentences of reasoning, then output valid JSON with your decision.`;
     const retry = await sealedInference(PROVIDER, systemPrompt, emphasisMsg);
-    parsed = safeJsonParse<Record<string, unknown>>(retry.content, fallback);
+    const retryResult = parseDualOutput<Record<string, unknown>>(retry.content, fallback);
     return {
       content: retry.content,
-      parsed,
+      parsed: retryResult.parsed,
+      reasoning: retryResult.reasoning,
       attestationHash: retry.attestationHash,
       teeVerified: retry.teeVerified,
     };
@@ -77,6 +83,7 @@ async function inferWithRetry(
   return {
     content: result.content,
     parsed,
+    reasoning,
     attestationHash: result.attestationHash,
     teeVerified: result.teeVerified,
   };
@@ -95,14 +102,14 @@ export async function runAdversarialDebate(
 
   await delay(DELAY_MS);
 
-  // Risk — AGAINST (sees specialist data + Alpha's argument)
-  const riskMsg = `Specialist signals:\n${specContext}\n\nAlpha proposes: ${JSON.stringify(alpha.parsed)}\n\nMax allowed: ${maxTradePercent}%. Challenge this.`;
+  // Risk — AGAINST (sees specialist data + Alpha's argument + Alpha's reasoning)
+  const riskMsg = `Specialist signals:\n${specContext}\n\nAlpha argues: "${alpha.reasoning}"\nAlpha proposes: ${JSON.stringify(alpha.parsed)}\n\nMax allowed: ${maxTradePercent}%. Challenge this.`;
   const risk = await inferWithRetry(PROMPTS.risk.content, riskMsg, RISK_FALLBACK);
 
   await delay(DELAY_MS);
 
-  // Executor — DECIDES (sees everything: data, Alpha, Risk)
-  const executorMsg = `Specialist signals:\n${specContext}\n\nAlpha: ${JSON.stringify(alpha.parsed)}\nRisk: ${JSON.stringify(risk.parsed)}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.`;
+  // Executor — DECIDES (sees everything: data, Alpha reasoning + proposal, Risk reasoning + challenge)
+  const executorMsg = `Specialist signals:\n${specContext}\n\nAlpha argues: "${alpha.reasoning}"\nAlpha: ${JSON.stringify(alpha.parsed)}\n\nRisk challenges: "${risk.reasoning}"\nRisk: ${JSON.stringify(risk.parsed)}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.`;
   const executor = await inferWithRetry(PROMPTS.executor.content, executorMsg, EXECUTOR_FALLBACK);
 
   return { alpha, risk, executor };

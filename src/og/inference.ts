@@ -26,7 +26,7 @@ export async function sealedInference(
         { role: "user", content: userMessage },
       ],
       temperature: 0.7,
-      max_tokens: 512,
+      max_tokens: 768,
     }),
   });
 

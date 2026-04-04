@@ -25,7 +25,10 @@ function rowToUser(row: UserRow): UserRecord {
     walletAddress: row.wallet_address,
     proxyWallet: row.proxy_wallet,
     telegram: row.telegram,
-    agent: row.agent,
+    agent: Object.assign(
+      { approvalMode: "always" as const, approvalTimeoutMin: 10 },
+      row.agent,
+    ),
     fund: row.fund,
     hotWalletIndex: row.hot_wallet_index,
     hotWalletAddress: row.hot_wallet_address,
@@ -63,6 +66,8 @@ export async function createUser(
     maxTradePercent: 10,
     lastCycleId: 0,
     lastCycleAt: null,
+    approvalMode: "always" as const,
+    approvalTimeoutMin: 10,
   };
 
   const fund = {

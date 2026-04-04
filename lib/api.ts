@@ -29,6 +29,9 @@ export interface UserRecord {
     lastCycleAt: string | null;
     approvalMode: "always" | "trades_only" | "auto";
     approvalTimeoutMin: number;
+    cycleCount?: number;
+    cyclePeriodMs?: number;
+    cyclesRemaining?: number;
   };
   fund: {
     depositedUsdc: number;
@@ -44,6 +47,7 @@ export interface SpecialistResult {
   name: string;
   signal: string;
   confidence: number;
+  reasoning?: string;
   attestationHash: string;
   teeVerified: boolean;
   reputation?: number;
@@ -53,6 +57,7 @@ export interface SpecialistResult {
 export interface DebateStage {
   content: string;
   parsed: Record<string, unknown>;
+  reasoning?: string;
   attestationHash: string;
   teeVerified: boolean;
 }
@@ -78,9 +83,9 @@ export interface CompactCycleRecord {
   rp: string;
   s: Array<{ n: string; sig: string; conf: number; att: string }>;
   adv: {
-    a: { act: string; pct: number; att: string };
-    r: { obj: string; max: number; att: string };
-    e: { act: string; pct: number; sl: number; att: string };
+    a: { act: string; pct: number; att: string; r?: string };
+    r: { obj: string; max: number; att: string; r?: string };
+    e: { act: string; pct: number; sl: number; att: string; r?: string };
   };
   d: { act: string; asset: string; pct: number };
   nav: number;
@@ -114,12 +119,17 @@ export async function onboard(
 
 export async function configure(
   userId: string,
-  riskProfile: string,
-  notifyPreference: string
+  opts: {
+    riskProfile?: string;
+    notifyPreference?: string;
+    approvalMode?: string;
+    cycleCount?: number;
+    cyclePeriodMs?: number;
+  }
 ): Promise<UserRecord> {
   return apiFetch("/api/configure", {
     method: "POST",
-    body: JSON.stringify({ userId, riskProfile, notifyPreference }),
+    body: JSON.stringify({ userId, ...opts }),
   });
 }
 
@@ -179,22 +189,54 @@ export async function analyzeCycle(userId: string): Promise<PendingCycleResponse
   return apiFetch(`/api/cycle/analyze/${userId}`, { method: "POST" });
 }
 
-export async function approveCycle(pendingId: string, modifiedPct?: number): Promise<CycleResult> {
+export async function approveCycle(pendingId: string, userId: string, modifiedPct?: number): Promise<CycleResult> {
   return apiFetch(`/api/cycle/approve/${pendingId}`, {
     method: "POST",
-    body: JSON.stringify({ modifiedPct }),
+    body: JSON.stringify({ userId, modifiedPct }),
   });
 }
 
-export async function rejectCycle(pendingId: string, reason?: string): Promise<{ status: string; pendingId: string }> {
+export async function rejectCycle(pendingId: string, userId: string, reason?: string): Promise<{ status: string; pendingId: string }> {
   return apiFetch(`/api/cycle/reject/${pendingId}`, {
     method: "POST",
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({ userId, reason }),
   });
 }
 
 export async function getPendingCycle(userId: string): Promise<PendingCycleResponse | null> {
   return apiFetch<PendingCycleResponse | null>(`/api/cycle/pending/${userId}`).catch(() => null);
+}
+
+// ── Compute detail (full cycle + action log) ───────────────
+
+export async function getCycleDetail(
+  userId: string,
+  cycleNumber: number
+): Promise<import("@/lib/types").ComputeDetailResponse | null> {
+  return apiFetch<import("@/lib/types").ComputeDetailResponse>(
+    `/api/cycle/detail/${userId}/${cycleNumber}`
+  ).catch(() => null);
+}
+
+// ── Trade execution ─────────────────────────────────────────
+
+export interface TradeResult {
+  success: boolean;
+  txId?: string;
+  error?: string;
+  usdcAmount?: string;
+}
+
+export async function executeTrade(
+  userId: string,
+  action: string,
+  asset: string,
+  percentage: number,
+): Promise<TradeResult> {
+  return apiFetch<TradeResult>("/api/trade/execute", {
+    method: "POST",
+    body: JSON.stringify({ userId, action, asset, percentage }),
+  });
 }
 
 export async function getStats(): Promise<PlatformStats> {

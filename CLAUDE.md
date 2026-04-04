@@ -6,7 +6,7 @@
 npm install                           # All dependencies
 npm run dev                           # Next.js 16.2 dev (Turbopack) on :3000
 npm run build                         # Production build
-npm run backend                       # Boot backend: heartbeat + telegram + API on :3001
+npm run backend                       # Boot backend: heartbeat + telegram + Express :3001 (backend services only, NOT dashboard API)
 npm run specialists                   # Start 3 specialist servers on :4001-4003
 npm run bot                           # Start Telegram bot standalone
 npm run cycle                         # Run full cycle (alias for backend)
@@ -42,6 +42,13 @@ Core product = **agent hiring economy**: autonomous agents discover, pay, and de
 - **Payments (buyer):** `@x402/fetch` · `@x402/core` · `@x402/evm` · `viem`
 - **Wallet Connect:** `@dynamic-labs/sdk-react-core` · `wagmi` · `@rainbow-me/rainbowkit`
 - **Other:** ethers v6 · express · node-telegram-bot-api · dotenv
+
+## API ARCHITECTURE
+Two API layers — **do not conflate them**:
+- **Next.js API routes (`app/api/*`)** — PRIMARY. Dashboard frontend calls these via relative paths (`/api/...`). Contains all business logic (onboard, cycles, fund, marketplace). Runs inside Next.js on `:3000`.
+- **Express (`src/api/*` on `:3001`)** — BACKEND SERVICES ONLY. Powers Telegram bot, heartbeat loop, specialist communication, and external integrations (curl testing). Dashboard does NOT call Express.
+
+`lib/api.ts` uses `NEXT_PUBLIC_API_URL ?? ""` — when empty (default), all requests go to Next.js API routes via relative paths. **Never set `NEXT_PUBLIC_API_URL` to Express `:3001`.**
 
 ## REPO STRUCTURE
 ```
@@ -111,7 +118,7 @@ alphadawg/
 │   │       └── cached-fetch.ts       ← Response caching for market APIs
 │   ├── telegram/
 │   │   └── bot.ts                     ← /start /status /why /history /run /stop /resume + notifyUser
-│   └── api/
+│   └── api/                           ← Express :3001 — backend services ONLY (Telegram bot, heartbeat, external integrations). Dashboard does NOT use these.
 │       ├── server.ts                  ← Express on :3001, CORS, error handler
 │       └── routes/
 │           ├── onboard.ts            ← POST /api/onboard + /configure + GET /user/:wallet + /stats
@@ -128,16 +135,33 @@ alphadawg/
 │   ├── marketplace/page.tsx           ← Specialist pack + community agents
 │   ├── verify/page.tsx                ← TEE attestation verification
 │   ├── portfolio/page.tsx             ← Fund balance + NAV
-│   └── api/                           ← Next.js API routes (proxy to backend or mirror node)
-│       ├── cycle/latest/route.ts
-│       ├── cycle/history/route.ts
-│       └── fund/info/route.ts
+│   └── api/                           ← Next.js API routes — PRIMARY dashboard API (contains business logic, NOT proxies)
+│       ├── onboard/route.ts           ← POST /api/onboard — wallet verification + Circle proxy wallet + iNFT
+│       ├── configure/route.ts         ← POST /api/configure — risk profile + notifications
+│       ├── user/[walletAddress]/route.ts ← GET /api/user/:wallet — user record lookup
+│       ├── stats/route.ts             ← GET /api/stats — platform-wide statistics
+│       ├── deposit/route.ts           ← POST /api/deposit — USDC deposit + HTS mint
+│       ├── withdraw/route.ts          ← POST /api/withdraw — HTS burn + Circle transfer
+│       ├── fund/info/route.ts         ← GET /api/fund/info — HTS token info via mirror node
+│       ├── cycle/
+│       │   ├── run/[userId]/route.ts  ← POST — trigger cycle (auto-approve or two-phase)
+│       │   ├── analyze/[userId]/route.ts ← POST — Phase 1: analyze + create pending
+│       │   ├── approve/[pendingId]/route.ts ← POST — Phase 2: approve + commit to HCS/0G
+│       │   ├── reject/[pendingId]/route.ts  ← POST — reject pending cycle
+│       │   ├── pending/[userId]/route.ts    ← GET — current pending cycle
+│       │   ├── latest/[userId]/route.ts     ← GET — latest committed cycle from HCS
+│       │   └── history/[userId]/route.ts    ← GET — historical cycles from HCS
+│       └── marketplace/
+│           ├── leaderboard/route.ts   ← GET — agent reputation leaderboard
+│           ├── my-agents/route.ts     ← GET — user's hired agents (Prisma)
+│           ├── hire/route.ts          ← POST — hire specialist agent
+│           └── fire/route.ts          ← POST — fire specialist agent (soft-delete)
 ├── components/                        ← Shared React components
 │   ├── ui/card.tsx, ui/badge.tsx
 │   ├── cycle-view.tsx, debate-column.tsx, nav.tsx
 │   ├── proof-column.tsx, specialist-card.tsx, wallet-connect.tsx
 ├── lib/                               ← Frontend utilities
-│   ├── api.ts                         ← apiFetch<T>(), onboard, cycle, fund API calls
+│   ├── api.ts                         ← apiFetch<T>() → relative /api/* (hits Next.js routes, NOT Express)
 │   ├── types.ts                       ← Frontend-specific types
 │   ├── cycle-mapper.ts               ← HCS CompactCycleRecord → frontend Cycle
 │   └── mock-data.ts                  ← Development mock data
@@ -231,7 +255,7 @@ FNG_API_URL=https://api.alternative.me/fng
 SERVER_PORT=3001                      # Express API port (default 3001)
 
 # Frontend
-NEXT_PUBLIC_API_URL=http://localhost:3001    # Backend API base
+NEXT_PUBLIC_API_URL=                         # Leave EMPTY — dashboard uses Next.js API routes (relative /api/*), NOT Express :3001
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=...
 NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID=...
 ```
@@ -338,3 +362,4 @@ Payment: x402 on Arc · Inference: 0G Sealed · Audit: Hedera HCS · Token: HTS
 Agents: OpenClaw · Memory: 0G Storage · Frontend: Next.js 16.2 · Style: Tailwind v4
 Database: Supabase PostgreSQL · Wallets: Circle MPC (proxy) + BIP-44 HD (hot)
 iNFT: ERC-7857 on 0G Chain (NOT Hedera) · Contracts: Hardhat 2 + Solidity 0.8.24 (0G Chain only — Hedera uses native SDK, zero Solidity)
+Dashboard API: Next.js API routes (`app/api/*`) — Express `:3001` is backend services only (Telegram, heartbeat), NEVER the dashboard API

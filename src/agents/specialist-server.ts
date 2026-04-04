@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createSpecialistServer } from "../payments/x402-server";
 import { sealedInference } from "../og/inference";
-import { PROMPTS, safeJsonParse } from "./prompts";
+import { PROMPTS, parseDualOutput } from "./prompts";
 import { deriveSpecialistAddress } from "../config/wallets";
 import { fetchSentimentData } from "./data/sentiment-data";
 import { fetchWhaleData } from "./data/whale-data";
@@ -64,18 +64,22 @@ export async function startSpecialists(): Promise<void> {
       console.log(`[specialist:${s.name}] Fetched real data (${rawData.length} bytes)`);
 
       let parsed: { signal: string; confidence: number; [k: string]: unknown };
+      let reasoning: string;
       let attestationHash: string;
       let teeVerified: boolean;
 
       try {
         // 2. Pass through 0G sealed inference
         const result = await sealedInference(PROVIDER, s.prompt, `Current market data:\n${rawData}`);
-        parsed = safeJsonParse(result.content, { signal: "HOLD" as const, confidence: 0 });
+        const dual = parseDualOutput(result.content, { signal: "HOLD" as const, confidence: 0 });
+        parsed = dual.parsed;
+        reasoning = dual.reasoning;
         attestationHash = result.attestationHash;
         teeVerified = result.teeVerified;
       } catch (err) {
         console.warn(`[specialist:${s.name}] 0G inference failed, using local fallback:`, err instanceof Error ? err.message : String(err));
         parsed = computeLocalFallback(s.name, rawData);
+        reasoning = "Local fallback: 0G inference unavailable.";
         attestationHash = "local-fallback";
         teeVerified = false;
       }
@@ -87,6 +91,7 @@ export async function startSpecialists(): Promise<void> {
       return {
         name: s.name,
         ...parsed,
+        reasoning: reasoning || (parsed as { reasoning?: string }).reasoning || "",
         rawDataSnapshot: rawSnapshot,
         attestationHash,
         teeVerified,

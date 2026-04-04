@@ -25,12 +25,12 @@ function buildCompactRecord(
   debate: DebateResult,
 ): CompactCycleRecord {
   const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number };
-  const riskParsed = debate.risk.parsed as { challenge?: string; max_pct?: number };
+  const riskParsed = debate.risk.parsed as { challenge?: string; objection?: string; max_pct?: number };
   const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
 
   const stopLoss = parseFloat(String(execParsed.stop_loss ?? "-5").replace("%", "").replace("-", ""));
 
-  return {
+  const record: CompactCycleRecord = {
     c: cycleId,
     u: user.id,
     t: new Date().toISOString(),
@@ -46,17 +46,20 @@ function buildCompactRecord(
         act: String(alphaParsed.action ?? "HOLD"),
         pct: Number(alphaParsed.pct ?? 0),
         att: debate.alpha.attestationHash.slice(0, 16),
+        r: (debate.alpha.reasoning ?? "").slice(0, 60) || undefined,
       },
       r: {
-        obj: String(riskParsed.challenge ?? "none").slice(0, 40),
+        obj: String(riskParsed.challenge ?? riskParsed.objection ?? "none").slice(0, 40),
         max: Number(riskParsed.max_pct ?? 0),
         att: debate.risk.attestationHash.slice(0, 16),
+        r: (debate.risk.reasoning ?? "").slice(0, 60) || undefined,
       },
       e: {
         act: String(execParsed.action ?? "HOLD"),
         pct: Number(execParsed.pct ?? 0),
         sl: stopLoss,
         att: debate.executor.attestationHash.slice(0, 16),
+        r: (debate.executor.reasoning ?? "").slice(0, 60) || undefined,
       },
     },
     d: {
@@ -66,6 +69,15 @@ function buildCompactRecord(
     },
     nav: user.fund.currentNav,
   };
+
+  // Safety check: drop reasoning excerpts if record exceeds HCS byte limit
+  if (Buffer.byteLength(JSON.stringify(record), "utf8") > 950) {
+    delete record.adv.a.r;
+    delete record.adv.r.r;
+    delete record.adv.e.r;
+  }
+
+  return record;
 }
 
 // ── Phase 1: Analyze (hire specialists + adversarial debate) ─────────────────
@@ -192,7 +204,7 @@ export async function commitCycle(
 
   // 4. Parse debate results for cycle record
   const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number };
-  const riskParsed = debate.risk.parsed as { challenge?: string; max_pct?: number };
+  const riskParsed = debate.risk.parsed as { challenge?: string; objection?: string; max_pct?: number };
   const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
 
   // 5. Save full cycle record to Supabase (non-fatal)
@@ -208,17 +220,20 @@ export async function commitCycle(
         action: String(alphaParsed.action ?? "HOLD"),
         pct: modifiedPct ?? Number(alphaParsed.pct ?? 0),
         attestation: debate.alpha.attestationHash,
+        reasoning: debate.alpha.reasoning ?? "",
       },
       risk: {
-        challenge: String(riskParsed.challenge ?? "none"),
+        challenge: String(riskParsed.challenge ?? riskParsed.objection ?? "none"),
         maxPct: Number(riskParsed.max_pct ?? 0),
         attestation: debate.risk.attestationHash,
+        reasoning: debate.risk.reasoning ?? "",
       },
       executor: {
         action: String(execParsed.action ?? "HOLD"),
         pct: modifiedPct ?? Number(execParsed.pct ?? 0),
         stopLoss: String(execParsed.stop_loss ?? "-5%"),
         attestation: debate.executor.attestationHash,
+        reasoning: debate.executor.reasoning ?? "",
       },
       decision: String(execParsed.action ?? "HOLD"),
       asset: "ETH",

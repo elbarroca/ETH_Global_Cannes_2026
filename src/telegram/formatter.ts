@@ -34,9 +34,9 @@ export function formatDebate(record: CompactCycleRecord): string {
     "📡 *Specialists:*",
     specs || "  No data",
     "",
-    `🟢 *Alpha:* ${alpha?.act ?? "?"} ${alpha?.pct ?? 0}%`,
-    `🔴 *Risk:* ${risk?.obj ?? "?"} (max ${risk?.max ?? 0}%)`,
-    `⚖️ *Executor:* ${exec?.act ?? "?"} ${exec?.pct ?? 0}% (SL ${exec?.sl ?? 0}%)`,
+    `🟢 *Alpha:* ${alpha?.act ?? "?"} ${alpha?.pct ?? 0}%${alpha?.r ? `\n  _"${alpha.r}"_` : ""}`,
+    `🔴 *Risk:* ${risk?.obj ?? "?"} (max ${risk?.max ?? 0}%)${risk?.r ? `\n  _"${risk.r}"_` : ""}`,
+    `⚖️ *Executor:* ${exec?.act ?? "?"} ${exec?.pct ?? 0}% (SL ${exec?.sl ?? 0}%)${exec?.r ? `\n  _"${exec.r}"_` : ""}`,
     "",
     `📊 Decision: *${record.d?.act ?? "HOLD"}* ${record.d?.asset ?? ""} ${record.d?.pct ?? 0}%`,
     `💰 NAV: $${(record.nav ?? 0).toLocaleString()}`,
@@ -58,11 +58,15 @@ export function formatAnalysisPreview(analysis: AnalysisResult, user: UserRecord
     .map((s) => `  ${signalEmoji(s.signal)} ${s.name}: ${s.signal} (${s.confidence}%) [rep: ${s.reputation ?? "?"}]`)
     .join("\n");
 
-  const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number; argument?: string };
-  const riskParsed = debate.risk.parsed as { challenge?: string; max_pct?: number };
+  const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number; argument?: string; thesis?: string };
+  const riskParsed = debate.risk.parsed as { challenge?: string; objection?: string; max_pct?: number };
   const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string; reasoning?: string };
 
   const exec = compactRecord.adv.e;
+
+  const alphaReasoning = debate.alpha.reasoning ?? alphaParsed.argument ?? alphaParsed.thesis ?? "";
+  const riskReasoning = debate.risk.reasoning ?? riskParsed.objection ?? riskParsed.challenge ?? "";
+  const execReasoning = debate.executor.reasoning ?? execParsed.reasoning ?? "";
 
   return [
     `🧠 *Hunt #${analysis.cycleId} — Recommendation Ready*`,
@@ -71,9 +75,9 @@ export function formatAnalysisPreview(analysis: AnalysisResult, user: UserRecord
     specLines || "  No data",
     "",
     "⚔️ *Adversarial Debate:*",
-    `🟢 Alpha: ${alphaParsed.action ?? "?"} ${alphaParsed.pct ?? 0}% ETH — "${(alphaParsed.argument ?? "").slice(0, 80)}${(alphaParsed.argument ?? "").length > 80 ? "..." : ""}"`,
-    `🔴 Risk: Max ${riskParsed.max_pct ?? 0}% — "${(riskParsed.challenge ?? "").slice(0, 80)}${(riskParsed.challenge ?? "").length > 80 ? "..." : ""}"`,
-    `⚖️ Executor: ${exec.act} ${exec.pct}% ETH (SL ${exec.sl}%) — "${(execParsed.reasoning ?? "").slice(0, 80)}${(execParsed.reasoning ?? "").length > 80 ? "..." : ""}"`,
+    `🟢 Alpha: ${alphaParsed.action ?? "?"} ${alphaParsed.pct ?? 0}% ETH — "${alphaReasoning.slice(0, 120)}${alphaReasoning.length > 120 ? "..." : ""}"`,
+    `🔴 Risk: Max ${riskParsed.max_pct ?? 0}% — "${riskReasoning.slice(0, 120)}${riskReasoning.length > 120 ? "..." : ""}"`,
+    `⚖️ Executor: ${exec.act} ${exec.pct}% ETH (SL ${exec.sl}%) — "${execReasoning.slice(0, 120)}${execReasoning.length > 120 ? "..." : ""}"`,
     "",
     `📊 Recommendation: *${exec.act}* ETH ${exec.pct}%`,
     `💰 NAV: $${user.fund.currentNav.toLocaleString()}`,
