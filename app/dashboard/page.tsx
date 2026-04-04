@@ -3,27 +3,40 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardBody, MetricCard, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
-import { MOCK_FUND, MOCK_CYCLE } from "@/lib/mock-data";
 import { mapCycleResultToCycle, mapCompactRecordToCycle } from "@/lib/cycle-mapper";
 import type { Cycle } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/user-context";
 import { triggerCycle, getLatestCycle } from "@/lib/api";
 
+const STAGES = [
+  "Hiring specialists from marketplace...",
+  "Running adversarial debate (Alpha \u2192 Risk \u2192 Executor)...",
+  "Logging decision to Hedera HCS...",
+  "Storing memory to 0G decentralized storage...",
+];
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, userId, linkCode } = useUser();
   const [running, setRunning] = useState(false);
   const [liveCycle, setLiveCycle] = useState<Cycle | null>(null);
+  const [stageIdx, setStageIdx] = useState(0);
 
-  // Use real data when available, fallback to mock
+  // Compute fund stats from user state only — no mock data
   const fund = user ? {
-    ...MOCK_FUND,
     nav: user.fund.currentNav,
+    navChange24h: 0,
     totalCycles: user.agent.lastCycleId,
-  } : MOCK_FUND;
-  const cycle = liveCycle ?? MOCK_CYCLE;
+    totalPayments: user.agent.lastCycleId * 3,
+    totalSpend: user.agent.lastCycleId * 0.003,
+    winRate: 0,
+    totalInferences: user.agent.lastCycleId * 6,
+  } : null;
 
+  const cycle = liveCycle;
+
+  // Fetch latest cycle on mount
   useEffect(() => {
     if (userId) {
       getLatestCycle(userId).then((record) => {
@@ -32,9 +45,19 @@ export default function DashboardPage() {
     }
   }, [userId]);
 
+  // Cycle through stage messages while running
+  useEffect(() => {
+    if (!running) { setStageIdx(0); return; }
+    const timer = setInterval(() => {
+      setStageIdx((s) => (s + 1) % STAGES.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [running]);
+
   async function handleHunt() {
     if (!userId) return;
     setRunning(true);
+    setStageIdx(0);
     try {
       const result = await triggerCycle(userId);
       setLiveCycle(mapCycleResultToCycle(result));
@@ -52,32 +75,32 @@ export default function DashboardPage() {
         <MetricCard
           emoji="💰"
           label="Fund NAV"
-          value={`$${fund.nav.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-          sub={`+${fund.navChange24h}% (24h)`}
-          subColor="text-green-400"
+          value={fund ? `$${fund.nav.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
+          sub={fund ? `+${fund.navChange24h}% (24h)` : "Connect wallet"}
+          subColor={fund ? "text-green-400" : undefined}
         />
         <MetricCard
           emoji="🔄"
           label="Hunts"
-          value={fund.totalCycles.toString()}
+          value={fund ? fund.totalCycles.toString() : "0"}
           sub="All sealed"
         />
         <MetricCard
           emoji="💸"
           label="Pack spend"
-          value={`$${fund.totalSpend.toFixed(2)}`}
-          sub={`${fund.totalPayments} payments`}
+          value={fund ? `$${fund.totalSpend.toFixed(2)}` : "$0.00"}
+          sub={fund ? `${fund.totalPayments} payments` : "0 payments"}
         />
         <MetricCard
           emoji="🎯"
           label="Win rate"
-          value={`${fund.winRate}%`}
+          value={fund ? `${fund.winRate}%` : "—"}
           sub="Verified"
         />
         <MetricCard
           emoji="🧠"
           label="0G sealed"
-          value={fund.totalInferences.toString()}
+          value={fund ? fund.totalInferences.toString() : "0"}
           sub="6 per hunt"
           subColor="text-void-500"
         />
@@ -86,35 +109,48 @@ export default function DashboardPage() {
       {/* Hunt button */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-void-600 uppercase tracking-wider">
-          Hunt #{cycle.id} · {new Date(cycle.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+          {cycle
+            ? `Hunt #${cycle.id} \u00b7 ${new Date(cycle.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`
+            : "Ready to hunt"}
         </h2>
-        <button
-          onClick={handleHunt}
-          disabled={running}
-          className={`flex items-center gap-2 px-6 py-3 bg-blood-600 hover:bg-blood-700 disabled:opacity-60 text-white text-sm font-bold rounded-xl transition-colors ${running ? "hunting" : ""}`}
-        >
-          {running ? (
-            <>
-              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Hunting…
-            </>
-          ) : (
-            "🐺 Hunt"
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={handleHunt}
+            disabled={running}
+            className={`flex items-center gap-2 px-6 py-3 bg-blood-600 hover:bg-blood-700 disabled:opacity-60 text-white text-sm font-bold rounded-xl transition-colors ${running ? "hunting" : ""}`}
+          >
+            {running ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Hunting\u2026
+              </>
+            ) : (
+              "\uD83D\uDC3A Hunt"
+            )}
+          </button>
+          {running && (
+            <p className="text-xs text-void-500 animate-pulse">{STAGES[stageIdx]}</p>
           )}
-        </button>
+        </div>
       </div>
 
       {/* Row 2: Three columns */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Column 1: ETH Pack */}
-        <PackColumn cycle={cycle} onVerify={() => router.push("/verify")} />
-
-        {/* Column 2: The Challenge */}
-        <ChallengeColumn cycle={cycle} onVerify={() => router.push("/verify")} />
-
-        {/* Column 3: Payments + Audit + Memory */}
-        <RightColumn cycle={cycle} />
-      </div>
+      {cycle ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <PackColumn cycle={cycle} onVerify={() => router.push("/verify")} />
+          <ChallengeColumn cycle={cycle} onVerify={() => router.push("/verify")} />
+          <RightColumn cycle={cycle} />
+        </div>
+      ) : (
+        <Card>
+          <CardBody className="text-center py-12 space-y-3">
+            <p className="text-void-400 text-sm">No hunts yet. Click Hunt to trigger your first cycle.</p>
+            <p className="text-void-600 text-xs">
+              Your agent will hire 3 specialists, run adversarial debate, and log everything on-chain.
+            </p>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Row 3: Status bar */}
       <Card>
@@ -158,7 +194,7 @@ export default function DashboardPage() {
 
 // ─── Column components ────────────────────────────────────────────────────────
 
-function PackColumn({ cycle, onVerify }: { cycle: typeof MOCK_CYCLE; onVerify: () => void }) {
+function PackColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => void }) {
   return (
     <Card>
       <CardHeader>
@@ -193,7 +229,7 @@ function PackColumn({ cycle, onVerify }: { cycle: typeof MOCK_CYCLE; onVerify: (
   );
 }
 
-function ChallengeColumn({ cycle, onVerify }: { cycle: typeof MOCK_CYCLE; onVerify: () => void }) {
+function ChallengeColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => void }) {
   const agents = [
     {
       emoji: "🟢",
@@ -252,7 +288,7 @@ function ChallengeColumn({ cycle, onVerify }: { cycle: typeof MOCK_CYCLE; onVeri
   );
 }
 
-function RightColumn({ cycle }: { cycle: typeof MOCK_CYCLE }) {
+function RightColumn({ cycle }: { cycle: Cycle }) {
   const totalCost = cycle.payments.reduce((s, p) => s + p.amount, 0);
 
   return (
@@ -340,7 +376,7 @@ function RightColumn({ cycle }: { cycle: typeof MOCK_CYCLE }) {
           <ZeroGBadge label="0G Storage" />
         </CardHeader>
         <CardBody className="space-y-2.5">
-          {cycle.memory.map((m) => (
+          {cycle.memory.length > 0 ? cycle.memory.map((m) => (
             <div key={m.cycleRef} className="flex gap-2">
               <span className="font-mono text-xs text-gold-400 shrink-0 pt-0.5">
                 #{m.cycleRef}
@@ -349,7 +385,9 @@ function RightColumn({ cycle }: { cycle: typeof MOCK_CYCLE }) {
                 {m.text}
               </p>
             </div>
-          ))}
+          )) : (
+            <p className="text-xs text-void-600">Memory builds over cycles.</p>
+          )}
         </CardBody>
       </Card>
     </div>

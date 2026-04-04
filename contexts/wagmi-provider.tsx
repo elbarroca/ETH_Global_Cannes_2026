@@ -8,6 +8,7 @@ import { defineChain } from "viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode } from "react";
 import { UserProvider } from "./user-context";
+import { AuthGuard } from "@/components/auth-guard";
 
 export const arcTestnet = defineChain({
   id: 2655,
@@ -57,7 +58,9 @@ export function Providers({ children }: { children: ReactNode }) {
       <WagmiProvider config={wagmiConfig}>
         <QueryClientProvider client={queryClient}>
           <DynamicWagmiConnector>
-            <UserProvider>{children}</UserProvider>
+            <UserProvider>
+              <AuthGuard>{children}</AuthGuard>
+            </UserProvider>
           </DynamicWagmiConnector>
         </QueryClientProvider>
       </WagmiProvider>

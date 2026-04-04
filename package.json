@@ -23,12 +23,15 @@
     "cycle": "tsx src/index.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "setup:gateway": "npx tsx scripts/setup-gateway.ts",
+    "validate:x402": "npx tsx scripts/validate-x402.ts"
   },
   "dependencies": {
     "@0gfoundation/0g-ts-sdk": "^1.2.1",
     "@0glabs/0g-serving-broker": "*",
     "@circle-fin/developer-controlled-wallets": "^10.2.0",
+    "@circle-fin/x402-batching": "^2.0.4",
     "@dynamic-labs/ethereum": "^4.75.0",
     "@dynamic-labs/sdk-react-core": "^4.75.0",
     "@dynamic-labs/wagmi-connector": "^4.75.0",

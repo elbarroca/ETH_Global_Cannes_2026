@@ -18,9 +18,11 @@ interface UserContextValue {
   user: UserRecord | null;
   isConnected: boolean;
   isOnboarded: boolean;
+  telegramVerified: boolean;
   linkCode: string | null;
   setUser: (user: UserRecord | null) => void;
   refetch: () => Promise<void>;
+  refreshLinkCode: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextValue | null>(null);
@@ -31,6 +33,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [linkCode, setLinkCode] = useState<string | null>(null);
 
   const onboardingRef = useRef(false);
+
+  const telegramVerified = user?.telegram?.verified ?? false;
+
+  const refreshLinkCode = useCallback(async () => {
+    if (!address) return;
+    try {
+      const result = await onboard(address, "mock", "AlphaDawg sign-in");
+      if (result.telegramLinkCode) setLinkCode(result.telegramLinkCode);
+    } catch (err) {
+      console.warn("[user-context] Failed to refresh link code:", err);
+    }
+  }, [address]);
 
   const refetch = useCallback(async () => {
     if (!address) { setUser(null); return; }
@@ -71,9 +85,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
         user,
         isConnected,
         isOnboarded: !!user?.id,
+        telegramVerified,
         linkCode,
         setUser,
         refetch,
+        refreshLinkCode,
       }}
     >
       {children}
