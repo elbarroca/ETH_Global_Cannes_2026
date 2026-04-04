@@ -20,6 +20,7 @@ import {
   configure,
 } from "@/lib/api";
 import { HuntCard } from "@/components/hunt-card";
+import { ExpandableHuntCard } from "@/components/expandable-hunt-card";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreconditionModal } from "@/components/precondition-modal";
 import { TelegramModal } from "@/components/telegram-modal";
@@ -28,7 +29,7 @@ import { NaryoFeed } from "@/components/naryo-feed";
 import { StreamingHuntPanel } from "@/components/streaming-hunt-panel";
 import { SwarmStatusBar } from "@/components/swarm-status-bar";
 import { SwarmActivityTicker } from "@/components/swarm-activity-ticker";
-import { DebateTheater } from "@/components/debate-theater";
+// DebateTheater removed — debate data is shown inside ExpandableHuntCard
 
 const ANALYZE_STAGES = [
   "Hiring specialists from marketplace...",
@@ -408,22 +409,25 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      {/* Row 2: Three columns */}
-      {displayCycle ? (
+      {/* Row 2: Current hunt as expandable card */}
+      {pendingCycle ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <PackColumn cycle={displayCycle} onVerify={() => router.push("/verify")} />
-          <ChallengeColumn cycle={displayCycle} onVerify={() => router.push("/verify")} />
-          {pendingCycle ? (
-            <ApprovalPanel
-              pendingCycle={pendingCycle}
-              approving={approving}
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          ) : cycle ? (
-            <RightColumn cycle={cycle} userInftTokenId={user?.inftTokenId ?? null} />
-          ) : null}
+          <PackColumn cycle={pendingAsCycle!} onVerify={() => router.push("/verify")} />
+          <ChallengeColumn cycle={pendingAsCycle!} onVerify={() => router.push("/verify")} />
+          <ApprovalPanel
+            pendingCycle={pendingCycle}
+            approving={approving}
+            onApprove={handleApprove}
+            onReject={handleReject}
+          />
         </div>
+      ) : cycle && userId ? (
+        <ExpandableHuntCard
+          cycle={cycle}
+          userId={userId}
+          defaultExpanded
+          userInftTokenId={user?.inftTokenId ?? null}
+        />
       ) : (
         <Card>
           <CardBody className="text-center py-12 space-y-3">
@@ -435,25 +439,15 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Row 2.5: Debate Theater — turn-by-turn timeline of the latest committed cycle */}
-      {cycle?.dbId && userId && (
-        <DebateTheater
-          cycleUuid={cycle.dbId}
-          userId={userId}
-          cycleNumber={cycle.id}
-          isActive={running || approving}
-        />
-      )}
-
       {/* Row 3: Past hunt cards */}
       {pastCycles.length > 0 && (
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-void-600 uppercase tracking-wider">
             Hunt history
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {pastCycles.map((c) => (
-              <HuntCard key={c.id} cycle={c} />
+              <ExpandableHuntCard key={c.id} cycle={c} userId={userId!} />
             ))}
           </div>
         </div>
@@ -544,15 +538,15 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Chat FAB */}
+      {/* Chat FAB — bottom-left */}
       <button
         onClick={() => setChatOpen((prev) => !prev)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-2xl rounded-full shadow-lg shadow-dawg-500/30 transition-all flex items-center justify-center"
+        className="fixed bottom-6 left-6 z-50 w-14 h-14 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-2xl rounded-full shadow-lg shadow-dawg-500/30 transition-all flex items-center justify-center"
       >
         {chatOpen ? "✕" : "🐺"}
       </button>
 
-      {/* Chat Slide-over */}
+      {/* Chat panel — opens from bottom-left, adjacent to FAB */}
       {chatOpen && userId && (
         <ChatPanel userId={userId} onClose={() => setChatOpen(false)} />
       )}

@@ -71,7 +71,7 @@ export function SwarmStatusBar() {
   }, [health]);
 
   return (
-    <div className="bg-black/90 backdrop-blur-sm border-b border-dawg-500/20 px-4 py-3">
+    <div className="sticky top-0 z-40 bg-black/90 backdrop-blur-sm border-b border-dawg-500/20 px-4 py-3">
       <div className="max-w-screen-2xl mx-auto flex items-center gap-4 flex-wrap">
         {/* Left: 13 agent health pills */}
         <div className="flex items-center gap-2 flex-wrap">

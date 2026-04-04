@@ -20,10 +20,26 @@ export async function GET(
       );
     }
 
-    const actions = await prisma.agentAction.findMany({
+    // Try direct cycle_id match first
+    let actions = await prisma.agentAction.findMany({
       where: { cycleId: cycle.id },
       orderBy: { createdAt: "asc" },
     });
+
+    // Fallback: many existing rows have cycle_id = null. Correlate by
+    // user + time window around the cycle's created_at.
+    if (actions.length === 0) {
+      const cycleTime = new Date(cycle.createdAt);
+      const windowStart = new Date(cycleTime.getTime() - 120_000); // -2 min
+      const windowEnd = new Date(cycleTime.getTime() + 30_000);    // +30s
+      actions = await prisma.agentAction.findMany({
+        where: {
+          userId,
+          createdAt: { gte: windowStart, lte: windowEnd },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+    }
 
     return NextResponse.json({ cycle, actions });
   } catch (err) {

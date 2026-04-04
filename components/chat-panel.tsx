@@ -105,13 +105,10 @@ export function ChatPanel({ userId, onClose }: ChatPanelProps) {
   }
 
   return (
-    // The xl:right offset docks the panel flush with the LEFT edge of the
-    // swarm activity ticker (320px aside + 16px gap + 20px container padding
-    // = 356px), so the modal never covers the live activity feed. On wide
-    // screens the aside + container are centered inside `max-w-screen-2xl`
-    // (1536px) so we add the extra viewport-side margin with a clamped calc.
+    // Docked bottom-left, above the FAB. Opens as a card, not a full-height
+    // slide-over. On mobile it stretches full width.
     <div
-      className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-void-800 bg-void-900 shadow-2xl sm:w-[400px] xl:right-[max(356px,calc((100vw-1536px)/2+356px))]"
+      className="fixed bottom-24 left-6 z-50 flex w-[calc(100vw-48px)] flex-col rounded-2xl border border-void-800 bg-void-900 shadow-2xl sm:w-[400px] max-h-[min(70vh,600px)]"
       role="dialog"
       aria-label="Lead Dawg chat"
     >
