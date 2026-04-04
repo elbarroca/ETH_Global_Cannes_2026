@@ -1,12 +1,19 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useUser } from "@/contexts/user-context";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isConnected, user } = useUser();
+  const [mounted, setMounted] = useState(false);
+
+  // Wait for client hydration before rendering conditional UI
+  // This prevents SSR mismatch with Dynamic Labs' injected elements
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return <>{children}</>;
 
   // While wallet is connected but user record hasn't loaded yet, show loading
-  // This prevents a flash of unblocked content before the modal appears
   if (isConnected && !user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">

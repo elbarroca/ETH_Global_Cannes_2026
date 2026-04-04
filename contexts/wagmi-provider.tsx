@@ -50,10 +50,10 @@ function ChainGuard({ children }: { children: ReactNode }) {
   const { chainId, isConnected } = useConnection();
   const { mutate: switchChain } = useSwitchChain();
 
-  // Suppress unhandled 4902 rejections from Dynamic Labs' internal chain switching
+  // Suppress unhandled wallet rejections (4902=chain not configured, 4001=user denied)
   useEffect(() => {
     const handler = (event: PromiseRejectionEvent) => {
-      if (event.reason?.code === 4902) {
+      if (event.reason?.code === 4902 || event.reason?.code === 4001) {
         event.preventDefault();
       }
     };

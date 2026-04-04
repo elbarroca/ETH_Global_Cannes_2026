@@ -43,13 +43,25 @@ function getAttestationForAgent(
     SentimentBot: "SPECIALIST_HIRED",
     WhaleEye: "SPECIALIST_HIRED",
     MomentumX: "SPECIALIST_HIRED",
+    MemecoinHunter: "SPECIALIST_HIRED",
+    TwitterAlpha: "SPECIALIST_HIRED",
+    DeFiYield: "SPECIALIST_HIRED",
+    NewsScanner: "SPECIALIST_HIRED",
+    OnChainForensics: "SPECIALIST_HIRED",
+    OptionsFlow: "SPECIALIST_HIRED",
+    MacroCorrelator: "SPECIALIST_HIRED",
     Alpha: "DEBATE_ALPHA",
     Risk: "DEBATE_RISK",
     Executor: "DEBATE_EXECUTOR",
   };
 
   // For specialists, also match by agent name
-  const nameMap: Record<string, string> = { SentimentBot: "sentiment", WhaleEye: "whale", MomentumX: "momentum" };
+  const nameMap: Record<string, string> = {
+    SentimentBot: "sentiment", WhaleEye: "whale", MomentumX: "momentum",
+    MemecoinHunter: "memecoin-hunter", TwitterAlpha: "twitter-alpha", DeFiYield: "defi-yield",
+    NewsScanner: "news-scanner", OnChainForensics: "onchain-forensics", OptionsFlow: "options-flow",
+    MacroCorrelator: "macro-correlator",
+  };
   const action = key in nameMap
     ? actions.find((a) => a.actionType === actionTypeMap[key] && a.agentName === nameMap[key])
     : actions.find((a) => a.actionType === actionTypeMap[key]);
@@ -59,8 +71,14 @@ function getAttestationForAgent(
   switch (key) {
     case "SentimentBot":
     case "WhaleEye":
-    case "MomentumX": {
-      // Parse specialist attestations from the JSON column
+    case "MomentumX":
+    case "MemecoinHunter":
+    case "TwitterAlpha":
+    case "DeFiYield":
+    case "NewsScanner":
+    case "OnChainForensics":
+    case "OptionsFlow":
+    case "MacroCorrelator": {
       const specs = Array.isArray(cycle.specialists) ? cycle.specialists as Array<{ name?: string; attestation?: string }> : [];
       const specName = nameMap[key];
       const spec = specs.find((s) => s.name === specName);
@@ -69,6 +87,7 @@ function getAttestationForAgent(
     case "Alpha": return cycle.alphaAttestation ?? "—";
     case "Risk": return cycle.riskAttestation ?? "—";
     case "Executor": return cycle.execAttestation ?? "—";
+    default: return "—";
   }
 }
 
@@ -77,6 +96,13 @@ function getTeeVerified(key: AgentKey, actions: AgentActionRecord[]): boolean {
     SentimentBot: "SPECIALIST_HIRED",
     WhaleEye: "SPECIALIST_HIRED",
     MomentumX: "SPECIALIST_HIRED",
+    MemecoinHunter: "SPECIALIST_HIRED",
+    TwitterAlpha: "SPECIALIST_HIRED",
+    DeFiYield: "SPECIALIST_HIRED",
+    NewsScanner: "SPECIALIST_HIRED",
+    OnChainForensics: "SPECIALIST_HIRED",
+    OptionsFlow: "SPECIALIST_HIRED",
+    MacroCorrelator: "SPECIALIST_HIRED",
     Alpha: "DEBATE_ALPHA",
     Risk: "DEBATE_RISK",
     Executor: "DEBATE_EXECUTOR",
