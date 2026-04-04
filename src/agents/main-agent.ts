@@ -13,7 +13,7 @@ import { getUserPaymentFetch, getUserPrivateKey } from "../config/arc";
 import { hireFromMarketplace } from "../marketplace/registry";
 import { evaluateCycleSignals } from "../marketplace/reputation";
 import { executeArcSwap, calculateSwapAmount } from "../execution/arc-swap";
-import { prepareSwapFunds, computeHoldingsUpdate } from "../payments/fund-swap";
+import { prepareSwapFunds, computeHoldingsUpdate, ensureHotWalletFunded } from "../payments/fund-swap";
 import { getTokenPrice } from "../payments/circle-wallet";
 import { synthesizeCycleNarrative, type CycleNarrative } from "./narrative";
 import { recordPickEntries } from "../marketplace/pick-tracker";
@@ -273,10 +273,71 @@ function buildPaymentRecords(specialists: SpecialistResult[]): PaymentRecord[] {
     }));
 }
 
-// Lean HCS audit pointer (must fit under 1024 bytes). The full record — goal,
-// payment graph, reasoning, full attestation hashes — lives in 0G Storage; the
-// `sh` field (storageHash/CID) is injected by commitCycle after the 0G write
-// so independent verifiers reading HCS can hop to the rich record.
+// Truncate a string to at most `maxChars`, but never cut a word in half.
+// Falls back to a hard slice only if the input has no spaces at all (e.g.
+// weird single-token output). Adds "..." suffix when trimming actually
+// happens. This replaces the old char-chopping behaviour that produced
+// Hashscan strings like "The withdrawal of smart money and the la" — no
+// trailing word break, mid-syllable cut, confusing to judges.
+function wordTrim(raw: string | undefined, maxChars: number): string | undefined {
+  if (!raw) return undefined;
+  const cleaned = raw.trim().replace(/\s+/g, " ");
+  if (cleaned.length <= maxChars) return cleaned || undefined;
+  // Find the last space within the budget (leaving 3 chars for "...")
+  const sliceLimit = maxChars - 3;
+  const lastSpace = cleaned.lastIndexOf(" ", sliceLimit);
+  const cut = lastSpace > 0 ? cleaned.slice(0, lastSpace) : cleaned.slice(0, sliceLimit);
+  return cut + "...";
+}
+
+// Synthesize a single-sentence A2A dialogue narrative. Captures who argued
+// what in a way readers of the HCS aggregate can understand at a glance
+// WITHOUT fetching 0G. Complements (doesn't replace) the full turn-by-turn
+// transcript that lives in per-event swarm records + 0G rich payloads.
+//
+// Format: "alpha <action> <asset> <pct>% (<thesis>); risk max <max_pct>% (<objection>); executor <action> <pct>%"
+//
+// Internal field widths are tuned so the full narrative stays ≤110 chars,
+// leaving budget for per-agent reasoning excerpts in the same record.
+function buildDialogueNarrative(
+  alphaParsed: { action?: string; pct?: number; asset?: string; thesis?: string },
+  riskParsed: { max_pct?: number; objection?: string; challenge?: string },
+  execParsed: { action?: string; pct?: number; asset?: string },
+): string {
+  const alphaAct = String(alphaParsed.action ?? "HOLD").toUpperCase();
+  const alphaAsset = alphaParsed.asset ? String(alphaParsed.asset).toUpperCase() : "";
+  const alphaPct = Number(alphaParsed.pct ?? 0);
+  const alphaThesis = alphaParsed.thesis ? ` (${wordTrim(String(alphaParsed.thesis), 35)})` : "";
+  const alphaFrag = `alpha ${alphaAct}${alphaAsset ? " " + alphaAsset : ""} ${alphaPct}%${alphaThesis}`;
+
+  const maxPct = Number(riskParsed.max_pct ?? 0);
+  const riskObj = wordTrim(String(riskParsed.objection ?? riskParsed.challenge ?? ""), 35);
+  const riskFrag = `risk max ${maxPct}%${riskObj ? " (" + riskObj + ")" : ""}`;
+
+  const execAct = String(execParsed.action ?? "HOLD").toUpperCase();
+  const execPct = Number(execParsed.pct ?? 0);
+  const execAsset = execParsed.asset ? String(execParsed.asset).toUpperCase() : "";
+  const execFrag =
+    execAct === "HOLD"
+      ? `exec HOLD`
+      : `exec ${execAct}${execAsset ? " " + execAsset : ""} ${execPct}%`;
+
+  return `${alphaFrag}; ${riskFrag}; ${execFrag}`;
+}
+
+// Lean HCS audit pointer (must fit under 1024 bytes). The full record — full
+// reasoning, full attestations, full input/output per agent — lives on 0G
+// Storage via the `sh` pointer that commitCycle injects after the 0G write.
+//
+// What the aggregate DOES include, so it tells the story at a glance without
+// forcing readers to click through to 0G:
+//   • 4-field specialist list (name, signal, confidence, attestation prefix)
+//   • Per-agent verdicts (action, pct/max, attestation) in `adv`
+//   • Per-agent reasoning previews (word-trimmed at sentence boundaries, not
+//     char-chopped mid-word like the old format)
+//   • A top-level `dlg` one-sentence dialogue narrative synthesized from the
+//     three parsed verdicts, so Hashscan viewers see "alpha BUY 10%;
+//     risk max 3% (smart money out); exec HOLD" immediately
 function buildCompactRecord(
   cycleId: number,
   user: UserRecord,
@@ -284,43 +345,71 @@ function buildCompactRecord(
   specialists: SpecialistResult[],
   debate: DebateResult,
 ): CompactCycleRecord {
-  const alphaParsed = debate.alpha.parsed as { action?: string; pct?: number };
-  const riskParsed = debate.risk.parsed as { challenge?: string; objection?: string; max_pct?: number };
-  const execParsed = debate.executor.parsed as { action?: string; pct?: number; stop_loss?: string };
+  const alphaParsed = debate.alpha.parsed as {
+    action?: string;
+    pct?: number;
+    asset?: string;
+    thesis?: string;
+  };
+  const riskParsed = debate.risk.parsed as {
+    challenge?: string;
+    objection?: string;
+    max_pct?: number;
+  };
+  const execParsed = debate.executor.parsed as {
+    action?: string;
+    pct?: number;
+    asset?: string;
+    stop_loss?: string;
+  };
 
-  const stopLoss = parseFloat(String(execParsed.stop_loss ?? "-5").replace("%", "").replace("-", ""));
+  const stopLoss = parseFloat(
+    String(execParsed.stop_loss ?? "-5").replace("%", "").replace("-", ""),
+  );
 
   const record: CompactCycleRecord = {
     c: cycleId,
     u: user.id,
     t: new Date().toISOString(),
     rp: user.agent.riskProfile,
-    g: goal.slice(0, 120) || undefined,
+    g: wordTrim(goal, 120),
+    dlg: buildDialogueNarrative(alphaParsed, riskParsed, execParsed),
+    // Specialist att reduced from 16 → 12 chars — the full hash lives in the
+    // per-event swarm-hire record and the 0G rich payload. 12 chars is still
+    // unique within a cycle cluster and saves ~16 bytes per specialist.
     s: specialists.map((sp) => ({
       n: sp.name,
       sig: sp.signal,
       conf: sp.confidence,
-      att: sp.attestationHash.slice(0, 16),
+      att: sp.attestationHash.slice(0, 12),
     })),
+    // Adversarial block carries only action/pct/reasoning — `att` and `obj`
+    // are redundant (att lives in per-event swarm-hire records + 0G rich
+    // payload; obj was redundant with `r` reasoning and was the source of
+    // the original mid-word-chop bug the user flagged).
     adv: {
       a: {
         act: String(alphaParsed.action ?? "HOLD"),
         pct: Number(alphaParsed.pct ?? 0),
-        att: debate.alpha.attestationHash.slice(0, 16),
-        r: (debate.alpha.reasoning ?? "").slice(0, 60) || undefined,
+        r: wordTrim(debate.alpha.reasoning, 80),
       },
       r: {
-        obj: String(riskParsed.challenge ?? riskParsed.objection ?? "none").slice(0, 40),
         max: Number(riskParsed.max_pct ?? 0),
-        att: debate.risk.attestationHash.slice(0, 16),
-        r: (debate.risk.reasoning ?? "").slice(0, 60) || undefined,
+        r: wordTrim(
+          // Prefer the full reasoning narrative; fall back to `objection`
+          // or `challenge` if the model didn't emit a reasoning field (Risk
+          // historically only had `objection` — the Phase 3 prompt fix added
+          // `reasoning` but older cycles may still only carry `objection`).
+          debate.risk.reasoning ||
+            String(riskParsed.challenge ?? riskParsed.objection ?? ""),
+          80,
+        ),
       },
       e: {
         act: String(execParsed.action ?? "HOLD"),
         pct: Number(execParsed.pct ?? 0),
         sl: stopLoss,
-        att: debate.executor.attestationHash.slice(0, 16),
-        r: (debate.executor.reasoning ?? "").slice(0, 60) || undefined,
+        r: wordTrim(debate.executor.reasoning, 80),
       },
     },
     d: {
@@ -331,18 +420,28 @@ function buildCompactRecord(
     nav: user.fund.currentNav,
   };
 
-  // Safety check: drop reasoning excerpts if record exceeds HCS byte limit.
-  // We reserved ~80 bytes for the `sh` field that commitCycle will inject
-  // after the 0G storage upload, so the ceiling here is 870 instead of 950.
-  if (Buffer.byteLength(JSON.stringify(record), "utf8") > 870) {
+  // Safety trim under the HCS 1024-byte limit. Budget is 944 (reserves ~80
+  // bytes for the `sh` CID that commitCycle injects after the 0G write).
+  //
+  // Priority order — what we shed to stay under budget, lowest-value first:
+  //   1. goal (`g`)     — already in 0G RichCycleRecord, just a hint field
+  //   2. reasoning excerpts (`adv.*.r`) — the actual dialogue content
+  //   3. dlg (`dlg`) — last resort since it's the at-a-glance narrative
+  //
+  // The old behaviour dropped ALL reasoning at the first sign of overflow,
+  // which meant any 4-specialist cycle showed up on Hashscan as a bag of
+  // verdicts with no explanation. New order preserves the signal: drop goal
+  // first (it's in 0G), then reasoning only if still over budget, dlg last.
+  const BUDGET = 944;
+  const size = (): number => Buffer.byteLength(JSON.stringify(record), "utf8");
+
+  if (size() > BUDGET) delete record.g;
+  if (size() > BUDGET) {
     delete record.adv.a.r;
     delete record.adv.r.r;
     delete record.adv.e.r;
   }
-  // If still over, drop the goal excerpt (0G has it anyway).
-  if (Buffer.byteLength(JSON.stringify(record), "utf8") > 870) {
-    delete record.g;
-  }
+  if (size() > BUDGET) delete record.dlg;
 
   return record;
 }
@@ -493,6 +592,30 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
   ) {
     console.warn(
       `[cycle] ⚠ DB/chain drift detected: DB $${cycleLiquidity.depositedUsd.toFixed(4)} vs chain $${cycleLiquidity.proxyUsd.toFixed(4)} — honoring $${cycleLiquidity.availableUsd.toFixed(4)}`,
+    );
+  }
+
+  // ── Top up the x402 signer wallet before any specialist hire ──────────
+  //
+  // The x402 buyer is the BIP-44 hot wallet (see src/config/arc.ts
+  // `getUserPaymentFetch`), NOT the Circle MPC proxy that holds user
+  // deposits. On a fresh user — or whenever prior hires have drained it —
+  // the hot wallet's Arc USDC balance is 0 and Circle Gateway rejects every
+  // x402 payment with `{"error":"Payment settlement failed","reason":
+  // "insufficient_balance"}`. ensureHotWalletFunded() bridges a small
+  // buffer (default $0.20 = ~200 hires at $0.001 each) from the proxy only
+  // when the hot wallet is below the floor, so we don't churn Circle
+  // transfers on every cycle.
+  //
+  // Non-fatal: if Circle rejects or the proxy is itself dry, log-and-continue
+  // — the cycle will still run, individual hires will 402 and cascade to a
+  // degraded HOLD, but the whole pipeline doesn't abort.
+  try {
+    await ensureHotWalletFunded(user, 0.05, 0.20);
+  } catch (err) {
+    console.warn(
+      `[cycle] hot wallet top-up failed (continuing — hires may 402):`,
+      err instanceof Error ? err.message : String(err),
     );
   }
 

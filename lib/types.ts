@@ -45,6 +45,10 @@ export interface Cycle {
     asset: string;
     percentage: number;
     stopLoss: number | null;
+    /** True when the executor's raw asset was rewritten by the EVM whitelist. */
+    assetSubstituted?: boolean;
+    /** Original ticker before validation, if substitution fired. */
+    originalAsset?: string;
   };
   memory: { cycleRef: number; text: string }[];
   storageHash?: string;
@@ -241,6 +245,13 @@ export interface SwarmActivityRow {
   paymentTxHash: string | null;
   durationMs: number | null;
   createdAt: string;
+  /**
+   * Arbitrary JSON blob from `agent_actions.payload`. Currently used by the
+   * ticker for `AGENT_RATED` rows (carries kind + reputationBefore/After) but
+   * other action types may populate it with per-event context (hire signal,
+   * swap method, etc.). Shape is action-type-dependent — callers narrow.
+   */
+  payload: Record<string, unknown> | null;
 }
 
 export interface SwarmActivityResponse {

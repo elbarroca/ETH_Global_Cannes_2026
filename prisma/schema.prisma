@@ -130,6 +130,36 @@ model MarketplaceAgent {
   @@map("marketplace_agents")
 }
 
+// Canonical history of user feedback on specialists. Every like / dislike /
+// verify action produces a row — the `MarketplaceAgent.reputation` column is
+// the derived ELO value after applying these ratings in order. The unique
+// `(userId, agentName, cycleId)` constraint enforces one rating per user per
+// specialist per hunt cycle; flipping a vote upserts the existing row.
+//
+// `hcsSeqNum` / `hcsTopicId` are populated after the rate API awaits a
+// `logSwarmEvent({ ev: "rating", ... })` call — together with the
+// `reputationBefore`/`reputationAfter` snapshot, this row is the point-in-time
+// on-chain proof that judges can verify on Hashscan. If HCS is down the row
+// still commits with those columns null so the UX never blocks on Hedera.
+model AgentRating {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String   @map("user_id")
+  agentName         String   @map("agent_name")
+  cycleId           Int      @map("cycle_id")
+  kind              String   // "like" | "dislike" | "verify"
+  reputationBefore  Int      @map("reputation_before")
+  reputationAfter   Int      @map("reputation_after")
+  hcsSeqNum         Int?     @map("hcs_seq_num")
+  hcsTopicId        String?  @map("hcs_topic_id")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([userId, agentName, cycleId], map: "uniq_user_agent_cycle_rating")
+  @@index([agentName, createdAt], map: "idx_agent_ratings_agent")
+  @@index([userId, createdAt], map: "idx_agent_ratings_user")
+  @@map("agent_ratings")
+}
+
 // Per-pick performance tracking for specialists.
 //
 // When a specialist emits a pick (sentiment picks "BUY UNI 80%"), we snapshot

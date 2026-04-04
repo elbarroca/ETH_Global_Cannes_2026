@@ -394,13 +394,24 @@ export interface CompactCycleRecord {
   u: string;
   t: string;
   rp: string;
-  g?: string; // user goal (truncated)
+  g?: string; // user goal (word-trimmed if too long)
   sh?: string; // 0G storage rootHash / CID — points at the RichCycleRecord
+  /** One-sentence A2A dialogue narrative so the aggregate tells the story at a
+   *  glance without forcing readers to click through to 0G. Example:
+   *  "alpha BUY 10% (confluence); risk max 3% (smart money out); exec HOLD"
+   *  The full turn-by-turn transcript lives in the per-event `turn` swarm
+   *  records on HCS plus RichTurnData on 0G. */
+  dlg?: string;
   s: Array<{ n: string; sig: string; conf: number; att: string }>;
+  // Per-agent adversarial debate block. `att` fields live on the per-event
+  // swarm-hire records (HCS) + the 0G rich payload — intentionally omitted
+  // from the aggregate to stay under 1024 bytes while keeping room for full
+  // word-truncated reasoning excerpts. `obj` is omitted for the same reason
+  // (redundant with `r` and was the source of the mid-word-chop bug).
   adv: {
-    a: { act: string; pct: number; att: string; r?: string };
-    r: { obj: string; max: number; att: string; r?: string };
-    e: { act: string; pct: number; sl: number; att: string; r?: string };
+    a: { act: string; pct: number; r?: string };
+    r: { max: number; r?: string };
+    e: { act: string; pct: number; sl: number; r?: string };
   };
   d: { act: string; asset: string; pct: number };
   nav: number;

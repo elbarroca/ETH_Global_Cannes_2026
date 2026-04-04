@@ -7,7 +7,23 @@ import type { CompactCycleRecord, SwarmEventRecord } from "../types/index";
 
 const HASHSCAN_BASE = "https://hashscan.io/testnet/topic";
 const MIRROR_BASE = "https://testnet.mirrornode.hedera.com/api/v1";
-const MAX_PAYLOAD_BYTES = 1024;
+
+// Hedera's TopicMessageSubmitTransaction natively chunks messages at
+// CHUNK_SIZE (1024 bytes) per chunk, bounded by `maxChunks` (default 20).
+// The SDK handles all the splitting transparently — we just call .setMessage()
+// with a string of any size up to maxChunks × CHUNK_SIZE and it issues one
+// transaction per chunk with a shared initial_transaction_id.
+//
+// We bump maxChunks to 50 so each swarm event can carry up to ~50KB of full
+// untruncated content (cot + reasoning + verdict + attestation + rawDataSnapshot).
+// Mirror node returns each chunk as a separate record with `chunk_info`
+// metadata; Hashscan and the validator both reassemble by initial_transaction_id.
+const MAX_CHUNKS = 50;
+
+// Legacy aggregate limit kept for buildCompactRecord only — the aggregate
+// CompactCycleRecord is intentionally a single-chunk summary. Per-event
+// swarm records use native chunking (above) and have no size cap.
+const AGGREGATE_MAX_PAYLOAD_BYTES = 1024;
 
 export async function logCycle(
   topicId: string,
@@ -15,8 +31,11 @@ export async function logCycle(
 ): Promise<{ seqNum: number; hashscanUrl: string }> {
   const payload = JSON.stringify(record);
   const payloadBytes = Buffer.byteLength(payload, "utf8");
-  if (payloadBytes > MAX_PAYLOAD_BYTES) {
-    throw new Error(`HCS payload too large: ${payloadBytes} bytes (max ${MAX_PAYLOAD_BYTES})`);
+  if (payloadBytes > AGGREGATE_MAX_PAYLOAD_BYTES) {
+    throw new Error(
+      `HCS aggregate payload too large: ${payloadBytes} bytes (max ${AGGREGATE_MAX_PAYLOAD_BYTES}). ` +
+      `The aggregate is deliberately single-chunk — trim via buildCompactRecord safety pass.`,
+    );
   }
 
   try {
@@ -44,66 +63,33 @@ export async function logCycle(
 }
 
 // ── Swarm audit trail ──────────────────────────────────────────────────────
-// Writes one small HCS message per swarm event (cycle start, specialist hire,
-// debate turn, final decision). Unlike logCycle() this does NOT wait 6s for
-// mirror node propagation — swarm events are fire-and-forget audit logs, the
-// aggregate logCycle() call at end of commit is what readers actually use for
-// full history reconstruction.
+// Writes one HCS message per swarm event (cycle start, specialist hire, debate
+// turn, final decision). Each message carries the FULL untruncated content
+// (cot, verdict, attestation, reasoning, rawDataSnapshot) via Hedera's native
+// chunking — the SDK splits large payloads into CHUNK_SIZE (1024 byte) chunks
+// automatically, and mirror node clients reassemble via `chunk_info`.
 //
-// Callers should invoke this with `.catch(console.warn)` — a failed HCS write
-// must never fail a cycle.
+// Unlike logCycle() this does NOT wait 6s for mirror node propagation — swarm
+// events are fire-and-forget audit logs, the aggregate logCycle() call at end
+// of commit is what readers use for quick single-message summaries.
+//
+// No truncation. No size cap (beyond maxChunks × CHUNK_SIZE = ~50KB). Callers
+// should invoke this with `.catch(console.warn)` — a failed HCS write must
+// never fail a cycle.
 export async function logSwarmEvent(
   topicId: string,
   event: SwarmEventRecord,
-): Promise<{ seqNum: number }> {
-  // Truncate cot[] entries (shortest first is nonsensical — trim longest first)
-  // if the payload overflows the 1024-byte HCS limit. Only "hire" and "turn"
-  // events carry cot[], so we only touch those.
-  let payload = JSON.stringify(event);
-  let payloadBytes = Buffer.byteLength(payload, "utf8");
-
-  if (payloadBytes > MAX_PAYLOAD_BYTES && (event.ev === "hire" || event.ev === "turn")) {
-    const withCot = event as Extract<SwarmEventRecord, { cot: string[] }>;
-    const trimmed: SwarmEventRecord = {
-      ...withCot,
-      cot: withCot.cot.map((s) => (s.length > 80 ? s.slice(0, 77) + "..." : s)),
-    };
-    payload = JSON.stringify(trimmed);
-    payloadBytes = Buffer.byteLength(payload, "utf8");
-
-    // Still too big? Drop the tail cot entries until we fit.
-    let cotCopy = [...(trimmed as Extract<SwarmEventRecord, { cot: string[] }>).cot];
-    while (payloadBytes > MAX_PAYLOAD_BYTES && cotCopy.length > 1) {
-      cotCopy = cotCopy.slice(0, cotCopy.length - 1);
-      const shrunk = { ...trimmed, cot: cotCopy };
-      payload = JSON.stringify(shrunk);
-      payloadBytes = Buffer.byteLength(payload, "utf8");
-    }
-  }
-
-  // Second fallback: if still too big, drop `verdict` entirely on turn events
-  // (the cycle-decision aggregate logCycle still carries the final verdicts).
-  // Keep `cot` — reasoning is the most valuable audit payload.
-  if (payloadBytes > MAX_PAYLOAD_BYTES && event.ev === "turn") {
-    const withoutVerdict = { ...event, verdict: { dropped: true } };
-    payload = JSON.stringify(withoutVerdict);
-    payloadBytes = Buffer.byteLength(payload, "utf8");
-    console.warn(
-      `[hcs] swarm-event ev=turn c=${event.c} t=${event.t}: verdict dropped to fit 1024-byte limit`,
-    );
-  }
-
-  if (payloadBytes > MAX_PAYLOAD_BYTES) {
-    throw new Error(
-      `HCS swarm event too large even after cot+verdict truncation: ${payloadBytes} bytes (ev=${event.ev})`,
-    );
-  }
+): Promise<{ seqNum: number; chunks: number }> {
+  const payload = JSON.stringify(event);
+  const payloadBytes = Buffer.byteLength(payload, "utf8");
+  const estimatedChunks = Math.ceil(payloadBytes / 1024);
 
   try {
     const client = getHederaClient();
     const tx = await new TopicMessageSubmitTransaction()
       .setTopicId(TopicId.fromString(topicId))
       .setMessage(payload)
+      .setMaxChunks(MAX_CHUNKS)
       .freezeWith(client)
       .sign(getOperatorKey());
 
@@ -112,13 +98,13 @@ export async function logSwarmEvent(
     const seqNum = receipt.topicSequenceNumber?.toNumber() ?? 0;
 
     console.log(
-      `[hcs] ✓ ev=${event.ev} c=${(event as { c?: number }).c ?? "?"} seq=${seqNum} bytes=${payloadBytes}`,
+      `[hcs] ✓ ev=${event.ev} c=${(event as { c?: number }).c ?? "?"} seq=${seqNum} bytes=${payloadBytes} chunks=${estimatedChunks}`,
     );
 
-    return { seqNum };
+    return { seqNum, chunks: estimatedChunks };
   } catch (err) {
     throw new Error(
-      `HCS logSwarmEvent failed (ev=${event.ev}): ${err instanceof Error ? err.message : String(err)}`,
+      `HCS logSwarmEvent failed (ev=${event.ev}, bytes=${payloadBytes}): ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }

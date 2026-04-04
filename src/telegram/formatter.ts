@@ -35,7 +35,7 @@ export function formatDebate(record: CompactCycleRecord): string {
     specs || "  No data",
     "",
     `🟢 *Alpha:* ${alpha?.act ?? "?"} ${alpha?.pct ?? 0}%${alpha?.r ? `\n  _"${alpha.r}"_` : ""}`,
-    `🔴 *Risk:* ${risk?.obj ?? "?"} (max ${risk?.max ?? 0}%)${risk?.r ? `\n  _"${risk.r}"_` : ""}`,
+    `🔴 *Risk:* max ${risk?.max ?? 0}%${risk?.r ? `\n  _"${risk.r}"_` : ""}`,
     `⚖️ *Executor:* ${exec?.act ?? "?"} ${exec?.pct ?? 0}% (SL ${exec?.sl ?? 0}%)${exec?.r ? `\n  _"${exec.r}"_` : ""}`,
     "",
     `📊 Decision: *${record.d?.act ?? "HOLD"}* ${record.d?.asset ?? ""} ${record.d?.pct ?? 0}%`,

@@ -110,22 +110,63 @@ const SPECIALIST_PAY_INDEX: Record<string, number> = {
 
 const isLeafSpecialist = DATA_FETCHERS[AGENT_NAME] != null;
 
-// Build the middleware once at module init. Each specialist has its own
-// deterministic seller address derived from the master mnemonic at a fixed
-// HD index — matches the existing `deriveSpecialistAccount` convention and
-// avoids env-var plumbing per Fly app. `networks: ["eip155:5042002"]` pins
-// the accepted chain to Arc testnet (CAIP-2).
-const gateway = isLeafSpecialist
-  ? createGatewayMiddleware({
-      sellerAddress: deriveSpecialistAccount(SPECIALIST_PAY_INDEX[AGENT_NAME] ?? 0).address,
+// Resolve the seller address for this specialist.
+//
+// Order of precedence (allows Fly containers to run with OR without the full
+// AGENT_MNEMONIC — new deploys set MNEMONIC as a Fly secret, existing deploys
+// that only carry 0G keys can optionally set SPECIALIST_SELLER_ADDRESS):
+//   1. SPECIALIST_SELLER_ADDRESS env var (explicit override per container)
+//   2. deriveSpecialistAccount(SPECIALIST_PAY_INDEX[AGENT_NAME]) (needs AGENT_MNEMONIC)
+//   3. null → paywall disabled, container runs without nanopayments
+//
+// We wrap this in try/catch so a missing mnemonic never kills the container.
+// The specialist will still serve /analyze (unpaywalled) and the rest of the
+// system degrades gracefully — main-agent's SSE layer already tolerates
+// paymentTxHash being "no-payment" for legacy rows.
+function resolveSellerAddress(): string | null {
+  if (!isLeafSpecialist) return null;
+  const override = process.env.SPECIALIST_SELLER_ADDRESS;
+  if (override && override.startsWith("0x")) return override;
+  const idx = SPECIALIST_PAY_INDEX[AGENT_NAME as keyof typeof SPECIALIST_PAY_INDEX];
+  if (idx == null) {
+    console.warn(`[fly] ${AGENT_NAME}: no SPECIALIST_PAY_INDEX entry — paywall DISABLED`);
+    return null;
+  }
+  try {
+    return deriveSpecialistAccount(idx).address;
+  } catch (err) {
+    console.warn(
+      `[fly] ${AGENT_NAME}: cannot derive seller address (${err instanceof Error ? err.message : String(err)}) — paywall DISABLED`,
+    );
+    return null;
+  }
+}
+
+const SELLER_ADDRESS = resolveSellerAddress();
+
+// Build the middleware once at module init. `networks: ["eip155:5042002"]`
+// pins the accepted chain to Arc testnet (CAIP-2). When the seller address
+// couldn't be resolved, we fall through to paywall-less mode rather than
+// crashing the container.
+let gateway: ReturnType<typeof createGatewayMiddleware> | null = null;
+if (isLeafSpecialist && SELLER_ADDRESS) {
+  try {
+    gateway = createGatewayMiddleware({
+      sellerAddress: SELLER_ADDRESS,
       networks: ["eip155:5042002"],
       description: `${AGENT_NAME} specialist analysis`,
-    })
-  : null;
-
-if (isLeafSpecialist && gateway) {
-  console.log(
-    `[fly] ${AGENT_NAME}: x402 paywall active, seller=${deriveSpecialistAccount(SPECIALIST_PAY_INDEX[AGENT_NAME] ?? 0).address} price=$0.001`,
+    });
+    console.log(`[fly] ${AGENT_NAME}: x402 paywall active, seller=${SELLER_ADDRESS} price=$0.001`);
+  } catch (err) {
+    console.warn(
+      `[fly] ${AGENT_NAME}: createGatewayMiddleware threw — running WITHOUT paywall. Error:`,
+      err instanceof Error ? err.message : String(err),
+    );
+    gateway = null;
+  }
+} else if (isLeafSpecialist) {
+  console.warn(
+    `[fly] ${AGENT_NAME}: no seller address (set AGENT_MNEMONIC or SPECIALIST_SELLER_ADDRESS) — x402 paywall DISABLED, serving unpaid /analyze`,
   );
 }
 

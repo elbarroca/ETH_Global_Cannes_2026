@@ -30,18 +30,50 @@ import type {
 
 const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID;
 
+// In-process mutex for 0G Storage uploads. The 0G ethers signer allocates
+// sequential nonces, and when multiple uploads run in parallel (e.g. a
+// `Promise.all(emitHireWithRichData(...))` batch of 4 hires) the signer
+// races on the nonce counter and hits "replacement transaction underpriced"
+// because two txs claim the same nonce. The fix is to serialize the uploads
+// through a simple chain of promises — each caller waits for the previous
+// upload to resolve before starting its own transaction.
+//
+// HCS writes (logSwarmEvent) stay fully parallel; only the 0G Storage leg
+// is gated. Hedera's TopicMessageSubmit is idempotent across parallel
+// submissions because each carries a different payload hash.
+//
+// This trades a few seconds of cycle latency (N×upload instead of max(N))
+// for correctness: every hire/turn event gets a valid `sh` pointer instead
+// of most of them landing without one.
+let zeroGUploadChain: Promise<unknown> = Promise.resolve();
+
+async function serialized0GUpload<T>(task: () => Promise<T>): Promise<T> {
+  const previous = zeroGUploadChain;
+  let resolveNext: () => void;
+  const next = new Promise<void>((resolve) => {
+    resolveNext = resolve;
+  });
+  zeroGUploadChain = next;
+  try {
+    await previous.catch(() => {});
+    return await task();
+  } finally {
+    resolveNext!();
+  }
+}
+
 // Persist a full hire/turn rich payload to 0G Storage and return its rootHash.
 // This is the content-addressable pointer that turns the HCS audit trail
 // from "summary only" into "fully verifiable with byte-for-byte reproducibility".
 //
-// Fire-and-forget from the caller's perspective: failures are logged and this
-// returns undefined, but the caller can still emit the HCS event without `sh`.
+// Serialized via serialized0GUpload so that parallel Promise.all() batches of
+// hires don't collide on nonce allocation in the shared ethers signer.
 async function persistRichPayload(
   rich: RichHireData | RichTurnData,
 ): Promise<string | undefined> {
   try {
     const key = `swarm-${rich.eventKind}-c${rich.cycleId}-${rich.userId.slice(0, 8)}`;
-    const rootHash = await storeMemory(key, rich);
+    const rootHash = await serialized0GUpload(() => storeMemory(key, rich));
     return rootHash;
   } catch (err) {
     console.warn(

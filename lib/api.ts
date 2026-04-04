@@ -188,7 +188,13 @@ export interface EnrichedCycleResponse {
     executor: { action: string; pct: number; stopLoss: string; reasoning: string; attestationHash: string };
   };
   payments: PaymentRecord[];
-  decision: { action: string; asset: string; pct: number };
+  decision: {
+    action: string;
+    asset: string;
+    pct: number;
+    assetSubstituted?: boolean;
+    originalAsset?: string;
+  };
   swap?: { success: boolean; txHash?: string; explorerUrl?: string; method?: string };
   seqNum: number;
   hashscanUrl: string | null;

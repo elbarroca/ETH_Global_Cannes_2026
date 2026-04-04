@@ -359,7 +359,39 @@ RULES:
  * truncated to 100 chars. If the `cot` field is missing entirely, it falls
  * back to splitting the pre-JSON reasoning narrative captured by
  * parseDualOutput so HCS still gets *some* structured steps.
+ *
+ * NOTE: This is the truncating variant used by the aggregate CompactCycleRecord
+ * preview only. For the per-event swarm audit trail that uses native HCS
+ * chunking (no byte cap), use `normalizeCotFull` below which preserves the
+ * full untruncated content.
  */
+export function normalizeCotFull(raw: unknown, fallbackReasoning?: string): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((s) => String(s ?? "").trim())
+      .filter((s) => s.length > 0)
+      .slice(0, 20);
+  }
+
+  if (typeof raw === "string" && raw.trim().length > 0) {
+    return raw
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .slice(0, 20);
+  }
+
+  if (typeof fallbackReasoning === "string" && fallbackReasoning.trim().length > 0) {
+    return fallbackReasoning
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .slice(0, 10);
+  }
+
+  return [];
+}
+
 export function normalizeCot(raw: unknown, fallbackReasoning?: string): string[] {
   if (Array.isArray(raw)) {
     return raw
