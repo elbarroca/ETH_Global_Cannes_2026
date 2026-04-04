@@ -5,9 +5,16 @@ node_modules
 !README.md
 .env
 .env.*
+.env.local
 progress/
 .claude/
 hardhat-cache/
 artifacts/
 cache/
 coverage/
+naryo/
+contracts/
+scripts/deploy-*
+scripts/test-*
+scripts/setup-*
+scripts/validate-*
