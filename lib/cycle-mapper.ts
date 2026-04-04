@@ -90,6 +90,8 @@ export function mapCycleResultToCycle(result: CycleResult): Cycle {
       stopLoss: parseStopLoss(execParsed.stop_loss),
     },
     memory: [],
+    storageHash: result.storageHash,
+    inftTokenId: result.inftTokenId,
   };
 }
 

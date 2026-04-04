@@ -31,7 +31,7 @@ export async function createPendingCycle(
   const prisma = getPrisma();
   const expiresAt = new Date(Date.now() + timeoutMin * 60_000);
 
-  const row = await prisma.pendingCycles.create({
+  const row = await prisma.pendingCycle.create({
     data: {
       userId: analysis.userId,
       cycleNumber: analysis.cycleId,

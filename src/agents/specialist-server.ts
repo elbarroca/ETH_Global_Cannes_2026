@@ -78,8 +78,8 @@ export async function startSpecialists(): Promise<void> {
         teeVerified = result.teeVerified;
       } catch (err) {
         console.warn(`[specialist:${s.name}] 0G inference failed, using local fallback:`, err instanceof Error ? err.message : String(err));
-        parsed = computeLocalFallback(s.name, rawData);
-        reasoning = "Local fallback: 0G inference unavailable.";
+        parsed = { ...computeLocalFallback(s.name, rawData), degraded: true };
+        reasoning = `[FALLBACK] Local heuristic — 0G inference unavailable: ${err instanceof Error ? err.message : String(err)}`;
         attestationHash = "local-fallback";
         teeVerified = false;
       }

@@ -13,7 +13,9 @@ const REQUIRED_ENV = [
   "HCS_AUDIT_TOPIC_ID",
   "OG_PRIVATE_KEY",
   "OG_PROVIDER_ADDRESS",
+  "OG_STORAGE_INDEXER",
   "SERVER_ENCRYPTION_KEY",
+  "DATABASE_URL",
 ] as const;
 
 function validateEnv(): void {

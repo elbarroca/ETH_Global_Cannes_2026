@@ -196,6 +196,7 @@ export default function DashboardPage() {
       stopLoss: pendingCycle.compactRecord.adv.e.sl ? -pendingCycle.compactRecord.adv.e.sl : null,
     },
     memory: [],
+    rebuttalTriggered: pendingCycle?.debate?.rebuttalTriggered,
   } : null;
 
   const displayCycle = pendingAsCycle ?? cycle;
@@ -624,6 +625,9 @@ function ChallengeColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => vo
         <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
           <span className="w-2 h-2 rounded-full bg-blood-500 animate-pulse" />
           The challenge
+          {cycle.rebuttalTriggered && (
+            <Badge variant="amber">2 rounds</Badge>
+          )}
         </div>
         <LiveBadge />
       </CardHeader>
@@ -733,27 +737,64 @@ function RightColumn({ cycle }: { cycle: Cycle }) {
         </CardBody>
       </Card>
 
-      {/* Pack Memory */}
+      {/* 0G Proof */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
             <span className="w-2 h-2 rounded-full bg-gold-400" />
-            Pack memory
+            0G proof
           </div>
-          <ZeroGBadge label="0G Storage" />
+          <ZeroGBadge label="0G Storage + Chain" />
         </CardHeader>
-        <CardBody className="space-y-2.5">
-          {cycle.memory.length > 0 ? cycle.memory.map((m) => (
-            <div key={m.cycleRef} className="flex gap-2">
-              <span className="font-mono text-xs text-gold-400 shrink-0 pt-0.5">
-                #{m.cycleRef}
-              </span>
-              <p className="text-xs text-void-500 leading-relaxed">
-                {m.text}
-              </p>
+        <CardBody className="space-y-3">
+          {/* Storage Hash */}
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
+              0G Storage root
             </div>
-          )) : (
-            <p className="text-xs text-void-600">Memory builds over cycles.</p>
+            {cycle.storageHash ? (
+              <span className="font-mono text-sm text-gold-400 break-all">
+                {cycle.storageHash}
+              </span>
+            ) : (
+              <span className="text-xs text-void-600">Pending commit</span>
+            )}
+          </div>
+
+          {/* iNFT */}
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
+              iNFT (ERC-7857)
+            </div>
+            {cycle.inftTokenId ? (
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm text-gold-400">
+                  Token #{cycle.inftTokenId}
+                </span>
+                <Badge variant="green">0G Chain</Badge>
+              </div>
+            ) : (
+              <span className="text-xs text-void-600">No iNFT minted</span>
+            )}
+          </div>
+
+          {/* Memory */}
+          {cycle.memory.length > 0 && (
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
+                Pack memory
+              </div>
+              {cycle.memory.map((m) => (
+                <div key={m.cycleRef} className="flex gap-2">
+                  <span className="font-mono text-xs text-gold-400 shrink-0 pt-0.5">
+                    #{m.cycleRef}
+                  </span>
+                  <p className="text-xs text-void-500 leading-relaxed">
+                    {m.text}
+                  </p>
+                </div>
+              ))}
+            </div>
           )}
         </CardBody>
       </Card>

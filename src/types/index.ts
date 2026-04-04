@@ -74,28 +74,19 @@ export interface SpecialistResult {
   [key: string]: unknown;
 }
 
+export interface DebateStageResult {
+  content: string;
+  parsed: Record<string, unknown>;
+  reasoning?: string;
+  attestationHash: string;
+  teeVerified: boolean;
+}
+
 export interface DebateResult {
-  alpha: {
-    content: string;
-    parsed: Record<string, unknown>;
-    reasoning?: string;
-    attestationHash: string;
-    teeVerified: boolean;
-  };
-  risk: {
-    content: string;
-    parsed: Record<string, unknown>;
-    reasoning?: string;
-    attestationHash: string;
-    teeVerified: boolean;
-  };
-  executor: {
-    content: string;
-    parsed: Record<string, unknown>;
-    reasoning?: string;
-    attestationHash: string;
-    teeVerified: boolean;
-  };
+  alpha: DebateStageResult;
+  risk: DebateStageResult;
+  executor: DebateStageResult;
+  rebuttalTriggered?: boolean;
 }
 
 export interface CycleResult {
@@ -106,6 +97,8 @@ export interface CycleResult {
   decision: Record<string, unknown>;
   seqNum: number;
   hashscanUrl: string;
+  storageHash?: string;
+  inftTokenId?: number;
   timestamp: Date;
 }
 

@@ -73,6 +73,8 @@ export interface CycleResult {
   decision: Record<string, unknown>;
   seqNum: number;
   hashscanUrl: string;
+  storageHash?: string;
+  inftTokenId?: number;
   timestamp: string;
 }
 
@@ -180,6 +182,7 @@ export interface PendingCycleResponse {
     alpha: DebateStage;
     risk: DebateStage;
     executor: DebateStage;
+    rebuttalTriggered?: boolean;
   };
   compactRecord: CompactCycleRecord;
   expiresAt: string;

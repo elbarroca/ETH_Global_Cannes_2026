@@ -31,6 +31,9 @@ export interface Cycle {
     stopLoss: number | null;
   };
   memory: { cycleRef: number; text: string }[];
+  storageHash?: string;
+  inftTokenId?: number;
+  rebuttalTriggered?: boolean;
 }
 
 export interface FundState {

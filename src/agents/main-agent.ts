@@ -112,20 +112,26 @@ export async function analyzeCycle(user: UserRecord): Promise<AnalysisResult> {
     console.warn("[cycle] x402 setup failed, using bare fetch:", err instanceof Error ? err.message : String(err));
     payFetch = fetch;
   }
+  // Dynamic specialist selection: prioritize by reputation, always hire all 3
+  // but order determines which specialist's signal gets more weight in debate context
   let specialists: SpecialistResult[];
   try {
     specialists = await hireFromMarketplace(payFetch, user.id, {
       tags: ["sentiment", "whale", "momentum"],
-      minReputation: 300,
+      minReputation: 0, // Accept all specialists — prefer real data over mock fallback
       maxHires: 3,
     });
     if (specialists.length === 0) throw new Error("No specialists returned");
+
+    // Sort by reputation (highest first) — debate agents weight higher-rep specialists more heavily
+    specialists.sort((a, b) => (b.reputation ?? 500) - (a.reputation ?? 500));
+    console.log(`[cycle] Specialist priority: ${specialists.map((s) => `${s.name}(rep:${s.reputation ?? 500})`).join(" > ")}`);
   } catch (err) {
-    console.warn("[cycle] Marketplace hiring failed, using mock data:", err);
+    console.warn("[cycle] ⚠️ DEGRADED: Marketplace hiring failed, using mock data:", err instanceof Error ? err.message : String(err));
     specialists = [
-      { name: "sentiment", signal: "BUY", confidence: 65, attestationHash: "mock-s", teeVerified: false },
-      { name: "whale", signal: "HOLD", confidence: 50, attestationHash: "mock-w", teeVerified: false },
-      { name: "momentum", signal: "BUY", confidence: 70, attestationHash: "mock-m", teeVerified: false },
+      { name: "sentiment", signal: "BUY", confidence: 65, attestationHash: "mock-s", teeVerified: false, reasoning: "[MOCK] Marketplace unavailable" },
+      { name: "whale", signal: "HOLD", confidence: 50, attestationHash: "mock-w", teeVerified: false, reasoning: "[MOCK] Marketplace unavailable" },
+      { name: "momentum", signal: "BUY", confidence: 70, attestationHash: "mock-m", teeVerified: false, reasoning: "[MOCK] Marketplace unavailable" },
     ];
   }
   console.log(`[cycle] Specialists: ${specialists.map((s) => `${s.name}=${s.signal}`).join(", ")}`);
@@ -287,6 +293,8 @@ export async function commitCycle(
     decision: debate.executor.parsed,
     seqNum,
     hashscanUrl,
+    storageHash,
+    inftTokenId: user.inftTokenId ?? undefined,
     timestamp: new Date(),
   };
 }
