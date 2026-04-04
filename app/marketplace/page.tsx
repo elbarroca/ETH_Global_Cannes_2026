@@ -130,6 +130,7 @@ export default function MarketplacePage() {
           skill: e.tags.join(", ") || "Analysis",
           accuracy: e.accuracy,
           timesHired: e.totalHires,
+          reputation: e.reputation,
           pricePerQuery: parseFloat(e.price.replace("$", "")) || 0.001,
           // Canonical: either a real ERC-7857 token ID from marketplace_agents
           // or `null`. Callers render "Not minted" for null. We DO NOT
@@ -172,6 +173,7 @@ export default function MarketplacePage() {
     skill: h.tags.join(", ") || "Analysis",
     accuracy: h.correctCalls > 0 ? Math.round((h.correctCalls / h.totalHires) * 100) : 75,
     timesHired: h.totalHires,
+    reputation: h.reputation ?? 500,
     pricePerQuery: parseFloat(h.price.replace("$", "")) || 0.001,
     // my-agents endpoint doesn't surface inftTokenId yet — the pack view
     // intentionally hides the "#XXXX" line when no real token exists.
@@ -220,71 +222,142 @@ export default function MarketplacePage() {
   const swarmTotal = health?.summary.total ?? 0;
   const availableCount = marketplaceAgents.length;
 
+  // Top-5 ELO standings — drawn from the same leaderboard fetch so the strip
+  // at the top of the marketplace is always coherent with the cards below.
+  const leaderboardStandings = [...allAgents]
+    .sort((a, b) => b.reputation - a.reputation)
+    .slice(0, 5);
+
   return (
-    <main className="max-w-7xl mx-auto px-5 py-6 space-y-8">
-      {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden rounded-2xl border border-void-800 bg-gradient-to-br from-void-900 via-void-900 to-void-950 p-6">
-        <div
-          className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-dawg-500/10 blur-3xl"
-          aria-hidden="true"
-        />
-        <div
-          className="pointer-events-none absolute -bottom-24 -left-10 h-56 w-56 rounded-full bg-blood-900/20 blur-3xl"
-          aria-hidden="true"
-        />
-        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-xl">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-dawg-500/30 bg-dawg-500/10 px-2 py-0.5 font-mono text-[11px] text-dawg-300">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-dawg-400" />
-                live marketplace
+    <main className="max-w-7xl mx-auto px-5 py-6 space-y-6">
+      {/* ── HERO — Nasdaq LED marketplace board ─────────────────────── */}
+      <section
+        className="nasdaq-led nasdaq-scanlines relative overflow-hidden rounded-2xl border-2 border-dawg-500/60 shadow-[0_0_0_1px_rgba(0,0,0,0.9),0_10px_50px_-10px_rgba(255,199,0,0.35)]"
+        aria-label="AlphaDawg specialist marketplace board"
+      >
+        <div className="h-[3px] w-full bg-gradient-to-r from-transparent via-dawg-500 to-transparent" />
+        <div className="nasdaq-dot-matrix pointer-events-none absolute inset-0 opacity-70" aria-hidden="true" />
+
+        <div className="relative">
+          {/* Row 1: exchange strip */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-dawg-500/20 px-5 py-2 text-xs uppercase">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#39FF7A] opacity-60" />
+                  <span className="nasdaq-led-green relative inline-flex h-2.5 w-2.5 rounded-full bg-[#39FF7A]" />
+                </span>
+                <span className="nasdaq-led-green text-[18px] leading-none">LIVE</span>
               </span>
-              <span className="font-mono text-[11px] text-void-500">
-                ERC-7857 on 0G Chain
+              <span className="nasdaq-led-dim text-[18px] leading-none">||</span>
+              <span className="text-[18px] leading-none">
+                PACK
+                <span className="nasdaq-led-dim mx-2">·</span>
+                <span className="nasdaq-led-bright">SPECIALIST MARKETPLACE</span>
+              </span>
+              <span className="nasdaq-led-dim text-[18px] leading-none">||</span>
+              <span className="nasdaq-led-dim hidden text-[16px] leading-none md:inline">
+                ERC-7857 · 0G CHAIN · X402 PAYWALLS
               </span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-void-100 md:text-3xl">
-              Hire your pack.
-            </h1>
-            <p className="mt-2 text-sm leading-relaxed text-void-400">
-              Every specialist is an iNFT with a sealed-inference TEE, an x402
-              paywall, and an on-chain reputation score. Your Lead Dawg dispatches
-              them every cycle and pays per call in USDC.
-            </p>
+            <div className="flex items-center gap-3">
+              <span className="nasdaq-led-dim text-[16px] leading-none tabular-nums">
+                {user?.inftTokenId != null ? `LEAD DAWG #${user.inftTokenId}` : "LEAD DAWG · UNMINTED"}
+              </span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <HeroStat
-              label="your pack"
-              value={loadingPack ? "…" : String(packSize)}
-              sub="specialists hired"
-              tone="dawg"
-            />
-            <HeroStat
-              label="pack earned"
-              value={
-                loadingPack
-                  ? "…"
-                  : packEarningsUsd > 0
-                    ? `$${packEarningsUsd.toFixed(3)}`
-                    : "$0.000"
-              }
-              sub="cumulative USDC"
-              tone="emerald"
-            />
-            <HeroStat
-              label="swarm online"
-              value={swarmTotal > 0 ? `${swarmOnline}/${swarmTotal}` : "…"}
-              sub="live on Fly.io"
-              tone={swarmOnline === swarmTotal && swarmTotal > 0 ? "emerald" : "gold"}
-            />
-            <HeroStat
-              label="available"
-              value={loadingMarketplace ? "…" : String(availableCount)}
-              sub="to hire now"
-              tone="void"
-            />
+          {/* Row 2: headline + metric tiles */}
+          <div className="grid grid-cols-1 gap-6 px-5 py-6 md:grid-cols-[auto_1fr] md:items-end md:gap-10">
+            <div>
+              <div className="nasdaq-led-dim text-[18px] uppercase leading-none tracking-[0.22em]">
+                HIRE YOUR PACK
+              </div>
+              <div className="mt-2">
+                <span className="nasdaq-led-bright text-[56px] leading-[0.85] md:text-[80px]">
+                  PACK
+                </span>
+              </div>
+              <p className="mt-3 max-w-md text-[13px] leading-relaxed text-void-400">
+                Every specialist is an iNFT with a TEE-sealed inference
+                endpoint, an x402 paywall, and an on-chain ELO score. Vote on
+                each hunt to move the standings.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <LedMarketTile
+                label="YOUR PACK"
+                value={loadingPack ? "—" : String(packSize)}
+                sub="SPECIALISTS HIRED"
+                tone="bright"
+              />
+              <LedMarketTile
+                label="PACK EARNED"
+                value={
+                  loadingPack
+                    ? "—"
+                    : packEarningsUsd > 0
+                      ? `$${packEarningsUsd.toFixed(3)}`
+                      : "$0.000"
+                }
+                sub="CUMULATIVE USDC"
+                tone="green"
+              />
+              <LedMarketTile
+                label="SWARM ONLINE"
+                value={swarmTotal > 0 ? `${swarmOnline}/${swarmTotal}` : "—"}
+                sub="LIVE ON FLY.IO"
+                tone={swarmOnline === swarmTotal && swarmTotal > 0 ? "green" : "bright"}
+              />
+              <LedMarketTile
+                label="AVAILABLE"
+                value={loadingMarketplace ? "—" : String(availableCount)}
+                sub="TO HIRE NOW"
+                tone="bright"
+              />
+            </div>
           </div>
+
+          {/* Row 3: Top-5 ELO standings (pixel leaderboard) */}
+          {leaderboardStandings.length > 0 && (
+            <div className="border-t border-dawg-500/20 bg-black/40 px-5 py-3">
+              <div className="mb-2 flex items-center gap-2 text-[12px] uppercase tracking-[0.2em]">
+                <span className="nasdaq-led-dim">TOP ELO STANDINGS</span>
+                <span className="nasdaq-led-dim">·</span>
+                <span className="nasdaq-led-bright">LEAGUE LEADERS</span>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-5">
+                {leaderboardStandings.map((agent, idx) => {
+                  const rankTone =
+                    idx === 0
+                      ? "nasdaq-led-bright"
+                      : idx === 1
+                        ? "nasdaq-led-green"
+                        : "nasdaq-led-dim";
+                  return (
+                    <div
+                      key={agent.registryName ?? agent.name}
+                      className="flex items-center gap-2 rounded-md border border-dawg-500/20 bg-black/60 px-2.5 py-1.5"
+                    >
+                      <span className={`font-pixel text-[18px] leading-none ${rankTone}`}>
+                        #{idx + 1}
+                      </span>
+                      <span className="text-base">{agent.emoji}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[11px] font-semibold text-void-200">
+                          {agent.name}
+                        </div>
+                        <div className="font-pixel text-[14px] leading-none tabular-nums nasdaq-led-bright">
+                          {agent.reputation}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -394,9 +467,14 @@ export default function MarketplacePage() {
 
 // ── Shared sub-components ─────────────────────────────────────────────
 
-type StatTone = "dawg" | "gold" | "emerald" | "void";
+type LedTone = "bright" | "green" | "dim";
 
-function HeroStat({
+/**
+ * LED tile that matches the dashboard Nasdaq hero — same pixelated
+ * font, same glow colors, same black panel. Used in the marketplace hero
+ * metric grid so both surfaces share one visual language.
+ */
+function LedMarketTile({
   label,
   value,
   sub,
@@ -405,23 +483,26 @@ function HeroStat({
   label: string;
   value: string;
   sub?: string;
-  tone: StatTone;
+  tone: LedTone;
 }) {
-  const valueTone: Record<StatTone, string> = {
-    dawg: "text-dawg-300",
-    gold: "text-gold-300",
-    emerald: "text-emerald-300",
-    void: "text-void-100",
+  const valueClass: Record<LedTone, string> = {
+    bright: "nasdaq-led-bright",
+    green: "nasdaq-led-green",
+    dim: "nasdaq-led-dim",
   };
   return (
-    <div className="rounded-xl border border-void-800 bg-void-950/60 px-3.5 py-3 backdrop-blur-sm">
-      <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-void-600">
+    <div className="rounded-lg border border-dawg-500/30 bg-black px-4 py-3 shadow-[inset_0_0_20px_rgba(255,199,0,0.04)]">
+      <div className="nasdaq-led-dim text-[14px] uppercase leading-none tracking-[0.18em]">
         {label}
       </div>
-      <div className={`text-xl font-bold tabular-nums ${valueTone[tone]}`}>
+      <div className={`mt-2 text-[34px] leading-[0.9] tabular-nums ${valueClass[tone]}`}>
         {value}
       </div>
-      {sub && <div className="mt-0.5 text-[11px] text-void-600">{sub}</div>}
+      {sub && (
+        <div className="nasdaq-led-dim mt-2 text-[13px] uppercase leading-none tracking-wider">
+          {sub}
+        </div>
+      )}
     </div>
   );
 }
@@ -492,9 +573,28 @@ function AgentAvatar({
   );
 }
 
-function AccuracyMeter({ value }: { value: number }) {
-  const pct = Math.max(0, Math.min(100, value));
-  const tone =
+/**
+ * Headline ELO reputation tile + accuracy progress bar. The big pixel number
+ * is the same metric the TOP ELO STANDINGS strip at the top of the page
+ * shows — user thumbs up/down in hunt cards moves it in real time via
+ * /api/marketplace/rate. Accuracy sits underneath as a supporting stat.
+ */
+function EloHeadline({
+  reputation,
+  accuracy,
+}: {
+  reputation: number;
+  accuracy: number;
+}) {
+  const elo = Math.max(0, Math.min(1000, Math.round(reputation)));
+  const eloTone =
+    elo >= 700
+      ? "nasdaq-led-bright"
+      : elo >= 500
+        ? "nasdaq-led-green"
+        : "nasdaq-led-red";
+  const pct = Math.max(0, Math.min(100, accuracy));
+  const barTone =
     pct >= 80
       ? "bg-emerald-400"
       : pct >= 60
@@ -503,8 +603,16 @@ function AccuracyMeter({ value }: { value: number }) {
           ? "bg-gold-500"
           : "bg-blood-500";
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-[11px]">
+    <div className="rounded-xl border border-dawg-500/20 bg-black/60 p-3 shadow-[inset_0_0_20px_rgba(255,199,0,0.04)]">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="nasdaq-led-dim text-[11px] uppercase tracking-[0.2em]">
+          ELO
+        </span>
+        <span className={`font-pixel text-[32px] leading-none tabular-nums ${eloTone}`}>
+          {elo}
+        </span>
+      </div>
+      <div className="mt-2 flex items-center justify-between text-[10px]">
         <span className="font-mono uppercase tracking-wider text-void-600">
           accuracy
         </span>
@@ -512,9 +620,9 @@ function AccuracyMeter({ value }: { value: number }) {
           {pct}%
         </span>
       </div>
-      <div className="h-1 w-full overflow-hidden rounded-full bg-void-800">
+      <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-void-800">
         <div
-          className={`h-full ${tone} transition-all duration-500`}
+          className={`h-full ${barTone} transition-all duration-500`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -623,7 +731,7 @@ function ActiveAgentCard({
           </div>
         </div>
 
-        <AccuracyMeter value={agent.accuracy} />
+        <EloHeadline reputation={agent.reputation} accuracy={agent.accuracy} />
 
         <div className="grid grid-cols-2 gap-2 rounded-xl border border-void-800/80 bg-void-950/40 p-2.5">
           <Stat label="hires" value={String(agent.timesHired)} />
@@ -730,7 +838,7 @@ function CommunityAgentCard({
           </div>
         </div>
 
-        <AccuracyMeter value={agent.accuracy} />
+        <EloHeadline reputation={agent.reputation} accuracy={agent.accuracy} />
 
         <div className="flex items-center justify-between text-[11px]">
           <div className="flex items-center gap-1.5 font-mono text-void-500">

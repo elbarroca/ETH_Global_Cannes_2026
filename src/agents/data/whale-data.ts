@@ -1,6 +1,7 @@
 // Fetches REAL on-chain whale proxy data — Etherscan + CoinGecko
 
 import { cachedFetch } from "./cached-fetch";
+import { injectUniverseInto } from "./universe-injector";
 
 function getCoinGeckoBase(): string {
   return process.env.COINGECKO_API_URL ?? "https://api.coingecko.com/api/v3";
@@ -82,6 +83,10 @@ export async function fetchWhaleData(): Promise<string> {
   } catch {
     // non-fatal
   }
+
+  // Multi-token research universe — EVM-tradeable tickers only. Whale picks
+  // must draw from this list so the executor can actually swap them.
+  await injectUniverseInto(results);
 
   return JSON.stringify(results);
 }

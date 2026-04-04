@@ -1,6 +1,7 @@
 // Fetches REAL crypto Twitter sentiment — Twitter API v2 recent search
 
 import { cachedFetch } from "./cached-fetch";
+import { injectUniverseInto } from "./universe-injector";
 
 const TWITTER_SEARCH_URL = "https://api.twitter.com/2/tweets/search/recent";
 
@@ -92,6 +93,9 @@ export async function fetchTwitterData(): Promise<string> {
     results.influencer_consensus = "cautiously bullish";
     results.source = "mock";
   }
+
+  // EVM universe for picks — twitter specialist maps narratives to tickers.
+  await injectUniverseInto(results);
 
   return JSON.stringify(results);
 }

@@ -104,7 +104,7 @@ export async function agentTransfer(
 
 // ── Token price lookup via CoinGecko ─────────────────────────────────────────
 
-async function getTokenPrice(symbol: string): Promise<number | null> {
+export async function getTokenPrice(symbol: string): Promise<number | null> {
   const geckoId = COINGECKO_IDS[symbol.toUpperCase()];
   if (!geckoId) return null;
 

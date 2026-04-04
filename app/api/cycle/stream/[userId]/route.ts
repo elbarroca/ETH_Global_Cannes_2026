@@ -51,6 +51,7 @@ interface StreamEvent {
     | "swap_executed"
     | "swap_failed"
     | "holdings_updated"
+    | "cycle_narrative"
     | "cycle_committed"
     | "error"
     | "done"
@@ -244,6 +245,19 @@ export async function POST(
                 usdcSpent: (payload as { usdcSpent?: number }).usdcSpent,
                 newDepositedUsdc: (payload as { newDepositedUsdc?: number }).newDepositedUsdc,
                 newHoldings: (payload as { newHoldings?: Record<string, number> }).newHoldings,
+              },
+            });
+          } else if (a.actionType === "CYCLE_COMPLETED" && a.agentName === "narrative") {
+            // Augmented-layer narrative — what the agents discussed and why.
+            // The full object is in the CycleResult returned at the end; here
+            // we emit the headline + a few highlights for early UI feedback.
+            send({
+              type: "cycle_narrative",
+              data: {
+                headline: (payload as { headline?: string }).headline,
+                finalReasoning: (payload as { finalReasoning?: string }).finalReasoning,
+                confluence: (payload as { confluence?: Record<string, number> }).confluence,
+                overrideApplied: (payload as { overrideApplied?: boolean }).overrideApplied,
               },
             });
           }

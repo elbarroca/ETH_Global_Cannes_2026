@@ -21,7 +21,7 @@ const publicClient = createPublicClient({
 });
 
 export default function DepositPage() {
-  const { user, userId, refetch } = useUser();
+  const { user, userId, refetch, agentBalance, refreshAgentBalance } = useUser();
   const { isConnected } = useConnection();
   const { data: walletClient } = useWalletClient();
   const [tab, setTab] = useState<Tab>("deposit");
@@ -36,7 +36,10 @@ export default function DepositPage() {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"idle" | "wallet" | "confirming" | "recording">("idle");
 
-  const deposited = user?.fund?.depositedUsdc ?? 0;
+  // Live on-chain balance from UserContext — same source nav + hero read.
+  // Fall back to the DB accounting number only while the first Arc RPC read
+  // is still in flight.
+  const deposited = agentBalance ?? user?.fund?.depositedUsdc ?? 0;
   const nav = user?.fund?.currentNav ?? 0;
   const shares = user?.fund?.htsShareBalance ?? 0;
   const proxyAddress = user?.proxyWallet?.address;
@@ -65,7 +68,10 @@ export default function DepositPage() {
       await deposit(userId, parsedAmount, txHash);
       setLastReceipt({ txHash, amount: parsedAmount.toFixed(2), kind: "deposit", at: Date.now() });
       setAmount("");
-      await refetch();
+      // Refetch the user record AND force-refresh the live balance so every
+      // UI surface (nav chip, hero DEPOSITED, this page, dashboard card)
+      // flips to the new number on the same render pass.
+      await Promise.all([refetch(), refreshAgentBalance()]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message
         : typeof err === "object" && err !== null && "message" in err ? String((err as { message: unknown }).message)
@@ -86,7 +92,7 @@ export default function DepositPage() {
       await withdraw(userId, parseFloat(amount));
       setLastReceipt({ txHash: "", amount: parseFloat(amount).toFixed(2), kind: "withdraw", at: Date.now() });
       setAmount("");
-      await refetch();
+      await Promise.all([refetch(), refreshAgentBalance()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Withdrawal failed");
     } finally {

@@ -41,7 +41,15 @@ const COMMIT_STAGES = [
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, userId, linkCode, telegramVerified, refreshLinkCode } = useUser();
+  const {
+    user,
+    userId,
+    linkCode,
+    telegramVerified,
+    refreshLinkCode,
+    agentBalance,
+    agentBalanceFetchedAt,
+  } = useUser();
   const [running, setRunning] = useState(false);
   const [approving, setApproving] = useState(false);
   const [liveCycle, setLiveCycle] = useState<Cycle | null>(null);
@@ -61,10 +69,12 @@ export default function DashboardPage() {
   // navChange24h and winRate are NOT shown as "0" — we render "—" in the UI
   // until we have a real historical NAV series and per-cycle P&L attribution.
   // totalSpend is an estimate: 3 specialist hires × $0.001 per cycle.
+  // `deposited` is NOT passed here anymore — the hero reads the live on-chain
+  // balance from UserContext via the agentBalance prop so every surface shows
+  // the same number.
   const fund = user ? {
     nav: user.fund.currentNav,
     navChange24h: null,
-    deposited: user.fund.depositedUsdc,
     totalCycles: user.agent.lastCycleId,
     totalPayments: user.agent.lastCycleId * 3,
     totalSpend: user.agent.lastCycleId * 0.003,
@@ -117,11 +127,13 @@ export default function DashboardPage() {
   async function handleHunt() {
     if (!userId || !user) return;
 
-    // Precondition: check USDC balance
-    if (user.fund.depositedUsdc < 0.003) {
+    // Precondition: check live on-chain balance, not the DB accounting value.
+    // Out-of-band top-ups to the proxy wallet should unblock the hunt immediately.
+    const liveBalance = agentBalance ?? user.fund.depositedUsdc;
+    if (liveBalance < 0.003) {
       setPrecondition({
         title: "Insufficient USDC",
-        body: `You need at least $0.003 to pay 3 specialists. Current balance: $${user.fund.depositedUsdc.toFixed(2)}`,
+        body: `You need at least $0.003 to pay 3 specialists. Current balance: $${liveBalance.toFixed(4)}`,
         ctaLabel: "Deposit USDC",
         ctaHref: "/deposit",
       });
@@ -237,8 +249,10 @@ export default function DashboardPage() {
         <TelegramModal linkCode={linkCode} onRefresh={refreshLinkCode} />
       )}
 
-      {/* Unskippable funding modal — shown after Telegram is verified but no USDC deposited */}
-      {user && telegramVerified && user.fund.depositedUsdc === 0 && user.proxyWallet?.address && (
+      {/* Unskippable funding modal — shown after Telegram is verified but the
+          live proxy wallet is empty. Uses agentBalance (Arc RPC direct) so a
+          fresh top-up auto-dismisses the modal on the next 5s poll. */}
+      {user && telegramVerified && (agentBalance ?? user.fund.depositedUsdc) === 0 && user.proxyWallet?.address && (
         <FundingModal
           proxyAddress={user.proxyWallet.address}
           onNavigate={(href) => router.push(href)}
@@ -278,7 +292,12 @@ export default function DashboardPage() {
       )}
 
       {/* Nasdaq-style terminal header — big NAV + ticker strip. */}
-      <NasdaqHeader fund={fund} connected={!!user} userId={userId} />
+      <NasdaqHeader
+        fund={fund}
+        connected={!!user}
+        agentBalance={agentBalance}
+        agentBalanceFetchedAt={agentBalanceFetchedAt}
+      />
 
       {/* Naryo Multichain Event Stream */}
       <Card>
@@ -468,16 +487,16 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <p className={`text-lg font-bold font-mono ${user.fund.depositedUsdc > 0 ? "text-gold-400" : "text-void-600"}`}>
-                    ${user.fund.depositedUsdc.toFixed(2)}
+                  <p className={`text-lg font-bold font-mono ${(agentBalance ?? 0) > 0 ? "text-gold-400" : "text-void-600"}`}>
+                    {agentBalance != null ? `$${agentBalance.toFixed(4)}` : "—"}
                   </p>
-                  <p className="text-[10px] text-void-600">USDC on Arc</p>
+                  <p className="text-[10px] text-void-600">USDC on Arc · live</p>
                 </div>
                 <button
                   onClick={() => router.push("/deposit")}
                   className="px-3 py-1.5 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-xs font-bold rounded-lg transition-colors"
                 >
-                  {user.fund.depositedUsdc > 0 ? "Manage" : "Deposit"}
+                  {(agentBalance ?? 0) > 0 ? "Manage" : "Deposit"}
                 </button>
               </div>
             </div>

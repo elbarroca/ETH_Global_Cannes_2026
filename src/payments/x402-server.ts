@@ -10,6 +10,7 @@ export function createSpecialistServer(
   handler: () => Promise<object>
 ): void {
   const app = express();
+  app.use(express.json({ limit: "64kb" }));
 
   // Circle Gateway nanopayments — gas-free batched settlement
   // Handles scheme registration, facilitator sync, and extra metadata automatically
@@ -18,7 +19,12 @@ export function createSpecialistServer(
     description: `${name} specialist analysis`,
   });
 
-  app.get("/analyze", gateway.require(price), async (_req, res) => {
+  // POST /analyze — client sends { task } in body and pays via x402/Circle Gateway.
+  // Previously this was GET, which caused every hire-specialist call to 405 and
+  // silently fall back to HOLD/http-failed. The handler doesn't use the task
+  // string today (specialists fetch their own data by identity), but we accept
+  // the body so clients can pass context without breaking the contract.
+  app.post("/analyze", gateway.require(price), async (_req, res) => {
     try {
       const result = await handler();
       res.json(result);

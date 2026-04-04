@@ -212,7 +212,56 @@ export interface CycleResult {
   proofs: CycleProofs;
   degraded: boolean;
   degradedReasons: string[];
+  /** Full augmented-layer narrative — what each agent said + why. */
+  narrative?: import("../agents/narrative").CycleNarrative;
 }
+
+// Swarm audit events — one HCS message per swarm interaction within a cycle.
+// Each cycle emits a cluster: start → N×hire → M×turn → done. All events carry
+// the cycle number `c` so independent verifiers can group them off the topic.
+//
+// This is the on-chain proof of the multi-agent dialogue that the CompactCycleRecord
+// aggregate can't capture (the aggregate truncates reasoning to 60 chars and
+// has no turn-by-turn history). Each event must fit inside the 1024-byte HCS
+// message limit; `cot[]` entries are the elastic field and get truncated first
+// if an event overflows.
+export type SwarmEventRecord =
+  | {
+      ev: "start";
+      c: number;
+      u: string; // full user id on the start event (shortened on later events)
+      t: string; // ISO timestamp
+      rp: string; // risk profile
+      g?: string; // user goal (truncated to 120 chars)
+    }
+  | {
+      ev: "hire";
+      c: number;
+      by: string; // hiring agent ("main" | "alpha" | "risk" | "executor")
+      to: string; // specialist name
+      sig: string; // signal verdict ("BUY" | "SELL" | "HOLD")
+      conf: number; // confidence 0-100
+      cot: string[]; // chain-of-thought steps, ≤5 × ≤100 chars
+      att: string; // attestation hash (truncated)
+    }
+  | {
+      ev: "turn";
+      c: number;
+      t: number; // turnNumber within the debate
+      ph: "opening" | "rebuttal" | "decision"; // phase
+      from: string; // speaking agent ("alpha" | "risk" | "executor")
+      to?: string; // addressed agent (for rebuttals)
+      cot: string[]; // chain-of-thought steps
+      verdict: Record<string, unknown>; // the structured decision this turn produced
+      att: string; // attestation hash (truncated)
+    }
+  | {
+      ev: "done";
+      c: number;
+      d: { act: string; asset: string; pct: number };
+      sh?: string; // 0G Storage CID of the rich record
+      nav: number;
+    };
 
 // The lean record that gets serialised to HCS (must fit under 1024 bytes).
 // Payment graph + goal text + full reasoning live in 0G Storage instead — this
@@ -276,5 +325,7 @@ export interface RichCycleRecord {
   payments: PaymentRecord[];
   decision: { action: string; asset: string; pct: number };
   swap?: { success: boolean; txHash?: string; explorerUrl?: string; method: string };
+  /** Full augmented-layer narrative persisted with the record for permanent audit. */
+  narrative?: import("../agents/narrative").CycleNarrative;
   nav: number;
 }

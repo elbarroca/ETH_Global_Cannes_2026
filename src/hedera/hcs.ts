@@ -3,7 +3,7 @@ import {
   TopicId,
 } from "@hashgraph/sdk";
 import { getHederaClient, getOperatorKey } from "../config/hedera";
-import type { CompactCycleRecord } from "../types/index";
+import type { CompactCycleRecord, SwarmEventRecord } from "../types/index";
 
 const HASHSCAN_BASE = "https://hashscan.io/testnet/topic";
 const MIRROR_BASE = "https://testnet.mirrornode.hedera.com/api/v1";
@@ -40,6 +40,74 @@ export async function logCycle(
     };
   } catch (err) {
     throw new Error(`HCS logCycle failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+// ── Swarm audit trail ──────────────────────────────────────────────────────
+// Writes one small HCS message per swarm event (cycle start, specialist hire,
+// debate turn, final decision). Unlike logCycle() this does NOT wait 6s for
+// mirror node propagation — swarm events are fire-and-forget audit logs, the
+// aggregate logCycle() call at end of commit is what readers actually use for
+// full history reconstruction.
+//
+// Callers should invoke this with `.catch(console.warn)` — a failed HCS write
+// must never fail a cycle.
+export async function logSwarmEvent(
+  topicId: string,
+  event: SwarmEventRecord,
+): Promise<{ seqNum: number }> {
+  // Truncate cot[] entries (shortest first is nonsensical — trim longest first)
+  // if the payload overflows the 1024-byte HCS limit. Only "hire" and "turn"
+  // events carry cot[], so we only touch those.
+  let payload = JSON.stringify(event);
+  let payloadBytes = Buffer.byteLength(payload, "utf8");
+
+  if (payloadBytes > MAX_PAYLOAD_BYTES && (event.ev === "hire" || event.ev === "turn")) {
+    const withCot = event as Extract<SwarmEventRecord, { cot: string[] }>;
+    const trimmed: SwarmEventRecord = {
+      ...withCot,
+      cot: withCot.cot.map((s) => (s.length > 80 ? s.slice(0, 77) + "..." : s)),
+    };
+    payload = JSON.stringify(trimmed);
+    payloadBytes = Buffer.byteLength(payload, "utf8");
+
+    // Still too big? Drop the tail cot entries until we fit.
+    let cotCopy = [...(trimmed as Extract<SwarmEventRecord, { cot: string[] }>).cot];
+    while (payloadBytes > MAX_PAYLOAD_BYTES && cotCopy.length > 1) {
+      cotCopy = cotCopy.slice(0, cotCopy.length - 1);
+      const shrunk = { ...trimmed, cot: cotCopy };
+      payload = JSON.stringify(shrunk);
+      payloadBytes = Buffer.byteLength(payload, "utf8");
+    }
+  }
+
+  if (payloadBytes > MAX_PAYLOAD_BYTES) {
+    throw new Error(
+      `HCS swarm event too large even after cot truncation: ${payloadBytes} bytes (ev=${event.ev})`,
+    );
+  }
+
+  try {
+    const client = getHederaClient();
+    const tx = await new TopicMessageSubmitTransaction()
+      .setTopicId(TopicId.fromString(topicId))
+      .setMessage(payload)
+      .freezeWith(client)
+      .sign(getOperatorKey());
+
+    const response = await tx.execute(client);
+    const receipt = await response.getReceipt(client);
+    const seqNum = receipt.topicSequenceNumber?.toNumber() ?? 0;
+
+    console.log(
+      `[hcs] swarm-event ev=${event.ev} c=${(event as { c?: number }).c ?? "?"} seq=${seqNum}`,
+    );
+
+    return { seqNum };
+  } catch (err) {
+    throw new Error(
+      `HCS logSwarmEvent failed (ev=${event.ev}): ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
