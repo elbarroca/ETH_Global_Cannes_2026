@@ -190,3 +190,32 @@ model ChatMessage {
   @@index([userId, createdAt], map: "idx_chat_messages_user")
   @@map("chat_messages")
 }
+
+model NaryoEvent {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source        String
+  chain         String
+  eventType     String            @map("event_type")
+  txHash        String?           @map("tx_hash")
+  decodedData   Json?             @map("decoded_data")
+  rawPayload    Json              @map("raw_payload")
+  correlationId String?           @map("correlation_id") @db.Uuid
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  correlation   NaryoCorrelation? @relation(fields: [correlationId], references: [id])
+
+  @@index([source, createdAt], map: "idx_naryo_events_source")
+  @@index([chain, createdAt], map: "idx_naryo_events_chain")
+  @@index([correlationId], map: "idx_naryo_events_correlation")
+  @@map("naryo_events")
+}
+
+model NaryoCorrelation {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  description String
+  chains      String[]
+  proofTxHash String?      @map("proof_tx_hash")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  events      NaryoEvent[]
+
+  @@map("naryo_correlations")
+}

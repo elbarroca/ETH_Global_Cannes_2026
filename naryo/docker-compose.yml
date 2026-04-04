@@ -1,0 +1,41 @@
+# Naryo Multichain Event Listener — Docker Compose
+# Monitors Hedera Testnet + 0G Chain and pushes events to AlphaDawg
+#
+# Usage:
+#   cd naryo && docker compose up -d
+#   docker compose logs -f naryo-server
+
+services:
+  naryo-mongodb:
+    image: mongo:latest
+    container_name: naryo-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - naryo-mongo-data:/data/db
+    networks:
+      - naryo-net
+
+  naryo-server:
+    image: ghcr.io/lf-decentralized-trust-labs/naryo:latest
+    container_name: naryo-server
+    restart: on-failure
+    depends_on:
+      naryo-mongodb:
+        condition: service_started
+    ports:
+      - "6060:6060"  # Naryo API + Swagger UI at /swagger-ui/index.html
+    networks:
+      - naryo-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file: .env
+    volumes:
+      - ./application.yml:/app/application.yml
+
+networks:
+  naryo-net:
+    driver: bridge
+
+volumes:
+  naryo-mongo-data:

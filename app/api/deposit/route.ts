@@ -52,6 +52,16 @@ export async function POST(req: NextRequest) {
       agent: { active: true },
     });
 
+    // Emit DepositRecorded event on Hedera EVM for Naryo (non-fatal)
+    if (process.env.NARYO_AUDIT_CONTRACT_ADDRESS) {
+      try {
+        const { emitDepositEvent } = await import("@/src/naryo/emit-event");
+        await emitDepositEvent(user.walletAddress, amount, updated.fund.currentNav);
+      } catch (err) {
+        console.warn("[deposit] Naryo event emit failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      }
+    }
+
     return NextResponse.json({
       success: true,
       depositedUsdc: updated.fund.depositedUsdc,

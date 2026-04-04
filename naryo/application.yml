@@ -1,0 +1,173 @@
+# Naryo Configuration — AlphaDawg Multichain Event Listener
+# Monitors Hedera Testnet (native + EVM) and 0G Chain
+# Broadcasts matched events to AlphaDawg via HTTP POST
+
+naryo:
+  # ── Nodes (2 chains for multi-DLT correlation) ──────────────────
+  nodes:
+    # Node 1: Hedera Testnet — polls Mirror Node for native + EVM events
+    - id: "hedera-testnet-node"
+      name: "Hedera Testnet"
+      type: HEDERA
+      connection:
+        type: HTTP
+        endpoint:
+          url: https://testnet.mirrornode.hedera.com
+      interaction:
+        mode: HEDERA_MIRROR_NODE
+      subscription:
+        method: POLL
+        interval: 2s
+        confirmationBlocks: 0
+
+    # Node 2: 0G Chain — polls RPC for EVM contract events
+    - id: "og-chain-node"
+      name: "0G Chain Testnet"
+      type: ETHEREUM
+      connection:
+        type: HTTP
+        endpoint:
+          url: https://evmrpc-testnet.0g.ai
+      interaction:
+        mode: ETHEREUM_RPC
+      subscription:
+        method: POLL
+        interval: 5s
+        confirmationBlocks: 1
+
+  # ── Filters (6 total — exhaustive Hedera service coverage) ──────
+  filters:
+    # 1. HCS Topic messages (native Hedera transaction filter)
+    - id: "hcs-topic-filter"
+      name: "AlphaDawg HCS Audit Trail"
+      nodeId: "hedera-testnet-node"
+      type: TRANSACTION
+      identifierType: IDENTITY_ID
+      value: ${TOPIC_ID:-0.0.8497439}
+
+    # 2. HTS Token transfers (native Hedera transaction filter)
+    - id: "hts-token-filter"
+      name: "AlphaDawg HTS Fund Token"
+      nodeId: "hedera-testnet-node"
+      type: TRANSACTION
+      identifierType: IDENTITY_ID
+      value: ${TOKEN_ID:-0.0.8498202}
+
+    # 3. CycleCompleted events (Hedera EVM contract)
+    - id: "cycle-event-filter"
+      name: "CycleCompleted Events"
+      nodeId: "hedera-testnet-node"
+      type: EVENT
+      scope: CONTRACT
+      specification:
+        signature: "CycleCompleted(address,uint256,string,string,uint256)"
+      address: ${CONTRACT_ADDRESS}
+
+    # 4. DepositRecorded events (Hedera EVM contract)
+    - id: "deposit-event-filter"
+      name: "DepositRecorded Events"
+      nodeId: "hedera-testnet-node"
+      type: EVENT
+      scope: CONTRACT
+      specification:
+        signature: "DepositRecorded(address,uint256,uint256)"
+      address: ${CONTRACT_ADDRESS}
+
+    # 5. AgentMinted events (0G Chain — VaultMindAgent iNFT)
+    - id: "og-mint-filter"
+      name: "0G Chain AgentMinted"
+      nodeId: "og-chain-node"
+      type: EVENT
+      scope: CONTRACT
+      specification:
+        signature: "AgentMinted(uint256,address,address,bytes32)"
+      address: ${OG_CONTRACT_ADDRESS:-0x73e3016D0D3Bf2985c55860cd2A51FF017c2c874}
+
+    # 6. MetadataUpdated events (0G Chain — VaultMindAgent iNFT)
+    - id: "og-metadata-filter"
+      name: "0G Chain MetadataUpdated"
+      nodeId: "og-chain-node"
+      type: EVENT
+      scope: CONTRACT
+      specification:
+        signature: "MetadataUpdated(uint256,bytes32,string,uint256)"
+      address: ${OG_CONTRACT_ADDRESS:-0x73e3016D0D3Bf2985c55860cd2A51FF017c2c874}
+
+  # ── Broadcasting (HTTP POST to AlphaDawg) ───────────────────────
+  broadcasting:
+    configuration:
+      - id: "alphadawg-http"
+        type: HTTP
+        endpoint:
+          url: http://host.docker.internal:3000
+
+    broadcasters:
+      # Hedera native events
+      - id: "hcs-broadcaster"
+        configurationId: "alphadawg-http"
+        target:
+          type: FILTER
+          filterId: "hcs-topic-filter"
+          destinations:
+            - /api/naryo/events/hcs
+
+      - id: "hts-broadcaster"
+        configurationId: "alphadawg-http"
+        target:
+          type: FILTER
+          filterId: "hts-token-filter"
+          destinations:
+            - /api/naryo/events/hts
+
+      # Hedera EVM events
+      - id: "cycle-broadcaster"
+        configurationId: "alphadawg-http"
+        target:
+          type: FILTER
+          filterId: "cycle-event-filter"
+          destinations:
+            - /api/naryo/events/cycle
+
+      - id: "deposit-broadcaster"
+        configurationId: "alphadawg-http"
+        target:
+          type: FILTER
+          filterId: "deposit-event-filter"
+          destinations:
+            - /api/naryo/events/deposit
+
+      # 0G Chain events
+      - id: "og-mint-broadcaster"
+        configurationId: "alphadawg-http"
+        target:
+          type: FILTER
+          filterId: "og-mint-filter"
+          destinations:
+            - /api/naryo/events/og-mint
+
+      - id: "og-metadata-broadcaster"
+        configurationId: "alphadawg-http"
+        target:
+          type: FILTER
+          filterId: "og-metadata-filter"
+          destinations:
+            - /api/naryo/events/og-metadata
+
+  # ── Stores (MongoDB persistence) ────────────────────────────────
+  stores:
+    block:
+      type: MONGO
+    transaction:
+      type: MONGO
+    contractEvent:
+      type: MONGO
+    filterSync:
+      type: MONGO
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://naryo-mongodb:27017/naryo
+
+server:
+  port: 6060

@@ -22,6 +22,7 @@ import { ChatPanel } from "@/components/chat-panel";
 import { PreconditionModal } from "@/components/precondition-modal";
 import { TelegramModal } from "@/components/telegram-modal";
 import { FundingModal } from "@/components/funding-modal";
+import { NaryoFeed } from "@/components/naryo-feed";
 
 const ANALYZE_STAGES = [
   "Hiring specialists from marketplace...",
@@ -253,6 +254,20 @@ export default function DashboardPage() {
           subColor="text-void-500"
         />
       </div>
+
+      {/* Naryo Multichain Event Stream */}
+      <Card>
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-void-400 uppercase tracking-wider">Multichain Events</h3>
+              <span className="text-[10px] px-1.5 py-0.5 bg-void-800 text-void-500 rounded">Naryo</span>
+            </div>
+            <LiveBadge />
+          </div>
+          <NaryoFeed />
+        </div>
+      </Card>
 
       {/* Hunt button */}
       <div className="flex items-center justify-between">
