@@ -80,6 +80,16 @@ export interface ArcSwapResultDto {
   tokenOut?: string;
 }
 
+export type SpecialistPath = "hierarchical_x402" | "direct_x402" | "openclaw_gateway";
+export type OpenClawGatewayStatus = "active" | "offline";
+
+export interface CycleProofs {
+  hcs: boolean;
+  storage: boolean;
+  inft: boolean;
+  naryo: boolean;
+}
+
 export interface CycleResult {
   cycleId: number;
   specialists: SpecialistResult[];
@@ -90,10 +100,15 @@ export interface CycleResult {
   };
   decision: Record<string, unknown>;
   seqNum: number;
-  hashscanUrl: string;
+  hashscanUrl?: string;
   storageHash?: string;
   inftTokenId?: number;
   swapResult?: ArcSwapResultDto;
+  specialistPath?: SpecialistPath;
+  openclawGatewayStatus?: OpenClawGatewayStatus;
+  proofs?: CycleProofs;
+  degraded?: boolean;
+  degradedReasons?: string[];
   timestamp: string;
 }
 

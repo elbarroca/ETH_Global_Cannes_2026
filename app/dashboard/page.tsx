@@ -50,14 +50,15 @@ export default function DashboardPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [precondition, setPrecondition] = useState<{ title: string; body: string; ctaLabel: string; ctaHref: string } | null>(null);
 
-  // Compute fund stats from user state only
+  // Compute fund stats from user state only.
+  // navChange24h and winRate are NOT shown as "0" — we render "—" in the UI
+  // until we have a real historical NAV series and per-cycle P&L attribution.
+  // totalSpend is an estimate: 3 specialist hires × $0.001 per cycle.
   const fund = user ? {
     nav: user.fund.currentNav,
-    navChange24h: 0,
     totalCycles: user.agent.lastCycleId,
     totalPayments: user.agent.lastCycleId * 3,
     totalSpend: user.agent.lastCycleId * 0.003,
-    winRate: 0,
     totalInferences: user.agent.lastCycleId * 6,
   } : null;
 
@@ -219,14 +220,37 @@ export default function DashboardPage() {
         />
       )}
 
+      {/* Degraded-cycle banner: only rendered when the last committed cycle
+          had a proof failure OR a specialist ran without TEE attestation.
+          This replaces the previous silent-degradation behavior so users know
+          when something on the glass-box proof chain didn't succeed. */}
+      {cycle?.degraded && (
+        <div className="rounded-xl border border-amber-700/40 bg-amber-950/40 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-amber-300">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              Degraded cycle #{cycle.id}
+            </div>
+            <Badge variant="amber">Partial proofs</Badge>
+          </div>
+          {cycle.degradedReasons && cycle.degradedReasons.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-xs text-amber-200/80">
+              {cycle.degradedReasons.map((reason, idx) => (
+                <li key={idx}>• {reason}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Row 1: Metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <MetricCard
           emoji="💰"
           label="Fund NAV"
           value={fund ? `$${fund.nav.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
-          sub={fund ? `+${fund.navChange24h}% (24h)` : "Connect wallet"}
-          subColor={fund ? "text-green-400" : undefined}
+          sub={fund ? "24h change —" : "Connect wallet"}
+          subColor={fund ? "text-void-500" : undefined}
         />
         <MetricCard
           emoji="🔄"
@@ -243,8 +267,9 @@ export default function DashboardPage() {
         <MetricCard
           emoji="🎯"
           label="Win rate"
-          value={fund ? `${fund.winRate}%` : "—"}
-          sub="Verified"
+          value="—"
+          sub="Pending P&L attribution"
+          subColor="text-void-500"
         />
         <MetricCard
           emoji="🧠"
@@ -449,7 +474,17 @@ export default function DashboardPage() {
                   <span>{user.agent.riskProfile} / max {user.agent.maxTradePercent}%</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {cycle?.openclawGatewayStatus && (
+                  <Badge variant={cycle.openclawGatewayStatus === "active" ? "green" : "gray"}>
+                    OpenClaw: {cycle.openclawGatewayStatus}
+                  </Badge>
+                )}
+                {cycle?.specialistPath && (
+                  <Badge variant="purple">
+                    path: {cycle.specialistPath.replace(/_/g, " ")}
+                  </Badge>
+                )}
                 <Badge variant="gray">0G Sealed</Badge>
                 <Badge variant="gray">Hedera HCS</Badge>
                 <Badge variant="gray">Arc Nano</Badge>

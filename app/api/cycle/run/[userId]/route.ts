@@ -29,6 +29,11 @@ export async function POST(
         storageHash: result.storageHash,
         inftTokenId: result.inftTokenId,
         swapResult: result.swapResult,
+        specialistPath: result.specialistPath,
+        openclawGatewayStatus: result.openclawGatewayStatus,
+        proofs: result.proofs,
+        degraded: result.degraded,
+        degradedReasons: result.degradedReasons,
         timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp,
       });
     }
@@ -55,6 +60,8 @@ export async function POST(
       debate: pending.debate,
       compactRecord: pending.compactRecord,
       expiresAt: pending.expiresAt,
+      specialistPath: analysis.specialistPath ?? "direct_x402",
+      openclawGatewayStatus: analysis.openclawGatewayStatus ?? "offline",
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

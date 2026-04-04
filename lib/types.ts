@@ -49,6 +49,16 @@ export interface Cycle {
     tokenIn?: string;
     tokenOut?: string;
   };
+  specialistPath?: "hierarchical_x402" | "direct_x402" | "openclaw_gateway";
+  openclawGatewayStatus?: "active" | "offline";
+  proofs?: {
+    hcs: boolean;
+    storage: boolean;
+    inft: boolean;
+    naryo: boolean;
+  };
+  degraded?: boolean;
+  degradedReasons?: string[];
   debateTranscripts?: DebateTranscriptView[];
 }
 

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge, ZeroGBadge } from "@/components/ui/badge";
-import { MOCK_AGENTS } from "@/lib/mock-data";
 import { getLeaderboard, getMyAgents, hireAgent, fireAgent } from "@/lib/api";
 import type { Agent } from "@/lib/types";
 import type { HiredAgent } from "@/lib/api";
@@ -53,6 +52,8 @@ export default function MarketplacePage() {
     fetchMyAgents();
   }, [fetchMyAgents]);
 
+  const [leaderboardFailed, setLeaderboardFailed] = useState(false);
+
   useEffect(() => {
     getLeaderboard()
       .then((entries) => {
@@ -71,32 +72,35 @@ export default function MarketplacePage() {
           walletAddress: e.walletAddress,
         }));
         setAllAgents(mapped);
+        setLeaderboardFailed(false);
       })
       .catch(() => {
-        setAllAgents(MOCK_AGENTS);
+        // Surface the failure honestly instead of silently substituting mock data.
+        setAllAgents([]);
+        setLeaderboardFailed(true);
       })
       .finally(() => setLoadingMarketplace(false));
   }, []);
 
-  // Combine leaderboard + mock community agents for marketplace display
-  const communityAgents = MOCK_AGENTS.filter((a) => !a.isActive);
-  const marketplaceAgents = [
-    ...allAgents.filter((a) => !myAgentNames.has(a.name) && !myAgentNames.has(NAME_MAP[a.name] ?? "")),
-    ...communityAgents,
-  ];
+  // Marketplace shows ONLY real agents from the leaderboard.
+  // Previously this was silently padded with MOCK_AGENTS community entries,
+  // which made it impossible for judges to tell real agents from fixtures.
+  const marketplaceAgents = allAgents.filter(
+    (a) => !myAgentNames.has(a.name) && !myAgentNames.has(NAME_MAP[a.name] ?? ""),
+  );
 
-  // Build "Your Pack" from real hired agents, enriched with display data
+  // Build "Your Pack" from real hired agents. No mock enrichment — the display
+  // name/emoji lookups above already cover every known specialist.
   const packCards: Agent[] = myAgents.map((h) => {
     const displayName = NAME_MAP[h.name] ?? h.name;
-    const mock = MOCK_AGENTS.find((m) => m.name === displayName);
     return {
       name: displayName,
-      emoji: EMOJI_MAP[h.name] ?? mock?.emoji ?? "\uD83E\uDD16",
-      skill: h.tags.join(", ") || mock?.skill || "Analysis",
-      accuracy: h.correctCalls > 0 ? Math.round((h.correctCalls / h.totalHires) * 100) : mock?.accuracy ?? 75,
+      emoji: EMOJI_MAP[h.name] ?? "\uD83E\uDD16",
+      skill: h.tags.join(", ") || "Analysis",
+      accuracy: h.correctCalls > 0 ? Math.round((h.correctCalls / h.totalHires) * 100) : 75,
       timesHired: h.totalHires,
       pricePerQuery: parseFloat(h.price.replace("$", "")) || 0.001,
-      inftId: mock?.inftId ?? `#${String(h.totalHires).padStart(4, "0")}`,
+      inftId: `#${String(h.totalHires).padStart(4, "0")}`,
       model: "glm-5-chat",
       provider: "0G Sealed TEE",
       creator: "AlphaDawg",
@@ -188,6 +192,14 @@ export default function MarketplacePage() {
 
         {loadingMarketplace ? (
           <div className="text-sm text-void-500 py-8 text-center">Loading marketplace...</div>
+        ) : leaderboardFailed ? (
+          <div className="text-sm text-void-500 py-8 text-center border border-dashed border-void-700 rounded-xl">
+            Leaderboard API unavailable — cannot load community specialists.
+          </div>
+        ) : marketplaceAgents.length === 0 ? (
+          <div className="text-sm text-void-500 py-8 text-center border border-dashed border-void-700 rounded-xl">
+            No unhired specialists available right now.
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {marketplaceAgents.map((agent) => (

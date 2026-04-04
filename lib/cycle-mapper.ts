@@ -118,6 +118,11 @@ export function mapCycleResultToCycle(result: CycleResult): Cycle {
           tokenOut: result.swapResult.tokenOut,
         }
       : undefined,
+    specialistPath: result.specialistPath,
+    openclawGatewayStatus: result.openclawGatewayStatus,
+    proofs: result.proofs,
+    degraded: result.degraded,
+    degradedReasons: result.degradedReasons,
   };
 }
 

@@ -65,6 +65,11 @@ export async function POST(
         storageHash: result.storageHash,
         inftTokenId: result.inftTokenId,
         swapResult: result.swapResult,
+        specialistPath: result.specialistPath,
+        openclawGatewayStatus: result.openclawGatewayStatus,
+        proofs: result.proofs,
+        degraded: result.degraded,
+        degradedReasons: result.degradedReasons,
         timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp,
       });
     } catch (commitErr) {
