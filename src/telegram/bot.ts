@@ -5,7 +5,8 @@ import {
 } from "../store/user-store";
 import { redeemLinkCode } from "../store/link-codes";
 import { analyzeCycle, commitCycle, rejectCycle } from "../agents/main-agent";
-import { createPendingCycle, getPendingCycle, resolvePendingCycle } from "../store/pending-cycles";
+import { createPendingCycle, getPendingCycle, getPendingForUser, resolvePendingCycle } from "../store/pending-cycles";
+import { getPrisma } from "../config/prisma";
 import type { UserRecord, CycleResult, CompactCycleRecord, AnalysisResult } from "../types/index";
 import {
   formatDebate,
@@ -337,6 +338,13 @@ function registerCallbacks(telegramBot: TelegramBot): void {
           return;
         }
 
+        // Guard: check for existing pending cycle
+        const existing = await getPendingForUser(user.id);
+        if (existing) {
+          await telegramBot.sendMessage(chatId, "⚠️ You already have a pending hunt. Approve or reject it first.");
+          return;
+        }
+
         // Phase 1: Analyze only (no on-chain commit yet)
         const analysis = await analyzeCycle(user);
 
@@ -352,11 +360,10 @@ function registerCallbacks(telegramBot: TelegramBot): void {
         });
 
         // Store telegram message ID for later editing (timeout checker needs it)
-        const { getPrisma } = await import("../config/prisma");
         await getPrisma().pendingCycle.update({
           where: { id: pending.id },
           data: { telegramMsgId: sent.message_id },
-        }).catch(() => {});
+        }).catch((e) => console.warn("[telegram] telegramMsgId update failed:", e));
 
       } catch (err) {
         console.error("[telegram] Analysis failed:", err);
@@ -393,7 +400,17 @@ function registerCallbacks(telegramBot: TelegramBot): void {
           }).catch(() => {});
         }
 
-        // Phase 2: Commit to HCS, 0G, Supabase
+        // Atomically resolve FIRST to prevent double-commit race condition
+        const resolved = await resolvePendingCycle(pendingId, {
+          status: "APPROVED",
+          resolvedBy: "user",
+        });
+        if (!resolved) {
+          await telegramBot.sendMessage(chatId, "⚠️ Already resolved by another session.");
+          return;
+        }
+
+        // Phase 2: Commit to HCS, 0G, Supabase (safe — only one caller reaches here)
         const analysis: AnalysisResult = {
           userId: pending.userId,
           cycleId: pending.cycleNumber,
@@ -401,24 +418,26 @@ function registerCallbacks(telegramBot: TelegramBot): void {
           debate: pending.debate,
           compactRecord: pending.compactRecord,
         };
-        const result = await commitCycle(analysis, user);
 
-        // Mark as resolved
-        await resolvePendingCycle(pendingId, {
-          status: "APPROVED",
-          resolvedBy: "user",
-        });
+        try {
+          const result = await commitCycle(analysis, user);
 
-        // Show approved result
-        const approvedMsg = formatApprovedResult(result, user);
-        if (query.message) {
-          await telegramBot.editMessageText(approvedMsg, {
-            chat_id: chatId,
-            message_id: query.message.message_id,
-            parse_mode: "Markdown",
-          }).catch(() => {});
-        } else {
-          await telegramBot.sendMessage(chatId, approvedMsg, { parse_mode: "Markdown" });
+          // Show approved result
+          const approvedMsg = formatApprovedResult(result, user);
+          if (query.message) {
+            await telegramBot.editMessageText(approvedMsg, {
+              chat_id: chatId,
+              message_id: query.message.message_id,
+              parse_mode: "Markdown",
+            }).catch(() => {});
+          } else {
+            await telegramBot.sendMessage(chatId, approvedMsg, { parse_mode: "Markdown" });
+          }
+        } catch (commitErr) {
+          // commitCycle failed AFTER resolve succeeded — advance lastCycleId to prevent reuse
+          console.error("[telegram] commitCycle failed after resolve, cleaning up:", commitErr);
+          await rejectCycle(analysis, user, "commit_failed").catch(() => {});
+          await telegramBot.sendMessage(chatId, "❌ Commit failed after approval. Cycle logged as failed.");
         }
       } catch (err) {
         console.error("[telegram] Approval failed:", err);
@@ -445,6 +464,17 @@ function registerCallbacks(telegramBot: TelegramBot): void {
           return;
         }
 
+        // Atomically resolve FIRST
+        const resolved = await resolvePendingCycle(pendingId, {
+          status: "REJECTED",
+          resolvedBy: "user",
+          rejectReason: "user_rejected",
+        });
+        if (!resolved) {
+          await telegramBot.sendMessage(chatId, "⚠️ Already resolved by another session.");
+          return;
+        }
+
         const analysis: AnalysisResult = {
           userId: pending.userId,
           cycleId: pending.cycleNumber,
@@ -454,11 +484,6 @@ function registerCallbacks(telegramBot: TelegramBot): void {
         };
 
         await rejectCycle(analysis, user, "user_rejected");
-        await resolvePendingCycle(pendingId, {
-          status: "REJECTED",
-          resolvedBy: "user",
-          rejectReason: "user_rejected",
-        });
 
         const rejectedMsg = formatRejectedResult(analysis);
         if (query.message) {

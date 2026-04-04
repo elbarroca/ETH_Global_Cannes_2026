@@ -1,3 +1,27 @@
+export type PendingCycleStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "TIMED_OUT";
+export type CycleOrigin = "ui" | "telegram" | "heartbeat";
+
+export interface AnalysisResult {
+  userId: string;
+  cycleId: number;
+  specialists: SpecialistResult[];
+  debate: DebateResult;
+  compactRecord: CompactCycleRecord;
+}
+
+export interface PendingCycleRecord {
+  id: string;
+  userId: string;
+  cycleNumber: number;
+  status: PendingCycleStatus;
+  origin: CycleOrigin;
+  specialists: SpecialistResult[];
+  debate: DebateResult;
+  compactRecord: CompactCycleRecord;
+  expiresAt: string;
+  telegramMsgId: number | null;
+}
+
 export interface UserRecord {
   id: string;
   walletAddress: string;
@@ -14,6 +38,11 @@ export interface UserRecord {
     maxTradePercent: number;
     lastCycleId: number;
     lastCycleAt: string | null;
+    approvalMode: "always" | "trades_only" | "auto";
+    approvalTimeoutMin: number;
+    cycleCount?: number;
+    cyclePeriodMs?: number;
+    cyclesRemaining?: number;
   };
   fund: {
     depositedUsdc: number;
@@ -37,6 +66,7 @@ export interface SpecialistResult {
   name: string;
   signal: string;
   confidence: number;
+  reasoning?: string;
   attestationHash: string;
   teeVerified: boolean;
   reputation?: number;
@@ -48,18 +78,21 @@ export interface DebateResult {
   alpha: {
     content: string;
     parsed: Record<string, unknown>;
+    reasoning?: string;
     attestationHash: string;
     teeVerified: boolean;
   };
   risk: {
     content: string;
     parsed: Record<string, unknown>;
+    reasoning?: string;
     attestationHash: string;
     teeVerified: boolean;
   };
   executor: {
     content: string;
     parsed: Record<string, unknown>;
+    reasoning?: string;
     attestationHash: string;
     teeVerified: boolean;
   };
@@ -83,9 +116,9 @@ export interface CompactCycleRecord {
   rp: string;
   s: Array<{ n: string; sig: string; conf: number; att: string }>;
   adv: {
-    a: { act: string; pct: number; att: string };
-    r: { obj: string; max: number; att: string };
-    e: { act: string; pct: number; sl: number; att: string };
+    a: { act: string; pct: number; att: string; r?: string };
+    r: { obj: string; max: number; att: string; r?: string };
+    e: { act: string; pct: number; sl: number; att: string; r?: string };
   };
   d: { act: string; asset: string; pct: number };
   nav: number;
