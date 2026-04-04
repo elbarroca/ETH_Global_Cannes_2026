@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getUserById } from "@/src/store/user-store";
-import { getHistoryForUser } from "@/src/hedera/hcs";
+import { getPrisma } from "@/src/config/prisma";
+import { enrichCycleRow } from "@/src/store/enrich-cycle";
 
 export async function GET(
   request: NextRequest,
@@ -13,16 +14,20 @@ export async function GET(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const topicId = process.env.HCS_AUDIT_TOPIC_ID ?? "";
-    if (!topicId) {
-      return NextResponse.json({ error: "HCS_AUDIT_TOPIC_ID not configured" }, { status: 500 });
-    }
-
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Number(searchParams.get("limit") ?? 10), 100);
-    const history = await getHistoryForUser(topicId, user.id, limit);
+    const offset = Math.max(Number(searchParams.get("offset") ?? 0), 0);
 
-    return NextResponse.json(history);
+    const prisma = getPrisma();
+    const cycles = await prisma.cycle.findMany({
+      where: { userId: user.id },
+      orderBy: { cycleNumber: "desc" },
+      take: limit,
+      skip: offset,
+    });
+
+    const enriched = await Promise.all(cycles.map((c) => enrichCycleRow(c)));
+    return NextResponse.json(enriched);
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

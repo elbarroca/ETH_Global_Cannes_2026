@@ -42,9 +42,11 @@ export async function POST(
       {
         userId: pending.userId,
         cycleId: pending.cycleNumber,
+        goal: pending.goal,
         specialists: pending.specialists,
         debate: pending.debate,
         compactRecord: pending.compactRecord,
+        richRecord: pending.richRecord,
       },
       user,
       reason,

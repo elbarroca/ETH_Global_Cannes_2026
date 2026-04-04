@@ -4,7 +4,7 @@ import { analyzeCycle, runCycle } from "@/src/agents/main-agent";
 import { createPendingCycle, getPendingForUser } from "@/src/store/pending-cycles";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
@@ -14,16 +14,26 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // Accept an optional user-authored goal from the dashboard. Heartbeat and
+    // Telegram triggers send nothing and fall back to the default goal string
+    // inside analyzeCycle.
+    const body = await request.json().catch(() => ({}));
+    const goal = typeof (body as { goal?: unknown }).goal === "string"
+      ? (body as { goal: string }).goal
+      : undefined;
+
     const approvalMode = user.agent.approvalMode ?? "always";
 
     if (approvalMode === "auto") {
       console.log(`[api] Auto-approve cycle for user ${user.id}`);
-      const result = await runCycle(user);
+      const result = await runCycle(user, goal);
       return NextResponse.json({
         cycleId: result.cycleId,
+        goal: result.goal,
         specialists: result.specialists,
         debate: result.debate,
         decision: result.decision,
+        payments: result.payments,
         seqNum: result.seqNum,
         hashscanUrl: result.hashscanUrl,
         storageHash: result.storageHash,
@@ -48,13 +58,14 @@ export async function POST(
     }
 
     console.log(`[api] Analyze cycle for user ${user.id} (approval: ${approvalMode})`);
-    const analysis = await analyzeCycle(user);
+    const analysis = await analyzeCycle(user, goal);
     const timeoutMin = user.agent.approvalTimeoutMin ?? 10;
     const pending = await createPendingCycle(analysis, "ui", timeoutMin);
 
     return NextResponse.json({
       pendingId: pending.id,
       cycleNumber: pending.cycleNumber,
+      goal: pending.goal,
       status: pending.status,
       specialists: pending.specialists,
       debate: pending.debate,

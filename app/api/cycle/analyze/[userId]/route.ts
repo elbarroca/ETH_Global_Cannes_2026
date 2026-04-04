@@ -4,7 +4,7 @@ import { analyzeCycle } from "@/src/agents/main-agent";
 import { createPendingCycle, getPendingForUser } from "@/src/store/pending-cycles";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
@@ -13,6 +13,11 @@ export async function POST(
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
+
+    const body = await request.json().catch(() => ({}));
+    const goal = typeof (body as { goal?: unknown }).goal === "string"
+      ? (body as { goal: string }).goal
+      : undefined;
 
     // Guard: reject if user already has a pending cycle
     const existing = await getPendingForUser(userId);
@@ -24,13 +29,14 @@ export async function POST(
     }
 
     console.log(`[api] Analyze cycle for user ${user.id}`);
-    const analysis = await analyzeCycle(user);
+    const analysis = await analyzeCycle(user, goal);
     const timeoutMin = user.agent.approvalTimeoutMin ?? 10;
     const pending = await createPendingCycle(analysis, "ui", timeoutMin);
 
     return NextResponse.json({
       pendingId: pending.id,
       cycleNumber: pending.cycleNumber,
+      goal: pending.goal,
       status: pending.status,
       specialists: pending.specialists,
       debate: pending.debate,
