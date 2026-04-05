@@ -215,11 +215,12 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
     const result = await sealedInference(OG_PROVIDER, prompt, userMessage);
     const { reasoning, parsed } = parseDualOutput(result.content, { signal: "HOLD", confidence: 50 });
 
-    // Capture the real x402 settlement tx hash when the middleware ran.
-    // `req.payment.transaction` is populated by `gateway.require(price)` after
-    // Circle Gateway batched settlement on Arc. Echoed back to the buyer in
-    // the response body so `hire-specialist.callSpecialist` can persist it
-    // into the AgentAction.payment_tx_hash column instead of the "paid" stub.
+    // Capture the x402 settlement id when the middleware ran.
+    // `req.payment.transaction` comes from `BatchFacilitatorClient.settle()`;
+    // the SDK’s SettleResponse only exposes `transaction`, `network`, `payer`
+    // (no separate “batch tx” vs “receipt id” fields). Gateway may return an
+    // Arc `0x` or a settlement identifier depending on timing — see Circle
+    // nanopayments + batched settlement docs. We echo the single string as-is.
     const payment = (req as unknown as PaymentRequest).payment;
     const paymentTxHash = payment?.transaction ?? "no-payment";
 

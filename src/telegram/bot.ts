@@ -49,6 +49,16 @@ async function fetchHistory(limit: number): Promise<CompactCycleRecord[]> {
   }
 }
 
+function sumPaymentUsd(payments: CycleResult["payments"]): number {
+  let sum = 0;
+  for (const p of payments ?? []) {
+    const raw = String(p.amount ?? "").replace(/[$,]/g, "");
+    const n = parseFloat(raw);
+    if (!Number.isNaN(n)) sum += n;
+  }
+  return sum;
+}
+
 // ── Exported notify function (used by heartbeat) ────────────────────────────
 
 export function notifyUser(user: UserRecord, result: CycleResult): void {
@@ -61,9 +71,17 @@ export function notifyUser(user: UserRecord, result: CycleResult): void {
   if (pref === "trades_only" && action === "HOLD") return;
   if (pref === "daily") return; // daily digest not yet implemented — suppress per-cycle
 
+  const pays = result.payments ?? [];
+  const payCount = pays.length;
+  const payTotal = sumPaymentUsd(pays);
+  const payLine =
+    payCount > 0
+      ? `💰 *${payCount}* nanopayment${payCount === 1 ? "" : "s"} (~$${payTotal.toFixed(4)} USDC)`
+      : `💰 *${result.specialists.length}* specialist${result.specialists.length === 1 ? "" : "s"} (no payment rows in result)`;
+
   const msg = [
     `📊 *Hunt #${result.cycleId} Complete*`,
-    `💰 Hired 3 specialists ($0.003)`,
+    payLine,
     `⚖️ Decision: *${action}* ${(result.decision as { asset?: string })?.asset ?? ""} ${(result.decision as { pct?: number })?.pct ?? 0}%`,
     `✅ TEE verified: ${result.specialists.filter((s) => s.teeVerified).length}/${result.specialists.length}`,
     `🔗 [Proof](${result.hashscanUrl})`,

@@ -12,8 +12,14 @@ import { updateAgentMetadata } from "../og/inft";
 import { getUserPaymentFetch, getUserPrivateKey } from "../config/arc";
 import { hireFromMarketplace } from "../marketplace/registry";
 import { evaluateCycleSignals } from "../marketplace/reputation";
-import { executeArcSwap, calculateSwapAmount } from "../execution/arc-swap";
-import { prepareSwapFunds, computeHoldingsUpdate, ensureHotWalletFunded } from "../payments/fund-swap";
+import { executeArcSwap, executeArcSell, calculateSwapAmount } from "../execution/arc-swap";
+import {
+  prepareSwapFunds,
+  computeHoldingsUpdate,
+  computeSellHoldingsUpdate,
+  computeCurrentNav,
+  ensureHotWalletFunded,
+} from "../payments/fund-swap";
 import { getTokenPrice } from "../payments/circle-wallet";
 import { synthesizeCycleNarrative, type CycleNarrative } from "./narrative";
 import { recordPickEntries } from "../marketplace/pick-tracker";
@@ -1120,113 +1126,262 @@ export async function commitCycle(
     }).catch(() => {});
   }
 
-  if (finalAction !== "HOLD" && finalPct > 0 && user.fund.depositedUsdc > 0 && user.hotWalletIndex != null) {
-    // Cap the allocation against real proxy-wallet liquidity, not the stale DB
-    // `depositedUsdc` value. If the DB and chain have drifted, honoring the
-    // smaller of the two is the honest budget — prepareSwapFunds() would
-    // otherwise throw later when it couldn't cover the transfer.
-    const honestBudget = Math.min(user.fund.depositedUsdc, cycleLiquidity.availableUsd);
-    const swapAmount = calculateSwapAmount(honestBudget, finalPct);
+  // ── On-chain execution ────────────────────────────────────────────────
+  // Outer gate allows both BUY and SELL. SELL cycles may have $0 deposited
+  // but non-zero `holdings[asset]` — the old `depositedUsdc > 0` gate would
+  // have blocked them, so the deposit check is now scoped to the BUY branch.
+  if (finalAction !== "HOLD" && finalPct > 0 && user.hotWalletIndex != null) {
+    if (finalAction === "BUY" && user.fund.depositedUsdc > 0) {
+      // Cap the allocation against real proxy-wallet liquidity, not the stale
+      // DB `depositedUsdc` value. If the DB and chain have drifted, honoring
+      // the smaller of the two is the honest budget — prepareSwapFunds() would
+      // otherwise throw later when it couldn't cover the transfer.
+      const honestBudget = Math.min(user.fund.depositedUsdc, cycleLiquidity.availableUsd);
+      const swapAmount = calculateSwapAmount(honestBudget, finalPct);
 
-    if (swapAmount > 0) {
-      try {
-        // 1a. Bridge funds from proxy wallet (where user deposits live) to
-        //     the agent's hot wallet (which signs the Arc swap).
-        await logAction({
-          userId: user.id,
-          actionType: "PAYMENT_SENT",
-          agentName: "fund-swap",
-          payload: { stage: "funds_transferring", fromProxy: user.proxyWallet.address, toHot: user.hotWalletAddress, amountUsd: swapAmount },
-        }).catch(() => {});
+      if (swapAmount > 0) {
+        try {
+          // 1a. Bridge funds from proxy wallet (where user deposits live) to
+          //     the agent's hot wallet (which signs the Arc swap).
+          await logAction({
+            userId: user.id,
+            actionType: "PAYMENT_SENT",
+            agentName: "fund-swap",
+            payload: { stage: "funds_transferring", fromProxy: user.proxyWallet.address, toHot: user.hotWalletAddress, amountUsd: swapAmount },
+          }).catch(() => {});
 
-        const prep = await prepareSwapFunds(user, swapAmount);
-        console.log(`[cycle] Swap funds prepared: ${prep.skipped ? "already-funded" : `bridged $${prep.transferredUsd.toFixed(4)} via Circle tx ${prep.circleTxId?.slice(0, 10)}…`}`);
+          const prep = await prepareSwapFunds(user, swapAmount);
+          console.log(`[cycle] Swap funds prepared: ${prep.skipped ? "already-funded" : `bridged $${prep.transferredUsd.toFixed(4)} via Circle tx ${prep.circleTxId?.slice(0, 10)}…`}`);
 
-        await logAction({
-          userId: user.id,
-          actionType: "PAYMENT_SENT",
-          agentName: "fund-swap",
-          paymentNetwork: "arc",
-          paymentAmount: prep.transferredUsd.toFixed(6),
-          payload: {
-            stage: "funds_ready",
-            skipped: prep.skipped,
-            circleTxId: prep.circleTxId,
-            beforeUsd: prep.beforeUsd,
-            afterUsd: prep.afterUsd,
-          },
-        }).catch(() => {});
+          await logAction({
+            userId: user.id,
+            actionType: "PAYMENT_SENT",
+            agentName: "fund-swap",
+            paymentNetwork: "arc",
+            paymentAmount: prep.transferredUsd.toFixed(6),
+            paymentTxHash: prep.circleTxId,
+            payload: {
+              stage: "funds_ready",
+              skipped: prep.skipped,
+              circleTxId: prep.circleTxId,
+              beforeUsd: prep.beforeUsd,
+              afterUsd: prep.afterUsd,
+            },
+          }).catch(() => {});
 
-        // 1b. Sign + send the actual Uniswap V3 exactInputSingle from hot wallet.
-        const userKey = getUserPrivateKey(user.hotWalletIndex);
-        swapResult = await executeArcSwap({
-          userPrivateKey: userKey,
-          amountUsd: swapAmount,
-        });
-        console.log(`[cycle] Arc swap: ${swapResult.success ? swapResult.txHash : swapResult.reason} (method: ${swapResult.method})`);
-
-        await logAction({
-          userId: user.id,
-          actionType: swapResult.success ? "SWAP_EXECUTED" : "SWAP_FAILED",
-          agentName: "arc-swap",
-          paymentNetwork: "arc",
-          paymentTxHash: swapResult.txHash,
-          paymentAmount: swapAmount.toFixed(4),
-          payload: {
-            ...swapResult,
-            asset: finalAsset,
+          // 1b. Sign + send the actual AlphaDawgSwap exactInputSingle from the
+          //     hot wallet. Calldata is Uniswap V3 compatible byte-for-byte.
+          const userKey = getUserPrivateKey(user.hotWalletIndex);
+          swapResult = await executeArcSwap({
+            userPrivateKey: userKey,
             amountUsd: swapAmount,
-          },
-        }).catch(() => {});
+          });
+          console.log(`[cycle] Arc BUY: ${swapResult.success ? swapResult.txHash : swapResult.reason} (method: ${swapResult.method})`);
 
-        // 1c. On success, update the user's DB accounting: the deposited
-        //     USDC drops by `swapAmount`, and the holdings map gets the
-        //     real token amount derived from the current CoinGecko price.
-        //     Falls back to swapAmount/100 only if the price lookup fails
-        //     (e.g. the ticker isn't in COINGECKO_IDS).
-        if (swapResult.success) {
-          const tokenPriceUsd = await getTokenPrice(finalAsset).catch(() => null);
-          const approximateTokenAmount =
-            tokenPriceUsd && tokenPriceUsd > 0 ? swapAmount / tokenPriceUsd : swapAmount / 100;
-          holdingsUpdate = computeHoldingsUpdate(user, finalAsset, swapAmount, approximateTokenAmount);
+          await logAction({
+            userId: user.id,
+            actionType: swapResult.success ? "SWAP_EXECUTED" : "SWAP_FAILED",
+            agentName: "arc-swap",
+            paymentNetwork: "arc",
+            paymentTxHash: swapResult.txHash,
+            paymentAmount: swapAmount.toFixed(4),
+            payload: {
+              ...swapResult,
+              asset: finalAsset,
+              amountUsd: swapAmount,
+              direction: "BUY",
+            },
+          }).catch(() => {});
+
+          // 1c. On success, update the user's DB accounting: the deposited
+          //     USDC drops by `swapAmount`, and the holdings map gets the
+          //     real token amount derived from the current CoinGecko price.
+          //     Falls back to swapAmount/100 only if the price lookup fails
+          //     (e.g. the ticker isn't in COINGECKO_IDS).
+          if (swapResult.success) {
+            const tokenPriceUsd = await getTokenPrice(finalAsset).catch(() => null);
+            const approximateTokenAmount =
+              tokenPriceUsd && tokenPriceUsd > 0 ? swapAmount / tokenPriceUsd : swapAmount / 100;
+            holdingsUpdate = computeHoldingsUpdate(user, finalAsset, swapAmount, approximateTokenAmount);
+
+            // Recompute NAV with fresh prices so the DB value the dashboard
+            // reads is honest. Stablecoins are $1 by definition; non-USDC
+            // tokens fall through to getTokenPrice() which hits CoinGecko.
+            const priceMap: Record<string, number> = { USDC: 1 };
+            for (const token of Object.keys(holdingsUpdate.newHoldings)) {
+              if (token.toUpperCase() === "USDC") continue;
+              const price = await getTokenPrice(token).catch(() => null);
+              if (price && price > 0) priceMap[token.toUpperCase()] = price;
+            }
+            const newCurrentNav = computeCurrentNav(
+              holdingsUpdate.newDepositedUsdc,
+              holdingsUpdate.newHoldings,
+              priceMap,
+            );
+
+            try {
+              await updateUser(user.id, {
+                fund: {
+                  depositedUsdc: holdingsUpdate.newDepositedUsdc,
+                  currentNav: newCurrentNav,
+                  // `holdings`, `costBasis`, `realizedPnl` are typed sub-fields
+                  // under user.fund — Prisma stores the fund JSON blob via JSONB
+                  // merge (`||`) so this upserts without clobbering other keys.
+                  holdings: holdingsUpdate.newHoldings,
+                  costBasis: holdingsUpdate.newCostBasis,
+                  realizedPnl: holdingsUpdate.newRealizedPnl,
+                },
+              });
+              await logAction({
+                userId: user.id,
+                actionType: "CYCLE_COMPLETED",
+                agentName: "holdings-updater",
+                payload: {
+                  stage: "holdings_updated",
+                  direction: "BUY",
+                  asset: finalAsset,
+                  usdcSpent: holdingsUpdate.usdcSpent,
+                  newDepositedUsdc: holdingsUpdate.newDepositedUsdc,
+                  newHoldings: holdingsUpdate.newHoldings,
+                  newCostBasis: holdingsUpdate.newCostBasis,
+                  newCurrentNav,
+                  realizedPnl: holdingsUpdate.newRealizedPnl,
+                },
+              }).catch(() => {});
+              console.log(
+                `[cycle] BUY holdings updated: -$${holdingsUpdate.usdcSpent.toFixed(4)} USDC, +${approximateTokenAmount.toFixed(6)} ${finalAsset} (basis $${(holdingsUpdate.newCostBasis[finalAsset] ?? 0).toFixed(4)}); NAV $${newCurrentNav.toFixed(4)}`,
+              );
+            } catch (err) {
+              console.warn("[cycle] holdings update failed (non-fatal):", err instanceof Error ? err.message : String(err));
+            }
+          }
+        } catch (err) {
+          console.warn("[cycle] Arc swap pipeline failed (non-fatal):", err instanceof Error ? err.message : String(err));
+          await logAction({
+            userId: user.id,
+            actionType: "SWAP_FAILED",
+            agentName: "arc-swap",
+            status: "failed",
+            payload: { stage: "pipeline_error", direction: "BUY", message: err instanceof Error ? err.message : String(err) },
+          }).catch(() => {});
+        }
+      }
+    } else if (finalAction === "SELL") {
+      // SELL branch — new code path enabled by AlphaDawgSwap.exactInputSingleSell.
+      // Reads the current holdings from user.fund.holdings (the CoinGecko-estimated
+      // cache of on-chain dWETH state), scales by finalPct, approves + sells.
+      // No Circle→hot bridge is needed because the hot wallet already owns the
+      // dWETH from a prior BUY cycle; the sell output (native USDC) lands in
+      // the hot wallet directly.
+      const prevHoldings = (user.fund as unknown as { holdings?: Record<string, number> }).holdings ?? {};
+      const heldAmount = prevHoldings[finalAsset] ?? 0;
+
+      if (heldAmount <= 0) {
+        console.log(`[cycle] SELL skipped: no ${finalAsset} holdings to sell`);
+      } else {
+        const tokensToSell = Math.max(0, (heldAmount * finalPct) / 100);
+        if (tokensToSell > 0) {
           try {
-            await updateUser(user.id, {
-              fund: {
-                depositedUsdc: holdingsUpdate.newDepositedUsdc,
-                // `holdings` is a typed sub-field under user.fund — Prisma
-                // stores the whole fund JSON blob via JSONB merge (`||`), so
-                // this upserts without clobbering depositedUsdc/currentNav.
-                holdings: holdingsUpdate.newHoldings,
-              },
+            const userKey = getUserPrivateKey(user.hotWalletIndex);
+            swapResult = await executeArcSell({
+              userPrivateKey: userKey,
+              dwethAmount: tokensToSell,
+              minUsdcOut: 0, // testnet smoke — no sandwich risk on shallow pool
             });
+            console.log(`[cycle] Arc SELL: ${swapResult.success ? swapResult.txHash : swapResult.reason} (method: ${swapResult.method})`);
+
             await logAction({
               userId: user.id,
-              actionType: "CYCLE_COMPLETED",
-              agentName: "holdings-updater",
+              actionType: swapResult.success ? "SWAP_EXECUTED" : "SWAP_FAILED",
+              agentName: "arc-swap",
+              paymentNetwork: "arc",
+              paymentTxHash: swapResult.txHash,
+              paymentAmount: tokensToSell.toFixed(6),
               payload: {
-                stage: "holdings_updated",
+                ...swapResult,
                 asset: finalAsset,
-                usdcSpent: holdingsUpdate.usdcSpent,
-                newDepositedUsdc: holdingsUpdate.newDepositedUsdc,
-                newHoldings: holdingsUpdate.newHoldings,
+                tokensSold: tokensToSell,
+                direction: "SELL",
               },
             }).catch(() => {});
-            console.log(
-              `[cycle] Holdings updated: -$${holdingsUpdate.usdcSpent.toFixed(4)} USDC, +${approximateTokenAmount.toFixed(6)} ${finalAsset}; deposited now $${holdingsUpdate.newDepositedUsdc.toFixed(4)}`,
-            );
+
+            if (swapResult.success) {
+              // Estimate USDC received via CoinGecko price (mirror of the BUY
+              // path's approximation — acceptable because the pool price is
+              // shallow and CoinGecko is close enough for narrative display).
+              const tokenPriceUsd = await getTokenPrice(finalAsset).catch(() => null);
+              const approximateUsdcReceived =
+                tokenPriceUsd && tokenPriceUsd > 0 ? tokensToSell * tokenPriceUsd : tokensToSell * 0.1;
+              holdingsUpdate = computeSellHoldingsUpdate(
+                user,
+                finalAsset,
+                tokensToSell,
+                approximateUsdcReceived,
+              );
+
+              // Recompute NAV with the fresh post-sell state. After a SELL the
+              // holdings map has one fewer token (or a reduced balance), and
+              // depositedUsdc has grown by the proceeds — so the honest NAV
+              // is computed against these new numbers, not the pre-swap ones.
+              const priceMap: Record<string, number> = { USDC: 1 };
+              for (const token of Object.keys(holdingsUpdate.newHoldings)) {
+                if (token.toUpperCase() === "USDC") continue;
+                const price = await getTokenPrice(token).catch(() => null);
+                if (price && price > 0) priceMap[token.toUpperCase()] = price;
+              }
+              const newCurrentNav = computeCurrentNav(
+                holdingsUpdate.newDepositedUsdc,
+                holdingsUpdate.newHoldings,
+                priceMap,
+              );
+
+              try {
+                await updateUser(user.id, {
+                  fund: {
+                    depositedUsdc: holdingsUpdate.newDepositedUsdc,
+                    currentNav: newCurrentNav,
+                    holdings: holdingsUpdate.newHoldings,
+                    costBasis: holdingsUpdate.newCostBasis,
+                    realizedPnl: holdingsUpdate.newRealizedPnl,
+                  },
+                });
+                await logAction({
+                  userId: user.id,
+                  actionType: "CYCLE_COMPLETED",
+                  agentName: "holdings-updater",
+                  payload: {
+                    stage: "holdings_updated",
+                    direction: "SELL",
+                    asset: finalAsset,
+                    tokensSold: tokensToSell,
+                    usdcReceived: approximateUsdcReceived,
+                    newDepositedUsdc: holdingsUpdate.newDepositedUsdc,
+                    newHoldings: holdingsUpdate.newHoldings,
+                    newCostBasis: holdingsUpdate.newCostBasis,
+                    realizedPnlDelta: holdingsUpdate.realizedPnlDelta,
+                    realizedPnl: holdingsUpdate.newRealizedPnl,
+                    newCurrentNav,
+                  },
+                }).catch(() => {});
+                const pnlSign = holdingsUpdate.realizedPnlDelta >= 0 ? "+" : "";
+                console.log(
+                  `[cycle] SELL holdings updated: -${tokensToSell.toFixed(6)} ${finalAsset}, +$${approximateUsdcReceived.toFixed(4)} USDC; realized P&L ${pnlSign}$${holdingsUpdate.realizedPnlDelta.toFixed(4)} (cum $${holdingsUpdate.newRealizedPnl.toFixed(4)}); NAV $${newCurrentNav.toFixed(4)}`,
+                );
+              } catch (err) {
+                console.warn("[cycle] holdings update failed (non-fatal):", err instanceof Error ? err.message : String(err));
+              }
+            }
           } catch (err) {
-            console.warn("[cycle] holdings update failed (non-fatal):", err instanceof Error ? err.message : String(err));
+            console.warn("[cycle] Arc sell pipeline failed (non-fatal):", err instanceof Error ? err.message : String(err));
+            await logAction({
+              userId: user.id,
+              actionType: "SWAP_FAILED",
+              agentName: "arc-swap",
+              status: "failed",
+              payload: { stage: "pipeline_error", direction: "SELL", message: err instanceof Error ? err.message : String(err) },
+            }).catch(() => {});
           }
         }
-      } catch (err) {
-        console.warn("[cycle] Arc swap pipeline failed (non-fatal):", err instanceof Error ? err.message : String(err));
-        await logAction({
-          userId: user.id,
-          actionType: "SWAP_FAILED",
-          agentName: "arc-swap",
-          status: "failed",
-          payload: { stage: "pipeline_error", message: err instanceof Error ? err.message : String(err) },
-        }).catch(() => {});
       }
     }
   }

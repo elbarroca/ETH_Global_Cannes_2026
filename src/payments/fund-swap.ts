@@ -266,16 +266,61 @@ export interface HoldingsUpdate {
   usdcSpent: number;
   newDepositedUsdc: number;
   newHoldings: Record<string, number>;
+  /** Weighted-average cost basis per token AFTER the swap, in USD per unit.
+   *  BUY blends the new entry price with the existing basis; SELL leaves the
+   *  basis untouched for remaining tokens. */
+  newCostBasis: Record<string, number>;
+  /** Cumulative realized P&L after the swap. Unchanged on BUY; SELL adds
+   *  `(usdcReceived - tokensSold × costBasis)` to the prior value. */
+  newRealizedPnl: number;
+  /** P&L realized BY THIS SWAP in USD (0 for BUY, positive/negative for SELL).
+   *  Separate from `newRealizedPnl` which is the cumulative total. */
+  realizedPnlDelta: number;
 }
 
+type FundExtensions = {
+  holdings?: Record<string, number>;
+  costBasis?: Record<string, number>;
+  realizedPnl?: number;
+};
+
+function readFundExtensions(user: UserRecord): Required<FundExtensions> {
+  const fund = user.fund as unknown as FundExtensions;
+  return {
+    holdings: fund.holdings ?? {},
+    costBasis: fund.costBasis ?? {},
+    realizedPnl: fund.realizedPnl ?? 0,
+  };
+}
+
+/**
+ * Fresh BUY: increment `holdings[token]`, decrement `depositedUsdc`, and
+ * recompute the token's weighted-average cost basis. If the user already owns
+ * some of the token, the new basis is:
+ *
+ *   newBasis = (oldAmount × oldBasis + usdcSpent) / (oldAmount + tokenAmount)
+ *
+ * which is the USD cost per unit averaged over the total position. Realized
+ * P&L is untouched (nothing is sold on BUY).
+ */
 export function computeHoldingsUpdate(
   user: UserRecord,
   tokenSymbol: string,
   usdcSpent: number,
   tokenAmount: number,
 ): HoldingsUpdate {
-  const prevHoldings = (user.fund as unknown as { holdings?: Record<string, number> }).holdings ?? {};
+  const { holdings: prevHoldings, costBasis: prevBasis, realizedPnl } = readFundExtensions(user);
   const currentAmount = prevHoldings[tokenSymbol] ?? 0;
+  const currentBasis = prevBasis[tokenSymbol] ?? 0;
+  const newAmount = currentAmount + tokenAmount;
+
+  // Weighted-average cost basis. When currentAmount is 0, newBasis reduces to
+  // the entry price of this purchase (usdcSpent / tokenAmount). When it's > 0,
+  // the old position's total cost blends with the new purchase's total cost.
+  const oldTotalCost = currentAmount * currentBasis;
+  const newTotalCost = oldTotalCost + usdcSpent;
+  const newBasis = newAmount > 0 ? newTotalCost / newAmount : 0;
+
   return {
     tokenSymbol,
     tokenAmount,
@@ -283,7 +328,89 @@ export function computeHoldingsUpdate(
     newDepositedUsdc: Math.max(0, user.fund.depositedUsdc - usdcSpent),
     newHoldings: {
       ...prevHoldings,
-      [tokenSymbol]: currentAmount + tokenAmount,
+      [tokenSymbol]: newAmount,
     },
+    newCostBasis: {
+      ...prevBasis,
+      [tokenSymbol]: newBasis,
+    },
+    newRealizedPnl: realizedPnl,
+    realizedPnlDelta: 0,
   };
+}
+
+/**
+ * SELL: decrement `holdings[token]`, credit `depositedUsdc`, and compute
+ * realized P&L against the token's weighted-average cost basis:
+ *
+ *   pnlDelta = usdcReceived - tokensSold × costBasis
+ *
+ * Cost basis for the remaining position is preserved — weighted-average
+ * accounting says unsold tokens still carry their original basis. If the
+ * position fully closes (amount → 0), the basis is reset to 0 so the next
+ * BUY starts fresh.
+ */
+export function computeSellHoldingsUpdate(
+  user: UserRecord,
+  tokenSymbol: string,
+  tokensSold: number,
+  usdcReceived: number,
+): HoldingsUpdate {
+  const { holdings: prevHoldings, costBasis: prevBasis, realizedPnl } = readFundExtensions(user);
+  const currentAmount = prevHoldings[tokenSymbol] ?? 0;
+  const currentBasis = prevBasis[tokenSymbol] ?? 0;
+  const remaining = Math.max(0, currentAmount - tokensSold);
+
+  // Realized P&L for this sale only. Positive = profit, negative = loss.
+  // Uses weighted-average cost basis — no FIFO/LIFO lot tracking needed.
+  const costOfSold = tokensSold * currentBasis;
+  const pnlDelta = usdcReceived - costOfSold;
+
+  const nextBasis = { ...prevBasis };
+  if (remaining <= 0) {
+    delete nextBasis[tokenSymbol];
+  } else {
+    nextBasis[tokenSymbol] = currentBasis;
+  }
+
+  return {
+    tokenSymbol,
+    tokenAmount: tokensSold,
+    usdcSpent: usdcReceived, // reused as "received" on the sell side
+    newDepositedUsdc: user.fund.depositedUsdc + usdcReceived,
+    newHoldings: {
+      ...prevHoldings,
+      [tokenSymbol]: remaining,
+    },
+    newCostBasis: nextBasis,
+    newRealizedPnl: realizedPnl + pnlDelta,
+    realizedPnlDelta: pnlDelta,
+  };
+}
+
+/**
+ * Compute a fresh NAV snapshot in USD from a holdings map and a price map.
+ *
+ *   NAV = depositedUsdc + Σ( holdings[token] × priceUsd[token] )
+ *
+ * Unknown tokens (no price available) are priced at 0 — callers should log a
+ * warning but should not fail the cycle. Stablecoins (USDC) are always $1.
+ */
+export function computeCurrentNav(
+  depositedUsdc: number,
+  holdings: Record<string, number>,
+  priceUsd: Record<string, number>,
+): number {
+  let nav = depositedUsdc;
+  for (const [symbol, amount] of Object.entries(holdings)) {
+    if (!amount || amount <= 0) continue;
+    const upper = symbol.toUpperCase();
+    if (upper === "USDC" || upper === "USD") {
+      nav += amount;
+      continue;
+    }
+    const price = priceUsd[upper] ?? priceUsd[symbol] ?? 0;
+    nav += amount * price;
+  }
+  return nav;
 }

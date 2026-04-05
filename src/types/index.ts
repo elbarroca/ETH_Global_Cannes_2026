@@ -64,12 +64,24 @@ export interface UserRecord {
   fund: {
     depositedUsdc: number;
     htsShareBalance: number;
+    /** Live portfolio NAV in USD = depositedUsdc + Σ(holdings[token] × currentPrice[token]).
+     *  Recomputed and persisted after every BUY or SELL cycle via updateUser()
+     *  so downstream readers (portfolio page, telegram, attribution log) can
+     *  trust the DB value without re-pricing on every request. */
     currentNav: number;
     /** Ticker → on-chain token amount bought via swaps. Populated by
      * computeHoldingsUpdate() after each successful swap via atomic JSONB
      * merge in updateUser(). Optional because users who never traded won't
      * have the sub-field set. */
     holdings?: Record<string, number>;
+    /** Ticker → weighted-average cost basis in USD per unit. Updated on BUY
+     * (cost basis blends with existing position) and stays constant on SELL
+     * until the position closes. Drives unrealized P&L calculation. */
+    costBasis?: Record<string, number>;
+    /** Cumulative realized P&L in USD from all SELL cycles. Incremented each
+     * time tokens are sold above (positive P&L) or below (negative) their
+     * weighted-average cost basis. Never decreases unless the user resets. */
+    realizedPnl?: number;
   };
   hotWalletIndex: number | null;
   hotWalletAddress: string | null;
@@ -213,7 +225,14 @@ export interface ArcSwapResult {
   txHash?: string;
   chain: "arc-testnet";
   explorerUrl?: string;
-  method: "uniswap_v3" | "direct_transfer" | "mock_swap" | "native_transfer" | "skipped";
+  method:
+    | "uniswap_v3"
+    | "direct_transfer"
+    | "mock_swap"
+    | "native_transfer"
+    | "alphadawg_swap"
+    | "alphadawg_swap_sell"
+    | "skipped";
   reason?: string;
   amountIn?: string;
   tokenIn?: string;
