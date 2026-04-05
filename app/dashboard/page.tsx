@@ -16,6 +16,7 @@ import {
   rejectCycle as rejectCycleApi,
   getPendingCycle,
   configure,
+  triggerCycle,
 } from "@/lib/api";
 import Link from "next/link";
 import { ExpandableHuntCard } from "@/components/expandable-hunt-card";
@@ -27,9 +28,21 @@ import { FundingModal } from "@/components/funding-modal";
 import { NaryoFeed } from "@/components/naryo-feed";
 import { RagStatusLine } from "@/components/rag-status-line";
 import { CreateAgentModal } from "@/components/create-agent-modal";
+import {
+  DashboardOnboardingModal,
+  DASHBOARD_ONBOARDING_STORAGE_KEY,
+} from "@/components/dashboard-onboarding";
 import { SwarmStatusBar } from "@/components/swarm-status-bar";
 import { SwarmActivityTicker } from "@/components/swarm-activity-ticker";
 // DebateTheater removed — debate data is shown inside ExpandableHuntCard
+
+function formatFeedSyncedAge(ms: number): string {
+  const s = Math.floor((Date.now() - ms) / 1000);
+  if (s < 2) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  return `${m}m ago`;
+}
 
 const ANALYZE_STAGES = [
   "Hiring specialists from marketplace...",
@@ -70,6 +83,24 @@ export default function DashboardPage() {
   const [autoCycles, setAutoCycles] = useState(0);
   const [autoPeriod, setAutoPeriod] = useState(300000); // 5m default
   const [savingConfig, setSavingConfig] = useState(false);
+  // Manual "Run Now" trigger — fires a one-shot cycle on demand (for demos
+  // when judges don't want to wait for the 5-min heartbeat tick).
+  const [manualRunning, setManualRunning] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  // `nowMs` ticks once per second so the countdown chip in the AUTO-HUNT card
+  // refreshes smoothly between UserContext polls (which are every 5s).
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  // Fade any manual-run error after 5s so the card doesn't stay stuck in an
+  // error state after the user acknowledges it by moving on.
+  useEffect(() => {
+    if (manualError == null) return;
+    const t = setTimeout(() => setManualError(null), 5000);
+    return () => clearTimeout(t);
+  }, [manualError]);
   // Persistent hunt goal — edited inline on the dashboard and saved to
   // user.agent.goal via /api/configure. Used as the default goal on every
   // cycle (manual Hunt, auto-heartbeat, Telegram /run).
@@ -80,6 +111,10 @@ export default function DashboardPage() {
   const [precondition, setPrecondition] = useState<{ title: string; body: string; ctaLabel: string; ctaHref: string } | null>(null);
   // "Create Your Own Agent" modal — opens from the Build Your Specialist card.
   const [showCreateAgent, setShowCreateAgent] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  /** Last successful hunt-feed poll — drives "Feed synced … ago". */
+  const [feedSyncedAt, setFeedSyncedAt] = useState<number | null>(null);
+  const [, setFeedSyncTick] = useState(0);
 
   // Compute fund stats from user state only.
   // navChange24h and winRate are NOT shown as "0" — we render "—" in the UI
@@ -119,6 +154,7 @@ export default function DashboardPage() {
         if (cancelled) return;
         setHunts(history.map(mapEnrichedResponseToCycle));
         setPendingCycle(pending);
+        setFeedSyncedAt(Date.now());
       } catch {
         // non-fatal — keep the last known list, try again on next tick
       }
@@ -142,6 +178,32 @@ export default function DashboardPage() {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [userId]);
+
+  // First dashboard visit: show onboarding once (localStorage). Wait until
+  // Telegram is verified and the funding wall is not blocking (same order as
+  // other modals — z-40 below Telegram/Funding at z-50).
+  useEffect(() => {
+    if (!userId || !telegramVerified) return;
+    const fundingBlocked =
+      user &&
+      (agentBalance ?? user.fund.depositedUsdc) === 0 &&
+      Boolean(user.proxyWallet?.address);
+    if (fundingBlocked) return;
+    try {
+      if (typeof window !== "undefined" && !localStorage.getItem(DASHBOARD_ONBOARDING_STORAGE_KEY)) {
+        setShowOnboarding(true);
+      }
+    } catch {
+      // private mode / quota — skip auto-open; user can still use "How this works"
+    }
+  }, [userId, telegramVerified, user, agentBalance]);
+
+  // Re-render periodically so "Feed synced … ago" stays current.
+  useEffect(() => {
+    if (feedSyncedAt == null) return;
+    const id = setInterval(() => setFeedSyncTick((n) => n + 1), 1_000);
+    return () => clearInterval(id);
+  }, [feedSyncedAt]);
 
   // Sync local form state from the user record so the Goal textarea and
   // AUTO-HUNT dropdown reflect saved values after a page load or refresh.
@@ -207,6 +269,57 @@ export default function DashboardPage() {
     }
   }, [pendingCycle, userId]);
 
+  // "Run Now" manual trigger — bypasses the 5-min heartbeat gate for demos.
+  // Calls POST /api/cycle/run/:userId which either runs a full cycle (auto
+  // mode) or creates a pending cycle (always/trades_only mode). Concurrent
+  // clicks or races against the heartbeat are blocked server-side by the
+  // per-user inFlightCycles lock in main-agent.ts, which returns 409. The
+  // existing 6s hunt-feed poller picks up the new cycle automatically.
+  const handleManualRun = useCallback(async () => {
+    if (!userId || manualRunning) return;
+    setManualRunning(true);
+    setManualError(null);
+    try {
+      await triggerCycle(userId);
+      // Refetch user immediately so lastCycleAt (and the countdown chip)
+      // updates without waiting for the next 5s UserContext poll.
+      await refetchUser();
+    } catch (err) {
+      setManualError((err as Error).message);
+    } finally {
+      setManualRunning(false);
+    }
+  }, [userId, manualRunning, refetchUser]);
+
+  // Countdown to next scheduled heartbeat tick for this user. Derived from
+  // `lastCycleAt + cyclePeriodMs`, updated once per second via `nowMs`.
+  // Returns a labelled state ("Paused" / "Budget exhausted") when the user
+  // has no scheduled hunts so the chip can communicate the reason instead
+  // of showing a misleading countdown.
+  const nextHuntStatus = (() => {
+    if (!user?.agent.active) return { label: "Paused" as const, msUntil: null };
+    const isInfinite = user.agent.cycleCount === -1;
+    const remaining = user.agent.cyclesRemaining ?? 0;
+    if (!isInfinite && (user.agent.cycleCount ?? 0) <= 0) return { label: "Paused" as const, msUntil: null };
+    if (!isInfinite && remaining <= 0) return { label: "Budget exhausted" as const, msUntil: null };
+    const lastAt = user.agent.lastCycleAt ? new Date(user.agent.lastCycleAt).getTime() : 0;
+    const period = user.agent.cyclePeriodMs ?? 300000;
+    if (lastAt === 0) return { label: "Due now" as const, msUntil: 0 };
+    const msUntil = lastAt + period - nowMs;
+    return { label: null, msUntil };
+  })();
+
+  const countdownText = (() => {
+    if (nextHuntStatus.label) return nextHuntStatus.label;
+    const ms = nextHuntStatus.msUntil ?? 0;
+    if (ms <= 0) return "Due now";
+    const totalSec = Math.ceil(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    if (m === 0) return `${s}s`;
+    return `${m}m ${s.toString().padStart(2, "0")}s`;
+  })();
+
   // Derive a partial Cycle from pending data for display in Pack + Challenge columns
   const pendingAsCycle: Cycle | null = pendingCycle ? {
     id: pendingCycle.cycleNumber,
@@ -269,6 +382,7 @@ export default function DashboardPage() {
 
   return (
     <>
+      <DashboardOnboardingModal open={showOnboarding} onDismiss={() => setShowOnboarding(false)} />
       {/* Swarm Observatory — full-width health strip at the top of every dashboard load. */}
       <SwarmStatusBar />
       <main className="max-w-screen-2xl mx-auto px-5 py-5">
@@ -332,15 +446,34 @@ export default function DashboardPage() {
             {pendingCycle
               ? `Hunt #${pendingCycle.cycleNumber} \u00b7 Awaiting approval`
               : cycle
-                ? `Hunt #${cycle.id} \u00b7 ${new Date(cycle.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`
+                ? `Hunt #${cycle.id} \u00b7 Completed ${new Date(cycle.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`
                 : "Ready to hunt"}
           </h2>
-          {cycle?.goal && (
-            <span className="text-sm text-void-400 italic truncate max-w-md" title={cycle.goal}>
-              &ldquo;{cycle.goal}&rdquo;
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowOnboarding(true)}
+              className="text-xs font-semibold uppercase tracking-wider text-dawg-400/90 hover:text-dawg-300 px-2 py-1 rounded-lg border border-dawg-500/30 bg-void-950/80 hover:bg-dawg-500/10 transition-colors"
+            >
+              How this works
+            </button>
+            {cycle?.goal && (
+              <span className="text-sm text-void-400 italic truncate max-w-md hidden sm:inline" title={cycle.goal}>
+                &ldquo;{cycle.goal}&rdquo;
+              </span>
+            )}
+          </div>
         </div>
+        {cycle?.goal && (
+          <p className="text-sm text-void-400 italic sm:hidden truncate" title={cycle.goal}>
+            &ldquo;{cycle.goal}&rdquo;
+          </p>
+        )}
+        {feedSyncedAt != null && (
+          <p className="text-[11px] text-void-500 font-mono">
+            Hunt feed synced {formatFeedSyncedAge(feedSyncedAt)}
+          </p>
+        )}
         {(running || approving) && (
           <p className="text-sm text-void-400 animate-pulse">{stages[stageIdx]}</p>
         )}
@@ -465,7 +598,7 @@ export default function DashboardPage() {
               <option value={3600000}>1 hour</option>
             </select>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {user?.agent?.cycleCount === -1 ? (
               <span className="text-xs text-gold-400">∞ forever</span>
             ) : (
@@ -475,6 +608,61 @@ export default function DashboardPage() {
                 </span>
               )
             )}
+            {/* Next-heartbeat countdown — ticks once per second based on
+                lastCycleAt + cyclePeriodMs. Hidden when the user is paused or
+                has never been configured for auto-hunt. Labelled variants
+                ("Paused" / "Budget exhausted" / "Due now") explain why the
+                countdown is not a number. */}
+            {/* When budget is exhausted, replace the countdown chip with a
+                one-click "Go infinite" CTA so the user doesn't have to know to
+                toggle the ∞ button separately. This is the #1 UX footgun with
+                the bounded-cycleCount model: user clicks Start, gets 1 cycle,
+                sees "Budget exhausted", doesn't know what to do next. */}
+            {user && nextHuntStatus.label === "Budget exhausted" ? (
+              <button
+                onClick={async () => {
+                  if (!userId) return;
+                  setSavingConfig(true);
+                  try {
+                    await configure(userId, { cycleCount: -1, cyclePeriodMs: autoPeriod });
+                    setAutoCycles(-1);
+                    await refetchUser();
+                  } catch (err) {
+                    console.warn("[dashboard] Go-infinite failed:", err);
+                  } finally {
+                    setSavingConfig(false);
+                  }
+                }}
+                disabled={savingConfig}
+                className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-md border border-gold-500/40 bg-gold-500/15 text-gold-400 hover:bg-gold-500/25 transition-colors disabled:opacity-60"
+                title="Switch to infinite mode — heartbeat will tick forever without a budget cap"
+              >
+                Budget exhausted · Go ∞
+              </button>
+            ) : user ? (
+              <span
+                className={`text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-md border ${
+                  nextHuntStatus.label === "Paused"
+                    ? "border-void-700 bg-void-900 text-void-500"
+                    : "border-dawg-500/30 bg-dawg-500/10 text-dawg-300"
+                }`}
+                title={
+                  user.agent.lastCycleAt
+                    ? `Last hunt: ${new Date(user.agent.lastCycleAt).toLocaleTimeString()}`
+                    : "No hunts yet"
+                }
+              >
+                Next hunt · {countdownText}
+              </span>
+            ) : null}
+            <button
+              onClick={handleManualRun}
+              disabled={manualRunning || !userId}
+              className="px-3 py-1.5 bg-void-800 hover:bg-void-700 disabled:opacity-60 disabled:cursor-not-allowed text-dawg-300 text-xs font-semibold rounded-lg border border-dawg-500/40 transition-colors"
+              title="Trigger a one-shot hunt now (bypasses the auto-hunt timer)"
+            >
+              {manualRunning ? "Running..." : "Run Now"}
+            </button>
             <button
               onClick={async () => {
                 if (!userId) return;
@@ -498,6 +686,11 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+        {manualError && (
+          <div className="px-4 pb-3 -mt-1">
+            <span className="text-[11px] text-blood-300">⚠ {manualError}</span>
+          </div>
+        )}
       </Card>
 
       {/* Row 2: Pending approval (3-column debate view) OR unified hunt feed.
@@ -559,16 +752,20 @@ export default function DashboardPage() {
           {/* Naryo Multichain Event Stream — secondary context, rendered
               below the hunt feed so the hunt list stays in the prime
               above-the-fold position. */}
-          <Card>
-            <div className="px-4 py-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-void-400 uppercase tracking-wider">Multichain Events</h3>
-                  <span className="text-[10px] px-1.5 py-0.5 bg-void-800 text-void-500 rounded">Naryo</span>
+          <Card className="bg-white border-2 border-neutral-900 shadow-lg shadow-neutral-900/10">
+            <div className="px-4 py-3 space-y-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-bold text-neutral-900 uppercase tracking-wider">Multichain Events</h3>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-neutral-900 text-white rounded border-2 border-neutral-900 font-medium">
+                    Naryo
+                  </span>
                 </div>
-                <LiveBadge />
+                <p className="text-[11px] text-neutral-700 mt-1.5 leading-snug max-w-2xl font-medium">
+                  Live indexer stream — proof that the AlphaDawg listener sees real activity across chains.
+                </p>
               </div>
-              <NaryoFeed />
+              <NaryoFeed variant="light" />
             </div>
           </Card>
         </>
@@ -690,8 +887,11 @@ export default function DashboardPage() {
         </div>
         {/* Right column: sticky live activity ticker (desktop only) */}
         <aside className="hidden xl:block">
-          <div className="sticky top-4">
+          <div className="sticky top-4 space-y-2">
             <SwarmActivityTicker />
+            <p className="text-[10px] text-void-600 leading-snug px-0.5">
+              Sidebar: live network activity. Main column: your hunts (only updates when a hunt finishes).
+            </p>
           </div>
         </aside>
       </div>

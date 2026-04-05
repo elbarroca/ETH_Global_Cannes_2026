@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserById } from "@/src/store/user-store";
-import { analyzeCycle, runCycle } from "@/src/agents/main-agent";
+import { analyzeCycle, runCycle, CycleInProgressError } from "@/src/agents/main-agent";
 import { createPendingCycle, getPendingForUser } from "@/src/store/pending-cycles";
 
 export async function POST(
@@ -75,6 +75,12 @@ export async function POST(
       openclawGatewayStatus: analysis.openclawGatewayStatus ?? "offline",
     });
   } catch (err) {
+    if (err instanceof CycleInProgressError) {
+      return NextResponse.json(
+        { error: "A cycle is already in progress for this user. Wait for it to finish before triggering another." },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
