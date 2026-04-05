@@ -296,7 +296,9 @@ export async function getUser(walletAddress: string): Promise<UserRecord | null>
 // Every UI surface reads that single value — see contexts/user-context.tsx.
 
 export async function getLatestCycle(userId: string): Promise<EnrichedCycleResponse | null> {
-  return apiFetch<EnrichedCycleResponse | null>(`/api/cycle/latest/${userId}`).catch(() => null);
+  return apiFetch<EnrichedCycleResponse | null>(`/api/cycle/latest/${userId}`, {
+    cache: "no-store",
+  }).catch(() => null);
 }
 
 export async function getCycleHistory(
@@ -305,7 +307,8 @@ export async function getCycleHistory(
   offset = 0
 ): Promise<EnrichedCycleResponse[]> {
   return apiFetch<EnrichedCycleResponse[]>(
-    `/api/cycle/history/${userId}?limit=${limit}&offset=${offset}`
+    `/api/cycle/history/${userId}?limit=${limit}&offset=${offset}`,
+    { cache: "no-store" },
   ).catch(() => []);
 }
 
@@ -355,7 +358,9 @@ export async function rejectCycle(pendingId: string, userId: string, reason?: st
 }
 
 export async function getPendingCycle(userId: string): Promise<PendingCycleResponse | null> {
-  return apiFetch<PendingCycleResponse | null>(`/api/cycle/pending/${userId}`).catch(() => null);
+  return apiFetch<PendingCycleResponse | null>(`/api/cycle/pending/${userId}`, {
+    cache: "no-store",
+  }).catch(() => null);
 }
 
 // ── Compute detail (full cycle + action log) ───────────────

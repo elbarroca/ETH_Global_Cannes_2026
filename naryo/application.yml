@@ -195,10 +195,13 @@ naryo:
   broadcasting:
     configuration:
       # alphadawg-http
+      # URL is driven by NARYO_BROADCAST_URL in naryo/.env so the same
+      # yml works against both local dev (http://host.docker.internal:3000)
+      # and the live Vercel deployment (https://cannes2026-jet.vercel.app).
       - id: "813f547e-b43a-49ce-8216-bbbd46a412db"
         type: HTTP
         endpoint:
-          url: http://host.docker.internal:3000
+          url: ${NARYO_BROADCAST_URL:http://host.docker.internal:3000}
 
     broadcasters:
       # Hedera native events
