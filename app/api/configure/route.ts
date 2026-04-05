@@ -22,9 +22,10 @@ export async function POST(request: NextRequest) {
       approvalMode?: string;
       cycleCount?: number;
       cyclePeriodMs?: number;
+      goal?: string;
     };
 
-    const { userId, riskProfile, notifyPreference, approvalMode, cycleCount, cyclePeriodMs } = body;
+    const { userId, riskProfile, notifyPreference, approvalMode, cycleCount, cyclePeriodMs, goal } = body;
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
@@ -65,10 +66,31 @@ export async function POST(request: NextRequest) {
     if (cycleCount != null && cycleCount >= 0) {
       agentPatch.cycleCount = cycleCount;
       agentPatch.cyclesRemaining = cycleCount;
+      // The AUTO-HUNT dropdown on the dashboard is the single source of truth
+      // for enrolling the user in the heartbeat loop. cycleCount > 0 = opt in
+      // (heartbeat will pick them up); cycleCount === 0 = opt out (heartbeat
+      // will skip them). The deposit route no longer flips `active`, so this
+      // is the ONLY place (besides Telegram /stop which sets active=false)
+      // where `active` is mutated.
+      agentPatch.active = cycleCount > 0;
     }
 
     if (cyclePeriodMs != null && cyclePeriodMs > 0) {
       agentPatch.cyclePeriodMs = cyclePeriodMs;
+    }
+
+    // Persistent per-user hunt goal. Empty string clears the saved value
+    // (fall back to risk-profile template). Non-empty is trimmed + length-
+    // capped so specialist prompts can't be spam-stuffed.
+    if (goal != null) {
+      const trimmed = String(goal).trim();
+      if (trimmed.length > 280) {
+        return NextResponse.json(
+          { error: "goal must be 280 characters or fewer" },
+          { status: 400 },
+        );
+      }
+      agentPatch.goal = trimmed;
     }
 
     if (Object.keys(agentPatch).length > 0) {

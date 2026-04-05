@@ -11,7 +11,7 @@ import { arcTxUrl } from "@/lib/links";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/user-context";
 import {
-  getLatestCycle,
+  getCycleHistory,
   approveCycle,
   rejectCycle as rejectCycleApi,
   getPendingCycle,
@@ -51,22 +51,32 @@ export default function DashboardPage() {
     agentBalance,
     agentBalanceFetchedAt,
   } = useUser();
-  // `running` is kept as a boolean flag so the stage indicator and auto-cycle
-  // helpers can read it without plumbing a separate state. It is no longer
-  // flipped from a user input — auto-hunt is the only trigger now.
+  // `running` is kept as a boolean flag so the stage indicator reflects an
+  // in-flight analyze/approve cycle. It is flipped by the SSE streaming path
+  // (not plumbed here yet) — for catch-up from non-dashboard surfaces we rely
+  // on the 6s polling loop below.
   const [running] = useState(false);
   const [approving, setApproving] = useState(false);
-  const [liveCycle, setLiveCycle] = useState<Cycle | null>(null);
+  // Hunt feed — holds up to 15 most-recent cycles for this user, newest first.
+  // Populated by /api/cycle/history so hunts from ANY trigger source (dashboard,
+  // Telegram /run, auto-heartbeat) appear here within 6 seconds without a
+  // manual refresh.
+  const [hunts, setHunts] = useState<Cycle[]>([]);
   const [pendingCycle, setPendingCycle] = useState<PendingCycleResponse | null>(null);
   const [stageIdx, setStageIdx] = useState(0);
   const [stages, setStages] = useState<string[]>(ANALYZE_STAGES);
   const [autoCycles, setAutoCycles] = useState(0);
   const [autoPeriod, setAutoPeriod] = useState(300000); // 5m default
   const [savingConfig, setSavingConfig] = useState(false);
+  // Persistent hunt goal — edited inline on the dashboard and saved to
+  // user.agent.goal via /api/configure. Used as the default goal on every
+  // cycle (manual Hunt, auto-heartbeat, Telegram /run).
+  const [huntGoal, setHuntGoal] = useState("");
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [goalSavedAt, setGoalSavedAt] = useState<number | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [precondition, setPrecondition] = useState<{ title: string; body: string; ctaLabel: string; ctaHref: string } | null>(null);
-  // "Create Your Own Agent" modal — opens from the dashboard card that replaced
-  // the old free-text hunt input. Auto-hunt now runs the default goal.
+  // "Create Your Own Agent" modal — opens from the Build Your Specialist card.
   const [showCreateAgent, setShowCreateAgent] = useState(false);
 
   // Compute fund stats from user state only.
@@ -85,18 +95,67 @@ export default function DashboardPage() {
     totalInferences: user.agent.lastCycleId * 6,
   } : null;
 
-  const cycle = liveCycle;
+  // Most-recent hunt drives the header, degraded banner, holdings KPI, and
+  // proof-status chips below the list. When the list is empty this is null
+  // and those surfaces gracefully render their empty/placeholder variants.
+  const cycle = hunts[0] ?? null;
 
-  // Fetch latest cycle + check for pending on mount
+  // Unified live hunt feed — polls /api/cycle/history every 6 seconds so hunts
+  // triggered from non-dashboard surfaces (Telegram /run, auto-heartbeat) show
+  // up without requiring a page refresh. Pauses while the tab is hidden to
+  // reduce DB load; catches up immediately on visibilitychange → visible.
   useEffect(() => {
     if (!userId) return;
-    getLatestCycle(userId).then((record) => {
-      if (record) setLiveCycle(mapEnrichedResponseToCycle(record));
-    }).catch(() => {});
-    getPendingCycle(userId).then((pending) => {
-      if (pending) setPendingCycle(pending);
-    }).catch(() => {});
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const [history, pending] = await Promise.all([
+          getCycleHistory(userId, 15, 0),
+          getPendingCycle(userId),
+        ]);
+        if (cancelled) return;
+        setHunts(history.map(mapEnrichedResponseToCycle));
+        setPendingCycle(pending);
+      } catch {
+        // non-fatal — keep the last known list, try again on next tick
+      }
+    };
+
+    // Initial fetch
+    void poll();
+
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") void poll();
+    }, 6_000);
+
+    const onVis = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [userId]);
+
+  // Sync local form state from the user record so the Goal textarea and
+  // AUTO-HUNT dropdown reflect saved values after a page load or refresh.
+  // Only resets when the user id changes to avoid clobbering mid-edit state.
+  useEffect(() => {
+    if (!user) return;
+    setHuntGoal(user.agent.goal ?? "");
+    setAutoCycles(user.agent.cycleCount ?? 0);
+  }, [user?.id]);
+
+  // Fade the "Saved ✓" confirmation on the Goal card after 2 seconds.
+  useEffect(() => {
+    if (goalSavedAt == null) return;
+    const t = setTimeout(() => setGoalSavedAt(null), 2_000);
+    return () => clearTimeout(t);
+  }, [goalSavedAt]);
 
   // Cycle through stage messages while running/approving
   useEffect(() => {
@@ -114,7 +173,14 @@ export default function DashboardPage() {
     setStages(COMMIT_STAGES);
     try {
       const result = await approveCycle(pendingCycle.pendingId, userId);
-      setLiveCycle(mapCycleResultToCycle(result));
+      // Optimistically prepend the committed cycle so the user sees it at the
+      // top of the feed immediately. The 6s poller will confirm/reconcile on
+      // its next tick (it replaces this list with the authoritative history).
+      const committed = mapCycleResultToCycle(result);
+      setHunts((prev) => {
+        const deduped = prev.filter((h) => h.id !== committed.id);
+        return [committed, ...deduped].slice(0, 15);
+      });
       setPendingCycle(null);
     } catch (err) {
       console.warn("[dashboard] Approval failed:", err);
@@ -248,9 +314,10 @@ export default function DashboardPage() {
         agentBalanceFetchedAt={agentBalanceFetchedAt}
       />
 
-      {/* Cycle header — shows the current/last hunt status. Auto-hunt runs
-          against the default goal baked into main-agent.ts, so there is no
-          longer a free-text prompt input on the dashboard. */}
+      {/* Cycle header — shows the current/last hunt status. The user's saved
+          goal (user.agent.goal) drives every cycle; they edit it inline in
+          the "Hunt Goal" card below. The italic quote next to the header
+          shows the goal the most recent cycle ran against. */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-base sm:text-lg font-semibold text-void-300 uppercase tracking-wide">
@@ -292,6 +359,54 @@ export default function DashboardPage() {
             <span className="text-base leading-none">+</span>
             <span>Create Agent</span>
           </button>
+        </div>
+      </Card>
+
+      {/* Hunt Goal — persistent per-user input. Saved to user.agent.goal via
+          /api/configure, then read by every cycle (auto-heartbeat, manual
+          dashboard Hunt, Telegram /run) as the default goal. Empty value
+          falls back to the risk-profile template. */}
+      <Card>
+        <div className="px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-void-500 uppercase tracking-wider">
+                Hunt Goal
+              </span>
+              <span className="text-[10px] text-void-600">
+                Persists across cycles · {huntGoal.length}/280
+              </span>
+              {goalSavedAt != null && (
+                <span className="text-[10px] text-emerald-400">Saved ✓</span>
+              )}
+            </div>
+            <button
+              onClick={async () => {
+                if (!userId) return;
+                setSavingGoal(true);
+                try {
+                  await configure(userId, { goal: huntGoal.trim() });
+                  setGoalSavedAt(Date.now());
+                } catch (err) {
+                  console.warn("[dashboard] Goal save failed:", err);
+                } finally {
+                  setSavingGoal(false);
+                }
+              }}
+              disabled={savingGoal || huntGoal.length > 280}
+              className="px-4 py-1.5 bg-void-800 hover:bg-void-700 disabled:opacity-60 text-void-300 text-xs font-semibold rounded-lg border border-void-700 transition-colors"
+            >
+              {savingGoal ? "Saving..." : "Save Goal"}
+            </button>
+          </div>
+          <textarea
+            value={huntGoal}
+            onChange={(e) => setHuntGoal(e.target.value.slice(0, 280))}
+            maxLength={280}
+            rows={2}
+            placeholder="e.g. 'Accumulate ETH safely during dips, target 20% upside over 3 months'"
+            className="w-full px-3 py-2 bg-void-950 border border-void-700 rounded-lg text-sm text-void-200 placeholder:text-void-600 resize-none focus:outline-none focus:border-dawg-500/60"
+          />
         </div>
       </Card>
 
@@ -348,7 +463,11 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      {/* Row 2: Current hunt as expandable card */}
+      {/* Row 2: Pending approval (3-column debate view) OR unified hunt feed.
+          The feed is populated by the 6s polling loop above, so hunts from
+          any source (dashboard, Telegram /run, auto-heartbeat) land here
+          live without requiring a page refresh. Newest hunt is expanded by
+          default; older hunts render collapsed and expand on click. */}
       {pendingCycle ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <PackColumn
@@ -366,28 +485,31 @@ export default function DashboardPage() {
             onReject={handleReject}
           />
         </div>
-      ) : cycle && userId ? (
+      ) : hunts.length > 0 && userId && cycle ? (
         <>
-          <ExpandableHuntCard
-            cycle={cycle}
-            userId={userId}
-            defaultExpanded
-            userInftTokenId={user?.inftTokenId ?? null}
-            computing={running || approving}
-            computingLabel={running ? "Analyzing" : "Committing"}
-            computingStage={stages[stageIdx]}
-          />
+          <div className="space-y-4">
+            {hunts.map((h, i) => (
+              <ExpandableHuntCard
+                key={h.id}
+                cycle={h}
+                userId={userId}
+                defaultExpanded={i === 0}
+                userInftTokenId={user?.inftTokenId ?? null}
+                computing={i === 0 && (running || approving)}
+                computingLabel={running ? "Analyzing" : "Committing"}
+                computingStage={stages[stageIdx]}
+              />
+            ))}
+          </div>
 
           {/* Narrative panel — explains what the augmented layer discussed
-              and why the executor landed on this decision. Populated from
-              cycles.narrative JSON column via enrichCycleRow. */}
+              for the MOST RECENT hunt. Populated from cycles.narrative JSON
+              column via enrichCycleRow. */}
           {cycle.narrative && <CycleNarrativePanel narrative={cycle.narrative} />}
 
-          {/* Holdings KPI — one-line summary that points at the full
-              /portfolio page (pie chart + evolution + attribution log).
-              We keep a KPI on the dashboard so the hunt context stays at
-              a glance, but the detail view now lives in its own tab so
-              it's not fighting the hunt controls for space. */}
+          {/* Holdings KPI — one-line summary that points at /portfolio. Shows
+              holdings from the most recent hunt so the dashboard stays a
+              glance-view; the detail tab has the full breakdown. */}
           {user && (
             <HoldingsSummaryKpi
               depositedUsdc={user.fund.depositedUsdc}
@@ -396,8 +518,8 @@ export default function DashboardPage() {
           )}
 
           {/* Naryo Multichain Event Stream — secondary context, rendered
-              below the current cycle card so the hunt controls + current
-              hunt stay in the prime above-the-fold position. */}
+              below the hunt feed so the hunt list stays in the prime
+              above-the-fold position. */}
           <Card>
             <div className="px-4 py-3">
               <div className="flex items-center justify-between mb-2">
@@ -426,14 +548,7 @@ export default function DashboardPage() {
           </CardBody>
         </Card>
       ) : (
-        <Card>
-          <CardBody className="text-center py-12 space-y-3">
-            <p className="text-void-400 text-sm">No hunts yet. Click Hunt to trigger your first cycle.</p>
-            <p className="text-void-600 text-xs">
-              Your agent will hire 3 specialists, run adversarial debate, and present its recommendation for your approval.
-            </p>
-          </CardBody>
-        </Card>
+        <EmptyHuntsState />
       )}
 
       {/* Row 4: Agent Wallet + Status bar */}
@@ -886,6 +1001,32 @@ function HoldingsSummaryKpi({
         </div>
       </Card>
     </Link>
+  );
+}
+
+// Empty-state card shown when a fresh user has zero hunts in the feed.
+// Intentionally blunt about WHY the pack is idle — the most common cause is
+// "user hasn't opted into auto-hunt yet" — and points at the two actions that
+// will start producing hunts (set AUTO-HUNT cycles on the dashboard, or
+// trigger a one-shot via Telegram /run).
+function EmptyHuntsState() {
+  return (
+    <Card>
+      <CardBody className="text-center py-12 space-y-3">
+        <div className="flex items-center justify-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-void-600" />
+          <p className="text-void-300 text-sm font-semibold uppercase tracking-wider">
+            No hunts yet
+          </p>
+        </div>
+        <p className="text-void-500 text-xs max-w-md mx-auto leading-relaxed">
+          Your pack is idle. Set an <span className="text-gold-400">AUTO-HUNT</span> cycle count
+          above to schedule hunts, or send <code className="px-1 py-0.5 bg-void-800 text-void-300 rounded text-[10px]">/run</code>
+          to your Telegram bot to trigger a one-shot hunt. Every hunt — regardless of source —
+          will appear live in this feed.
+        </p>
+      </CardBody>
+    </Card>
   );
 }
 

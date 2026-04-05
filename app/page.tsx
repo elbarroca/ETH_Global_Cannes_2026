@@ -182,11 +182,7 @@ export default async function LandingPage() {
           <a href="#glass-box" className="text-dawg-400 hover:underline font-medium">
             thesis
           </a>{" "}
-          above, then the live wires on{" "}
-          <Link href="/infrastructure" className="text-dawg-400 hover:underline font-medium">
-            Stack
-          </Link>
-          .
+          above, then the architecture and proof sections below.
         </p>
       </section>
 
@@ -216,11 +212,7 @@ export default async function LandingPage() {
           ))}
         </div>
         <p className="mt-4 text-xs text-void-600">
-          Contracts, topics, and listeners are listed on{" "}
-          <Link href="/infrastructure" className="text-dawg-400 hover:underline">
-            Stack
-          </Link>
-          .
+          Contracts, topics, and listeners are listed on the Stack page (nav).
         </p>
       </section>
 
@@ -241,11 +233,8 @@ export default async function LandingPage() {
             <ProofLink href={ogChainAddressUrl(INFT_CONTRACT_ADDRESS)} label="iNFT contract" sub={truncateId(INFT_CONTRACT_ADDRESS)} />
           </div>
           <p className="mt-3 text-xs text-void-600">
-            Same identifiers documented in{" "}
-            <Link href="/infrastructure" className="text-dawg-400 hover:underline">
-              Stack
-            </Link>
-            . Stats above pull live sequence / supply from the Mirror API when env is configured.
+            Same identifiers are on the Stack page (nav). Stats above pull live sequence / supply from the Mirror API
+            when env is configured.
           </p>
         </div>
       </section>

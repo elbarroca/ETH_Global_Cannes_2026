@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRecentEvents } from "@/src/naryo/event-handler";
 import { fetchMirrorAuditLogFeed, type MirrorFeedEventRow } from "@/src/naryo/mirror-feed";
+import { mapFeedEvents, type NaryoFeedPipeline } from "@/src/naryo/feed-mapper";
 import { getPrisma } from "@/src/config/prisma";
 
 export const dynamic = "force-dynamic";
@@ -34,19 +35,29 @@ export async function GET(req: NextRequest) {
     ].slice(0, 50);
 
     type Row = (typeof merged)[number] | MirrorFeedEventRow;
-    let events: Row[] = merged;
-    let source: "buffer+db" | "db" | "mirror" = buffered.length > 0 ? "buffer+db" : "db";
+    let rawRows: Row[] = merged;
+    let pipeline: NaryoFeedPipeline = buffered.length > 0 ? "buffer+db" : "db";
 
-    if (events.length === 0 && !mirrorOff) {
+    if (rawRows.length === 0 && !mirrorOff) {
       const mirrorRows = await fetchMirrorAuditLogFeed(15);
       if (mirrorRows.length > 0) {
-        events = mirrorRows;
-        source = "mirror";
+        rawRows = mirrorRows;
+        pipeline = "mirror";
       }
     }
 
-    return NextResponse.json({ events, correlations, source });
+    const events = mapFeedEvents(rawRows as Array<MirrorFeedEventRow | Record<string, unknown>>);
+
+    return NextResponse.json({
+      events,
+      correlations,
+      pipeline,
+      source: pipeline,
+    });
   } catch (err) {
-    return NextResponse.json({ events: [], correlations: [], error: String(err), source: "error" }, { status: 200 });
+    return NextResponse.json(
+      { events: [], correlations: [], error: String(err), pipeline: "error" as const, source: "error" },
+      { status: 200 },
+    );
   }
 }

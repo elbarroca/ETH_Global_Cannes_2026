@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserById, updateUser } from "@/src/store/user-store";
 import { mintShares, grantKyc, getTokenInfo } from "@/src/hedera/hts";
 import { getOperatorId } from "@/src/config/hedera";
-import { ensureGatewayPoolFunded } from "@/src/payments/fund-swap";
 
 let cachedDecimals: number | null = null;
 async function getDecimals(): Promise<number> {
@@ -44,13 +43,18 @@ export async function POST(req: NextRequest) {
     const shareUnits = Math.round(amount * Math.pow(10, decimals));
     const { newTotalSupply } = await mintShares(shareUnits);
 
+    // NOTE: Deposit does NOT flip `agent.active = true`. Depositing USDC is
+    // NOT consent to hunt. The dashboard's "AUTO-HUNT N cycles" card is the
+    // ONLY surface that enrolls a user in the heartbeat loop (via
+    // /api/configure → cycleCount > 0 → active = true). Manual hunts from the
+    // dashboard Hunt button or Telegram /run still work regardless of
+    // `active`, because they hit /api/cycle/stream or runCycle() directly.
     const updated = await updateUser(userId, {
       fund: {
         depositedUsdc: user.fund.depositedUsdc + amount,
         currentNav: user.fund.currentNav + amount,
         htsShareBalance: user.fund.htsShareBalance + amount,
       },
-      agent: { active: true },
     });
 
     // Emit DepositRecorded event on Hedera EVM for Naryo (non-fatal)
@@ -63,25 +67,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Bootstrap the Circle Gateway pool for this user's x402 signer so the
-    // first cycle doesn't pay the deposit round-trip itself. Best-effort:
-    // the runCycle() guard will re-attempt if this fails here (e.g. if the
-    // deposit amount is smaller than the gateway topup floor). Non-fatal.
-    if (amount >= 0.60 && updated.hotWalletIndex != null) {
-      try {
-        const gwResult = await ensureGatewayPoolFunded(updated, 0.10, 0.50);
-        if (!gwResult.skipped) {
-          console.log(
-            `[deposit] Bootstrapped Gateway pool: +$${gwResult.depositedUsd.toFixed(6)} tx=${gwResult.depositTxHash}`,
-          );
-        }
-      } catch (err) {
-        console.warn(
-          "[deposit] Gateway pool bootstrap skipped (non-fatal — runCycle will retry):",
-          err instanceof Error ? err.message : String(err),
-        );
-      }
-    }
+    // NOTE: Circle Gateway pool bootstrap removed from the deposit path.
+    // Previously, depositing ≥ $0.60 would immediately bridge $0.50 out of
+    // the user's Circle proxy wallet to their BIP-44 hot wallet → Gateway
+    // pool contract, which looked to users like unexplained transfers to a
+    // "random wallet". The bootstrap is still handled lazily at the start
+    // of the first real cycle via `ensureGatewayPoolFunded()` in
+    // src/agents/main-agent.ts:~675 → so deposit is now a pure deposit with
+    // no side effects on the proxy wallet balance.
 
     return NextResponse.json({
       success: true,

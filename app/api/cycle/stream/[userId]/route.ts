@@ -78,10 +78,24 @@ export async function POST(
   }
 
   const body = await request.json().catch(() => ({}));
-  const goal: string =
-    typeof (body as { goal?: unknown }).goal === "string" && (body as { goal: string }).goal.trim().length > 0
+  // Goal resolution priority:
+  //   1. Per-hunt override from the request body (e.g. user typed a custom
+  //      goal in the dashboard hunt input for this one click).
+  //   2. Persistent `user.agent.goal` configured via /api/configure — this
+  //      is the user's authored standing goal.
+  //   3. Generic risk-profile template as a last-resort fallback so the
+  //      specialists always have SOMETHING to anchor their picks.
+  const bodyGoal =
+    typeof (body as { goal?: unknown }).goal === "string"
       ? (body as { goal: string }).goal.trim()
-      : `Grow portfolio, max ${user.agent.maxTradePercent}% per trade, ${user.agent.riskProfile} risk`;
+      : "";
+  const savedGoal = user.agent.goal?.trim() ?? "";
+  const goal: string =
+    bodyGoal.length > 0
+      ? bodyGoal
+      : savedGoal.length > 0
+        ? savedGoal
+        : `Grow portfolio, max ${user.agent.maxTradePercent}% per trade, ${user.agent.riskProfile} risk`;
 
   const nextCycleId = user.agent.lastCycleId + 1;
   const prisma = getPrisma();

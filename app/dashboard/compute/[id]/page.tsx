@@ -39,6 +39,8 @@ export default function ComputePage() {
   const [data, setData] = useState<ComputeDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [showFullStorageRoot, setShowFullStorageRoot] = useState(false);
+  const [fullPriorCidIdx, setFullPriorCidIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!userId || !params.id) return;
@@ -165,37 +167,108 @@ export default function ComputePage() {
         )}
       </div>
 
-      {/* Memory Recall — RAG proof for the OpenClaw "evolving memory / RAG" bounty.
-           Lists the 0G Storage CIDs of the prior cycles that were loaded as context
-           at this cycle's start and injected into the specialist + debate prompts. */}
+      {c.storageHash && (
+        <div className="rounded-2xl border border-purple-500/25 bg-purple-950/20 p-4">
+          <p className="text-[11px] text-purple-300 uppercase tracking-wider font-semibold mb-2">
+            This hunt&apos;s RichCycleRecord (0G root hash)
+          </p>
+          <p className="font-mono text-sm text-gold-400 break-all">
+            {showFullStorageRoot ? c.storageHash : truncHash(c.storageHash)}
+          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => setShowFullStorageRoot((v) => !v)}
+              className="text-[10px] text-void-500 hover:text-void-300 underline decoration-dotted"
+            >
+              {showFullStorageRoot ? "Show shortened" : "Show full hash"}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(c.storageHash ?? "").catch(() => {})}
+              className="text-[10px] text-gold-400/80 hover:text-gold-400"
+            >
+              Copy
+            </button>
+          </div>
+          {c.hcsSeqNum != null && c.hcsSeqNum > 0 && (
+            <p className="text-[10px] text-void-600 mt-3 leading-relaxed">
+              Same root hash as compact field <code className="text-void-400">sh</code> in the HCS audit message on
+              topic <span className="font-mono text-void-400">{HCS_TOPIC_ID}</span>, seq #
+              <span className="font-mono text-void-400">{c.hcsSeqNum}</span> (
+              <a
+                href={hashscanMessageUrl(HCS_TOPIC_ID, c.hcsSeqNum)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-teal-400 hover:underline"
+              >
+                Hashscan
+              </a>
+              ).
+            </p>
+          )}
+          {typeof process !== "undefined" && process.env.NEXT_PUBLIC_OG_STORAGE_INDEXER && (
+            <p className="text-[10px] text-void-600 mt-2">
+              0G Storage indexer (API):{" "}
+              <a
+                href={process.env.NEXT_PUBLIC_OG_STORAGE_INDEXER.replace(/\/$/, "")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gold-400/90 hover:underline break-all"
+              >
+                {process.env.NEXT_PUBLIC_OG_STORAGE_INDEXER}
+              </a>
+              . No public blob browser — verify via indexer (
+              <code className="text-void-500">loadMemory(rootHash)</code>).
+            </p>
+          )}
+        </div>
+      )}
+
       {priorCids.length > 0 && (
         <div className="rounded-2xl border border-gold-400/25 bg-gold-400/[0.03] p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs text-gold-400 uppercase tracking-wider font-semibold">
-              🧠 Memory Recall — {priorCids.length} prior {priorCids.length === 1 ? "cycle" : "cycles"} loaded from 0G Storage
+              RAG context — prior hunt blobs (0G root hashes)
             </p>
             <Badge variant="purple">RAG</Badge>
           </div>
-          <div className="space-y-1">
-            {priorCids.map((cid, i) => (
-              <button
-                key={cid}
-                type="button"
-                onClick={() => navigator.clipboard.writeText(cid).catch(() => {})}
-                className="flex items-center gap-2 text-xs font-mono text-gold-400/80 hover:text-gold-400 transition-colors"
-                title={`Click to copy: ${cid}`}
-              >
-                <span className="text-void-600">{i + 1}.</span>
-                <span className="break-all">{cid.slice(0, 18)}…{cid.slice(-6)}</span>
-                <span className="text-void-600 text-[10px]">📋</span>
-              </button>
-            ))}
-          </div>
-          <p className="text-[10px] text-void-500 mt-2 leading-relaxed">
-            Each CID points at the RichCycleRecord of a prior hunt. 0G Storage is
-            used as evolving agent memory — the 7B specialists + Alpha/Risk/Executor
-            agents read these prior cycles as RAG context before making this decision.
+          <p className="text-[10px] text-void-600 mb-3 leading-relaxed">
+            Loaded at cycle start and injected into specialist + debate prompts (this hunt cites the memory it used).
           </p>
+          <div className="space-y-2">
+            {priorCids.map((cid, i) => {
+              const showFull = fullPriorCidIdx === i;
+              const display =
+                showFull || cid.length <= 28 ? cid : `${cid.slice(0, 18)}…${cid.slice(-6)}`;
+              return (
+                <div key={cid} className="space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-void-600 text-xs w-4">{i + 1}.</span>
+                    <span className="text-xs font-mono text-gold-400/90 break-all flex-1 min-w-0" title={cid}>
+                      {display}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard.writeText(cid).catch(() => {})}
+                      className="text-[10px] text-gold-400/80 hover:text-gold-400 shrink-0"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  {cid.length > 28 && (
+                    <button
+                      type="button"
+                      onClick={() => setFullPriorCidIdx(showFull ? null : i)}
+                      className="text-[10px] text-void-500 hover:text-void-300 underline decoration-dotted ml-6"
+                    >
+                      {showFull ? "Show shortened" : "Show full hash"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
