@@ -159,32 +159,73 @@ export function JsonPayloadTree({ value }: { value: unknown }) {
   );
 }
 
+function safeStringifyPanel(v: unknown): string {
+  try {
+    return JSON.stringify(v, null, 2);
+  } catch {
+    return String(v);
+  }
+}
+
 export function JsonPayloadPanel({
   value,
   onCopy,
   copied,
+  variant = "dark",
 }: {
   value: unknown;
   onCopy: () => void;
   copied: boolean;
+  variant?: "dark" | "light";
 }) {
+  const isLight = variant === "light";
   return (
-    <div className="mt-0 border-t border-void-800/60 pt-2 pb-1 px-1">
+    <div
+      className={
+        isLight
+          ? "mt-0 border-t-2 border-neutral-300 pt-2 pb-1 px-1"
+          : "mt-0 border-t border-void-800/60 pt-2 pb-1 px-1"
+      }
+    >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-[9px] font-semibold uppercase tracking-wider text-void-500">Payload</span>
+        <span
+          className={
+            isLight
+              ? "text-[9px] font-semibold uppercase tracking-wider text-neutral-600"
+              : "text-[9px] font-semibold uppercase tracking-wider text-void-500"
+          }
+        >
+          Payload
+        </span>
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onCopy();
           }}
-          className="text-[9px] font-mono px-2 py-0.5 rounded-md border border-void-700/70 bg-void-900/60 text-void-400 hover:text-void-200 hover:border-void-600 transition-colors"
+          className={
+            isLight
+              ? "text-[9px] font-mono px-2 py-0.5 rounded-md border-2 border-neutral-900 bg-white text-neutral-900 hover:bg-neutral-100 transition-colors"
+              : "text-[9px] font-mono px-2 py-0.5 rounded-md border border-void-700/70 bg-void-900/60 text-void-400 hover:text-void-200 hover:border-void-600 transition-colors"
+          }
         >
           {copied ? "Copied" : "Copy JSON"}
         </button>
       </div>
-      <div className="rounded-lg border border-void-800/90 bg-black/40 p-2.5 max-h-44 overflow-auto shadow-[inset_0_0_20px_rgba(0,0,0,0.35)]">
-        <JsonPayloadTree value={value} />
+      <div
+        className={
+          isLight
+            ? "rounded-lg border-2 border-neutral-900 bg-white p-2.5 max-h-44 overflow-auto shadow-sm"
+            : "rounded-lg border border-void-800/90 bg-black/40 p-2.5 max-h-44 overflow-auto shadow-[inset_0_0_20px_rgba(0,0,0,0.35)]"
+        }
+      >
+        {isLight ? (
+          <pre className="text-[10px] leading-relaxed text-neutral-900 font-mono whitespace-pre-wrap break-words select-text">
+            {safeStringifyPanel(value)}
+          </pre>
+        ) : (
+          <JsonPayloadTree value={value} />
+        )}
       </div>
     </div>
   );

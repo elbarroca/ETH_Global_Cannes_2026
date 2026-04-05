@@ -40,11 +40,18 @@ const ACTION_STYLES: Record<string, ActionStyle> = {
   DEBATE_EXECUTOR:  { label: "VERDICT",  tone: "dawg" },
   HCS_LOGGED:       { label: "HCS",      tone: "teal" },
   STORAGE_UPLOADED: { label: "0G",       tone: "teal" },
+  OG_HIRE_STORED:   { label: "0G·HIRE",  tone: "teal" },
+  OG_TURN_STORED:   { label: "0G·TRN",   tone: "teal" },
+  PAYMENT_SENT:     { label: "FUND",     tone: "green" },
   INFT_UPDATED:     { label: "iNFT",     tone: "purple" },
   TRADE_EXECUTED:   { label: "SWAP",     tone: "dawg" },
   SWAP_FAILED:      { label: "SWAP✗",    tone: "red" },
   CYCLE_STARTED:    { label: "START",    tone: "void" },
   CYCLE_COMPLETED:  { label: "SEALED",   tone: "dawg" },
+  // Terminal "hunt done" marker — fires exactly once per hunt at the very end
+  // of commitCycle, so it's the canonical "your hunt is finished" signal for
+  // the user. Rendered with the loudest tone in the palette.
+  HUNT_COMPLETE:    { label: "HUNT ✓",   tone: "dawg" },
   CYCLE_REJECTED:   { label: "REJ",      tone: "red" },
   AGENT_HIRED:      { label: "PACK+",    tone: "dawg" },
   AGENT_FIRED:      { label: "PACK−",    tone: "void" },
@@ -196,6 +203,31 @@ function describe(row: SwarmActivityRow): string {
       if (cycleNum != null) return `Uploaded hunt #${cycleNum} reasoning to 0G Storage`;
       return "Memory uploaded to 0G decentralized storage";
     }
+    case "OG_HIRE_STORED": {
+      const spec = typeof p.specialist === "string" ? p.specialist : null;
+      const sh = typeof p.storageHash === "string" ? p.storageHash : null;
+      const by = typeof p.hiredBy === "string" ? p.hiredBy : null;
+      if (spec && sh) {
+        return `${by ? `${by} → ` : ""}${spec} hire blob stored on 0G · ${sh.slice(0, 10)}…`;
+      }
+      return "Specialist hire rich payload stored on 0G Storage";
+    }
+    case "OG_TURN_STORED": {
+      const tn = typeof p.turnNumber === "number" ? p.turnNumber : null;
+      const ph = typeof p.phase === "string" ? p.phase : null;
+      const from = typeof p.from === "string" ? p.from : null;
+      const sh = typeof p.storageHash === "string" ? p.storageHash : null;
+      if (tn != null && ph && from && sh) {
+        return `Debate turn ${tn} (${ph}, ${from}) stored on 0G · ${sh.slice(0, 10)}…`;
+      }
+      return "Debate turn payload stored on 0G Storage";
+    }
+    case "PAYMENT_SENT": {
+      const st = typeof p.stage === "string" ? p.stage : null;
+      if (st === "funds_transferring") return "Bridging USDC from proxy wallet to hot wallet for swap";
+      if (st === "funds_ready") return "Hot wallet funded — executing or ready for Arc swap";
+      return "Fund movement on the agent wallet path";
+    }
     case "INFT_UPDATED": {
       if (tokenId != null) return `Refreshed iNFT #${tokenId} metadata on 0G Chain`;
       return "Agent iNFT metadata refreshed on 0G Chain";
@@ -217,11 +249,40 @@ function describe(row: SwarmActivityRow): string {
       return "New hunt cycle initiated by the main agent";
     }
     case "CYCLE_COMPLETED": {
+      const st = typeof p.stage === "string" ? p.stage : null;
+      if (st === "narrative_ready") {
+        const headline = typeof p.headline === "string" ? p.headline : null;
+        return headline
+          ? `Narrative sealed: ${headline.length > 100 ? `${headline.slice(0, 100)}…` : headline}`
+          : "Cycle narrative ready for 0G + HCS commit";
+      }
+      if (st === "override_applied") {
+        return "Executor override applied — debate default BUY enforced";
+      }
+      if (st === "asset_filtered") {
+        const orig = typeof p.original === "string" ? p.original : null;
+        const fin = typeof p.final === "string" ? p.final : null;
+        if (orig && fin) return `Tradeable asset normalized: ${orig} → ${fin}`;
+        return "Final asset validated against EVM whitelist";
+      }
       if (decision && asset && pct != null && cycleNum != null) {
         return `Hunt #${cycleNum} committed: ${decision} ${pct}% ${asset}`;
       }
       if (decision && asset) return `Cycle committed: ${decision} ${asset}`;
       return "Hunt cycle committed to the audit trail";
+    }
+    case "HUNT_COMPLETE": {
+      // Terminal, once-per-hunt row written at the very end of commitCycle.
+      // Payload always carries cycleNumber + decision + asset + pct; headline
+      // may be present if the narrative synthesis succeeded.
+      const headline = typeof p.headline === "string" ? p.headline : null;
+      const dur = typeof p.durationMs === "number" ? p.durationMs : null;
+      const durStr = dur != null && dur > 0 ? ` in ${(dur / 1000).toFixed(1)}s` : "";
+      if (decision && asset && pct != null && cycleNum != null) {
+        return `HUNT #${cycleNum} SEALED: ${decision} ${pct}% ${asset}${durStr}${headline ? ` — ${headline.slice(0, 80)}${headline.length > 80 ? "…" : ""}` : ""}`;
+      }
+      if (cycleNum != null) return `HUNT #${cycleNum} SEALED${durStr}`;
+      return "Hunt sealed to the audit trail";
     }
     case "CYCLE_REJECTED": {
       if (cycleNum != null) return `Hunt #${cycleNum} rejected by the user`;
@@ -301,7 +362,7 @@ const TONE_BORDER: Record<ActionStyle["tone"], string> = {
  * Sized for TV viewing: labels are 22px, descriptions 14px, meta 12px.
  */
 export function SwarmActivityTicker() {
-  const { refreshAgentBalance } = useUser();
+  const { refreshAgentBalance, userId } = useUser();
   const [rows, setRows] = useState<SwarmActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
   // Currently-expanded row id. Only one row open at a time — clicking another
@@ -321,7 +382,9 @@ export function SwarmActivityTicker() {
 
   const fetchRows = useCallback(async () => {
     try {
-      const res = await fetch(`/api/swarm/activity?limit=${LIMIT}`, { cache: "no-store" });
+      const params = new URLSearchParams({ limit: String(LIMIT) });
+      if (userId) params.set("userId", userId);
+      const res = await fetch(`/api/swarm/activity?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) return;
       const data = (await res.json()) as SwarmActivityResponse;
       const nextRows = data.rows ?? [];
@@ -355,7 +418,7 @@ export function SwarmActivityTicker() {
     } finally {
       setLoading(false);
     }
-  }, [refreshAgentBalance]);
+  }, [refreshAgentBalance, userId]);
 
   useEffect(() => {
     void fetchRows();

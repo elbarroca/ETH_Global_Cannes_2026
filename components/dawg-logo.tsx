@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 
 interface DawgLogoProps {
@@ -9,6 +11,10 @@ interface DawgLogoProps {
   /** Rendered pixel size. Defaults to 64. Keep this close to the displayed
    *  size so Next.js picks the right raster bucket. */
   size?: number;
+  /** Skip image optimizer (helps in modals / strict client trees). */
+  unoptimized?: boolean;
+  /** Defaults to `/logo.png`. Use `/logo-square.png` for squared frames. */
+  src?: string;
 }
 
 /**
@@ -23,9 +29,14 @@ export function DawgLogo({
   animated = false,
   title = "AlphaDawg",
   size = 64,
+  unoptimized = false,
+  src = "/logo.png",
 }: DawgLogoProps) {
+  // If caller sets their own rounding (e.g. rounded-lg in a modal), don't force rounded-full.
+  const hasCustomRounding = /\brounded-/.test(className ?? "");
   const classes = [
-    "dawg-logo select-none rounded-full overflow-hidden",
+    "dawg-logo select-none overflow-hidden object-cover",
+    !hasCustomRounding && "rounded-full",
     animated ? "dawg-logo-animated" : "",
     className ?? "",
   ]
@@ -34,12 +45,13 @@ export function DawgLogo({
 
   return (
     <Image
-      src="/logo.png"
+      src={src}
       alt={title}
       width={size}
       height={size}
       priority
       draggable={false}
+      unoptimized={unoptimized}
       className={classes}
     />
   );

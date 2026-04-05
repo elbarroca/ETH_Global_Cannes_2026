@@ -82,9 +82,12 @@ function CompactView({
     <button onClick={onClick} className="w-full text-left group">
       {/* Top strip — hunt number + time + action badge */}
       <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-3 mb-3">
-        <div className="flex items-baseline gap-3 min-w-0">
+        <div className="flex items-baseline gap-3 min-w-0 flex-wrap">
           <span className="font-pixel glow-dawg text-[20px] sm:text-[22px] leading-none text-[#FFCC00] uppercase tracking-wider shrink-0">
             HUNT #{cycle.id}
+          </span>
+          <span className="font-pixel text-[10px] sm:text-xs leading-none text-void-500 uppercase tracking-wide shrink-0">
+            Completed
           </span>
           <span className="font-pixel text-sm sm:text-base leading-none text-void-400 tabular-nums">{time}</span>
         </div>
@@ -618,7 +621,7 @@ function InlineDetail({
                   <CodeBlock>
                     <div className="space-y-1 text-void-500">
                       <div>Topic: <span className="text-void-200">{cycle.hcs.topicId}</span></div>
-                      <div>Seq: <span className="text-void-200">#{cycle.hcs.sequenceNumber}</span> · Time: {cycle.hcs.timestamp}</div>
+                      <div>Seq: <span className="text-void-200">#{cycle.hcs.sequenceNumber}</span> · Committed: {cycle.hcs.timestamp}</div>
                       <div className="text-void-600">6 attestations · 3 payments · 1 decision</div>
                     </div>
                   </CodeBlock>

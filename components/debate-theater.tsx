@@ -1,10 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DebateTranscriptResponse, DebateTurn } from "@/lib/types";
 import { agentEmoji, agentLabel, getSwarmAgent } from "@/lib/swarm-endpoints";
 
 const POLL_ACTIVE_MS = 2_000;
+/**
+ * When a cycle has just committed, there's a brief window (< 5s usually)
+ * where the Cycle row exists but commitCycle step 6 (debate transcript
+ * persistence) is still inserting rows. Without retries the fetch returns
+ * an empty array and the user sees "0 turns" forever. Retry a few times
+ * before giving up so a freshly-committed hunt populates itself.
+ */
+const EMPTY_RETRY_INTERVAL_MS = 1_500;
+const EMPTY_RETRY_MAX_ATTEMPTS = 20; // ~30s total
 
 interface DebateTheaterProps {
   /** UUID from the cycles table (not the display cycleNumber). */
@@ -69,33 +78,71 @@ export function DebateTheater({
   const [turns, setTurns] = useState<DebateTurn[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const emptyAttemptsRef = useRef(0);
+  const mountedRef = useRef(true);
 
-  const fetchTurns = useCallback(async () => {
+  const fetchTurns = useCallback(async (): Promise<number> => {
     try {
       const res = await fetch(
         `/api/cycle/debate/${cycleUuid}?userId=${encodeURIComponent(userId)}`,
         { cache: "no-store" },
       );
       if (!res.ok) {
-        setError(`${res.status}`);
-        return;
+        if (mountedRef.current) setError(`${res.status}`);
+        return -1;
       }
       const data = (await res.json()) as DebateTranscriptResponse;
-      setTurns(data.transcripts ?? []);
-      setError(null);
+      const next = data.transcripts ?? [];
+      if (mountedRef.current) {
+        setTurns(next);
+        setError(null);
+      }
+      return next.length;
     } catch (err) {
-      setError(String((err as Error).message ?? err));
+      if (mountedRef.current) setError(String((err as Error).message ?? err));
+      return -1;
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [cycleUuid, userId]);
 
   useEffect(() => {
     if (!cycleUuid || !userId) return;
-    void fetchTurns();
-    if (!isActive) return;
-    const id = setInterval(fetchTurns, POLL_ACTIVE_MS);
-    return () => clearInterval(id);
+    mountedRef.current = true;
+    emptyAttemptsRef.current = 0;
+
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+    const runInitial = async () => {
+      const count = await fetchTurns();
+      // If the fetch succeeded but came back empty, the cycle may have JUST
+      // committed and the transcript inserts (commitCycle step 6) are still
+      // landing. Retry a few times before giving up.
+      if (count === 0 && mountedRef.current) {
+        const scheduleRetry = () => {
+          if (!mountedRef.current) return;
+          if (emptyAttemptsRef.current >= EMPTY_RETRY_MAX_ATTEMPTS) return;
+          emptyAttemptsRef.current += 1;
+          retryTimer = setTimeout(async () => {
+            const n = await fetchTurns();
+            if (n === 0) scheduleRetry();
+          }, EMPTY_RETRY_INTERVAL_MS);
+        };
+        scheduleRetry();
+      }
+    };
+    void runInitial();
+
+    if (isActive) {
+      pollInterval = setInterval(fetchTurns, POLL_ACTIVE_MS);
+    }
+
+    return () => {
+      mountedRef.current = false;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [fetchTurns, cycleUuid, userId, isActive]);
 
   // Group turns by phase for the lane renderer.
