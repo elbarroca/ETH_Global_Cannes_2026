@@ -148,12 +148,12 @@ export function EvolutionChart({ evolution }: { evolution: EvolutionPoint[] }) {
         <path d={pathD} fill="none" stroke="#9A8540" strokeWidth="1.75" opacity={0.85} />
 
         {/* Per-cycle points, colored by action */}
-        {points.map((p) => {
+        {points.map((p, i) => {
           const x = xScale(p.cycleNumber);
           const y = yScale(p.navAfter);
           const color = ACTION_COLORS[p.action.toUpperCase()] ?? "#5C594F";
           return (
-            <g key={p.cycleNumber}>
+            <g key={p.cycleId ?? `ev-${p.cycleNumber}-${p.timestamp}-${i}`}>
               <circle cx={x} cy={y} r={4.5} fill={color} stroke="#070605" strokeWidth="1">
                 <title>
                   Hunt #{p.cycleNumber} · {p.action} {p.pct}% {p.asset} · NAV $

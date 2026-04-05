@@ -787,8 +787,8 @@ function InlineDetail({
                   {cycle.memory.length > 0 && (
                     <div>
                       <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">Pack memory</div>
-                      {cycle.memory.map((m) => (
-                        <div key={m.cycleRef} className="flex gap-2">
+                      {cycle.memory.map((m, i) => (
+                        <div key={`${cycle.id}-mem-${i}`} className="flex gap-2">
                           <span className="font-mono text-xs text-gold-400 shrink-0 pt-0.5">#{m.cycleRef}</span>
                           <p className="text-xs text-void-500 leading-relaxed">{m.text}</p>
                         </div>

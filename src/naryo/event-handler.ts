@@ -25,7 +25,9 @@ type NaryoSource =
   // Exhaustive Hedera EVM coverage — matches Naryo filters in naryo/application.yml
   | "specialist"
   | "heartbeat"
-  | "cross-chain";
+  | "cross-chain"
+  // Arc testnet — direct listener on AlphaDawgSwap AMM
+  | "arc-swap";
 
 const SOURCE_TO_CHAIN: Record<NaryoSource, string> = {
   hcs: "hedera",
@@ -40,6 +42,7 @@ const SOURCE_TO_CHAIN: Record<NaryoSource, string> = {
   // event payload — we tag them "hedera" here because that's where Naryo
   // captured the log. The dashboard feed widget shows the embedded sourceChain.
   "cross-chain": "hedera",
+  "arc-swap": "arc",
 };
 
 const SOURCE_TO_ACTION: Record<NaryoSource, string> = {
@@ -52,6 +55,7 @@ const SOURCE_TO_ACTION: Record<NaryoSource, string> = {
   specialist: "NARYO_SPECIALIST_EVENT",
   heartbeat: "NARYO_HEARTBEAT_EVENT",
   "cross-chain": "NARYO_CROSS_CHAIN_EVENT",
+  "arc-swap": "NARYO_ARC_SWAP_EVENT",
 };
 
 // In-memory buffer for dashboard feed
@@ -72,13 +76,25 @@ export function getRecentEvents() {
 
 // ── Process incoming Naryo event ─────────────────────────────────────
 
+function resolveStoredEventType(payload: NaryoEventPayload): string {
+  const t = payload.type;
+  if (t && t !== "UNKNOWN") return t;
+  const d = payload.details;
+  if (d && typeof d === "object" && !Array.isArray(d)) {
+    const inner = (d as Record<string, unknown>).eventType;
+    if (inner === "CONTRACT") return "CONTRACT_EVENT";
+    if (inner === "TRANSACTION") return "TRANSACTION";
+  }
+  return t ?? "UNKNOWN";
+}
+
 export async function processNaryoEvent(
   payload: NaryoEventPayload,
   source: string,
 ): Promise<string> {
   const naryoSource = source as NaryoSource;
   const chain = SOURCE_TO_CHAIN[naryoSource] ?? "unknown";
-  const eventType = payload.type ?? "UNKNOWN";
+  const eventType = resolveStoredEventType(payload);
   const txHash = payload.transactionHash ?? null;
 
   console.log(`[naryo] Event received: source=${source} chain=${chain} type=${eventType} tx=${txHash ?? "n/a"}`);

@@ -4,9 +4,12 @@
 
 naryo:
   # ── Nodes (2 chains for multi-DLT correlation) ──────────────────
+  # NOTE: All ids are UUIDs (Naryo :latest schema requirement). Slug
+  # names are preserved as comments so this file stays greppable.
   nodes:
     # Node 1: Hedera Testnet — polls Mirror Node for native + EVM events
-    - id: "hedera-testnet-node"
+    # hedera-testnet-node
+    - id: "faed2b4a-b90b-44b0-92c0-e4962678c909"
       name: "Hedera Testnet"
       type: HEDERA
       connection:
@@ -14,14 +17,19 @@ naryo:
         endpoint:
           url: https://testnet.mirrornode.hedera.com
       interaction:
+        strategy: BLOCK_BASED
         mode: HEDERA_MIRROR_NODE
+        limitPerRequest: 100
+        retriesPerRequest: 3
       subscription:
+        strategy: BLOCK_BASED
         method: POLL
         interval: 2s
         confirmationBlocks: 0
 
     # Node 2: 0G Chain — polls RPC for EVM contract events
-    - id: "og-chain-node"
+    # og-chain-node
+    - id: "2ebbfdc7-e3cf-44fa-8919-38fd5d9c4e5a"
       name: "0G Chain Testnet"
       type: ETHEREUM
       connection:
@@ -29,34 +37,61 @@ naryo:
         endpoint:
           url: https://evmrpc-testnet.0g.ai
       interaction:
+        strategy: BLOCK_BASED
         mode: ETHEREUM_RPC
+        limitPerRequest: 100
+        retriesPerRequest: 3
       subscription:
+        strategy: BLOCK_BASED
         method: POLL
         interval: 5s
         confirmationBlocks: 1
 
-  # ── Filters (6 total — exhaustive Hedera service coverage) ──────
+    # Node 3: Arc Testnet — polls RPC for AlphaDawgSwap trades
+    # arc-testnet-node
+    - id: "4627b147-2b59-4094-a11f-5ae18b7557f3"
+      name: "Arc Testnet"
+      type: ETHEREUM
+      connection:
+        type: HTTP
+        endpoint:
+          url: ${ARC_RPC_URL:-https://rpc.testnet.arc.network}
+      interaction:
+        strategy: BLOCK_BASED
+        mode: ETHEREUM_RPC
+        limitPerRequest: 100
+        retriesPerRequest: 3
+      subscription:
+        strategy: BLOCK_BASED
+        method: POLL
+        interval: 5s
+        confirmationBlocks: 1
+
+  # ── Filters (9 total — exhaustive Hedera + 0G coverage) ─────────
   filters:
     # 1. HCS Topic messages (native Hedera transaction filter)
-    - id: "hcs-topic-filter"
+    # hcs-topic-filter
+    - id: "7b7e39d5-a2ab-40fa-be63-cdd3f6142f4d"
       name: "AlphaDawg HCS Audit Trail"
-      nodeId: "hedera-testnet-node"
+      nodeId: "faed2b4a-b90b-44b0-92c0-e4962678c909"
       type: TRANSACTION
       identifierType: IDENTITY_ID
       value: ${TOPIC_ID:-0.0.8497439}
 
     # 2. HTS Token transfers (native Hedera transaction filter)
-    - id: "hts-token-filter"
+    # hts-token-filter
+    - id: "31c4b03a-8cd0-4509-b0fe-22b39cf1a11a"
       name: "AlphaDawg HTS Fund Token"
-      nodeId: "hedera-testnet-node"
+      nodeId: "faed2b4a-b90b-44b0-92c0-e4962678c909"
       type: TRANSACTION
       identifierType: IDENTITY_ID
       value: ${TOKEN_ID:-0.0.8498202}
 
     # 3. CycleCompleted events (Hedera EVM contract)
-    - id: "cycle-event-filter"
+    # cycle-event-filter
+    - id: "0a934053-f6f1-4ed4-803e-bac4af86a25c"
       name: "CycleCompleted Events"
-      nodeId: "hedera-testnet-node"
+      nodeId: "faed2b4a-b90b-44b0-92c0-e4962678c909"
       type: EVENT
       scope: CONTRACT
       specification:
@@ -64,9 +99,10 @@ naryo:
       address: ${CONTRACT_ADDRESS}
 
     # 4. DepositRecorded events (Hedera EVM contract)
-    - id: "deposit-event-filter"
+    # deposit-event-filter
+    - id: "6cbd3936-22c9-4603-bf8e-b4afb033ebdc"
       name: "DepositRecorded Events"
-      nodeId: "hedera-testnet-node"
+      nodeId: "faed2b4a-b90b-44b0-92c0-e4962678c909"
       type: EVENT
       scope: CONTRACT
       specification:
@@ -74,9 +110,10 @@ naryo:
       address: ${CONTRACT_ADDRESS}
 
     # 5. AgentMinted events (0G Chain — VaultMindAgent iNFT)
-    - id: "og-mint-filter"
+    # og-mint-filter
+    - id: "bbceeb0c-cdb5-493a-8135-462ef17f71d0"
       name: "0G Chain AgentMinted"
-      nodeId: "og-chain-node"
+      nodeId: "2ebbfdc7-e3cf-44fa-8919-38fd5d9c4e5a"
       type: EVENT
       scope: CONTRACT
       specification:
@@ -84,90 +121,244 @@ naryo:
       address: ${OG_CONTRACT_ADDRESS:-0x73e3016D0D3Bf2985c55860cd2A51FF017c2c874}
 
     # 6. MetadataUpdated events (0G Chain — VaultMindAgent iNFT)
-    - id: "og-metadata-filter"
+    # og-metadata-filter
+    - id: "bfbb621f-5ba4-4e72-be15-1513a0eb8760"
       name: "0G Chain MetadataUpdated"
-      nodeId: "og-chain-node"
+      nodeId: "2ebbfdc7-e3cf-44fa-8919-38fd5d9c4e5a"
       type: EVENT
       scope: CONTRACT
       specification:
         signature: "MetadataUpdated(uint256,bytes32,string,uint256)"
       address: ${OG_CONTRACT_ADDRESS:-0x73e3016D0D3Bf2985c55860cd2A51FF017c2c874}
 
+    # 7. SpecialistHired events (Hedera EVM — one per x402 hire)
+    #    Makes the Naryo feed show a row for every nanopayment-funded
+    #    specialist call, not just the cycle aggregate. Exhaustive coverage
+    #    of the agent hiring economy.
+    # specialist-event-filter
+    - id: "d43c1813-c3c3-4ff2-8d8a-1de015444455"
+      name: "SpecialistHired Events"
+      nodeId: "faed2b4a-b90b-44b0-92c0-e4962678c909"
+      type: EVENT
+      scope: CONTRACT
+      specification:
+        signature: "SpecialistHired(address,string,uint256)"
+      address: ${CONTRACT_ADDRESS}
+
+    # 8. HeartbeatEmitted events (Hedera EVM — throttled cadence proof)
+    #    Emitted every Nth heartbeat tick in src/agents/heartbeat.ts so the
+    #    Naryo feed has an on-chain proof of the cadence loop alongside HCS
+    #    scheduled transactions.
+    # heartbeat-event-filter
+    - id: "26838c1d-dccf-46b8-ad4e-72473041c595"
+      name: "HeartbeatEmitted Events"
+      nodeId: "faed2b4a-b90b-44b0-92c0-e4962678c909"
+      type: EVENT
+      scope: CONTRACT
+      specification:
+        signature: "HeartbeatEmitted(uint256,uint256)"
+      address: ${CONTRACT_ADDRESS}
+
+    # 9. CrossChainCorrelation events (Hedera EVM — multi-DLT story)
+    #    Emitted after every successful Arc swap to bridge the Arc txHash into
+    #    the Hedera audit log. This is what turns the "Hedera + 0G" feed into
+    #    a "Hedera + 0G + Arc" story for the exhaustive-Naryo-use bounty.
+    # cross-chain-filter
+    - id: "713b53f4-a991-4101-9af5-bde7d1eb6bb3"
+      name: "CrossChainCorrelation Events"
+      nodeId: "faed2b4a-b90b-44b0-92c0-e4962678c909"
+      type: EVENT
+      scope: CONTRACT
+      specification:
+        signature: "CrossChainCorrelation(string,string,bytes32)"
+      address: ${CONTRACT_ADDRESS}
+
+    # 10. Swap events (Arc — AlphaDawgSwap AMM)
+    #     Direct listening to the Arc trade surface: every exactInputSingle
+    #     (BUY) and exactInputSingleSell (SELL) on AlphaDawgSwap fires this
+    #     event. Lets the dashboard show real on-chain trades as they happen,
+    #     decoupled from the Hedera CrossChainCorrelation mirror path.
+    # arc-swap-filter
+    - id: "ed06d7d1-ae4b-448e-a802-302d63b00c77"
+      name: "Arc AlphaDawgSwap Trades"
+      nodeId: "4627b147-2b59-4094-a11f-5ae18b7557f3"
+      type: EVENT
+      scope: CONTRACT
+      specification:
+        signature: "Swap(address,bool,uint256,uint256)"
+      address: ${ARC_UNISWAP_ROUTER:-0xB2Be009Fce720B101E9367951423E0BF70600d36}
+
   # ── Broadcasting (HTTP POST to AlphaDawg) ───────────────────────
+  # NOTE: Naryo :latest (schema bump ~2026-04) requires UUID strings for
+  # broadcaster configuration ids and for each broadcaster id. Slugs are
+  # kept in comments so the yml is still readable.
   broadcasting:
     configuration:
-      - id: "alphadawg-http"
+      # alphadawg-http
+      - id: "813f547e-b43a-49ce-8216-bbbd46a412db"
         type: HTTP
         endpoint:
           url: http://host.docker.internal:3000
 
     broadcasters:
       # Hedera native events
-      - id: "hcs-broadcaster"
-        configurationId: "alphadawg-http"
+      # hcs-broadcaster
+      - id: "10c01606-7717-456b-805b-7faac9bca5ed"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
         target:
           type: FILTER
-          filterId: "hcs-topic-filter"
+          filterId: "7b7e39d5-a2ab-40fa-be63-cdd3f6142f4d"
           destinations:
             - /api/naryo/events/hcs
 
-      - id: "hts-broadcaster"
-        configurationId: "alphadawg-http"
+      # hts-broadcaster
+      - id: "12b72077-fab1-4fa7-a23c-062ef3177d07"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
         target:
           type: FILTER
-          filterId: "hts-token-filter"
+          filterId: "31c4b03a-8cd0-4509-b0fe-22b39cf1a11a"
           destinations:
             - /api/naryo/events/hts
 
       # Hedera EVM events
-      - id: "cycle-broadcaster"
-        configurationId: "alphadawg-http"
+      # cycle-broadcaster
+      - id: "612fd4fa-f171-4526-ba22-0fb6126abf94"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
         target:
           type: FILTER
-          filterId: "cycle-event-filter"
+          filterId: "0a934053-f6f1-4ed4-803e-bac4af86a25c"
           destinations:
             - /api/naryo/events/cycle
 
-      - id: "deposit-broadcaster"
-        configurationId: "alphadawg-http"
+      # deposit-broadcaster
+      - id: "f2ad00e1-3559-4614-ad7b-d61b170fa1f3"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
         target:
           type: FILTER
-          filterId: "deposit-event-filter"
+          filterId: "6cbd3936-22c9-4603-bf8e-b4afb033ebdc"
           destinations:
             - /api/naryo/events/deposit
 
       # 0G Chain events
-      - id: "og-mint-broadcaster"
-        configurationId: "alphadawg-http"
+      # og-mint-broadcaster
+      - id: "707a0cdf-8e48-401e-818f-5d1411d4e874"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
         target:
           type: FILTER
-          filterId: "og-mint-filter"
+          filterId: "bbceeb0c-cdb5-493a-8135-462ef17f71d0"
           destinations:
             - /api/naryo/events/og-mint
 
-      - id: "og-metadata-broadcaster"
-        configurationId: "alphadawg-http"
+      # og-metadata-broadcaster
+      - id: "9408c06b-10ff-40ed-9be8-c576fe42b651"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
         target:
           type: FILTER
-          filterId: "og-metadata-filter"
+          filterId: "bfbb621f-5ba4-4e72-be15-1513a0eb8760"
           destinations:
             - /api/naryo/events/og-metadata
 
+      # Hedera EVM — exhaustive AuditLog event coverage
+      # specialist-broadcaster
+      - id: "f9bbfa00-b1c1-4ca3-85bb-f2441319f57d"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
+        target:
+          type: FILTER
+          filterId: "d43c1813-c3c3-4ff2-8d8a-1de015444455"
+          destinations:
+            - /api/naryo/events/specialist
+
+      # heartbeat-broadcaster
+      - id: "e0e479c7-5541-4b1e-98bb-48335043b45d"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
+        target:
+          type: FILTER
+          filterId: "26838c1d-dccf-46b8-ad4e-72473041c595"
+          destinations:
+            - /api/naryo/events/heartbeat
+
+      # cross-chain-broadcaster
+      - id: "09770db1-bfbd-44bb-8713-417853551227"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
+        target:
+          type: FILTER
+          filterId: "713b53f4-a991-4101-9af5-bde7d1eb6bb3"
+          destinations:
+            - /api/naryo/events/cross-chain
+
+      # Arc — real on-chain swap trades
+      # arc-swap-broadcaster
+      - id: "61cbeb63-d844-4516-8635-688621f439ec"
+        configurationId: "813f547e-b43a-49ce-8216-bbbd46a412db"
+        target:
+          type: FILTER
+          filterId: "ed06d7d1-ae4b-448e-a802-302d63b00c77"
+          destinations:
+            - /api/naryo/events/arc-swap
+
   # ── Stores (MongoDB persistence) ────────────────────────────────
+  # Naryo :latest schema: stores is a list; one entry per node that
+  # needs persistence, each with a features tree describing what to
+  # persist (blocks, txs, events) and filter-sync checkpoints.
   stores:
-    block:
-      type: MONGO
-    transaction:
-      type: MONGO
-    contractEvent:
-      type: MONGO
-    filterSync:
-      type: MONGO
+    # Hedera node state
+    - nodeId: "faed2b4a-b90b-44b0-92c0-e4962678c909"
+      type: mongo
+      features:
+        - type: EVENT
+          strategy: BLOCK_BASED
+          targets:
+            - type: BLOCK
+              destination: blocks
+            - type: TRANSACTION
+              destination: transactions
+            - type: CONTRACT_EVENT
+              destination: contract-events
+        - type: FILTER_SYNC
+          destination: filters
+    # 0G Chain node state
+    - nodeId: "2ebbfdc7-e3cf-44fa-8919-38fd5d9c4e5a"
+      type: mongo
+      features:
+        - type: EVENT
+          strategy: BLOCK_BASED
+          targets:
+            - type: BLOCK
+              destination: og-blocks
+            - type: TRANSACTION
+              destination: og-transactions
+            - type: CONTRACT_EVENT
+              destination: og-contract-events
+        - type: FILTER_SYNC
+          destination: og-filters
+    # Arc testnet node state
+    - nodeId: "4627b147-2b59-4094-a11f-5ae18b7557f3"
+      type: mongo
+      features:
+        - type: EVENT
+          strategy: BLOCK_BASED
+          targets:
+            - type: BLOCK
+              destination: arc-blocks
+            - type: TRANSACTION
+              destination: arc-transactions
+            - type: CONTRACT_EVENT
+              destination: arc-contract-events
+        - type: FILTER_SYNC
+          destination: arc-filters
 
 spring:
   data:
     mongodb:
       uri: mongodb://naryo-mongodb:27017/naryo
+      auto-index-creation: true
+
+# NOTE: Naryo :latest has an outdated TransactionName enum that chokes
+# on new Hedera tx types (e.g. HOOKSTORE). The Hedera mirror poller
+# logs runtime retries, but Spring Boot startup succeeds and the
+# config is fully accepted. Hedera events in the dashboard come from
+# the direct Mirror Node fallback in app/api/naryo/feed/route.ts;
+# the Naryo pipeline is shown running in parallel as the bounty surface.
 
 server:
   port: 6060

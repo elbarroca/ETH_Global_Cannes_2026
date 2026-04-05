@@ -16,6 +16,18 @@ const DEFAULT_PERIOD_MS = 5 * 60 * 1000; // 5 minutes default
 const NARYO_HEARTBEAT_EVERY_TICKS = 6;
 let heartbeatTickCount = 0;
 
+// Re-entrancy guard — prevents concurrent runHeartbeat() invocations from
+// racing on user snapshots (lastCycleId + lastCycleAt). A single cycle can
+// take 60–120s, which is longer than the 60s tick interval; without this
+// guard, overlapping ticks would read the same lastCycleId and commit
+// duplicate Cycle rows under the same cycleNumber (we observed 4× duplicates
+// in prod before this lock was added).
+//
+// startHeartbeatLoop() below uses setTimeout recursion for the normal case —
+// isRunning is defense in depth for any other caller (Vercel cron route
+// imported locally, Telegram /run, etc).
+let isRunning = false;
+
 export interface HeartbeatOptions {
   /**
    * Soft time budget in milliseconds. When set, the heartbeat checks the
@@ -52,6 +64,29 @@ export async function runHeartbeat(
     budgetExceeded: false,
   };
 
+  // Re-entrancy guard — if a previous tick is still in flight (a cycle can
+  // take longer than INTERVAL_MS), return immediately instead of racing on
+  // the user snapshot and committing duplicate Cycle rows.
+  if (isRunning) {
+    console.warn("[heartbeat] Skipping tick — previous run still in progress");
+    result.durationMs = Date.now() - started;
+    return result;
+  }
+  isRunning = true;
+
+  try {
+    return await runHeartbeatInner(opts, result, started, deadline);
+  } finally {
+    isRunning = false;
+  }
+}
+
+async function runHeartbeatInner(
+  opts: HeartbeatOptions,
+  result: HeartbeatResult,
+  started: number,
+  deadline: number,
+): Promise<HeartbeatResult> {
   const users = await getActiveUsers();
   result.totalUsers = users.length;
   if (users.length === 0) {
@@ -198,17 +233,30 @@ export async function runHeartbeat(
 }
 
 export function startHeartbeatLoop(): void {
-  console.log(`[heartbeat] Starting loop (interval: ${INTERVAL_MS / 1000}s)`);
+  console.log(
+    `[heartbeat] Starting loop (min interval: ${INTERVAL_MS / 1000}s, serialized via setTimeout)`,
+  );
 
-  // Immediate first run
-  runHeartbeat().catch((err) => {
-    console.error("[heartbeat] Initial run failed:", err);
-  });
+  // setTimeout recursion instead of setInterval — each tick's schedule is
+  // chained after the previous tick COMPLETES, so a long-running cycle
+  // (60–120s) can never overlap with the next tick. The module-level
+  // `isRunning` guard inside runHeartbeat() is defense in depth against
+  // other callers (Vercel cron, Telegram /run). Together they guarantee
+  // no two runHeartbeat() bodies execute concurrently in the same process.
+  const scheduleNext = (): void => {
+    setTimeout(() => {
+      runHeartbeat()
+        .catch((err) => {
+          console.error("[heartbeat] Scheduled run failed:", err);
+        })
+        .finally(scheduleNext);
+    }, INTERVAL_MS);
+  };
 
-  // Recurring
-  setInterval(() => {
-    runHeartbeat().catch((err) => {
-      console.error("[heartbeat] Scheduled run failed:", err);
-    });
-  }, INTERVAL_MS);
+  // Immediate first run, then chain
+  runHeartbeat()
+    .catch((err) => {
+      console.error("[heartbeat] Initial run failed:", err);
+    })
+    .finally(scheduleNext);
 }

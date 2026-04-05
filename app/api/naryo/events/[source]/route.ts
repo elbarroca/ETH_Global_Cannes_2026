@@ -16,6 +16,9 @@ const VALID_SOURCES = new Set([
   "specialist",
   "heartbeat",
   "cross-chain",
+  // Arc testnet — direct listening to AlphaDawgSwap AMM trades.
+  // arc-swap: Swap(address recipient, bool usdcToDweth, uint256 amountIn, uint256 amountOut)
+  "arc-swap",
 ]);
 
 /**
