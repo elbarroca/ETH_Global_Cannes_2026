@@ -1,4 +1,4 @@
-import { getActiveUsers, updateUser } from "../store/user-store";
+import { getActiveUsers, decrementCyclesRemaining } from "../store/user-store";
 import { analyzeCycle, commitCycle, runCycle } from "./main-agent";
 import { notifyUser, sendApprovalNotification } from "../telegram/bot";
 import { scheduleNextHeartbeat } from "../hedera/scheduler";
@@ -86,15 +86,17 @@ export async function runHeartbeat(
         continue; // Not time yet for this user
       }
 
-      // Auto-hunt is strictly opt-in. A user must have an explicit positive
-      // cycle budget (set via the dashboard AUTO-HUNT card → /api/configure →
-      // cycleCount > 0 mirrors into cyclesRemaining). A `null`/`undefined`
-      // value means "never configured" and is treated the same as 0 — skip.
+      // Auto-hunt is strictly opt-in. A user must have either INFINITE mode
+      // (cycleCount === -1 → run forever every `cyclePeriodMs`) or a bounded
+      // budget (cyclesRemaining > 0 → run N times then pause). Both are set
+      // via the dashboard AUTO-HUNT card → /api/configure. A `null`/`undefined`
+      // cyclesRemaining means "never configured" and is treated the same as 0.
       // This is defense in depth on top of the `getActiveUsers()` SQL filter
       // which already excludes these rows, but protects against races where a
       // user row becomes stale between the fetch and the cycle decision.
+      const isInfinite = user.agent.cycleCount === -1;
       const remaining = user.agent.cyclesRemaining;
-      if (remaining == null || remaining <= 0) {
+      if (!isInfinite && (remaining == null || remaining <= 0)) {
         continue;
       }
 
@@ -193,22 +195,6 @@ export async function runHeartbeat(
     `[heartbeat] Done in ${result.durationMs}ms (processed=${result.processed}, skippedBudget=${result.skippedBudget}, skippedTiming=${result.skippedTiming})`,
   );
   return result;
-}
-
-async function decrementCyclesRemaining(userId: string): Promise<void> {
-  try {
-    // Re-read fresh value to avoid stale snapshot race
-    const { getUserById } = await import("../store/user-store");
-    const fresh = await getUserById(userId);
-    if (!fresh || fresh.agent.cyclesRemaining == null) return;
-    const newRemaining = Math.max(0, fresh.agent.cyclesRemaining - 1);
-    await updateUser(userId, { agent: { cyclesRemaining: newRemaining } });
-    if (newRemaining === 0) {
-      console.log(`[heartbeat] User ${userId} completed all configured cycles`);
-    }
-  } catch (err) {
-    console.warn(`[heartbeat] Failed to decrement cycles for ${userId}:`, err);
-  }
 }
 
 export function startHeartbeatLoop(): void {

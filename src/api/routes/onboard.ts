@@ -182,7 +182,9 @@ export function onboardRoutes(): Router {
         }
         if (cycleCount !== undefined) {
           patch.agent.cycleCount = cycleCount;
-          patch.agent.cyclesRemaining = cycleCount;
+          // cycleCount === -1 → infinite mode; budget field is unused, keep
+          // at 0 so heartbeat's bounded-mode guard doesn't see a stale value.
+          patch.agent.cyclesRemaining = cycleCount === -1 ? 0 : cycleCount;
         }
         if (cyclePeriodMs !== undefined) {
           patch.agent.cyclePeriodMs = cyclePeriodMs;

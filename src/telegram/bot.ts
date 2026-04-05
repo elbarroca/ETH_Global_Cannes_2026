@@ -2,6 +2,7 @@ import TelegramBot from "node-telegram-bot-api";
 import {
   getUserByChatId,
   updateUser,
+  decrementCyclesRemaining,
 } from "../store/user-store";
 import { redeemLinkCode } from "../store/link-codes";
 import { analyzeCycle, commitCycle, rejectCycle } from "../agents/main-agent";
@@ -282,7 +283,10 @@ export function registerCommands(telegramBot: TelegramBot): void {
     ].join("\n"), { parse_mode: "Markdown" });
   });
 
-  // /run — Show hire preview with inline buttons
+  // /run — Show hire preview with inline buttons. Manual hunts are ALWAYS
+  // allowed regardless of the `active` flag (which now only gates the auto-
+  // heartbeat loop). `/stop` pauses auto-hunt but must not disable manual
+  // hunts — this command is the user's explicit per-tap consent.
   telegramBot.onText(/\/run/, async (msg) => {
     const chatId = msg.chat.id.toString();
     const user = await getUserByChatId(chatId);
@@ -291,8 +295,11 @@ export function registerCommands(telegramBot: TelegramBot): void {
       return;
     }
 
-    if (!user.agent.active) {
-      await telegramBot.sendMessage(msg.chat.id, "⏸️ Agent is paused. Use /resume first.");
+    if (user.fund.depositedUsdc <= 0) {
+      await telegramBot.sendMessage(
+        msg.chat.id,
+        "💸 Your fund is empty. Deposit USDC from the dashboard, then /run again.",
+      );
       return;
     }
 
@@ -337,7 +344,11 @@ export function registerCommands(telegramBot: TelegramBot): void {
     await telegramBot.sendMessage(msg.chat.id, "⏸️ Agent *paused*. No more hunts until /resume.", { parse_mode: "Markdown" });
   });
 
-  // /resume — Resume agent
+  // /resume — Unpause the auto-hunt loop. We deliberately do NOT reset
+  // `cyclesRemaining` here — if the user ran 2 of 3 scheduled cycles before
+  // /stop, /resume should continue with 1 cycle left, not re-grant all 3.
+  // If the budget is already exhausted (or never configured) we tell the
+  // user explicitly instead of silently resuming into a no-op state.
   telegramBot.onText(/\/resume/, async (msg) => {
     const chatId = msg.chat.id.toString();
     const user = await getUserByChatId(chatId);
@@ -346,8 +357,29 @@ export function registerCommands(telegramBot: TelegramBot): void {
       return;
     }
 
+    const isInfinite = user.agent.cycleCount === -1;
+    const remaining = user.agent.cyclesRemaining ?? 0;
     await updateUser(user.id, { agent: { active: true } });
-    await telegramBot.sendMessage(msg.chat.id, "▶️ Agent *resumed*. Hunts will run every 5 minutes.", { parse_mode: "Markdown" });
+
+    if (isInfinite) {
+      await telegramBot.sendMessage(
+        msg.chat.id,
+        "▶️ Agent *resumed*. ∞ forever mode — hunts will keep running on your configured interval until you /stop.",
+        { parse_mode: "Markdown" },
+      );
+    } else if (remaining > 0) {
+      await telegramBot.sendMessage(
+        msg.chat.id,
+        `▶️ Agent *resumed*. ${remaining} hunt${remaining === 1 ? "" : "s"} remaining in your auto-hunt budget.`,
+        { parse_mode: "Markdown" },
+      );
+    } else {
+      await telegramBot.sendMessage(
+        msg.chat.id,
+        "▶️ Agent *resumed*, but your auto-hunt budget is empty. Open the dashboard and set an AUTO-HUNT cycle count to schedule more, or use /run for a one-shot manual hunt.",
+        { parse_mode: "Markdown" },
+      );
+    }
   });
 }
 
@@ -464,6 +496,12 @@ export function registerCallbacks(telegramBot: TelegramBot): void {
 
         try {
           const result = await commitCycle(analysis, user);
+
+          // Decrement the user's auto-hunt budget ONCE per committed cycle.
+          // This keeps `cyclesRemaining` in lockstep with actual approved
+          // hunts regardless of how many pending cycles the heartbeat created
+          // while waiting for this approval. Non-fatal.
+          await decrementCyclesRemaining(pending.userId);
 
           // Show approved result
           const approvedMsg = formatApprovedResult(result, user);

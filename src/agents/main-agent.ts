@@ -588,7 +588,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
   //
   // Non-fatal: returns empty arrays when HCS/0G is unreachable → cycle proceeds
   // with an empty priorContext block (functionally equivalent to no RAG).
-  const { cycles: priorCycles, cids: priorCids } = await loadRecentCycles(user.id, 3);
+  const { cycles: priorCycles, cids: priorCids } = await loadRecentCycles(user.id, 3, cycleId);
   const priorContext = formatPriorCyclesForPrompt(priorCycles);
   if (priorCycles.length > 0) {
     console.log(`[cycle] RAG: loaded ${priorCycles.length} prior cycles as context (cids: ${priorCids.map((c) => c.slice(0, 12) + "…").join(", ")})`);

@@ -124,20 +124,74 @@ export async function getUserByChatId(chatId: string): Promise<UserRecord | unde
   return rowToUser(rows[0] as unknown as UserRow);
 }
 
+/**
+ * Decrement a user's `cyclesRemaining` by 1 after a cycle is committed.
+ *
+ * Called from THREE places:
+ *   1. Heartbeat loop after `runCycle()` in auto-approval mode.
+ *   2. Heartbeat loop after `commitCycle()` in the HOLD auto-approve path
+ *      (approvalMode === "trades_only" with a HOLD decision).
+ *   3. Approval routes (Next.js `/api/cycle/approve/[pendingId]` and the
+ *      Telegram approve callback) after the user explicitly approves a
+ *      pending cycle and `commitCycle()` succeeds.
+ *
+ * The invariant is: **the budget decrements once per committed cycle, never
+ * per attempted cycle.** Rejected cycles do NOT decrement — the user's intent
+ * ("give me N committed hunts") is preserved regardless of how many failures
+ * or rejections occur along the way.
+ *
+ * Re-reads the user row to avoid stale-snapshot races when the caller passes
+ * a user record fetched seconds earlier. Non-fatal — logs and continues on
+ * error so a DB blip never blocks a successfully-committed cycle.
+ *
+ * Lives in user-store (not heartbeat) to avoid a circular dependency: the
+ * Telegram bot approve callback needs to call this, and heartbeat.ts already
+ * imports from bot.ts, so bot.ts can't import from heartbeat.ts.
+ */
+export async function decrementCyclesRemaining(userId: string): Promise<void> {
+  try {
+    const fresh = await getUserById(userId);
+    if (!fresh || fresh.agent.cyclesRemaining == null) return;
+    // Infinite mode (cycleCount === -1) — never decrement. The user opted
+    // into "run forever every N minutes" and expects the heartbeat to keep
+    // ticking until they explicitly stop.
+    if (fresh.agent.cycleCount === -1) return;
+    const newRemaining = Math.max(0, fresh.agent.cyclesRemaining - 1);
+    await updateUser(userId, { agent: { cyclesRemaining: newRemaining } });
+    if (newRemaining === 0) {
+      console.log(`[cycle] User ${userId} completed all configured auto-hunt cycles — heartbeat will pause`);
+    }
+  } catch (err) {
+    console.warn(`[cycle] Failed to decrement cyclesRemaining for ${userId}:`, err);
+  }
+}
+
 export async function getActiveUsers(): Promise<UserRecord[]> {
   const sql = getDb();
   // Heartbeat eligibility requires THREE conditions, all consent-gated:
   //   1. agent.active = true (user toggled on)
   //   2. depositedUsdc > 0 (fund has balance)
-  //   3. cyclesRemaining > 0 (explicit auto-hunt budget set from the dashboard
-  //      "AUTO-HUNT N cycles every X min" card)
-  // COALESCE handles legacy rows where cyclesRemaining is NULL — those get
-  // skipped, which is the desired behavior (no implicit unlimited loops).
+  //   3. Either INFINITE mode (cycleCount = -1 → run forever) OR BOUNDED
+  //      mode with budget remaining (cyclesRemaining > 0). Both modes are
+  //      set via the dashboard "AUTO-HUNT" card.
+  //
+  // Edge cases handled by the COALESCE/NULLIF casts:
+  //   - key missing         → `->>` returns NULL → COALESCE → 0
+  //   - JSON null           → `->>` returns the string 'null' → NULLIF → NULL
+  //     → COALESCE → 0 (without NULLIF the `::int` cast would throw and
+  //     crash the entire heartbeat tick — see reviewer concern #6)
+  //   - integer             → cast succeeds, compared as-is
+  //   - float or non-number → cast throws; caller's try/catch swallows. We
+  //     write only integers via decrementCyclesRemaining + configure, so
+  //     this case is defensive rather than expected.
   const rows = await sql`
     SELECT * FROM users
     WHERE (agent->>'active')::boolean = true
       AND (fund->>'depositedUsdc')::numeric > 0
-      AND COALESCE((agent->>'cyclesRemaining')::int, 0) > 0
+      AND (
+        COALESCE(NULLIF(agent->>'cycleCount', 'null')::int, 0) = -1
+        OR COALESCE(NULLIF(agent->>'cyclesRemaining', 'null')::int, 0) > 0
+      )
   `;
   return (rows as unknown as UserRow[]).map(rowToUser);
 }
