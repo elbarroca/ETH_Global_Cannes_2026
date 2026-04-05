@@ -128,6 +128,18 @@ export function arcTxUrl(txHash: string): string | null {
 }
 
 /**
+ * Best ArcScan URL for a vendor proof string: direct `/tx/{hash}` when it is an
+ * EVM hash; otherwise Blockscout search-results (Arc testnet uses `/search-results?q=`,
+ * not `/search` — UUID / batch receipt ids may not resolve — still the right path).
+ */
+export function arcProofExplorerHref(proof: string): string {
+  const trimmed = proof.trim();
+  const direct = arcTxUrl(trimmed);
+  if (direct) return direct;
+  return `${ARCSCAN_BASE}/search-results?q=${encodeURIComponent(proof)}`;
+}
+
+/**
  * Docs for GET a Developer Wallets transaction by id (Bearer auth). Circle does
  * not host a public “open in browser” URL per tx id — paths like
  * `developers.circle.com/.../transactions/{uuid}` return 404.

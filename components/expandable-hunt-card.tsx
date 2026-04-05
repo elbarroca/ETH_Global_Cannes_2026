@@ -8,6 +8,11 @@ import { DebateTheater } from "@/components/debate-theater";
 import { ArcTxHashPanel, HuntIndexedPaymentRows } from "@/components/hunt/hunt-payment-rows";
 import { mergeHuntPaymentRows } from "@/components/hunt/merge-hunt-payments";
 import { HuntPipelineArrows } from "@/components/hunt/hunt-pipeline-arrows";
+import {
+  HuntNarrativeFlow,
+  huntNarrativeAlreadySeen,
+  clearHuntNarrativeFlag,
+} from "@/components/hunt/hunt-narrative-flow";
 import { useUser } from "@/contexts/user-context";
 import { getCycleDetail } from "@/lib/api";
 import type { Cycle, AgentActionRecord } from "@/lib/types";
@@ -358,7 +363,7 @@ function RatingButtons({ agentName, cycleId }: { agentName: string; cycleId: num
 
 function AgentFlowStrip({ cycle }: { cycle: Cycle }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-mono rounded-lg border border-void-800 bg-void-950/60 px-3 py-2.5 mb-3">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm sm:text-base font-mono rounded-lg border border-void-800 bg-void-950/60 px-4 py-3 mb-3">
       <span className="text-teal-400">{cycle.specialists.length} specialists</span>
       <span className="text-void-700">→</span>
       <span className="text-green-400">Alpha</span>
@@ -407,11 +412,42 @@ function InlineDetail({
     { emoji: "🟡", name: "Executor", role: "executor" as const, data: cycle.adversarial.executor, recColor: "text-gold-400" },
   ];
 
+  const [narrativeDone, setNarrativeDone] = useState(() =>
+    typeof window !== "undefined" && huntNarrativeAlreadySeen(cycle.id),
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (mq.matches) setNarrativeDone(true);
+  }, [cycle.id]);
+
   return (
+    <>
+      {!narrativeDone && (
+        <HuntNarrativeFlow
+          cycle={cycle}
+          actions={actions}
+          loadingActions={loadingActions}
+          onComplete={() => setNarrativeDone(true)}
+        />
+      )}
+      {narrativeDone && (
     <div className="space-y-4 hunt-fade-in">
       {/* Decision banner */}
       <div className="nasdaq-led nasdaq-scanlines nasdaq-dot-matrix rounded-2xl px-6 py-5 border border-dawg-500/20 glow-card">
-        <p className="text-[11px] text-void-600 uppercase tracking-widest mb-1">Mediator Decision</p>
+        <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
+          <p className="text-[11px] text-void-600 uppercase tracking-widest">Mediator Decision</p>
+          <button
+            type="button"
+            onClick={() => {
+              clearHuntNarrativeFlag(cycle.id);
+              setNarrativeDone(false);
+            }}
+            className="text-[10px] font-mono uppercase tracking-wider text-void-500 hover:text-dawg-300 px-2 py-0.5 rounded-md border border-void-700/80 hover:border-dawg-500/40 transition-colors shrink-0"
+          >
+            Replay agent flow
+          </button>
+        </div>
         <p className={`font-pixel text-[36px] leading-none uppercase tracking-wider ${style.ledColor} ${style.glow}`}>
           {cycle.trade.action} {cycle.trade.percentage}% {cycle.trade.asset}
         </p>
@@ -503,7 +539,7 @@ function InlineDetail({
             >
               <HuntPipelineArrows actions={actions} />
             </div>
-            <p className="text-[11px] text-void-600 uppercase tracking-wider">Conclusion path</p>
+            <p className="text-xs sm:text-sm text-void-500 uppercase tracking-wider font-semibold">Conclusion path</p>
             <div className="hunt-detail-card-enter" style={{ "--hunt-stagger": "48ms" } as CSSProperties}>
               <AgentFlowStrip cycle={cycle} />
             </div>
@@ -766,6 +802,8 @@ function InlineDetail({
         )}
       </div>
     </div>
+      )}
+    </>
   );
 }
 
