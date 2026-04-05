@@ -546,12 +546,20 @@ function buildRichRecord(
 export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise<AnalysisResult> {
   const cycleId = user.agent.lastCycleId + 1;
 
-  // Default goal when the caller (heartbeat / Telegram /run) doesn't supply one.
-  // Dashboard callers send a real goal from the input box.
+  // Goal resolution priority (mirrors the /api/cycle/stream route):
+  //   1. Per-call `userGoal` argument — set when the dashboard or stream
+  //      route reads a custom goal from the request body.
+  //   2. Persistent `user.agent.goal` for callers that bypass the stream
+  //      route entirely (heartbeat loop, Telegram /run) — so the user's
+  //      standing goal drives those cycles automatically.
+  //   3. Generic risk-profile template as a last-resort fallback.
+  const savedGoal = user.agent.goal?.trim() ?? "";
   const goal =
     userGoal && userGoal.trim().length > 0
       ? userGoal.trim()
-      : `Grow portfolio, max ${user.agent.maxTradePercent}% per trade, ${user.agent.riskProfile} risk`;
+      : savedGoal.length > 0
+        ? savedGoal
+        : `Grow portfolio, max ${user.agent.maxTradePercent}% per trade, ${user.agent.riskProfile} risk`;
 
   console.log(`[cycle] Analyzing for user ${user.id} (risk: ${user.agent.riskProfile}) goal: "${goal}"`);
   console.log(`[cycle] Proxy wallet: ${user.proxyWallet.address} (Circle: ${user.proxyWallet.walletId})`);

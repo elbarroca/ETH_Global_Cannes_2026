@@ -122,7 +122,7 @@ export function Nav() {
     <header className="sticky top-0 z-50 bg-void-900 border-b border-void-800">
       <div className="max-w-7xl mx-auto px-5 h-14 flex items-center gap-4">
         {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-2 shrink-0 group">
+        <Link href="/" className="flex items-center gap-2 shrink-0 group">
           <DawgLogo animated className="w-8 h-8" />
           <span className="font-bold text-void-100 text-base tracking-tight">
             AlphaDawg
@@ -131,7 +131,7 @@ export function Nav() {
         </Link>
 
         {/* Nav tabs */}
-        <nav className="flex items-center gap-0.5 flex-1">
+        <nav className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto py-1">
           {TABS.map((tab) => {
             const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
             return (

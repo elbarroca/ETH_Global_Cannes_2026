@@ -137,8 +137,17 @@ export function SwarmStatusBar() {
           )}
         </div>
 
-        {/* Right: 24h metric chips + Live Contracts menu */}
+        {/* Right: 24h metric chips + Live Contracts menu.
+            These numbers are PLATFORM-WIDE (all users, last 24h), NOT personal
+            activity. A fresh wallet will see non-zero values here even with
+            zero personal hunts — the NETWORK label makes that explicit. */}
         <div className="flex items-center gap-2 ml-auto">
+          <span
+            className="font-pixel text-[12px] leading-none uppercase tracking-[0.14em] text-[#FFCC00]/50 pr-1 border-r border-dawg-500/20 mr-1"
+            title="Platform-wide activity across all users in the last 24 hours"
+          >
+            Network · 24h
+          </span>
           <MetricChip
             label="24h cycles"
             value={metrics ? metrics.last24h.cycles.toString() : "—"}

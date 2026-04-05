@@ -68,6 +68,14 @@ export async function createUser(
     lastCycleAt: null,
     approvalMode: "always" as const,
     approvalTimeoutMin: 10,
+    // Auto-hunt is opt-in only. A fresh wallet has zero scheduled cycles; the
+    // heartbeat loop filters on `cyclesRemaining > 0`, so these defaults mean
+    // "do nothing until the user saves a cycle count on the dashboard".
+    cycleCount: 0,
+    cyclesRemaining: 0,
+    // Persistent personalized hunt goal. Empty string = not yet set; the
+    // cycle-analyze fallback chain will use the risk-profile template.
+    goal: "",
   };
 
   const fund = {
@@ -118,7 +126,19 @@ export async function getUserByChatId(chatId: string): Promise<UserRecord | unde
 
 export async function getActiveUsers(): Promise<UserRecord[]> {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM users WHERE (agent->>'active')::boolean = true AND (fund->>'depositedUsdc')::numeric > 0`;
+  // Heartbeat eligibility requires THREE conditions, all consent-gated:
+  //   1. agent.active = true (user toggled on)
+  //   2. depositedUsdc > 0 (fund has balance)
+  //   3. cyclesRemaining > 0 (explicit auto-hunt budget set from the dashboard
+  //      "AUTO-HUNT N cycles every X min" card)
+  // COALESCE handles legacy rows where cyclesRemaining is NULL — those get
+  // skipped, which is the desired behavior (no implicit unlimited loops).
+  const rows = await sql`
+    SELECT * FROM users
+    WHERE (agent->>'active')::boolean = true
+      AND (fund->>'depositedUsdc')::numeric > 0
+      AND COALESCE((agent->>'cyclesRemaining')::int, 0) > 0
+  `;
   return (rows as unknown as UserRow[]).map(rowToUser);
 }
 

@@ -272,6 +272,20 @@ export default function ComputePage() {
         </div>
       )}
 
+      {c.storageHash && priorCids.length === 0 && (
+        <div className="rounded-2xl border border-void-700/60 bg-void-950/40 p-4">
+          <p className="text-[11px] text-void-500 uppercase tracking-wider font-semibold mb-2">
+            RAG context — prior hunt blobs
+          </p>
+          <p className="text-xs text-void-600 leading-relaxed">
+            None for this hunt: no <code className="text-void-500">priorCids</code> on the committed record (first
+            hunt(s), missing older <code className="text-void-500">sh</code> pointers, or pre-RAG commit). Storage +
+            HCS proof above still applies. CLI:{" "}
+            <code className="text-void-500">npx tsx scripts/inspect-rag-eligibility.ts</code>.
+          </p>
+        </div>
+      )}
+
       {/* 2x2 Agent Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Lead Dawg — orchestrator */}

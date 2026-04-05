@@ -2,12 +2,43 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentActionRecord, Cycle } from "@/lib/types";
+import { NAME_MAP } from "@/lib/cycle-mapper";
 import {
   getOrderedPipelineActions,
   formatPipelineTime,
   NODE_META,
   pipelineNodeLabel,
 } from "@/components/hunt/pipeline-shared";
+
+/** Align action log `agentName` (slug or display) with `cycle.specialists[].name`. */
+function canonicalSpecialistSlug(name: string): string {
+  const slug = Object.entries(NAME_MAP).find(([, display]) => display === name)?.[0];
+  if (slug) return slug;
+  if (name in NAME_MAP) return name;
+  return name.toLowerCase().replace(/\s+/g, "-");
+}
+
+function findCycleSpecialist(cycle: Cycle, agentName: string | null | undefined) {
+  if (!agentName) return undefined;
+  const target = canonicalSpecialistSlug(agentName);
+  return cycle.specialists.find((s) => canonicalSpecialistSlug(s.name) === target);
+}
+
+/** Prefer HCS snapshot text; else one line from audit payload / specialist fields. */
+function specialistNarrativeBody(
+  spec: Cycle["specialists"][0] | undefined,
+  payload: unknown,
+): string | null {
+  const primary = (spec?.analysis || spec?.reasoning || "").trim();
+  if (primary) return primary;
+  const p = payload as { signal?: string; confidence?: number } | null | undefined;
+  const sig = (typeof p?.signal === "string" ? p.signal : undefined) ?? spec?.signal;
+  const conf = p?.confidence ?? spec?.confidence;
+  if (typeof sig === "string" && sig.trim()) {
+    return conf != null ? `${sig.trim()} · ${conf}% confidence` : sig.trim();
+  }
+  return null;
+}
 
 const STORAGE_PREFIX = "alphadawg.huntNarrative.done.";
 
@@ -216,11 +247,13 @@ function buildPhasesFromTimeline(cycle: Cycle, actions: AgentActionRecord[]): Ph
     const time = formatPipelineTime(a.createdAt);
     switch (a.actionType) {
       case "SPECIALIST_HIRED": {
-        const name = a.agentName ?? "Specialist";
-        const spec = cycle.specialists.find((s) => s.name === name);
+        const rawName = a.agentName ?? "Specialist";
+        const spec = findCycleSpecialist(cycle, rawName);
+        const body = specialistNarrativeBody(spec, a.payload);
+        if (!body) return;
+        const displayName = spec?.name ?? rawName;
         const hiredBy =
           (a.payload as { hiredBy?: string } | null)?.hiredBy ?? spec?.hiredBy ?? "main-agent";
-        const body = (spec?.analysis || spec?.reasoning || "").trim() || "— (no analysis in snapshot)";
         const sig = spec
           ? [spec.signal ?? "?", spec.confidence != null ? `${spec.confidence}%` : ""].filter(Boolean).join(" ")
           : "—";
@@ -228,7 +261,7 @@ function buildPhasesFromTimeline(cycle: Cycle, actions: AgentActionRecord[]): Ph
           kind: "specialist",
           key: `sp-${a.id}-${index}`,
           emoji: spec?.emoji || "◆",
-          name,
+          name: displayName,
           hiredBy,
           body,
           tail: `Signal · ${sig} · ${time}`,
@@ -286,7 +319,8 @@ function buildPhasesFromTimeline(cycle: Cycle, actions: AgentActionRecord[]): Ph
 function buildPhasesFallback(cycle: Cycle): Phase[] {
   const out: Phase[] = [];
   cycle.specialists.forEach((s, i) => {
-    const body = (s.analysis || s.reasoning || "").trim() || "—";
+    const body = specialistNarrativeBody(s, null);
+    if (!body) return;
     const sig = [s.signal ?? "?", s.confidence != null ? `${s.confidence}%` : ""].filter(Boolean).join(" ");
     out.push({
       kind: "specialist",

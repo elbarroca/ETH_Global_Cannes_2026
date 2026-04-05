@@ -81,29 +81,47 @@ function CompactView({
   return (
     <button onClick={onClick} className="w-full text-left group">
       {/* Top strip — hunt number + time + action badge */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="font-pixel glow-dawg text-[18px] leading-none text-[#FFCC00] uppercase tracking-wider">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-3 mb-3">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <span className="font-pixel glow-dawg text-[20px] sm:text-[22px] leading-none text-[#FFCC00] uppercase tracking-wider shrink-0">
             HUNT #{cycle.id}
           </span>
-          <span className="font-pixel text-[13px] leading-none text-void-500">{time}</span>
+          <span className="font-pixel text-sm sm:text-base leading-none text-void-400 tabular-nums">{time}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {computing && (
-            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-dawg-500/40 bg-dawg-500/10 text-[10px] font-semibold uppercase tracking-wider text-dawg-300">
-              <span className="w-2.5 h-2.5 border-2 border-dawg-400 border-t-transparent rounded-full animate-spin" />
+            <span className="flex items-center gap-2 px-2.5 py-1 rounded-lg border border-dawg-500/40 bg-dawg-500/10 text-xs font-semibold uppercase tracking-wider text-dawg-300">
+              <span className="w-3 h-3 border-2 border-dawg-400 border-t-transparent rounded-full animate-spin shrink-0" />
               {computingLabel ?? "Computing"}…
             </span>
           )}
-          {cycle.proofs?.hcs && <span className="text-[9px] text-teal-400 font-mono">HCS ✓</span>}
-          {cycle.proofs?.storage && <span className="text-[9px] text-purple-400 font-mono">0G ✓</span>}
-          {cycle.proofs?.inft && <span className="text-[9px] text-gold-400 font-mono">iNFT ✓</span>}
+          {(cycle.proofs?.hcs || cycle.proofs?.storage || cycle.proofs?.inft) && (
+            <div className="flex items-center gap-1.5 flex-wrap justify-end" aria-label="Proof coverage">
+              {cycle.proofs?.hcs && (
+                <span className="text-xs font-medium text-teal-400 border border-teal-500/25 rounded-md px-2 py-0.5 bg-teal-500/10">
+                  HCS
+                </span>
+              )}
+              {cycle.proofs?.storage && (
+                <span className="text-xs font-medium text-purple-300 border border-purple-500/25 rounded-md px-2 py-0.5 bg-purple-500/10">
+                  0G
+                </span>
+              )}
+              {cycle.proofs?.inft && (
+                <span className="text-xs font-medium text-gold-400 border border-gold-500/25 rounded-md px-2 py-0.5 bg-gold-500/10">
+                  iNFT
+                </span>
+              )}
+            </div>
+          )}
           <Badge variant={style.badge}>{cycle.trade.action}</Badge>
         </div>
       </div>
 
-      {/* Big trade line */}
-      <div className={`font-pixel text-[28px] leading-none uppercase tracking-wider tabular-nums ${style.ledColor} ${style.glow}`}>
+      {/* Big trade line — scale with Nasdaq headline row */}
+      <div
+        className={`font-pixel text-[32px] sm:text-[38px] leading-[1.05] uppercase tracking-wider tabular-nums ${style.ledColor} ${style.glow}`}
+      >
         {cycle.trade.action} {cycle.trade.percentage}% {cycle.trade.asset}
       </div>
 
@@ -111,9 +129,9 @@ function CompactView({
           rewritten by the EVM whitelist gate (e.g. SIREN → WETH). Clicking
           the hunt surfaces the full before/after in the narrative panel. */}
       {cycle.trade.assetSubstituted && cycle.trade.originalAsset && (
-        <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-blood-700/40 bg-blood-900/20 text-[10px] font-mono uppercase tracking-wider text-blood-300">
-          <span className="w-1 h-1 rounded-full bg-blood-500" />
-          filtered: {cycle.trade.originalAsset} → {cycle.trade.asset}
+        <div className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border border-blood-700/40 bg-blood-900/25 text-xs font-mono uppercase tracking-wide text-blood-300/95">
+          <span className="w-1.5 h-1.5 rounded-full bg-blood-500 shrink-0" />
+          Filtered: {cycle.trade.originalAsset} → {cycle.trade.asset}
         </div>
       )}
 
@@ -127,7 +145,7 @@ function CompactView({
           on-chain Arc transaction lands later as one batch. The UUID is the
           settlement receipt that can be resolved to the eventual tx. */}
       {cycle.specialists.length > 0 && (
-        <div className="flex items-center gap-2 mt-2.5 overflow-x-auto pb-1">
+        <div className="flex items-stretch gap-2 mt-3 overflow-x-auto pb-1">
           {cycle.specialists.map((s, i) => {
             const sigColor =
               (s.signal ?? "HOLD") === "BUY" ? "text-[#39FF7A]" : (s.signal ?? "HOLD") === "SELL" ? "text-[#FF5A5A]" : "text-[#FFCC00]";
@@ -140,14 +158,16 @@ function CompactView({
             return (
               <div
                 key={i}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-void-800/60 border border-void-700/40 shrink-0"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-void-800/70 border border-void-700/50 shrink-0 min-h-[2.25rem]"
               >
-                <span className="text-[10px] text-void-500 font-mono">{s.name}</span>
-                <span className={`text-[10px] font-bold font-mono ${sigColor}`}>
+                <span className="text-xs text-void-300 font-mono max-w-[9rem] truncate" title={s.name}>
+                  {s.name}
+                </span>
+                <span className={`text-xs font-bold font-mono tabular-nums ${sigColor}`}>
                   {s.signal ?? "?"} {s.confidence ?? 0}%
                 </span>
                 {s.attestation && s.attestation !== "mock-s" && (
-                  <span className="w-1 h-1 rounded-full bg-gold-400" title="TEE attested" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-gold-400 shrink-0" title="TEE attested" />
                 )}
                 {txUrl && (
                   <a
@@ -156,7 +176,7 @@ function CompactView({
                     rel="noopener noreferrer"
                     onClick={stop}
                     title={`Arc x402 settlement: ${txHash}`}
-                    className="text-[9px] font-mono text-teal-400 hover:text-teal-300 underline decoration-dotted"
+                    className="text-xs font-mono text-teal-400 hover:text-teal-300 underline decoration-dotted shrink-0"
                   >
                     tx ↗
                   </a>
@@ -164,7 +184,7 @@ function CompactView({
                 {isBatched && (
                   <span
                     title={`Circle Gateway settlement receipt: ${txHash}`}
-                    className="text-[9px] font-mono text-teal-400/80 cursor-help"
+                    className="text-xs font-mono text-teal-400/90 cursor-help shrink-0"
                   >
                     batched
                   </span>
@@ -176,42 +196,50 @@ function CompactView({
       )}
 
       {/* Bottom metadata */}
-      <div className="flex items-center gap-3 mt-2 text-xs text-void-600 flex-wrap">
-        <span>{specCount} specialists</span>
-        <span className="w-1 h-1 rounded-full bg-void-700" />
+      <div className="flex items-center gap-x-3 gap-y-1.5 mt-3 pt-3 border-t border-void-800/60 text-sm text-void-400 flex-wrap">
+        <span className="text-void-300">{specCount} specialists</span>
+        <span className="text-void-600 hidden sm:inline" aria-hidden>
+          ·
+        </span>
         <span>{specCount * 2} sealed inferences</span>
-        <span className="w-1 h-1 rounded-full bg-void-700" />
-        <span>${cost} spent</span>
+        <span className="text-void-600 hidden sm:inline" aria-hidden>
+          ·
+        </span>
+        <span className="tabular-nums">${cost} spent</span>
         {hcsHref && (
           <>
-            <span className="w-1 h-1 rounded-full bg-void-700" />
+            <span className="text-void-600 hidden sm:inline" aria-hidden>
+              ·
+            </span>
             <a
               href={hcsHref}
               target="_blank"
               rel="noopener noreferrer"
               onClick={stop}
-              className="text-teal-400 hover:text-teal-300 underline decoration-dotted"
+              className="text-teal-400 hover:text-teal-300 underline underline-offset-2 decoration-dotted text-sm"
             >
-              HCS #{cycle.hcs.sequenceNumber} ↗
+              Audit #{cycle.hcs.sequenceNumber}
             </a>
           </>
         )}
         {cycle.swap?.txHash && (
           <>
-            <span className="w-1 h-1 rounded-full bg-void-700" />
+            <span className="text-void-600 hidden sm:inline" aria-hidden>
+              ·
+            </span>
             <a
               href={cycle.swap.explorerUrl ?? arcTxUrl(cycle.swap.txHash) ?? "#"}
               target="_blank"
               rel="noopener noreferrer"
               onClick={stop}
-              className="text-indigo-300 hover:text-indigo-200 font-mono underline decoration-dotted"
+              className="text-indigo-300 hover:text-indigo-200 font-mono text-sm underline underline-offset-2 decoration-dotted"
             >
-              Swap {cycle.swap.txHash.slice(0, 6)}… ↗
+              Swap {cycle.swap.txHash.slice(0, 6)}…
             </a>
           </>
         )}
-        <span className="ml-auto text-void-500 group-hover:text-dawg-500 transition-colors text-[10px] font-semibold uppercase tracking-wider">
-          {expanded ? "Click to collapse ‹" : "Click to expand ›"}
+        <span className="w-full sm:w-auto sm:ml-auto text-void-500 group-hover:text-dawg-400 transition-colors text-xs font-semibold uppercase tracking-wider">
+          {expanded ? "Collapse" : "Details"}
         </span>
       </div>
     </button>
@@ -364,11 +392,16 @@ function RatingButtons({ agentName, cycleId }: { agentName: string; cycleId: num
 function AgentFlowStrip({ cycle }: { cycle: Cycle }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm sm:text-base font-mono rounded-lg border border-void-800 bg-void-950/60 px-4 py-3 mb-3">
+      <span className="text-green-400">Alpha</span>
+      <span className="text-void-600">+</span>
+      <span className="text-blood-300">Risk</span>
+      <span className="text-void-700">→</span>
       <span className="text-teal-400">{cycle.specialists.length} specialists</span>
       <span className="text-void-700">→</span>
       <span className="text-green-400">Alpha</span>
-      <span className="text-void-700">→</span>
+      <span className="text-void-600">+</span>
       <span className="text-blood-300">Risk</span>
+      <span className="text-void-500 text-xs">(synthesize)</span>
       <span className="text-void-700">→</span>
       <span className="text-gold-400">Executor</span>
       <span className="text-void-700">→</span>
@@ -415,6 +448,8 @@ function InlineDetail({
   const [narrativeDone, setNarrativeDone] = useState(() =>
     typeof window !== "undefined" && huntNarrativeAlreadySeen(cycle.id),
   );
+  const [showFullStorageRoot, setShowFullStorageRoot] = useState(false);
+  const [fullPriorCidIdx, setFullPriorCidIdx] = useState<number | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -608,43 +643,129 @@ function InlineDetail({
                 </CardHeader>
                 <CardBody className="space-y-3">
                   <div>
-                    <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">0G Storage root</div>
+                    <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
+                      This hunt&apos;s RichCycleRecord (0G root hash)
+                    </div>
                     {cycle.storageHash ? (
-                      <span className="font-mono text-sm text-gold-400 break-all">{cycle.storageHash}</span>
+                      <>
+                        <span className="font-mono text-sm text-gold-400 break-all">
+                          {showFullStorageRoot ? cycle.storageHash : truncHash(cycle.storageHash)}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setShowFullStorageRoot((v) => !v)}
+                            className="text-[10px] text-void-500 hover:text-void-300 underline decoration-dotted"
+                          >
+                            {showFullStorageRoot ? "Show shortened" : "Show full hash"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigator.clipboard.writeText(cycle.storageHash ?? "").catch(() => {})}
+                            className="text-[10px] text-gold-400/80 hover:text-gold-400"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                        {cycle.hcs.sequenceNumber > 0 && (
+                          <p className="text-[10px] text-void-600 mt-2 leading-relaxed">
+                            Same root hash as compact field <code className="text-void-400">sh</code> in the HCS audit
+                            message on topic{" "}
+                            <span className="font-mono text-void-400">{cycle.hcs.topicId}</span>, seq #
+                            <span className="font-mono text-void-400">{cycle.hcs.sequenceNumber}</span> (
+                            <a
+                              href={hashscanMessageUrl(HCS_TOPIC_ID, cycle.hcs.sequenceNumber)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-teal-400 hover:underline"
+                            >
+                              Hashscan
+                            </a>
+                            ).
+                          </p>
+                        )}
+                      </>
                     ) : (
                       <span className="text-xs text-void-600">Pending commit</span>
                     )}
+                    {typeof process !== "undefined" && process.env.NEXT_PUBLIC_OG_STORAGE_INDEXER && (
+                      <p className="text-[10px] text-void-600 mt-2">
+                        0G Storage indexer (API):{" "}
+                        <a
+                          href={process.env.NEXT_PUBLIC_OG_STORAGE_INDEXER.replace(/\/$/, "")}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-gold-400/90 hover:underline break-all"
+                        >
+                          {process.env.NEXT_PUBLIC_OG_STORAGE_INDEXER}
+                        </a>
+                        . There is no public blob browser — verify by downloading via the indexer SDK (
+                        <code className="text-void-500">loadMemory(rootHash)</code>).
+                      </p>
+                    )}
                   </div>
-                  {/* Memory Recall — RAG loop proof. Lists the prior-cycle CIDs
-                       that were loaded from 0G Storage at this cycle's start
-                       and fed into the specialist + debate prompts. Turns the
-                       audit chain into a visible DAG: each cycle cites the
-                       cycles it learned from. */}
                   {cycle.narrative?.priorCids && cycle.narrative.priorCids.length > 0 && (
                     <div>
                       <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
-                        🧠 Memory Recall — {cycle.narrative.priorCids.length} prior {cycle.narrative.priorCids.length === 1 ? "cycle" : "cycles"} loaded from 0G Storage
+                        RAG context — prior hunt blobs (0G root hashes loaded at cycle start)
                       </div>
-                      <div className="space-y-1">
-                        {cycle.narrative.priorCids.map((cid, i) => (
-                          <button
-                            key={cid}
-                            type="button"
-                            onClick={() => navigator.clipboard.writeText(cid).catch(() => {})}
-                            className="flex items-center gap-2 text-xs font-mono text-gold-400/80 hover:text-gold-400 transition-colors"
-                            title={`Click to copy: ${cid}`}
-                          >
-                            <span className="text-void-600">{i + 1}.</span>
-                            <span className="break-all">{cid.slice(0, 18)}…{cid.slice(-6)}</span>
-                            <span className="text-void-600 text-[10px]">📋</span>
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[10px] text-void-600 mt-1">
-                        Each CID points at the RichCycleRecord of a prior hunt. The 7B specialists + Alpha/Risk/Executor agents read these as RAG context before making this decision.
+                      <p className="text-[10px] text-void-600 mb-2 leading-relaxed">
+                        These roots were read from 0G Storage and injected into specialist + Alpha/Risk/Executor prompts
+                        for this hunt (audit DAG: this cycle cites the memory it used).
                       </p>
+                      <div className="space-y-1">
+                        {cycle.narrative.priorCids.map((cid, i) => {
+                          const showFull = fullPriorCidIdx === i;
+                          const display =
+                            showFull || cid.length <= 28 ? cid : `${cid.slice(0, 18)}…${cid.slice(-6)}`;
+                          return (
+                            <div key={cid} className="flex flex-col gap-0.5">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-void-600 text-xs w-4">{i + 1}.</span>
+                                <span
+                                  className="text-xs font-mono text-gold-400/90 break-all flex-1 min-w-0"
+                                  title={cid}
+                                >
+                                  {display}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => navigator.clipboard.writeText(cid).catch(() => {})}
+                                  className="text-[10px] text-gold-400/80 hover:text-gold-400 shrink-0"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                              {cid.length > 28 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setFullPriorCidIdx(showFull ? null : i)}
+                                  className="text-[10px] text-void-500 hover:text-void-300 underline decoration-dotted ml-6"
+                                >
+                                  {showFull ? "Show shortened" : "Show full hash"}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
+                  {cycle.storageHash &&
+                    (!cycle.narrative?.priorCids || cycle.narrative.priorCids.length === 0) && (
+                      <div className="rounded-lg border border-void-700/60 bg-void-900/40 px-2.5 py-2">
+                        <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
+                          RAG context — prior hunt blobs
+                        </div>
+                        <p className="text-[10px] text-void-600 leading-relaxed">
+                          None recorded for this hunt: no <code className="text-void-500">priorCids</code> in the committed
+                          narrative (e.g. first hunt(s), no older cycles with a 0G <code className="text-void-500">sh</code>{" "}
+                          pointer, or hunt committed before RAG metadata shipped). The root hash above still proves this
+                          hunt&apos;s blob was stored; full live read check:{" "}
+                          <code className="text-void-500">npx tsx scripts/inspect-rag-eligibility.ts</code>.
+                        </p>
+                      </div>
+                    )}
                   <div>
                     <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">iNFT (ERC-7857)</div>
                     {effectiveInftTokenId != null ? (
@@ -899,7 +1020,11 @@ export function ExpandableHuntCard({
   }, [computing, expanded, userId, cycle.id]);
 
   return (
-    <div className={`bg-void-900 border rounded-2xl px-4 py-3 agent-card cursor-pointer transition-all ${expanded ? "border-dawg-500/30 glow-card col-span-full" : "border-void-800 hover:glow-card"} ${computing ? "border-dawg-500/40" : ""}`}>
+    <div
+      className={`bg-void-900 border rounded-2xl px-5 py-4 sm:px-6 sm:py-5 agent-card cursor-pointer transition-all ${
+        expanded ? "border-dawg-500/35 glow-card col-span-full shadow-lg shadow-black/40" : "border-void-800/90 hover:border-void-700 hover:glow-card"
+      } ${computing ? "border-dawg-500/45" : ""}`}
+    >
       <CompactView
         cycle={cycle}
         expanded={expanded}

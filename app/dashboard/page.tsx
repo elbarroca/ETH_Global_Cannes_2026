@@ -25,6 +25,7 @@ import { PreconditionModal } from "@/components/precondition-modal";
 import { TelegramModal } from "@/components/telegram-modal";
 import { FundingModal } from "@/components/funding-modal";
 import { NaryoFeed } from "@/components/naryo-feed";
+import { RagStatusLine } from "@/components/rag-status-line";
 import { CreateAgentModal } from "@/components/create-agent-modal";
 import { SwarmStatusBar } from "@/components/swarm-status-bar";
 import { SwarmActivityTicker } from "@/components/swarm-activity-ticker";
@@ -50,6 +51,7 @@ export default function DashboardPage() {
     refreshLinkCode,
     agentBalance,
     agentBalanceFetchedAt,
+    refetch: refetchUser,
   } = useUser();
   // `running` is kept as a boolean flag so the stage indicator reflects an
   // in-flight analyze/approve cycle. It is flipped by the SSE streaming path
@@ -143,11 +145,17 @@ export default function DashboardPage() {
 
   // Sync local form state from the user record so the Goal textarea and
   // AUTO-HUNT dropdown reflect saved values after a page load or refresh.
-  // Only resets when the user id changes to avoid clobbering mid-edit state.
+  // We key off the user id only — we intentionally do NOT reset on every
+  // `user` object change because refetchUser() after a save would clobber
+  // the user's in-progress edit in the textarea. Reading user.agent inside
+  // the effect is safe because it's read once per user.id change.
+  const userAgent = user?.agent;
   useEffect(() => {
-    if (!user) return;
-    setHuntGoal(user.agent.goal ?? "");
-    setAutoCycles(user.agent.cycleCount ?? 0);
+    if (!userAgent) return;
+    setHuntGoal(userAgent.goal ?? "");
+    setAutoCycles(userAgent.cycleCount ?? 0);
+    // Only re-run when the user identity changes, not on every agent patch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   // Fade the "Saved ✓" confirmation on the Goal card after 2 seconds.
@@ -386,6 +394,7 @@ export default function DashboardPage() {
                 setSavingGoal(true);
                 try {
                   await configure(userId, { goal: huntGoal.trim() });
+                  await refetchUser();
                   setGoalSavedAt(Date.now());
                 } catch (err) {
                   console.warn("[dashboard] Goal save failed:", err);
@@ -448,6 +457,10 @@ export default function DashboardPage() {
                 setSavingConfig(true);
                 try {
                   await configure(userId, { cycleCount: autoCycles, cyclePeriodMs: autoPeriod });
+                  // Refetch so the "X of N remaining" chip + Agent Active LED
+                  // reflect the new state immediately without waiting for the
+                  // next 5s UserContext poll.
+                  await refetchUser();
                 } catch (err) {
                   console.warn("[dashboard] Config save failed:", err);
                 } finally {
@@ -501,6 +514,8 @@ export default function DashboardPage() {
               />
             ))}
           </div>
+
+          {userId && <RagStatusLine userId={userId} />}
 
           {/* Narrative panel — explains what the augmented layer discussed
               for the MOST RECENT hunt. Populated from cycles.narrative JSON

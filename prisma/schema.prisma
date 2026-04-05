@@ -13,7 +13,7 @@ model User {
   walletAddress      String        @unique @map("wallet_address")
   proxyWallet        Json          @default("{}") @map("proxy_wallet")
   telegram           Json          @default("{\"chatId\": null, \"username\": null, \"verified\": false, \"notifyPreference\": \"every_cycle\"}")
-  agent              Json          @default("{\"active\": false, \"lastCycleAt\": null, \"lastCycleId\": 0, \"riskProfile\": \"balanced\", \"maxTradePercent\": 10}")
+  agent              Json          @default("{\"active\": false, \"goal\": \"\", \"cycleCount\": 0, \"cyclesRemaining\": 0, \"lastCycleAt\": null, \"lastCycleId\": 0, \"riskProfile\": \"balanced\", \"maxTradePercent\": 10}")
   fund               Json          @default("{\"currentNav\": 0, \"depositedUsdc\": 0, \"htsShareBalance\": 0}")
   inftTokenId        Int?          @map("inft_token_id")
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)

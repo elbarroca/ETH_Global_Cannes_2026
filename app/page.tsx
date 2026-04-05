@@ -212,7 +212,7 @@ export default async function LandingPage() {
           ))}
         </div>
         <p className="mt-4 text-xs text-void-600">
-          Contracts, topics, and listeners are listed on the Stack page (nav).
+          Contracts, topics, and listeners are listed on the Stack page (`/infrastructure`).
         </p>
       </section>
 
@@ -233,7 +233,7 @@ export default async function LandingPage() {
             <ProofLink href={ogChainAddressUrl(INFT_CONTRACT_ADDRESS)} label="iNFT contract" sub={truncateId(INFT_CONTRACT_ADDRESS)} />
           </div>
           <p className="mt-3 text-xs text-void-600">
-            Same identifiers are on the Stack page (nav). Stats above pull live sequence / supply from the Mirror API
+            Same identifiers are on the Stack page (`/infrastructure`). Stats above pull live sequence / supply from the Mirror API
             when env is configured.
           </p>
         </div>

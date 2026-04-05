@@ -62,6 +62,10 @@ export interface UserRecord {
     cycleCount?: number;
     cyclePeriodMs?: number;
     cyclesRemaining?: number;
+    /** Persistent per-user hunt goal. Used as the default when no per-cycle
+     *  goal is supplied. Empty string = not yet set (fall back to risk-profile
+     *  template). Max 280 chars enforced in /api/configure. */
+    goal?: string;
   };
   fund: {
     depositedUsdc: number;

@@ -86,10 +86,16 @@ export async function runHeartbeat(
         continue; // Not time yet for this user
       }
 
-      // If cycleCount was configured, check remaining
+      // Auto-hunt is strictly opt-in. A user must have an explicit positive
+      // cycle budget (set via the dashboard AUTO-HUNT card → /api/configure →
+      // cycleCount > 0 mirrors into cyclesRemaining). A `null`/`undefined`
+      // value means "never configured" and is treated the same as 0 — skip.
+      // This is defense in depth on top of the `getActiveUsers()` SQL filter
+      // which already excludes these rows, but protects against races where a
+      // user row becomes stale between the fetch and the cycle decision.
       const remaining = user.agent.cyclesRemaining;
-      if (remaining != null && remaining <= 0) {
-        continue; // No cycles remaining
+      if (remaining == null || remaining <= 0) {
+        continue;
       }
 
       const approvalMode = user.agent.approvalMode ?? "always";
