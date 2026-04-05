@@ -42,8 +42,15 @@ export async function getBroker(): Promise<OGBroker> {
   if (!brokerInstance) {
     brokerInstance = await ogBrokerModule.createZGComputeNetworkBroker(getOgWallet());
 
-    // Start auto-funding to prevent mid-cycle balance failures
-    if (!autoFundingStarted && OG_PROVIDER) {
+    // Start auto-funding to prevent mid-cycle balance failures.
+    // Gated behind ENABLE_BACKGROUND_WORKERS because startAutoFunding spawns an
+    // internal setInterval that would orphan on Vercel serverless (stateless
+    // lambdas). On the local backend process this is safe and desirable.
+    if (
+      !autoFundingStarted &&
+      OG_PROVIDER &&
+      process.env.ENABLE_BACKGROUND_WORKERS === "true"
+    ) {
       try {
         await brokerInstance.inference.startAutoFunding(OG_PROVIDER);
         autoFundingStarted = true;

@@ -305,6 +305,8 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
       riskParsed?: Record<string, unknown>;
       maxTradePercent?: number;
       cycleLiquidity?: CycleLiquidity;
+      reputationScores?: Record<string, number>;
+      cycleSeed?: number;
     };
 
     const prompt = PROMPT_MAP[AGENT_NAME];
@@ -321,9 +323,21 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
     const cycleLiquidity = body.cycleLiquidity;
 
     try {
-      // 1. Select specialists for this role
-      const specIds = selectForRole(role, { riskProfile, userGoal, marketVolatility });
-      console.log(`[${AGENT_NAME}] Hiring specialists: ${specIds.length > 0 ? specIds.join(", ") : "(none)"}`);
+      // 1. Select specialists for this role via dynamic rotation. main-agent
+      //    forwards a reputation snapshot + per-cycle seed; selectForRole
+      //    ranks the pool by score (reputation + context boost + jitter) and
+      //    picks the top N. The full scoring table rides back in the response
+      //    so downstream UI + Telegram can show "picked X,Y from pool of 4".
+      const selection = selectForRole(
+        role,
+        { riskProfile, userGoal, marketVolatility },
+        body.reputationScores ?? {},
+        body.cycleSeed ?? 0,
+      );
+      const specIds = selection.picked;
+      console.log(
+        `[${AGENT_NAME}] Rotation picked [${specIds.join(", ") || "(none)"}] from pool [${selection.pool.join(", ")}] scores=${JSON.stringify(selection.scores)}`,
+      );
       if (cycleLiquidity) {
         console.log(
           `[${AGENT_NAME}] Liquidity context: $${cycleLiquidity.availableUsd.toFixed(4)} available (proxy $${cycleLiquidity.proxyUsd.toFixed(4)})`,
@@ -388,6 +402,10 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
           picks: s.picks, // multi-token shortlist from sentiment/momentum etc.
         })),
         total_cost_usd: hiredSpecs.reduce((sum, s) => sum + s.priceUsd, 0),
+        // Rotation rationale — which pool, who was picked, and the full
+        // scoring table. Main-agent threads this onto DebateStageResult so
+        // the Telegram formatter can show "Alpha picked X,Y from 4".
+        rotation: selection,
       });
     } catch (err) {
       console.error(`[${AGENT_NAME}] hire-and-analyze failed:`, err);

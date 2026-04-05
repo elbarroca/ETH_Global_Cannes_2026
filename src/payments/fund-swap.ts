@@ -27,6 +27,7 @@
 import { createPublicClient, http, parseUnits, formatUnits } from "viem";
 import { arcTestnet } from "../config/arc-chain";
 import { agentTransfer, getProxyBalance } from "./circle-wallet";
+import { getUserGatewayClient } from "../config/arc";
 import type { UserRecord } from "../types/index";
 
 // Arc USDC has 18 decimals (it's the native currency, not ERC-20).
@@ -385,6 +386,125 @@ export function computeSellHoldingsUpdate(
     newCostBasis: nextBasis,
     newRealizedPnl: realizedPnl + pnlDelta,
     realizedPnlDelta: pnlDelta,
+  };
+}
+
+/**
+ * Circle Gateway pool funding result. Separate from FundPrepResult because
+ * the ledger is different — this is the Gateway contract's pool balance,
+ * not the wallet's native USDC.
+ */
+export interface GatewayFundResult {
+  skipped: boolean;
+  depositTxHash?: string;
+  /** Gateway pool balance in USD before the deposit (0 if nothing was there). */
+  beforeUsd: number;
+  /** Gateway pool balance in USD after the deposit lands. */
+  afterUsd: number;
+  /** Amount topped up in USD (0 if skipped). */
+  depositedUsd: number;
+  /** Human-readable address this deposit credits (the x402 signer). */
+  signerAddress: string;
+}
+
+/**
+ * Ensure the user's x402 signer has USDC inside the Circle Gateway pool so
+ * batched nanopayments can settle.
+ *
+ * Why this exists
+ * ───────────────
+ * Circle Gateway's batching scheme pays from a POOLED balance keyed by the
+ * signer address, NOT from the signer's wallet native USDC balance. When a
+ * specialist 402s, the facilitator asks the Gateway contract "does this
+ * address have capacity in the pool?" — if the pool is empty, settlement
+ * fails with `insufficient_balance` even though the hot wallet holds native
+ * USDC. `ensureHotWalletFunded` handles the wallet side (for swap execution);
+ * THIS helper handles the Gateway pool side (for x402 specialist hires).
+ *
+ * The two helpers are complementary — one funds the "wallet ledger" used by
+ * `prepareSwapFunds` → `executeArcSwap`, the other funds the "pool ledger"
+ * used by `@circle-fin/x402-batching` for specialist payments.
+ *
+ * At $0.001/hire, a $0.50 topup covers 500 specialist calls, so in practice
+ * this helper is a no-op skip on 99% of cycles and self-heals when the pool
+ * finally drains.
+ *
+ * Call sequence to bootstrap a fresh user:
+ *   1. ensureHotWalletFunded(user, 0.05, 0.50+0.05)  ← wallet native USDC
+ *   2. ensureGatewayPoolFunded(user, 0.10, 0.50)     ← Gateway pool USDC
+ *
+ * Non-fatal: logs and returns on failure so callers can cascade to HOLD
+ * rather than abort the cycle.
+ */
+export async function ensureGatewayPoolFunded(
+  user: UserRecord,
+  minBalanceUsd: number = 0.10,
+  topupUsd: number = 0.50,
+): Promise<GatewayFundResult> {
+  if (user.hotWalletIndex == null) {
+    throw new Error("user has no hotWalletIndex — cannot derive Gateway client");
+  }
+
+  const gateway = getUserGatewayClient(user.hotWalletIndex);
+
+  // Read the pool balance. `gateway.available` is a bigint in USDC atomic
+  // units (6 decimals on the Gateway contract even though Arc native USDC
+  // is 18 decimals — the pool uses Circle's canonical representation).
+  const balances = await gateway.getBalances();
+  const signerAddress = user.hotWalletAddress ?? "(unknown)";
+  const availableAtomic = balances.gateway.available;
+  const beforeUsd = Number(balances.gateway.formattedAvailable);
+
+  if (beforeUsd >= minBalanceUsd) {
+    console.log(
+      `[gateway-fund] pool balance $${beforeUsd.toFixed(4)} >= floor $${minBalanceUsd.toFixed(4)} for ${signerAddress.slice(0, 10)}… — skipping deposit`,
+    );
+    return {
+      skipped: true,
+      beforeUsd,
+      afterUsd: beforeUsd,
+      depositedUsd: 0,
+      signerAddress,
+    };
+  }
+
+  // Pool is below floor. The Gateway contract will pull from the signer's
+  // wallet native USDC, so the hot wallet needs enough headroom to cover the
+  // deposit plus a small buffer for gas (Arc gas is native USDC too). We
+  // opportunistically top up the hot wallet here — if it's already fine,
+  // ensureHotWalletFunded short-circuits on its own floor check.
+  const walletHeadroom = topupUsd + 0.05;
+  try {
+    await ensureHotWalletFunded(user, walletHeadroom, walletHeadroom + 0.05);
+  } catch (err) {
+    throw new Error(
+      `cannot deposit to Gateway pool: hot wallet top-up failed — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  console.log(
+    `[gateway-fund] pool balance $${beforeUsd.toFixed(6)} (atomic ${availableAtomic}) < floor $${minBalanceUsd.toFixed(4)} — depositing $${topupUsd.toFixed(2)} for ${signerAddress.slice(0, 10)}…`,
+  );
+
+  const result = await gateway.deposit(topupUsd.toFixed(6));
+  const depositedUsd = Number(result.formattedAmount);
+  console.log(
+    `[gateway-fund] deposit tx=${result.depositTxHash} amount=$${depositedUsd.toFixed(6)} depositor=${result.depositor}`,
+  );
+
+  // Re-read the balance to confirm the deposit settled. `deposit()` awaits
+  // the on-chain tx receipt internally, so the balance should reflect the
+  // new total immediately — no polling needed like the Circle MPC path.
+  const after = await gateway.getBalances();
+  const afterUsd = Number(after.gateway.formattedAvailable);
+
+  return {
+    skipped: false,
+    depositTxHash: result.depositTxHash,
+    beforeUsd,
+    afterUsd,
+    depositedUsd,
+    signerAddress,
   };
 }
 

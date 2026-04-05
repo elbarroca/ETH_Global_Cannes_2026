@@ -1,3 +1,5 @@
+import type { RoleSelection } from "../agents/role-manifests";
+
 export type PendingCycleStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "TIMED_OUT";
 export type CycleOrigin = "ui" | "telegram" | "heartbeat";
 
@@ -186,6 +188,8 @@ export interface DebateAgentResponse {
     picks?: TokenPick[];
   }>;
   total_cost_usd: number;
+  /** Specialist rotation rationale echoed from the Fly debate container. */
+  rotation?: RoleSelection;
 }
 
 export interface DebateStageResult {
@@ -194,6 +198,8 @@ export interface DebateStageResult {
   reasoning?: string;
   attestationHash: string;
   teeVerified: boolean;
+  /** Specialist rotation rationale for this stage — which pool, who was picked, scores. */
+  rotation?: RoleSelection;
 }
 
 export type DebatePhase = "intelligence" | "opening" | "rebuttal" | "decision" | "execution";

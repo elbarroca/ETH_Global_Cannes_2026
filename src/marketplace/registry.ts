@@ -222,6 +222,22 @@ export async function hireFromMarketplace(
   return results;
 }
 
+// ── Fetch reputation snapshot ───────────────────────────────
+//
+// Returns a plain { name → reputation } map read from the in-memory registry.
+// Used by main-agent at the top of runCycle() to feed specialist rotation —
+// each cycle picks the best N of a role's pool using these scores plus
+// context boosts and deterministic jitter. See role-manifests.ts:selectForRole.
+
+export async function getReputationScores(): Promise<Record<string, number>> {
+  await ensureLoaded();
+  const out: Record<string, number> = {};
+  for (const agent of agents.values()) {
+    out[agent.name] = agent.reputation;
+  }
+  return out;
+}
+
 // ── Increment hire count for an agent ─────────────────────
 
 export async function incrementAgentHires(name: string): Promise<void> {

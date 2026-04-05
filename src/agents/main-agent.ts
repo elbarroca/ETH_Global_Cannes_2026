@@ -10,7 +10,7 @@ import { logCycle } from "../hedera/hcs";
 import { storeMemory } from "../og/storage";
 import { updateAgentMetadata } from "../og/inft";
 import { getUserPaymentFetch, getUserPrivateKey } from "../config/arc";
-import { hireFromMarketplace } from "../marketplace/registry";
+import { hireFromMarketplace, getReputationScores } from "../marketplace/registry";
 import { evaluateCycleSignals } from "../marketplace/reputation";
 import { executeArcSwap, executeArcSell, calculateSwapAmount } from "../execution/arc-swap";
 import {
@@ -19,6 +19,7 @@ import {
   computeSellHoldingsUpdate,
   computeCurrentNav,
   ensureHotWalletFunded,
+  ensureGatewayPoolFunded,
 } from "../payments/fund-swap";
 import { getTokenPrice } from "../payments/circle-wallet";
 import { synthesizeCycleNarrative, type CycleNarrative } from "./narrative";
@@ -48,6 +49,7 @@ import type {
   CycleLiquidity,
 } from "../types/index";
 import type { RiskProfile, MarketVolatility, DebateRole } from "./role-manifests";
+import { fnv1a } from "./fnv";
 
 const TOPIC_ID = process.env.HCS_AUDIT_TOPIC_ID!;
 
@@ -158,6 +160,10 @@ interface DebateCallContext {
   alphaParsed?: Record<string, unknown>;
   riskChallenge?: string;
   riskParsed?: Record<string, unknown>;
+  /** Marketplace reputation snapshot — forwarded to selectForRole for rotation. */
+  reputationScores?: Record<string, number>;
+  /** Per-user per-cycle seed — makes rotation visible but deterministic for HCS replay. */
+  cycleSeed?: number;
 }
 
 // Call a remote debate agent's /hire-and-analyze endpoint.
@@ -198,6 +204,7 @@ function synthesizeDebateResult(
     reasoning: r.reasoning,
     attestationHash: r.attestationHash,
     teeVerified: r.teeVerified,
+    rotation: r.rotation,
   });
 
   // Build synthetic transcripts mirroring the shape of the old in-process debate.
@@ -625,6 +632,45 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     );
   }
 
+  // 0c. Ensure the Circle Gateway POOL has USDC for x402 batched settlement.
+  //
+  // This is the other half of the nanopayment ledger. `ensureHotWalletFunded`
+  // puts native USDC in the signer's wallet (used for gas + swap execution);
+  // this helper deposits USDC INTO the Gateway contract pool, which is where
+  // `@circle-fin/x402-batching` draws from when specialists 402. Without this,
+  // every x402 request failed with `insufficient_balance` even when the
+  // wallet had plenty of native USDC — different ledger.
+  //
+  // At $0.001/hire, the default $0.50 topup covers ~500 specialist calls, so
+  // this skips on every cycle until the pool drains. Non-fatal: logs on
+  // failure and lets the cycle continue to the degraded HOLD path.
+  if (user.hotWalletIndex != null) {
+    try {
+      const gatewayFund = await ensureGatewayPoolFunded(user, 0.10, 0.50);
+      if (!gatewayFund.skipped) {
+        await logAction({
+          userId: user.id,
+          actionType: "PAYMENT_SENT",
+          agentName: "gateway-fund",
+          paymentNetwork: "arc",
+          paymentTxHash: gatewayFund.depositTxHash,
+          paymentAmount: gatewayFund.depositedUsd.toFixed(6),
+          payload: {
+            stage: "gateway_pool_deposited",
+            signer: gatewayFund.signerAddress,
+            beforeUsd: gatewayFund.beforeUsd,
+            afterUsd: gatewayFund.afterUsd,
+          },
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn(
+        `[cycle] Gateway pool top-up failed (continuing — hires may 402):`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   // 1. Hire specialists + run debate
   //
   // HIERARCHICAL PATH (default): delegate to the three Fly.io debate agents
@@ -645,6 +691,16 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
   let debate!: DebateResult;
   let specialistPath: SpecialistPath = "direct_x402";
 
+  // Fetch live reputation snapshot from the marketplace registry so Fly
+  // containers can rank their candidate pool per cycle. Seed rotation jitter
+  // on (userId, cycleId) — deterministic for HCS replay, but distinct per
+  // user so two users on their respective cycle #N see different picks.
+  const reputationScores = await getReputationScores().catch((err) => {
+    console.warn(`[cycle] getReputationScores failed, falling back to defaults:`, err instanceof Error ? err.message : err);
+    return {} as Record<string, number>;
+  });
+  const cycleSeed = fnv1a(`${user.id}:${cycleId}`);
+
   const debateCtx: DebateCallContext = {
     userGoal: goal,
     userWalletIndex: user.hotWalletIndex,
@@ -652,6 +708,8 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     marketVolatility: "medium",
     maxTradePercent: user.agent.maxTradePercent,
     cycleLiquidity,
+    reputationScores,
+    cycleSeed,
   };
 
   let hierarchicalSucceeded = false;
