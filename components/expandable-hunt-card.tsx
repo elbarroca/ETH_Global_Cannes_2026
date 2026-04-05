@@ -575,7 +575,7 @@ function InlineDetail({
               className="hunt-detail-card-enter hunt-card-surface rounded-xl border border-void-800/50 bg-void-950/25 p-2"
               style={{ "--hunt-stagger": "0ms" } as CSSProperties}
             >
-              <HuntPipelineArrows actions={actions} />
+              <HuntPipelineArrows cycle={cycle} actions={actions} />
             </div>
             <p className="text-xs sm:text-sm text-void-500 uppercase tracking-wider font-semibold">Conclusion path</p>
             <div className="hunt-detail-card-enter" style={{ "--hunt-stagger": "48ms" } as CSSProperties}>
