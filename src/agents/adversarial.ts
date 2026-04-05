@@ -287,10 +287,17 @@ export async function runAdversarialDebate(
   maxTradePercent: number,
   cycleId?: number,
   userId?: string,
+  priorContext?: string,
 ): Promise<DebateResult> {
   const debateStart = Date.now();
   const transcripts: DebateTranscriptEntry[] = [];
   const specContext = buildSpecialistContext(specialistResults);
+  // RAG context block loaded from 0G Storage (last 3 committed cycles for this
+  // user). Appended to every debate prompt — Alpha, Risk, Executor, and their
+  // rebuttal variants — so the 7B model can cite its own history. Empty string
+  // means no prior cycles (fresh user or memory fetch failure); all prompts
+  // still work because `${priorBlock}` becomes "".
+  const priorBlock = priorContext && priorContext.length > 0 ? `\n\n${priorContext}` : "";
   let turnCounter = 0;
 
   // Helper: build RichTurnData from a single LLM turn's inputs and outputs.
@@ -342,7 +349,7 @@ export async function runAdversarialDebate(
 
   // ── Round 1: Standard debate ──────────────────────────────────
 
-  const alphaMsg = `Specialist signals:\n${specContext}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.`;
+  const alphaMsg = `Specialist signals:\n${specContext}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.${priorBlock}`;
   let t0 = Date.now();
   let alpha = await inferWithRetry("alpha", PROMPTS.alpha.content, alphaMsg, ALPHA_FALLBACK);
   let alphaDuration = Date.now() - t0;
@@ -368,7 +375,7 @@ export async function runAdversarialDebate(
 
   const alphaCotLines = normalizeCot((alpha.parsed as { cot?: unknown }).cot, alpha.reasoning);
   const alphaCotBlock = alphaCotLines.length > 0 ? `\nAlpha's chain of thought:\n${alphaCotLines.map((c) => `  - ${c}`).join("\n")}` : "";
-  const riskMsg = `Specialist signals:\n${specContext}\n\nAlpha argues: "${alpha.reasoning}"${alphaCotBlock}\nAlpha proposes: ${JSON.stringify(alpha.parsed)}\n\nMax allowed: ${maxTradePercent}%. Challenge this.`;
+  const riskMsg = `Specialist signals:\n${specContext}\n\nAlpha argues: "${alpha.reasoning}"${alphaCotBlock}\nAlpha proposes: ${JSON.stringify(alpha.parsed)}\n\nMax allowed: ${maxTradePercent}%. Challenge this.${priorBlock}`;
   t0 = Date.now();
   let risk = await inferWithRetry("risk", PROMPTS.risk.content, riskMsg, RISK_FALLBACK);
   let riskDuration = Date.now() - t0;
@@ -395,7 +402,7 @@ export async function runAdversarialDebate(
 
   const riskCotLines = normalizeCot((risk.parsed as { cot?: unknown }).cot, risk.reasoning);
   const riskCotBlock = riskCotLines.length > 0 ? `\nRisk's chain of thought:\n${riskCotLines.map((c) => `  - ${c}`).join("\n")}` : "";
-  const executorMsg = `Specialist signals:\n${specContext}\n\nAlpha argues: "${alpha.reasoning}"${alphaCotBlock}\nAlpha: ${JSON.stringify(alpha.parsed)}\n\nRisk challenges: "${risk.reasoning}"${riskCotBlock}\nRisk: ${JSON.stringify(risk.parsed)}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.`;
+  const executorMsg = `Specialist signals:\n${specContext}\n\nAlpha argues: "${alpha.reasoning}"${alphaCotBlock}\nAlpha: ${JSON.stringify(alpha.parsed)}\n\nRisk challenges: "${risk.reasoning}"${riskCotBlock}\nRisk: ${JSON.stringify(risk.parsed)}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.${priorBlock}`;
   t0 = Date.now();
   let executor = await inferWithRetry("executor", PROMPTS.executor.content, executorMsg, EXECUTOR_FALLBACK);
   let executorDuration = Date.now() - t0;
@@ -427,7 +434,7 @@ export async function runAdversarialDebate(
     console.log(`[debate] Low confidence (${execConfidence}%) — triggering rebuttal round`);
     await delay(DELAY_MS);
 
-    const alphaRebuttalMsg = `REBUTTAL ROUND. Executor initially decided: ${JSON.stringify(executor.parsed)}\nRisk argued: "${risk.reasoning}"\n\nSpecialist signals:\n${specContext}\n\nDefend or revise your position. Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.`;
+    const alphaRebuttalMsg = `REBUTTAL ROUND. Executor initially decided: ${JSON.stringify(executor.parsed)}\nRisk argued: "${risk.reasoning}"\n\nSpecialist signals:\n${specContext}\n\nDefend or revise your position. Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.${priorBlock}`;
     t0 = Date.now();
     alpha = await inferWithRetry("alpha", PROMPTS.alpha.content, alphaRebuttalMsg, ALPHA_FALLBACK);
     alphaDuration = Date.now() - t0;
@@ -452,7 +459,7 @@ export async function runAdversarialDebate(
 
     await delay(DELAY_MS);
 
-    const riskRebuttalMsg = `REBUTTAL ROUND. Executor initially decided: ${JSON.stringify(executor.parsed)}\nAlpha now argues: "${alpha.reasoning}"\nAlpha revised: ${JSON.stringify(alpha.parsed)}\n\nSpecialist signals:\n${specContext}\n\nMax allowed: ${maxTradePercent}%. Revise your challenge.`;
+    const riskRebuttalMsg = `REBUTTAL ROUND. Executor initially decided: ${JSON.stringify(executor.parsed)}\nAlpha now argues: "${alpha.reasoning}"\nAlpha revised: ${JSON.stringify(alpha.parsed)}\n\nSpecialist signals:\n${specContext}\n\nMax allowed: ${maxTradePercent}%. Revise your challenge.${priorBlock}`;
     t0 = Date.now();
     risk = await inferWithRetry("risk", PROMPTS.risk.content, riskRebuttalMsg, RISK_FALLBACK);
     riskDuration = Date.now() - t0;
@@ -477,7 +484,7 @@ export async function runAdversarialDebate(
 
     await delay(DELAY_MS);
 
-    const executorFinalMsg = `FINAL DECISION after rebuttal.\n\nSpecialist signals:\n${specContext}\n\nAlpha (rebuttal): "${alpha.reasoning}"\nAlpha: ${JSON.stringify(alpha.parsed)}\n\nRisk (rebuttal): "${risk.reasoning}"\nRisk: ${JSON.stringify(risk.parsed)}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make your FINAL call.`;
+    const executorFinalMsg = `FINAL DECISION after rebuttal.\n\nSpecialist signals:\n${specContext}\n\nAlpha (rebuttal): "${alpha.reasoning}"\nAlpha: ${JSON.stringify(alpha.parsed)}\n\nRisk (rebuttal): "${risk.reasoning}"\nRisk: ${JSON.stringify(risk.parsed)}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make your FINAL call.${priorBlock}`;
     t0 = Date.now();
     executor = await inferWithRetry("executor", PROMPTS.executor.content, executorFinalMsg, EXECUTOR_FALLBACK);
     executorDuration = Date.now() - t0;

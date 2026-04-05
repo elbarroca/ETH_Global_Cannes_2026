@@ -20,7 +20,44 @@ import {
 
 const MIRROR_BASE = "https://testnet.mirrornode.hedera.com/api/v1";
 
+// Single shared bot instance. Initialized by one of three entry points:
+//   1. startBot()          — local `npm run backend`, long-polling mode
+//   2. initWebhookBot()    — Vercel webhook route, no polling, handlers registered
+//   3. ensureBot()         — lazy send-only init from cron/dashboard routes
+// Whichever runs first wins; the others become no-ops.
 let bot: TelegramBot | null = null;
+let handlersRegistered = false;
+
+/**
+ * Lazily creates a send-only bot (no polling, no handlers) if none exists.
+ * Used by notifyUser/sendApprovalNotification/editTelegramMessage so they
+ * work from Vercel cron/dashboard routes where startBot() was never called.
+ */
+function ensureBot(): TelegramBot | null {
+  if (bot) return bot;
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return null;
+  bot = new TelegramBot(token, { polling: false });
+  return bot;
+}
+
+/**
+ * Initializes the bot for Vercel webhook mode:
+ *   - No polling (webhook pushes updates to us)
+ *   - Command + callback handlers registered (idempotent)
+ * Called by app/api/telegram/webhook/route.ts on every invocation; the
+ * lambda's warm period reuses the same memoized bot.
+ */
+export function initWebhookBot(): TelegramBot | null {
+  const b = ensureBot();
+  if (!b) return null;
+  if (!handlersRegistered) {
+    registerCommands(b);
+    registerCallbacks(b);
+    handlersRegistered = true;
+  }
+  return b;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,7 +96,8 @@ async function fetchHistory(limit: number): Promise<CompactCycleRecord[]> {
 // helpers and there's one place to evolve the message shape.
 
 export function notifyUser(user: UserRecord, result: CycleResult): void {
-  if (!bot || !user.telegram.chatId) return;
+  const b = ensureBot();
+  if (!b || !user.telegram.chatId) return;
 
   const pref = user.telegram.notifyPreference;
   const action = (result.decision as { act?: string })?.act ?? "HOLD";
@@ -70,7 +108,7 @@ export function notifyUser(user: UserRecord, result: CycleResult): void {
 
   const msg = formatHuntComplete(result, user);
 
-  bot.sendMessage(user.telegram.chatId, msg, { parse_mode: "Markdown" }).catch((err) => {
+  b.sendMessage(user.telegram.chatId, msg, { parse_mode: "Markdown" }).catch((err) => {
     console.warn(`[telegram] Failed to notify ${user.id}:`, err);
   });
 }
@@ -82,10 +120,11 @@ export async function sendApprovalNotification(
   analysis: AnalysisResult,
   pendingId: string,
 ): Promise<number | null> {
-  if (!bot || !user.telegram.chatId) return null;
+  const b = ensureBot();
+  if (!b || !user.telegram.chatId) return null;
 
   const preview = formatAnalysisPreview(analysis, user);
-  const sent = await bot.sendMessage(user.telegram.chatId, preview, {
+  const sent = await b.sendMessage(user.telegram.chatId, preview, {
     parse_mode: "Markdown",
     reply_markup: buildApprovalKeyboard(pendingId),
   });
@@ -99,8 +138,9 @@ export async function editTelegramMessage(
   messageId: number,
   text: string,
 ): Promise<void> {
-  if (!bot) return;
-  await bot.editMessageText(text, {
+  const b = ensureBot();
+  if (!b) return;
+  await b.editMessageText(text, {
     chat_id: chatId,
     message_id: messageId,
     parse_mode: "Markdown",
@@ -111,7 +151,7 @@ export async function editTelegramMessage(
 
 // ── Command handlers ────────────────────────────────────────────────────────
 
-function registerCommands(telegramBot: TelegramBot): void {
+export function registerCommands(telegramBot: TelegramBot): void {
   // /start — Welcome + link instructions
   telegramBot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id.toString();
@@ -313,7 +353,7 @@ function registerCommands(telegramBot: TelegramBot): void {
 
 // ── Callback handler for inline buttons ────────────────────────────────────
 
-function registerCallbacks(telegramBot: TelegramBot): void {
+export function registerCallbacks(telegramBot: TelegramBot): void {
   telegramBot.on("callback_query", async (query) => {
     const data = query.data;
     const chatId = query.message?.chat.id;
@@ -530,19 +570,22 @@ export function startBot(): void {
   }
 
   if (bot) {
-    console.warn("[telegram] Bot already running — skipping duplicate start");
+    console.warn("[telegram] Bot already initialized — skipping duplicate start");
     return;
   }
 
   bot = new TelegramBot(token, { polling: true });
 
-  // Handle 409 conflict (another instance polling) — stop gracefully
+  // Handle 409 conflict (another instance polling) — stop gracefully.
+  // Common cause: webhook is registered (Vercel prod) AND local polling is running.
+  // Fix: run `npm run setup:webhook -- delete` to clear the webhook, or stop polling.
   bot.on("polling_error", (err) => {
     const msg = (err as Error).message ?? "";
     if (msg.includes("409 Conflict")) {
-      console.error("[telegram] Another bot instance is polling — stopping this one to avoid conflict");
+      console.error("[telegram] Another bot instance or webhook is active — stopping local polling to avoid conflict");
       bot?.stopPolling();
       bot = null;
+      handlersRegistered = false;
     } else {
       console.error("[telegram] Polling error:", msg);
     }
@@ -550,5 +593,6 @@ export function startBot(): void {
 
   registerCommands(bot);
   registerCallbacks(bot);
+  handlersRegistered = true;
   console.log("[telegram] Bot started (polling mode)");
 }

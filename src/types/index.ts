@@ -495,5 +495,11 @@ export interface RichCycleRecord {
   cycleLiquidity?: CycleLiquidity;
   /** Full augmented-layer narrative persisted with the record for permanent audit. */
   narrative?: import("../agents/narrative").CycleNarrative;
+  /** 0G Storage CIDs of prior cycles that were loaded as RAG context at cycle start.
+   *  Makes the memory loop explicit and verifiable: each committed cycle points at
+   *  the past cycles it learned from, turning the audit chain into a DAG. Empty or
+   *  undefined when no prior cycles were available (fresh user, HCS drift, 0G down).
+   *  See src/og/storage.ts:loadRecentCycles and src/agents/memory-context.ts. */
+  priorCids?: string[];
   nav: number;
 }

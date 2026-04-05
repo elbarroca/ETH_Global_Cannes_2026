@@ -33,7 +33,10 @@ type ActionType =
   | "NARYO_CYCLE_EVENT"
   | "NARYO_DEPOSIT_EVENT"
   | "NARYO_OG_EVENT"
-  | "NARYO_CORRELATION";
+  | "NARYO_CORRELATION"
+  | "NARYO_SPECIALIST_EVENT"
+  | "NARYO_HEARTBEAT_EVENT"
+  | "NARYO_CROSS_CHAIN_EVENT";
 
 interface LogActionInput {
   userId: string;

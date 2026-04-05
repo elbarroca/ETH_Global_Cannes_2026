@@ -9,6 +9,13 @@ import { evaluatePickPerformance } from "../marketplace/pick-tracker";
 const INTERVAL_MS = 1 * 60 * 1000; // 1 minute tick — per-user timing checked inside
 const DEFAULT_PERIOD_MS = 5 * 60 * 1000; // 5 minutes default
 
+// Naryo heartbeat throttling — emit on-chain proof of cadence every Nth tick
+// so Hashscan / the Naryo audit log shows a HeartbeatEmitted event cluster
+// without burning gas on every 1-minute tick. 6 ticks = ~6 minutes between
+// on-chain heartbeats. Counter persists across ticks via module scope.
+const NARYO_HEARTBEAT_EVERY_TICKS = 6;
+let heartbeatTickCount = 0;
+
 export async function runHeartbeat(): Promise<void> {
   const users = await getActiveUsers();
   if (users.length === 0) {
@@ -89,6 +96,27 @@ export async function runHeartbeat(): Promise<void> {
     console.log(`[heartbeat] Scheduled next on Hedera: ${scheduleId}`);
   } catch (err) {
     console.warn("[heartbeat] Scheduler failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
+
+  // Emit a Naryo HeartbeatEmitted event on Hedera EVM every Nth tick — throttled
+  // so we don't burn gas on every 1-minute tick. Gives Naryo an on-chain proof
+  // of the cadence loop that the dashboard feed can surface. Non-fatal, fire-
+  // and-forget. Gated behind NARYO_AUDIT_CONTRACT_ADDRESS; skips entirely when
+  // Naryo isn't configured.
+  heartbeatTickCount += 1;
+  if (
+    process.env.NARYO_AUDIT_CONTRACT_ADDRESS &&
+    heartbeatTickCount % NARYO_HEARTBEAT_EVERY_TICKS === 0
+  ) {
+    void (async () => {
+      try {
+        const { emitHeartbeatEvent } = await import("../naryo/emit-event");
+        await emitHeartbeatEvent(users.length);
+        console.log(`[heartbeat] Naryo HeartbeatEmitted event posted (tick ${heartbeatTickCount}, active ${users.length})`);
+      } catch (err) {
+        console.warn("[heartbeat] Naryo HeartbeatEmitted failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      }
+    })();
   }
 
   // Score any specialist picks that have reached their evaluation window.

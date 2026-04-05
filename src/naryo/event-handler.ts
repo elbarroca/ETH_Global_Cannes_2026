@@ -15,7 +15,17 @@ export interface NaryoEventPayload {
   [key: string]: unknown;
 }
 
-type NaryoSource = "hcs" | "hts" | "cycle" | "deposit" | "og-mint" | "og-metadata";
+type NaryoSource =
+  | "hcs"
+  | "hts"
+  | "cycle"
+  | "deposit"
+  | "og-mint"
+  | "og-metadata"
+  // Exhaustive Hedera EVM coverage — matches Naryo filters in naryo/application.yml
+  | "specialist"
+  | "heartbeat"
+  | "cross-chain";
 
 const SOURCE_TO_CHAIN: Record<NaryoSource, string> = {
   hcs: "hedera",
@@ -24,6 +34,12 @@ const SOURCE_TO_CHAIN: Record<NaryoSource, string> = {
   deposit: "hedera",
   "og-mint": "0g-chain",
   "og-metadata": "0g-chain",
+  specialist: "hedera",
+  heartbeat: "hedera",
+  // cross-chain proofs live on Hedera EVM but carry the source chain in the
+  // event payload — we tag them "hedera" here because that's where Naryo
+  // captured the log. The dashboard feed widget shows the embedded sourceChain.
+  "cross-chain": "hedera",
 };
 
 const SOURCE_TO_ACTION: Record<NaryoSource, string> = {
@@ -33,6 +49,9 @@ const SOURCE_TO_ACTION: Record<NaryoSource, string> = {
   deposit: "NARYO_DEPOSIT_EVENT",
   "og-mint": "NARYO_OG_EVENT",
   "og-metadata": "NARYO_OG_EVENT",
+  specialist: "NARYO_SPECIALIST_EVENT",
+  heartbeat: "NARYO_HEARTBEAT_EVENT",
+  "cross-chain": "NARYO_CROSS_CHAIN_EVENT",
 };
 
 // In-memory buffer for dashboard feed

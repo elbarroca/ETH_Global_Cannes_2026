@@ -307,6 +307,10 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
       cycleLiquidity?: CycleLiquidity;
       reputationScores?: Record<string, number>;
       cycleSeed?: number;
+      /** RAG context from 0G Storage — last 3 committed cycles for this user,
+       *  formatted by formatPriorCyclesForPrompt. Appended to the debate agent's
+       *  userMessage so the 7B model can cite its own history. */
+      priorContext?: string;
     };
 
     const prompt = PROMPT_MAP[AGENT_NAME];
@@ -368,14 +372,20 @@ if (DEBATE_ROLES.has(AGENT_NAME)) {
 
       // 4. Compose the role-specific debate message. The specContext already
       //    carries the LIQUIDITY block, so prompts can reference it by name.
+      //    RAG memory block is appended at the end of every message so the 7B
+      //    model sees the user's own history (last 3 cycles from 0G Storage).
+      //    Empty string when no prior cycles exist → no-op append.
+      const priorBlock = body.priorContext && body.priorContext.length > 0
+        ? `\n\n${body.priorContext}`
+        : "";
       let userMessage: string;
       if (role === "alpha") {
-        userMessage = `User goal: "${userGoal}"\n\nSpecialist signals (you hired these):\n${specContext}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.`;
+        userMessage = `User goal: "${userGoal}"\n\nSpecialist signals (you hired these):\n${specContext}\n\nRisk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.${priorBlock}`;
       } else if (role === "risk") {
-        userMessage = `User goal: "${userGoal}"\n\nAlpha's thesis: "${body.alphaThesis ?? "(no thesis provided)"}"\nAlpha proposes: ${JSON.stringify(body.alphaParsed ?? {})}\n\nDefensive specialists (you hired these):\n${specContext}\n\nMax allowed: ${maxTradePercent}%. Challenge Alpha based on YOUR defensive data.`;
+        userMessage = `User goal: "${userGoal}"\n\nAlpha's thesis: "${body.alphaThesis ?? "(no thesis provided)"}"\nAlpha proposes: ${JSON.stringify(body.alphaParsed ?? {})}\n\nDefensive specialists (you hired these):\n${specContext}\n\nMax allowed: ${maxTradePercent}%. Challenge Alpha based on YOUR defensive data.${priorBlock}`;
       } else {
         // executor
-        userMessage = `User goal: "${userGoal}"\n\nAlpha argues: "${body.alphaThesis ?? ""}"\nAlpha: ${JSON.stringify(body.alphaParsed ?? {})}\n\nRisk challenges: "${body.riskChallenge ?? ""}"\nRisk: ${JSON.stringify(body.riskParsed ?? {})}\n\n${hiredSpecs.length > 0 ? `Tiebreakers (you hired):\n${specContext}\n\n` : cycleLiquidity ? `${formatLiquidityTable(cycleLiquidity)}\n\n` : ""}Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.`;
+        userMessage = `User goal: "${userGoal}"\n\nAlpha argues: "${body.alphaThesis ?? ""}"\nAlpha: ${JSON.stringify(body.alphaParsed ?? {})}\n\nRisk challenges: "${body.riskChallenge ?? ""}"\nRisk: ${JSON.stringify(body.riskParsed ?? {})}\n\n${hiredSpecs.length > 0 ? `Tiebreakers (you hired):\n${specContext}\n\n` : cycleLiquidity ? `${formatLiquidityTable(cycleLiquidity)}\n\n` : ""}Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make the final call.${priorBlock}`;
       }
 
       // 5. Run 0G sealed inference locally (inside this container)

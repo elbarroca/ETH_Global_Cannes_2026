@@ -7,7 +7,8 @@ import { hireSpecialists } from "./hire-specialist";
 import { selectSpecialists } from "../marketplace/hiring-strategy";
 import { getAgent } from "../config/agent-registry";
 import { logCycle } from "../hedera/hcs";
-import { storeMemory } from "../og/storage";
+import { storeMemory, loadRecentCycles } from "../og/storage";
+import { formatPriorCyclesForPrompt } from "./memory-context";
 import { updateAgentMetadata } from "../og/inft";
 import { getUserPaymentFetch, getUserPrivateKey } from "../config/arc";
 import { hireFromMarketplace, getReputationScores } from "../marketplace/registry";
@@ -164,6 +165,11 @@ interface DebateCallContext {
   reputationScores?: Record<string, number>;
   /** Per-user per-cycle seed — makes rotation visible but deterministic for HCS replay. */
   cycleSeed?: number;
+  /** RAG context block loaded from 0G Storage — last 3 committed cycles for this
+   *  user formatted by formatPriorCyclesForPrompt. Debate agents (local and Fly.io)
+   *  append this to their prompts so the 7B model can cite its own history. Empty
+   *  string when no prior cycles exist or 0G is unreachable. */
+  priorContext?: string;
 }
 
 // Call a remote debate agent's /hire-and-analyze endpoint.
@@ -562,6 +568,26 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     g: goal.slice(0, 120) || undefined,
   });
 
+  // ── RAG memory recall — load the last 3 committed cycles from 0G Storage ──
+  //
+  // Closes the write→read loop that makes 0G Storage an "evolving memory" layer
+  // rather than a write-only audit sink (the OpenClaw bounty criterion). Each
+  // prior RichCycleRecord is fetched via its HCS `sh` pointer + loadMemory().
+  // The formatted block is appended to the specialist task + debate prompts so
+  // the 7B model can cite its own history. CIDs are persisted on the new
+  // RichCycleRecord as `priorCids` so each cycle becomes a verifiable DAG node
+  // pointing at the cycles it learned from.
+  //
+  // Non-fatal: returns empty arrays when HCS/0G is unreachable → cycle proceeds
+  // with an empty priorContext block (functionally equivalent to no RAG).
+  const { cycles: priorCycles, cids: priorCids } = await loadRecentCycles(user.id, 3);
+  const priorContext = formatPriorCyclesForPrompt(priorCycles);
+  if (priorCycles.length > 0) {
+    console.log(`[cycle] RAG: loaded ${priorCycles.length} prior cycles as context (cids: ${priorCids.map((c) => c.slice(0, 12) + "…").join(", ")})`);
+  } else {
+    console.log(`[cycle] RAG: no prior cycles available (fresh user or HCS/0G unreachable)`);
+  }
+
   // Probe OpenClaw gateway so we can honestly report its status in the CycleResult.
   // This call is cheap — the gateway auto-disables on ECONNREFUSED and subsequent
   // callers short-circuit. Status is display-only; it never gates specialist hiring.
@@ -710,6 +736,11 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     cycleLiquidity,
     reputationScores,
     cycleSeed,
+    // RAG context — last 3 committed cycles loaded from 0G Storage. Forwarded
+    // to Fly.io debate agents via /hire-and-analyze so Alpha/Risk/Executor can
+    // reference the user's own history in their 7B prompts. Empty string means
+    // no prior cycles (fresh user or memory fetch failure — still safe).
+    priorContext,
   };
 
   let hierarchicalSucceeded = false;
@@ -997,7 +1028,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
       ),
     );
 
-    debate = await runAdversarialDebate(specialists, user.agent.riskProfile, user.agent.maxTradePercent, cycleId, user.id);
+    debate = await runAdversarialDebate(specialists, user.agent.riskProfile, user.agent.maxTradePercent, cycleId, user.id, priorContext);
     specialistPath = "direct_x402";
     console.log(`[cycle] Flat debate complete — executor: ${JSON.stringify(debate.executor.parsed)}`);
   }
@@ -1011,6 +1042,29 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     console.warn("[cycle] logAction debate failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
+  // Emit a Naryo SpecialistHired event on Hedera EVM for every specialist
+  // that was actually hired this cycle (both hierarchical and flat paths
+  // converge here). Fire-and-forget, non-fatal — gated behind the same env
+  // var as emitCycleEvent so it's a no-op when Naryo isn't configured. This
+  // makes the Naryo audit log exhaustive: one event per economic action
+  // (hire + cycle + deposit + swap + heartbeat) instead of just one per cycle.
+  if (process.env.NARYO_AUDIT_CONTRACT_ADDRESS && specialists.length > 0) {
+    void (async () => {
+      try {
+        const { emitSpecialistEvent } = await import("../naryo/emit-event");
+        for (const sp of specialists) {
+          const costMicroUsd = Math.round((sp.priceUsd ?? 0.001) * 1_000_000);
+          await emitSpecialistEvent(user.walletAddress, sp.name, costMicroUsd);
+        }
+      } catch (err) {
+        console.warn(
+          "[cycle] Naryo SpecialistHired emit batch failed (non-fatal):",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    })();
+  }
+
   // 3. Build compact + rich records (but do NOT commit to HCS/0G yet).
   // The rich record carries the cycleLiquidity snapshot so commitCycle can
   // cap the swap amount against real proxy balance even though it runs in a
@@ -1018,6 +1072,13 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
   const payments = buildPaymentRecords(specialists);
   const compactRecord = buildCompactRecord(cycleId, user, goal, specialists, debate);
   const richRecord = buildRichRecord(cycleId, user, goal, specialists, debate, payments, cycleLiquidity);
+  // Attach the prior-cycle CIDs that were loaded as RAG context at the top of
+  // this function. When commitCycle writes `richRecord` to 0G Storage, this
+  // turns the audit chain into a DAG — each cycle points at the cycles it
+  // learned from, so verifiers can walk the memory graph backwards.
+  if (priorCids.length > 0) {
+    richRecord.priorCids = priorCids;
+  }
 
   return {
     userId: user.id,
@@ -1452,6 +1513,33 @@ export async function commitCycle(
       explorerUrl: swapResult.explorerUrl,
       method: swapResult.method,
     };
+  }
+
+  // Bridge successful Arc swaps into the Naryo multichain story by emitting a
+  // CrossChainCorrelation event on the Hedera EVM AuditLog. This is what turns
+  // the Naryo feed from "Hedera + 0G" into "Hedera + 0G + Arc (via proof)" —
+  // the CrossChainCorrelation event carries the Arc txHash as `sourceTxHash`,
+  // so Naryo's cycle-event-filter picks it up and the dashboard shows the Arc
+  // swap as a first-class multichain node. Fire-and-forget, non-fatal; gated
+  // behind NARYO_AUDIT_CONTRACT_ADDRESS so absence is a no-op.
+  if (
+    process.env.NARYO_AUDIT_CONTRACT_ADDRESS &&
+    swapResult?.success &&
+    swapResult.txHash &&
+    swapResult.txHash !== "skipped"
+  ) {
+    void (async () => {
+      try {
+        const { emitCrossChainEvent } = await import("../naryo/emit-event");
+        const action = String(compactRecord.d.act ?? "SWAP").toUpperCase();
+        await emitCrossChainEvent("arc", `SWAP_${action}`, swapResult.txHash!);
+      } catch (err) {
+        console.warn(
+          "[cycle] Naryo CrossChainCorrelation emit failed (non-fatal):",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    })();
   }
 
   // ── Synthesize the augmented-layer narrative (pre-0G) ─────────────────
