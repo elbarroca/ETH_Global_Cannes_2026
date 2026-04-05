@@ -1568,6 +1568,14 @@ export async function commitCycle(
     assetSubstituted: (execParsed as Record<string, unknown>).asset_substituted === true,
     originalAsset: (execParsed as Record<string, unknown>).original_asset as string | undefined,
   });
+  // Fold the RAG CIDs that were captured at analyzeCycle start into the
+  // persisted narrative so the dashboard can surface "Memory Recall" without
+  // re-fetching 0G. richRecord.priorCids is the canonical on-chain proof (it
+  // gets written to 0G Storage alongside the rich record); narrative.priorCids
+  // is the UI-convenience copy kept in the Prisma cycles JSONB.
+  if (richRecord.priorCids && richRecord.priorCids.length > 0) {
+    narrative.priorCids = richRecord.priorCids;
+  }
   richRecord.narrative = narrative;
   // Write the post-validation asset into the decision field so HCS + Prisma
   // + the dashboard headline all show the honest ticker instead of the

@@ -121,6 +121,11 @@ export interface CycleNarrative {
   assetSubstituted?: boolean;
   /** Original executor-picked ticker before validation, if substituted. */
   originalAsset?: string;
+  /** 0G Storage CIDs of the prior cycles loaded as RAG context at cycle start.
+   *  Persisted into the narrative JSONB column on the Prisma cycle row so the
+   *  dashboard can show "Memory Recall: N prior cycles loaded from 0G Storage"
+   *  without having to re-fetch from 0G. See src/og/storage.ts:loadRecentCycles. */
+  priorCids?: string[];
 }
 
 interface NarrativeInput {
