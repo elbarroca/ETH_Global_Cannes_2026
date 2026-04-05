@@ -35,9 +35,12 @@ import { enrichCycleRow } from "@/src/store/enrich-cycle";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Longer than the typical 90-120s cycle — Vercel/Railway may still cap this
-// on certain plans, but the Next.js node runtime honors it locally.
-export const maxDuration = 300;
+// Vercel Hobby caps functions at 60s; Pro goes up to 300s. The per-6s
+// heartbeat tick below keeps the connection alive through the 60s window.
+// Cycles that run past 60s will truncate the stream, but the UI falls back
+// to polling /api/cycle/latest/[userId] to pick up the committed record.
+// If upgrading to Vercel Pro, bump this to 300.
+export const maxDuration = 60;
 
 interface StreamEvent {
   type:

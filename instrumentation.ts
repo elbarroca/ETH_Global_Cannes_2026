@@ -1,9 +1,16 @@
 // Next.js instrumentation — runs once on server startup
 // Auto-starts specialist servers, marketplace registry, Telegram bot, and heartbeat loop
+//
+// Gated behind ENABLE_BACKGROUND_WORKERS so Vercel serverless (stateless, no port
+// binding, no long-lived setInterval) never runs these. Locally, `npm run backend`
+// (src/index.ts) is the canonical place these loops live — don't set
+// ENABLE_BACKGROUND_WORKERS=true when running `npm run dev` or you'll get duplicate
+// heartbeats and Telegram polling conflicts.
 
 export async function register() {
   // Only run on the server (not during build or in the browser)
-  if (process.env.NEXT_RUNTIME === "nodejs") {
+  // AND only when explicitly opted-in (off by default → Vercel-safe)
+  if (process.env.NEXT_RUNTIME === "nodejs" && process.env.ENABLE_BACKGROUND_WORKERS === "true") {
     try {
       const { loadRegistry } = await import("./src/marketplace/registry");
       await loadRegistry();
