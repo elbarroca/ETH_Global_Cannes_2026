@@ -7,6 +7,7 @@ import { formatLiquidityTable } from "./data/liquidity-injector";
 import type {
   SpecialistResult,
   DebateResult,
+  DebateStageResult,
   DebateTranscriptEntry,
   DebatePhase,
   RichTurnData,
@@ -277,6 +278,178 @@ function recordTranscript(
     responseContent: response.slice(0, 2000),
     attestationHash, teeVerified, durationMs,
   });
+}
+
+// ── Rebuttal round (hierarchical hybrid) ──────────────────────────────────────
+//
+// Drop-in Round 2 for the hierarchical path. The hierarchical Fly agents each
+// hire their own specialists and run single-shot 0G inference — that's the
+// agent-hiring-economy narrative. But single-shot means the agents never see
+// each other's full arguments, and the executor defaults to HOLD on any
+// disagreement. This function takes the Round 1 stage results plus the
+// aggregated specialist set from all three Fly agents, builds a shared
+// CROSS-SPECIALIST CONFLUENCE TABLE, and runs Alpha → Risk → Executor one
+// more time — now each agent reads the others' Round 1 reasoning and the
+// full cross-agent fact base.
+//
+// The result: genuine multi-turn swarm dialogue on top of hierarchical hiring.
+// Fly agents keep paying for their own specialists (economy preserved).
+// Rebuttal runs entirely in-process via inferWithRetry so no Fly redeploy is
+// needed.
+
+export interface RebuttalRoundInput {
+  /** Round 1 alpha stage — from synthesizeDebateResult after hierarchical returns. */
+  prevAlpha: DebateStageResult;
+  /** Round 1 risk stage. */
+  prevRisk: DebateStageResult;
+  /** Round 1 executor stage. */
+  prevExecutor: DebateStageResult;
+  /** All specialists hired across the three hierarchical agents, flattened. */
+  specialists: SpecialistResult[];
+  riskProfile: string;
+  maxTradePercent: number;
+  cycleLiquidity?: CycleLiquidity;
+  cycleId?: number;
+  userId?: string;
+  priorContext?: string;
+  /** Turn number of the last Round 1 turn — rebuttal transcripts start at +1. */
+  startTurnNumber: number;
+}
+
+export interface RebuttalRoundOutput {
+  alpha: DebateStageResult;
+  risk: DebateStageResult;
+  executor: DebateStageResult;
+  transcripts: DebateTranscriptEntry[];
+}
+
+export async function runRebuttalRound(input: RebuttalRoundInput): Promise<RebuttalRoundOutput> {
+  const {
+    prevAlpha,
+    prevRisk,
+    prevExecutor,
+    specialists,
+    riskProfile,
+    maxTradePercent,
+    cycleLiquidity,
+    cycleId,
+    userId,
+    priorContext,
+    startTurnNumber,
+  } = input;
+
+  const specContext = buildSpecialistContext(specialists, cycleLiquidity);
+  const priorBlock = priorContext && priorContext.length > 0 ? `\n\n${priorContext}` : "";
+  const transcripts: DebateTranscriptEntry[] = [];
+  let turnCounter = startTurnNumber;
+
+  const buildRichTurnLocal = (
+    turnNum: number,
+    phase: DebatePhase,
+    from: string,
+    to: string | undefined,
+    promptKey: "alpha" | "risk" | "executor",
+    userMessage: string,
+    stage: { content: string; parsed: Record<string, unknown>; reasoning: string; attestationHash: string; teeVerified: boolean },
+    durationMs: number,
+  ): RichTurnData => ({
+    schemaVersion: 1,
+    eventKind: "turn",
+    cycleId: cycleId ?? 0,
+    userId: userId ?? "unknown",
+    timestamp: new Date().toISOString(),
+    turnNumber: turnNum,
+    phase,
+    from,
+    to,
+    input: { systemPromptName: promptKey, userMessage },
+    output: {
+      content: stage.content,
+      parsed: stage.parsed,
+      reasoning: stage.reasoning,
+      cot: normalizeCotFull((stage.parsed as { cot?: unknown }).cot, stage.reasoning),
+    },
+    attestation: { hash: stage.attestationHash, teeVerified: stage.teeVerified },
+    durationMs,
+  });
+
+  // ── Alpha rebuttal ──
+  const alphaRebuttalMsg = `REBUTTAL ROUND. Executor initially decided: ${JSON.stringify(prevExecutor.parsed)}\nRisk argued: "${prevRisk.reasoning ?? ""}"\n\nSpecialist signals (shared cross-agent fact base):\n${specContext}\n\nYou argued previously: "${prevAlpha.reasoning ?? ""}"\n\nDefend or REVISE your position now that you see the full picture. Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%.${priorBlock}`;
+  let t0 = Date.now();
+  const alphaNew = await inferWithRetry("alpha", PROMPTS.alpha.content, alphaRebuttalMsg, ALPHA_FALLBACK);
+  const alphaDuration = Date.now() - t0;
+  recordTranscript(transcripts, "rebuttal", "main-orchestrator", "alpha", alphaRebuttalMsg, alphaNew.content, alphaNew.attestationHash, alphaNew.teeVerified, alphaDuration);
+  if (cycleId != null) {
+    const tNum = ++turnCounter;
+    await emitTurnWithRichData(
+      { ev: "turn", c: cycleId, t: tNum, ph: "rebuttal", from: "alpha", to: "risk", cot: normalizeCotFull((alphaNew.parsed as { cot?: unknown }).cot, alphaNew.reasoning), verdict: alphaNew.parsed, att: alphaNew.attestationHash ?? "" },
+      buildRichTurnLocal(tNum, "rebuttal", "alpha", "risk", "alpha", alphaRebuttalMsg, alphaNew, alphaDuration),
+    );
+  } else {
+    turnCounter += 1;
+  }
+
+  await delay(DELAY_MS);
+
+  // ── Risk counter-rebuttal ──
+  const riskRebuttalMsg = `REBUTTAL ROUND. Executor initially decided: ${JSON.stringify(prevExecutor.parsed)}\nAlpha revised its position: "${alphaNew.reasoning}"\nAlpha now proposes: ${JSON.stringify(alphaNew.parsed)}\n\nSpecialist signals (shared cross-agent fact base):\n${specContext}\n\nYou argued previously: "${prevRisk.reasoning ?? ""}"\n\nMax allowed: ${maxTradePercent}%. Revise your challenge now that you see the full picture.${priorBlock}`;
+  t0 = Date.now();
+  const riskNew = await inferWithRetry("risk", PROMPTS.risk.content, riskRebuttalMsg, RISK_FALLBACK);
+  const riskDuration = Date.now() - t0;
+  recordTranscript(transcripts, "rebuttal", "main-orchestrator", "risk", riskRebuttalMsg, riskNew.content, riskNew.attestationHash, riskNew.teeVerified, riskDuration);
+  if (cycleId != null) {
+    const tNum = ++turnCounter;
+    await emitTurnWithRichData(
+      { ev: "turn", c: cycleId, t: tNum, ph: "rebuttal", from: "risk", to: "alpha", cot: normalizeCotFull((riskNew.parsed as { cot?: unknown }).cot, riskNew.reasoning), verdict: riskNew.parsed, att: riskNew.attestationHash ?? "" },
+      buildRichTurnLocal(tNum, "rebuttal", "risk", "alpha", "risk", riskRebuttalMsg, riskNew, riskDuration),
+    );
+  } else {
+    turnCounter += 1;
+  }
+
+  await delay(DELAY_MS);
+
+  // ── Executor final call ──
+  const executorFinalMsg = `FINAL DECISION after rebuttal.\n\nSpecialist signals (shared cross-agent fact base):\n${specContext}\n\nAlpha (rebuttal): "${alphaNew.reasoning}"\nAlpha: ${JSON.stringify(alphaNew.parsed)}\n\nRisk (rebuttal): "${riskNew.reasoning}"\nRisk: ${JSON.stringify(riskNew.parsed)}\n\nYour Round 1 verdict was: ${JSON.stringify(prevExecutor.parsed)}. Risk profile: ${riskProfile}. Max allocation: ${maxTradePercent}%. Make your FINAL call — prefer the CONFLUENCE TABLE top entry unless Risk presents specific new evidence.${priorBlock}`;
+  t0 = Date.now();
+  const executorNew = await inferWithRetry("executor", PROMPTS.executor.content, executorFinalMsg, EXECUTOR_FALLBACK);
+  const executorDuration = Date.now() - t0;
+  recordTranscript(transcripts, "decision", "main-orchestrator", "executor", executorFinalMsg, executorNew.content, executorNew.attestationHash, executorNew.teeVerified, executorDuration);
+  if (cycleId != null) {
+    const tNum = ++turnCounter;
+    await emitTurnWithRichData(
+      { ev: "turn", c: cycleId, t: tNum, ph: "decision", from: "executor", cot: normalizeCotFull((executorNew.parsed as { cot?: unknown }).cot, executorNew.reasoning), verdict: executorNew.parsed, att: executorNew.attestationHash ?? "" },
+      buildRichTurnLocal(tNum, "decision", "executor", undefined, "executor", executorFinalMsg, executorNew, executorDuration),
+    );
+  }
+
+  return {
+    alpha: {
+      content: alphaNew.content,
+      parsed: alphaNew.parsed,
+      reasoning: alphaNew.reasoning,
+      attestationHash: alphaNew.attestationHash,
+      teeVerified: alphaNew.teeVerified,
+      rotation: prevAlpha.rotation, // carry forward rotation metadata from Round 1
+    },
+    risk: {
+      content: riskNew.content,
+      parsed: riskNew.parsed,
+      reasoning: riskNew.reasoning,
+      attestationHash: riskNew.attestationHash,
+      teeVerified: riskNew.teeVerified,
+      rotation: prevRisk.rotation,
+    },
+    executor: {
+      content: executorNew.content,
+      parsed: executorNew.parsed,
+      reasoning: executorNew.reasoning,
+      attestationHash: executorNew.attestationHash,
+      teeVerified: executorNew.teeVerified,
+      rotation: prevExecutor.rotation,
+    },
+    transcripts,
+  };
 }
 
 // ── Main debate pipeline ──────────────────────────────────────────────────────

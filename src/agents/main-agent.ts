@@ -1,6 +1,6 @@
 import { updateUser } from "../store/user-store";
 import { logAction, logCycleRecord } from "../store/action-logger";
-import { runAdversarialDebate } from "./adversarial";
+import { runAdversarialDebate, runRebuttalRound } from "./adversarial";
 import { normalizeCotFull } from "./prompts";
 import { emitSwarmEvent, emitHireWithRichData, emitTurnWithRichData } from "./swarm-emit";
 import { hireSpecialists } from "./hire-specialist";
@@ -937,6 +937,75 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
       hierarchicalSucceeded = true;
       specialistPath = "hierarchical_x402"; // debate agents autonomously hired their own specialists
       console.log(`[cycle] Hierarchical debate complete — executor: ${JSON.stringify(debate.executor.parsed)}`);
+
+      // ── Round 2: Rebuttal (hybrid — preserves hierarchical hiring, adds swarm dialogue) ──
+      //
+      // Hierarchical single-shot debate has a known failure mode: Alpha hires
+      // bullish specialists, Risk hires defensive ones, they never see each
+      // other's full fact base, and the executor defaults to HOLD on any
+      // disagreement — producing the "no transactions ever fire" demo bug.
+      //
+      // Trigger rebuttal on any HOLD outcome OR any low-confidence BUY/SELL
+      // so the swarm visibly works harder to find alpha. Demo-friendly: more
+      // aggressive than the flat path's < 60 threshold. Once rebuttal runs,
+      // alpha and risk see all specialists hired across the three agents
+      // (shared CONFLUENCE TABLE) and can genuinely talk to each other.
+      try {
+        const execParsed = debate.executor.parsed as { confidence?: unknown; pct?: unknown };
+        const rawConf = execParsed.confidence;
+        const execConfidence = rawConf != null ? parseFloat(String(rawConf).replace("%", "")) : 100;
+        const execPct = Number((execParsed.pct ?? 0) as number);
+        const shouldRebut = !isNaN(execConfidence) && (execPct === 0 || execConfidence < 70);
+
+        if (shouldRebut && specialists.length > 0) {
+          console.log(
+            `[cycle] Rebuttal triggered — Round 1 executor pct=${execPct}% conf=${execConfidence}% (threshold: pct===0 OR conf<70)`,
+          );
+          const startTurn = debate.totalTurns ?? debate.transcripts?.length ?? 0;
+          const rebuttal = await runRebuttalRound({
+            prevAlpha: debate.alpha,
+            prevRisk: debate.risk,
+            prevExecutor: debate.executor,
+            specialists,
+            riskProfile: user.agent.riskProfile,
+            maxTradePercent: user.agent.maxTradePercent,
+            cycleLiquidity,
+            cycleId,
+            userId: user.id,
+            priorContext,
+            startTurnNumber: startTurn,
+          });
+
+          // Merge rebuttal results into the DebateResult. The stage cards on
+          // the dashboard (Alpha/Risk/Executor columns) show the LATEST
+          // reasoning, so they'll render the post-rebuttal arguments — that's
+          // the "smarter swarm" effect. Round 1 reasoning is preserved in
+          // transcripts[].phase === "opening" for the audit trail.
+          debate = {
+            ...debate,
+            alpha: rebuttal.alpha,
+            risk: rebuttal.risk,
+            executor: rebuttal.executor,
+            transcripts: [...(debate.transcripts ?? []), ...rebuttal.transcripts],
+            totalTurns: (debate.transcripts?.length ?? 0) + rebuttal.transcripts.length,
+            rebuttalTriggered: true,
+          };
+          console.log(
+            `[cycle] Rebuttal complete — Round 2 executor: ${JSON.stringify(debate.executor.parsed)} (total turns: ${debate.totalTurns})`,
+          );
+        } else {
+          console.log(
+            `[cycle] Rebuttal skipped — Round 1 executor pct=${execPct}% conf=${execConfidence}% (decisive)`,
+          );
+        }
+      } catch (rebutErr) {
+        // Rebuttal is ENHANCEMENT — if it throws, keep the Round 1 result so
+        // the cycle still commits. Never let rebuttal failure kill a hunt.
+        console.warn(
+          `[cycle] Rebuttal failed (non-fatal, keeping Round 1 result):`,
+          rebutErr instanceof Error ? rebutErr.message : String(rebutErr),
+        );
+      }
     } catch (err) {
       console.warn(`[cycle] Hierarchical hiring failed, falling back to flat path:`, err instanceof Error ? err.message : String(err));
     }

@@ -10,7 +10,8 @@
 # killing src/* subdirectories with the same name (src/openclaw, src/naryo, etc.)
 
 # Long-running / port-binding backend services (specific file paths — safe as-is)
-src/agents/specialist-server.ts
+# specialist-server.ts is NOT listed: instrumentation.ts dynamic-imports it; excluding
+# it breaks `npm run build` (module not found / TS2307) on Vercel.
 src/index.ts
 src/api/
 

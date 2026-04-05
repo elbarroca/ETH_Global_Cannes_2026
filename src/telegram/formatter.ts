@@ -257,12 +257,26 @@ export function formatHuntComplete(result: CycleResult, user: UserRecord): strin
   const riskRot = result.debate.risk.rotation;
   const execRot = result.debate.executor.rotation;
 
+  // Rebuttal badge — set when main-agent runs a Round 2 swarm dialogue after
+  // the hierarchical executor returned a non-decisive verdict (HOLD or low
+  // confidence). Signals to the reader that the agents revised their
+  // positions after seeing each other's full arguments.
+  const rebuttalBadge = result.debate.rebuttalTriggered ? " · 🔄 *Rebuttal*" : "";
+  const turnsLine = result.debate.totalTurns != null
+    ? `🗣️ ${result.debate.totalTurns} debate turns${rebuttalBadge}`
+    : "";
+
   const lines: string[] = [
     `📊 *Hunt #${result.cycleId} Complete* — *${action}* ${asset} ${pct}%`,
     `💹 NAV: $${user.fund.currentNav.toLocaleString()} · ${costLine}`,
+  ];
+  if (turnsLine) lines.push(turnsLine);
+  lines.push(
     "",
     "⚔️ *Debate*",
     "",
+  );
+  lines.push(
     `🟢 *Alpha* — ${alphaAct} ${alphaPct}%`,
     `_${alphaReasoning || "(no reasoning captured)"}_`,
     "",
@@ -275,7 +289,7 @@ export function formatHuntComplete(result: CycleResult, user: UserRecord): strin
     "📡 *Hires this hunt*",
     formatHireLine("🟢", "Alpha", result.specialists, alphaRot),
     formatHireLine("🔴", "Risk", result.specialists, riskRot),
-  ];
+  );
 
   // Only show executor hire line if it actually picked someone — otherwise
   // clutter. Executor's pool is single-element and usually skipped.
