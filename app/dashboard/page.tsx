@@ -424,16 +424,36 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <span className="text-xs text-void-500 uppercase tracking-wider">Auto-Hunt</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={autoCycles}
-              onChange={(e) => setAutoCycles(Math.min(100, Math.max(0, Number(e.target.value))))}
-              className="w-16 px-2 py-1.5 bg-void-950 border border-void-700 rounded-lg text-sm text-void-200 text-center"
-              placeholder="0"
-            />
-            <span className="text-xs text-void-500">cycles every</span>
+            {/* ∞ toggle — flips cycleCount between -1 (infinite) and a bounded
+                value. When infinite, the number input hides because the budget
+                is meaningless: the heartbeat ticks forever every `cyclePeriodMs`
+                until the user clicks ∞ off again. */}
+            <button
+              type="button"
+              onClick={() => setAutoCycles(autoCycles === -1 ? 5 : -1)}
+              className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+                autoCycles === -1
+                  ? "bg-gold-500/15 border-gold-500/50 text-gold-400"
+                  : "bg-void-950 border-void-700 text-void-500 hover:text-void-300"
+              }`}
+              title={autoCycles === -1 ? "Click to switch to a bounded cycle count" : "Click to run forever"}
+            >
+              ∞
+            </button>
+            {autoCycles !== -1 && (
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={autoCycles}
+                onChange={(e) => setAutoCycles(Math.min(100, Math.max(0, Number(e.target.value))))}
+                className="w-16 px-2 py-1.5 bg-void-950 border border-void-700 rounded-lg text-sm text-void-200 text-center"
+                placeholder="0"
+              />
+            )}
+            <span className="text-xs text-void-500">
+              {autoCycles === -1 ? "cycles forever, every" : "cycles every"}
+            </span>
             <select
               value={autoPeriod}
               onChange={(e) => setAutoPeriod(Number(e.target.value))}
@@ -446,10 +466,14 @@ export default function DashboardPage() {
             </select>
           </div>
           <div className="flex items-center gap-3">
-            {user?.agent?.cyclesRemaining != null && user.agent.cyclesRemaining > 0 && (
-              <span className="text-xs text-gold-400">
-                {user.agent.cyclesRemaining} of {user.agent.cycleCount ?? "?"} remaining
-              </span>
+            {user?.agent?.cycleCount === -1 ? (
+              <span className="text-xs text-gold-400">∞ forever</span>
+            ) : (
+              user?.agent?.cyclesRemaining != null && user.agent.cyclesRemaining > 0 && (
+                <span className="text-xs text-gold-400">
+                  {user.agent.cyclesRemaining} of {user.agent.cycleCount ?? "?"} remaining
+                </span>
+              )
             )}
             <button
               onClick={async () => {
@@ -470,7 +494,7 @@ export default function DashboardPage() {
               disabled={savingConfig}
               className="px-4 py-1.5 bg-void-800 hover:bg-void-700 disabled:opacity-60 text-void-300 text-xs font-semibold rounded-lg border border-void-700 transition-colors"
             >
-              {savingConfig ? "Saving..." : autoCycles > 0 ? "Start" : "Save"}
+              {savingConfig ? "Saving..." : autoCycles !== 0 ? "Start" : "Save"}
             </button>
           </div>
         </div>

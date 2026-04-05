@@ -42,7 +42,14 @@ export default function HistoryPage() {
       {cycles.length > 0 && userId && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {cycles.map((cycle) => (
-            <ExpandableHuntCard key={cycle.id} cycle={cycle} userId={userId} />
+            <ExpandableHuntCard
+              key={
+                cycle.dbId ??
+                `${cycle.id}-${cycle.timestamp}-${cycle.hcs.sequenceNumber}`
+              }
+              cycle={cycle}
+              userId={userId}
+            />
           ))}
         </div>
       )}

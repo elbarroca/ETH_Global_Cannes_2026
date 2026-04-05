@@ -63,16 +63,26 @@ export async function POST(request: NextRequest) {
       agentPatch.approvalMode = approvalMode as UserRecord["agent"]["approvalMode"];
     }
 
-    if (cycleCount != null && cycleCount >= 0) {
+    if (cycleCount != null && cycleCount >= -1) {
       agentPatch.cycleCount = cycleCount;
-      agentPatch.cyclesRemaining = cycleCount;
       // The AUTO-HUNT dropdown on the dashboard is the single source of truth
-      // for enrolling the user in the heartbeat loop. cycleCount > 0 = opt in
-      // (heartbeat will pick them up); cycleCount === 0 = opt out (heartbeat
-      // will skip them). The deposit route no longer flips `active`, so this
-      // is the ONLY place (besides Telegram /stop which sets active=false)
-      // where `active` is mutated.
-      agentPatch.active = cycleCount > 0;
+      // for enrolling the user in the heartbeat loop. Three modes:
+      //   cycleCount === -1  → INFINITE (run forever every `cyclePeriodMs`,
+      //                        `cyclesRemaining` is unused)
+      //   cycleCount  >  0   → BOUNDED (heartbeat decrements once per commit,
+      //                        pauses when cyclesRemaining hits 0)
+      //   cycleCount === 0   → OPT OUT (active=false, heartbeat skips user)
+      // The deposit route no longer flips `active`, so this is the ONLY place
+      // (besides Telegram /stop which sets active=false) where `active` is
+      // mutated.
+      if (cycleCount === -1) {
+        // Infinite mode — clear the budget so the heartbeat only checks
+        // `cycleCount === -1` and never a stale `cyclesRemaining` value.
+        agentPatch.cyclesRemaining = 0;
+      } else {
+        agentPatch.cyclesRemaining = cycleCount;
+      }
+      agentPatch.active = cycleCount !== 0;
     }
 
     if (cyclePeriodMs != null && cyclePeriodMs > 0) {

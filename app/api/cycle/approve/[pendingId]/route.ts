@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getUserById } from "@/src/store/user-store";
+import { getUserById, decrementCyclesRemaining } from "@/src/store/user-store";
 import { commitCycle, rejectCycle } from "@/src/agents/main-agent";
 import { getPendingCycle, resolvePendingCycle } from "@/src/store/pending-cycles";
 
@@ -57,6 +57,11 @@ export async function POST(
 
     try {
       const result = await commitCycle(analysis, user, modifiedPct);
+      // Budget decrement lives on the COMMIT path (not the heartbeat create-
+      // pending path) so a user with approvalMode=always who sets
+      // cycleCount=3 gets exactly 3 committed hunts regardless of how many
+      // pending cycles were created along the way. Non-fatal.
+      await decrementCyclesRemaining(pending.userId);
       return NextResponse.json({
         cycleId: result.cycleId,
         specialists: result.specialists,
