@@ -2,7 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { processNaryoEvent } from "@/src/naryo/event-handler";
 import type { NaryoEventPayload } from "@/src/naryo/event-handler";
 
-const VALID_SOURCES = new Set(["hcs", "hts", "cycle", "deposit", "og-mint", "og-metadata"]);
+const VALID_SOURCES = new Set([
+  "hcs",
+  "hts",
+  "cycle",
+  "deposit",
+  "og-mint",
+  "og-metadata",
+  // Exhaustive Naryo coverage — three new Hedera EVM event broadcasts.
+  // specialist: SpecialistHired per x402 hire
+  // heartbeat: HeartbeatEmitted on the throttled heartbeat cadence
+  // cross-chain: CrossChainCorrelation proof for Arc swaps + other DLT events
+  "specialist",
+  "heartbeat",
+  "cross-chain",
+]);
 
 /**
  * POST /api/naryo/events/[source]

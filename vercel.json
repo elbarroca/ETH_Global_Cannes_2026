@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/heartbeat",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "functions": {
+    "app/api/cycle/stream/[userId]/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/heartbeat/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/telegram/webhook/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
