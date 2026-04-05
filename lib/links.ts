@@ -127,6 +127,29 @@ export function arcTxUrl(txHash: string): string | null {
   return `${ARCSCAN_BASE}/tx/${txHash}`;
 }
 
+/**
+ * Docs for GET a Developer Wallets transaction by id (Bearer auth). Circle does
+ * not host a public “open in browser” URL per tx id — paths like
+ * `developers.circle.com/.../transactions/{uuid}` return 404.
+ *
+ * @see https://developers.circle.com/api-reference/wallets/developer-controlled-wallets/get-transaction
+ */
+export const CIRCLE_WALLET_GET_TX_DOC_URL =
+  "https://developers.circle.com/api-reference/wallets/developer-controlled-wallets/get-transaction";
+
+/** No public explorer URL per Circle wallet tx id — use copyable id + {@link CIRCLE_WALLET_GET_TX_DOC_URL}. */
+export function circleWalletTxUrl(_txId: string): string | null {
+  return null;
+}
+
+/** Circle Gateway gas-free x402 nanopayments (agentic / overview). */
+export const CIRCLE_GATEWAY_NANOPAYMENTS_DOC_URL =
+  "https://developers.circle.com/gateway/nanopayments";
+
+/** How Gateway batches authorizations into on-chain settlement. */
+export const CIRCLE_GATEWAY_BATCHED_SETTLEMENT_DOC_URL =
+  "https://developers.circle.com/gateway/nanopayments/concepts/batched-settlement";
+
 export function arcAddressUrl(address: string): string {
   return `${ARCSCAN_BASE}/address/${address}`;
 }

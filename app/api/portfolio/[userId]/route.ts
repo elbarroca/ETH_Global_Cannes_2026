@@ -31,6 +31,13 @@ interface PortfolioPosition {
   amount: number;
   usdValue: number;
   sharePct: number;
+  /** Weighted-average cost basis in USD per unit. Populated from
+   *  user.fund.costBasis (updated on BUY cycles). 0 for USDC (cost = face) or
+   *  tokens acquired before the cost-basis tracking sprint. */
+  costBasisPerUnit: number;
+  /** Mark-to-market P&L: (currentPrice - costBasisPerUnit) × amount. Only
+   *  non-zero when cost basis is tracked; 0 otherwise. */
+  unrealizedPnl: number;
 }
 
 interface EvolutionPoint {
@@ -89,19 +96,45 @@ export async function GET(
 
     const prisma = getPrisma();
 
+    const fundExtensions = user.fund as unknown as {
+      holdings?: Record<string, number>;
+      costBasis?: Record<string, number>;
+      realizedPnl?: number;
+    };
     const depositedUsdc = user.fund?.depositedUsdc ?? 0;
-    const holdings =
-      (user.fund as unknown as { holdings?: Record<string, number> }).holdings ?? {};
+    const persistedNav = user.fund?.currentNav ?? 0;
+    const holdings = fundExtensions.holdings ?? {};
+    const costBasis = fundExtensions.costBasis ?? {};
+    const realizedPnl = fundExtensions.realizedPnl ?? 0;
 
     const usdcUsd = depositedUsdc * priceUsd("USDC");
     const positions: PortfolioPosition[] = [];
     if (usdcUsd > 0) {
-      positions.push({ symbol: "USDC", amount: depositedUsdc, usdValue: usdcUsd, sharePct: 0 });
+      positions.push({
+        symbol: "USDC",
+        amount: depositedUsdc,
+        usdValue: usdcUsd,
+        sharePct: 0,
+        costBasisPerUnit: 1,
+        unrealizedPnl: 0,
+      });
     }
     for (const [symbol, amount] of Object.entries(holdings)) {
       if (!amount || amount <= 0) continue;
-      const usd = amount * priceUsd(symbol);
-      positions.push({ symbol: symbol.toUpperCase(), amount, usdValue: usd, sharePct: 0 });
+      const upper = symbol.toUpperCase();
+      const unitPrice = priceUsd(symbol);
+      const usd = amount * unitPrice;
+      // Cost basis is per-unit USD; unrealized = (currentPrice - basis) × amount
+      const basisPerUnit = costBasis[symbol] ?? costBasis[upper] ?? 0;
+      const unrealized = basisPerUnit > 0 ? (unitPrice - basisPerUnit) * amount : 0;
+      positions.push({
+        symbol: upper,
+        amount,
+        usdValue: usd,
+        sharePct: 0,
+        costBasisPerUnit: basisPerUnit,
+        unrealizedPnl: unrealized,
+      });
     }
 
     const totalUsd = positions.reduce((s, p) => s + p.usdValue, 0);
@@ -129,17 +162,27 @@ export async function GET(
       attribution: resolveAttribution(c.specialists, c.decision),
     }));
 
-    const lastNavAfter = cycles.length > 0 ? (cycles[cycles.length - 1].navAfter ?? 0) : 0;
-    const totalNav = Math.max(totalUsd, lastNavAfter);
+    // Prefer the persisted `currentNav` (updated on every swap since the
+    // real-swap sprint) over the live-priced sum. They should match modulo
+    // CoinGecko rate drift, but the DB value is the canonical number that
+    // every other reader (telegram, dashboard, attribution log) sees.
+    const liveTotalUsd = totalUsd;
+    const totalNav = persistedNav > 0 ? persistedNav : liveTotalUsd;
+    const unrealizedPnl = positions.reduce((s, p) => s + (p.unrealizedPnl ?? 0), 0);
 
     return NextResponse.json({
       current: {
         usdcDeposited: depositedUsdc,
         positions,
-        totalUsd,
+        totalUsd: liveTotalUsd,
       },
       evolution,
       totalNav,
+      pnl: {
+        realized: realizedPnl,
+        unrealized: unrealizedPnl,
+        total: realizedPnl + unrealizedPnl,
+      },
       cycleCount: cycles.length,
       swapCount: cycles.filter((c) => c.swapTxHash != null).length,
     });

@@ -5,14 +5,14 @@ import { Card, CardHeader, CardBody, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
 import { ComputeLog } from "@/components/compute-log";
 import { DebateTheater } from "@/components/debate-theater";
-import { HuntIndexedPaymentRows } from "@/components/hunt/hunt-payment-rows";
+import { ArcTxHashPanel, HuntIndexedPaymentRows } from "@/components/hunt/hunt-payment-rows";
 import { mergeHuntPaymentRows } from "@/components/hunt/merge-hunt-payments";
 import { HuntPipelineArrows } from "@/components/hunt/hunt-pipeline-arrows";
 import { useUser } from "@/contexts/user-context";
 import { getCycleDetail } from "@/lib/api";
-import { arcTxUrl } from "@/lib/links";
 import type { Cycle, AgentActionRecord } from "@/lib/types";
 import {
+  arcTxUrl,
   HCS_TOPIC_ID,
   INFT_CONTRACT_ADDRESS,
   hashscanMessageUrl,
@@ -462,18 +462,10 @@ function InlineDetail({
                         <span className="font-mono text-xs text-void-200">${swap.amountIn} USDC</span>
                       </div>
                     )}
-                    <div>
-                      <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">Tx hash</div>
-                      <span className="font-mono text-xs text-gold-400 break-all">
-                        {swap.txHash.slice(0, 18)}…{swap.txHash.slice(-6)}
-                      </span>
-                    </div>
-                    {swap.explorerUrl && (
-                      <a href={swap.explorerUrl} target="_blank" rel="noopener noreferrer"
-                        className="inline-block text-xs text-indigo-300 hover:underline">
-                        View on ArcScan →
-                      </a>
-                    )}
+                    <ArcTxHashPanel
+                      hash={swap.txHash}
+                      explorerHref={swap.explorerUrl ?? arcTxUrl(swap.txHash) ?? "#"}
+                    />
                   </>
                 ) : (
                   <div className="text-xs text-void-500">
