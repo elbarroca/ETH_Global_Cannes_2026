@@ -464,6 +464,51 @@ body {
   animation: huntFadeIn 300ms ease-out 100ms both;
 }
 
+/* ───────── Hunt accordion — inner cards & rows ───────── */
+
+@keyframes huntAccordionCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+details:not([open]) .hunt-detail-card-enter {
+  animation: none !important;
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+}
+
+details[open] .hunt-detail-card-enter {
+  animation: huntAccordionCardIn 0.48s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--hunt-stagger, 0ms);
+}
+
+/* Expanded hunt body (outside <details>) — stagger once when hunt opens */
+.hunt-panel-card-enter {
+  animation: huntAccordionCardIn 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--hunt-stagger, 0ms);
+}
+
+.hunt-card-surface {
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.28s ease,
+    box-shadow 0.32s ease;
+}
+
+.hunt-card-surface:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 199, 0, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(255, 199, 0, 0.08),
+    0 12px 32px -12px rgba(0, 0, 0, 0.55);
+}
+
 /* ───────── Reduced motion ───────── */
 
 @media (prefers-reduced-motion: reduce) {

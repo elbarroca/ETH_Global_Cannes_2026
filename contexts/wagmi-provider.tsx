@@ -17,6 +17,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect } from "react";
 import { UserProvider } from "./user-context";
 import { AuthGuard } from "@/components/auth-guard";
+import { RouteTransitionLoader } from "@/components/route-transition-loader";
 import { arcTestnet, ARC_TESTNET_RPC } from "@/lib/arc-chain";
 
 // Re-export so existing `@/contexts/wagmi-provider` importers (deposit page,
@@ -258,6 +259,7 @@ export function Providers({ children }: { children: ReactNode }) {
             <ChainGuard>
               <UserProvider>
                 <AuthGuard>{children}</AuthGuard>
+                <RouteTransitionLoader />
                 {/* Renders the settings modal opened by `setShowDynamicUserProfile`
                     from components/wallet-connect.tsx. Without this the custom
                     wallet-menu button in <Nav /> has nothing to open. */}

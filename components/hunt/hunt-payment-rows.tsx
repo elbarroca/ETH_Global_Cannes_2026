@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import {
+  arcProofExplorerHref,
   arcTxUrl,
   CIRCLE_GATEWAY_BATCHED_SETTLEMENT_DOC_URL,
   CIRCLE_GATEWAY_NANOPAYMENTS_DOC_URL,
@@ -37,15 +38,17 @@ function inferProofFromCyclePayment(tx: string): HuntPaymentProofKind | undefine
   return undefined;
 }
 
-/** Full vendor settlement string + copy (Gateway settle / Circle MPC — whatever the API returned). */
+/** Full vendor settlement string + copy + ArcScan (tx page or search). */
 function VendorProofPanel({
   label,
   value,
   sublabel,
+  explorerHref,
 }: {
   label: string;
   value: string;
   sublabel?: string;
+  explorerHref: string;
 }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -54,20 +57,36 @@ function VendorProofPanel({
       setTimeout(() => setCopied(false), 1500);
     });
   };
+  const isDirectTx = value.trim().startsWith("0x");
   return (
     <div className="border-t border-void-800/60 bg-void-950/40 px-3 py-2.5">
       <div className="text-[9px] uppercase tracking-wider text-void-600 mb-0.5">{label}</div>
       {sublabel && <p className="text-[9px] text-void-500 mb-1 leading-snug">{sublabel}</p>}
       <div className="flex flex-wrap items-start gap-2">
         <p className="font-mono text-[10px] text-void-200 break-all leading-relaxed min-w-0 flex-1">{value}</p>
-        <button
-          type="button"
-          onClick={copy}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-void-700/80 bg-void-900/80 text-[11px] text-void-400 hover:text-teal-300 hover:border-teal-400/40 transition-colors"
-          title="Copy proof"
-        >
-          {copied ? "✓" : "📋"}
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={copy}
+            className="flex h-7 w-7 items-center justify-center rounded border border-void-700/80 bg-void-900/80 text-[11px] text-void-400 hover:text-teal-300 hover:border-teal-400/40 transition-colors"
+            title="Copy proof"
+          >
+            {copied ? "✓" : "📋"}
+          </button>
+          <a
+            href={explorerHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] font-mono text-teal-400 hover:text-teal-300 underline decoration-dotted whitespace-nowrap"
+            title={
+              isDirectTx
+                ? "Open transaction on ArcScan"
+                : "Open ArcScan — searches this id (UUID receipts may not appear as a single tx)"
+            }
+          >
+            {isDirectTx ? "ArcScan ↗" : "Explorer ↗"}
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -175,7 +194,8 @@ export function HuntIndexedPaymentRows({ payments }: { payments: HuntPaymentRow[
           return (
             <li
               key={`${p.from}-${p.to}-${index}`}
-              className="flex flex-col bg-void-900/30 overflow-hidden"
+              style={{ "--hunt-stagger": `${index * 42}ms` } as CSSProperties}
+              className="hunt-detail-card-enter hunt-card-surface flex flex-col bg-void-900/30 overflow-hidden"
             >
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-xs">
                 <span className="font-mono text-void-600 w-7 shrink-0">#{index}</span>
@@ -209,7 +229,12 @@ export function HuntIndexedPaymentRows({ payments }: { payments: HuntPaymentRow[
               </div>
               {showArcTxPanel && arcHref && <ArcTxHashPanel hash={tx} explorerHref={arcHref} />}
               {showVendorProofPanel && (
-                <VendorProofPanel label={vendorLabel} value={tx} sublabel={vendorSublabel} />
+                <VendorProofPanel
+                  label={vendorLabel}
+                  value={tx}
+                  sublabel={vendorSublabel}
+                  explorerHref={arcProofExplorerHref(tx)}
+                />
               )}
             </li>
           );

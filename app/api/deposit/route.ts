@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserById, updateUser } from "@/src/store/user-store";
 import { mintShares, grantKyc, getTokenInfo } from "@/src/hedera/hts";
 import { getOperatorId } from "@/src/config/hedera";
+import { ensureGatewayPoolFunded } from "@/src/payments/fund-swap";
 
 let cachedDecimals: number | null = null;
 async function getDecimals(): Promise<number> {
@@ -59,6 +60,26 @@ export async function POST(req: NextRequest) {
         await emitDepositEvent(user.walletAddress, amount, updated.fund.currentNav);
       } catch (err) {
         console.warn("[deposit] Naryo event emit failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    // Bootstrap the Circle Gateway pool for this user's x402 signer so the
+    // first cycle doesn't pay the deposit round-trip itself. Best-effort:
+    // the runCycle() guard will re-attempt if this fails here (e.g. if the
+    // deposit amount is smaller than the gateway topup floor). Non-fatal.
+    if (amount >= 0.60 && updated.hotWalletIndex != null) {
+      try {
+        const gwResult = await ensureGatewayPoolFunded(updated, 0.10, 0.50);
+        if (!gwResult.skipped) {
+          console.log(
+            `[deposit] Bootstrapped Gateway pool: +$${gwResult.depositedUsd.toFixed(6)} tx=${gwResult.depositTxHash}`,
+          );
+        }
+      } catch (err) {
+        console.warn(
+          "[deposit] Gateway pool bootstrap skipped (non-fatal — runCycle will retry):",
+          err instanceof Error ? err.message : String(err),
+        );
       }
     }
 

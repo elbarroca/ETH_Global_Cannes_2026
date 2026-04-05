@@ -14,6 +14,8 @@ interface DawgLoaderProps {
   fullScreen?: boolean;
   /** Milliseconds between message rotations. Defaults to 2000. */
   messageIntervalMs?: number;
+  /** Merged onto the outer container (e.g. `z-[100]` above other overlays). */
+  className?: string;
 }
 
 type Phase = "spinning" | "blasting" | "done";
@@ -41,6 +43,7 @@ export function DawgLoader({
   onComplete,
   fullScreen = true,
   messageIntervalMs = 2000,
+  className = "",
 }: DawgLoaderProps) {
   const [phase, setPhase] = useState<Phase>(isLoading ? "spinning" : "blasting");
   const [messageIndex, setMessageIndex] = useState(0);
@@ -71,8 +74,8 @@ export function DawgLoader({
   if (phase === "done") return null;
 
   const containerClass = fullScreen
-    ? "fixed inset-0 z-50 flex items-center justify-center bg-void-950/95 backdrop-blur-sm"
-    : "flex items-center justify-center py-8";
+    ? `fixed inset-0 z-50 flex items-center justify-center bg-void-950/95 backdrop-blur-sm ${className}`.trim()
+    : `flex items-center justify-center py-8 ${className}`.trim();
 
   const isBlasting = phase === "blasting";
   const currentMessage = messages[messageIndex] ?? "";

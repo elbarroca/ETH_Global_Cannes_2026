@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
 import { Card, CardHeader, CardBody, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
 import { ComputeLog } from "@/components/compute-log";
@@ -443,7 +443,14 @@ function InlineDetail({
               <span className="font-mono font-bold text-void-100">${totalCost.toFixed(3)}</span>
             </div>
             <p className="text-xs text-blue-400">Circle nanopayments · Gas-free</p>
-            <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 space-y-2">
+            <div
+              className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 space-y-2 hunt-detail-card-enter hunt-card-surface"
+              style={
+                {
+                  "--hunt-stagger": `${Math.min(mergedPayments.length * 42, 320)}ms`,
+                } as CSSProperties
+              }
+            >
               <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
                 <span className="w-2 h-2 rounded-full bg-indigo-500" />
                 Arc execution
@@ -490,15 +497,27 @@ function InlineDetail({
             <Badge variant="amber">debate</Badge>
           </summary>
           <div className="p-4 border-t border-void-800/60 space-y-3">
-            <HuntPipelineArrows actions={actions} />
+            <div
+              className="hunt-detail-card-enter hunt-card-surface rounded-xl border border-void-800/50 bg-void-950/25 p-2"
+              style={{ "--hunt-stagger": "0ms" } as CSSProperties}
+            >
+              <HuntPipelineArrows actions={actions} />
+            </div>
             <p className="text-[11px] text-void-600 uppercase tracking-wider">Conclusion path</p>
-            <AgentFlowStrip cycle={cycle} />
+            <div className="hunt-detail-card-enter" style={{ "--hunt-stagger": "48ms" } as CSSProperties}>
+              <AgentFlowStrip cycle={cycle} />
+            </div>
             {cycle.dbId ? (
-              <DebateTheater
-                cycleUuid={cycle.dbId}
-                userId={userId}
-                cycleNumber={cycle.id}
-              />
+              <div
+                className="hunt-detail-card-enter hunt-card-surface rounded-xl border border-void-800/50 bg-void-950/20 p-1"
+                style={{ "--hunt-stagger": "96ms" } as CSSProperties}
+              >
+                <DebateTheater
+                  cycleUuid={cycle.dbId}
+                  userId={userId}
+                  cycleNumber={cycle.id}
+                />
+              </div>
             ) : (
               <p className="text-xs text-void-600 py-2">
                 Full transcript requires a cycle UUID (fresh hunts from this dashboard). Older rows may omit it.
@@ -516,78 +535,82 @@ function InlineDetail({
             <ZeroGBadge label="audit" />
           </summary>
           <div className="p-4 border-t border-void-800/60 space-y-4">
-            <Card className="border-void-800/60">
-              <CardHeader>
-                <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-                  <span className="w-2 h-2 rounded-full bg-teal-500" />
-                  Hedera audit
-                </div>
-              </CardHeader>
-              <CardBody>
-                <CodeBlock>
-                  <div className="space-y-1 text-void-500">
-                    <div>Topic: <span className="text-void-200">{cycle.hcs.topicId}</span></div>
-                    <div>Seq: <span className="text-void-200">#{cycle.hcs.sequenceNumber}</span> · Time: {cycle.hcs.timestamp}</div>
-                    <div className="text-void-600">6 attestations · 3 payments · 1 decision</div>
+            <div className="hunt-detail-card-enter rounded-2xl" style={{ "--hunt-stagger": "0ms" } as CSSProperties}>
+              <Card className="border-void-800/60 hunt-card-surface">
+                <CardHeader>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
+                    <span className="w-2 h-2 rounded-full bg-teal-500" />
+                    Hedera audit
                   </div>
-                </CodeBlock>
-                <a
-                  href={`https://hashscan.io/testnet/topic/${cycle.hcs.topicId}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="inline-block mt-2 text-xs text-teal-400 hover:underline transition-colors"
-                >
-                  Verify on Hashscan →
-                </a>
-              </CardBody>
-            </Card>
-            <Card className="border-void-800/60">
-              <CardHeader>
-                <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-                  <span className="w-2 h-2 rounded-full bg-gold-400" />
-                  0G proof
-                </div>
-                <ZeroGBadge label="0G Storage + Chain" />
-              </CardHeader>
-              <CardBody className="space-y-3">
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">0G Storage root</div>
-                  {cycle.storageHash ? (
-                    <span className="font-mono text-sm text-gold-400 break-all">{cycle.storageHash}</span>
-                  ) : (
-                    <span className="text-xs text-void-600">Pending commit</span>
-                  )}
-                </div>
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">iNFT (ERC-7857)</div>
-                  {effectiveInftTokenId != null ? (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-gold-400">Token #{effectiveInftTokenId}</span>
-                        <Badge variant="green">0G Chain</Badge>
-                      </div>
-                      <a href={`${OG_EXPLORER_BASE}/address/${INFT_CONTRACT}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="inline-block text-xs text-gold-400 hover:underline">
-                        View on 0G Explorer →
-                      </a>
+                </CardHeader>
+                <CardBody>
+                  <CodeBlock>
+                    <div className="space-y-1 text-void-500">
+                      <div>Topic: <span className="text-void-200">{cycle.hcs.topicId}</span></div>
+                      <div>Seq: <span className="text-void-200">#{cycle.hcs.sequenceNumber}</span> · Time: {cycle.hcs.timestamp}</div>
+                      <div className="text-void-600">6 attestations · 3 payments · 1 decision</div>
                     </div>
-                  ) : (
-                    <span className="text-xs text-void-600">No iNFT minted</span>
-                  )}
-                </div>
-                {cycle.memory.length > 0 && (
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">Pack memory</div>
-                    {cycle.memory.map((m) => (
-                      <div key={m.cycleRef} className="flex gap-2">
-                        <span className="font-mono text-xs text-gold-400 shrink-0 pt-0.5">#{m.cycleRef}</span>
-                        <p className="text-xs text-void-500 leading-relaxed">{m.text}</p>
-                      </div>
-                    ))}
+                  </CodeBlock>
+                  <a
+                    href={`https://hashscan.io/testnet/topic/${cycle.hcs.topicId}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-block mt-2 text-xs text-teal-400 hover:underline transition-colors"
+                  >
+                    Verify on Hashscan →
+                  </a>
+                </CardBody>
+              </Card>
+            </div>
+            <div className="hunt-detail-card-enter rounded-2xl" style={{ "--hunt-stagger": "56ms" } as CSSProperties}>
+              <Card className="border-void-800/60 hunt-card-surface">
+                <CardHeader>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
+                    <span className="w-2 h-2 rounded-full bg-gold-400" />
+                    0G proof
                   </div>
-                )}
-              </CardBody>
-            </Card>
+                  <ZeroGBadge label="0G Storage + Chain" />
+                </CardHeader>
+                <CardBody className="space-y-3">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">0G Storage root</div>
+                    {cycle.storageHash ? (
+                      <span className="font-mono text-sm text-gold-400 break-all">{cycle.storageHash}</span>
+                    ) : (
+                      <span className="text-xs text-void-600">Pending commit</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">iNFT (ERC-7857)</div>
+                    {effectiveInftTokenId != null ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm text-gold-400">Token #{effectiveInftTokenId}</span>
+                          <Badge variant="green">0G Chain</Badge>
+                        </div>
+                        <a href={`${OG_EXPLORER_BASE}/address/${INFT_CONTRACT}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="inline-block text-xs text-gold-400 hover:underline">
+                          View on 0G Explorer →
+                        </a>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-void-600">No iNFT minted</span>
+                    )}
+                  </div>
+                  {cycle.memory.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">Pack memory</div>
+                      {cycle.memory.map((m) => (
+                        <div key={m.cycleRef} className="flex gap-2">
+                          <span className="font-mono text-xs text-gold-400 shrink-0 pt-0.5">#{m.cycleRef}</span>
+                          <p className="text-xs text-void-500 leading-relaxed">{m.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            </div>
           </div>
         </details>
       </div>
@@ -612,7 +635,11 @@ function InlineDetail({
               const paymentUrl = s.paymentTxHash && s.paymentTxHash.startsWith("0x")
                 ? arcTxUrl(s.paymentTxHash) : null;
               return (
-                <div key={`${s.name}-${i}`} className="space-y-2">
+                <div
+                  key={`${s.name}-${i}`}
+                  className="space-y-2 rounded-xl border border-void-800/70 bg-void-950/30 p-3 hunt-panel-card-enter hunt-card-surface"
+                  style={{ "--hunt-stagger": `${i * 52}ms` } as CSSProperties}
+                >
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
                       <span>{s.emoji}</span>
@@ -659,10 +686,14 @@ function InlineDetail({
             <LiveBadge />
           </CardHeader>
           <CardBody className="space-y-4">
-            {debateAgents.map(({ emoji, name, role, data, recColor }) => {
+            {debateAgents.map(({ emoji, name, role, data, recColor }, idx) => {
               const hires = hiresFor(role);
               return (
-                <div key={name} className="space-y-2">
+                <div
+                  key={name}
+                  className="space-y-2 rounded-xl border border-void-800/70 bg-void-950/30 p-3 hunt-panel-card-enter hunt-card-surface"
+                  style={{ "--hunt-stagger": `${idx * 52}ms` } as CSSProperties}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <span>{emoji}</span>
