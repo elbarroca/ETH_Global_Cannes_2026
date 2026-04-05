@@ -2,31 +2,36 @@
 # Long-running / port-binding services stay excluded. Anything imported by
 # `app/api/**` (Telegram webhook, cron heartbeat) must NOT be listed here or
 # the build fails with "Can't resolve".
+#
+# PATTERN RULES (same as .gitignore):
+#   - Patterns WITHOUT leading `/` match at any depth → `openclaw/` also matches `src/openclaw/`
+#   - Patterns WITH leading `/` match only at repo root
+# All root-only exclusions below MUST use leading `/` to avoid accidentally
+# killing src/* subdirectories with the same name (src/openclaw, src/naryo, etc.)
 
-# Long-running / port-binding backend services
+# Long-running / port-binding backend services (specific file paths — safe as-is)
 src/agents/specialist-server.ts
 src/index.ts
 src/api/
 
-# Build / deploy tooling
-scripts/
-naryo/
-fly/
-hardhat.config.cjs
+# Build / deploy tooling (root-only)
+/scripts/
+/naryo/
+/fly/
+/hardhat.config.cjs
 
-# Smart contract artifacts (deployed separately)
-contracts/
-artifacts/
-cache/
-test/
-*.sol
+# Smart contract artifacts (deployed separately, root-only)
+/contracts/
+/artifacts/
+/cache/
+/test/
 
-# Docs and progress tracking
-progress/
-docs/
-openclaw/
+# Docs and progress tracking (root-only — must NOT shadow src/openclaw!)
+/progress/
+/docs/
+/openclaw/
 
 # Editor / local
-.vscode/
-.idea/
+/.vscode/
+/.idea/
 *.log
