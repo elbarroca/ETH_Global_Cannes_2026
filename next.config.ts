@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      { source: "/product", destination: "/", permanent: true },
+      { source: "/design", destination: "/", permanent: true },
+    ];
+  },
   serverExternalPackages: [
     "@hashgraph/sdk",
     "@0glabs/0g-serving-broker",

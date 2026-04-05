@@ -24,6 +24,7 @@ type ActionType =
   | "AGENT_HIRED"
   | "AGENT_FIRED"
   | "AGENT_RATED"
+  | "AGENT_DEPLOYED"
   | "TRADE_EXECUTED"
   | "SWAP_EXECUTED"
   | "SWAP_FAILED"

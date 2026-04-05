@@ -3,16 +3,35 @@ import type { TokenPick } from "@/src/types/index";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+const FETCH_RETRIES = 3;
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
-    ...init,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as { error?: string }).error ?? res.statusText);
+  const url = `${API_BASE}${path}`;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= FETCH_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { "Content-Type": "application/json", ...init?.headers },
+        ...init,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error((err as { error?: string }).error ?? res.statusText);
+      }
+      return res.json() as Promise<T>;
+    } catch (e) {
+      lastErr = e;
+      const aborted = init?.signal?.aborted === true;
+      const transient =
+        e instanceof TypeError &&
+        (e.message === "Failed to fetch" || e.message === "Load failed");
+      if (aborted || !transient || attempt === FETCH_RETRIES) {
+        throw e;
+      }
+      await new Promise((r) => setTimeout(r, 120 * attempt));
+    }
   }
-  return res.json() as Promise<T>;
+  throw lastErr;
 }
 
 export interface UserRecord {
@@ -432,5 +451,57 @@ export async function fireAgent(userId: string, agentName: string): Promise<{ su
   return apiFetch("/api/marketplace/fire", {
     method: "POST",
     body: JSON.stringify({ userId, agentName }),
+  });
+}
+
+// ── Create Your Own Agent (dashboard + marketplace flow) ────────
+
+export interface GeneratedInstructions {
+  markdown: string;
+  reasoning: string;
+  attestationHash: string | null;
+  teeVerified: boolean;
+  fallback: boolean;
+}
+
+export async function generateAgentInstructions(
+  name: string,
+  description: string,
+): Promise<GeneratedInstructions> {
+  return apiFetch<GeneratedInstructions>("/api/marketplace/generate-instructions", {
+    method: "POST",
+    body: JSON.stringify({ name, description }),
+  });
+}
+
+export interface CreatedAgent {
+  id: string;
+  name: string;
+  emoji: string;
+  price: string;
+  reputation: number;
+  tools: string[];
+  description: string | null;
+  instructions: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface CreateAgentPayload {
+  name: string;
+  description: string;
+  instructions: string;
+  tools: string[];
+  emoji?: string;
+  createdBy?: string;
+  attestationHash?: string | null;
+}
+
+export async function createMarketplaceAgent(
+  payload: CreateAgentPayload,
+): Promise<CreatedAgent> {
+  return apiFetch<CreatedAgent>("/api/marketplace/create", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

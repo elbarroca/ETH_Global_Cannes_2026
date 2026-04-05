@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge, ZeroGBadge } from "@/components/ui/badge";
 import { DawgSpinner } from "@/components/dawg-spinner";
+import { CreateAgentModal } from "@/components/create-agent-modal";
 import { getLeaderboard, getMyAgents, hireAgent, fireAgent } from "@/lib/api";
 import type {
   Agent,
@@ -54,6 +55,7 @@ export default function MarketplacePage() {
   const [firingName, setFiringName] = useState<string | null>(null);
   const [health, setHealth] = useState<SwarmHealthResponse | null>(null);
   const [earnings, setEarnings] = useState<MarketplaceEarningsResponse | null>(null);
+  const [showCreateAgent, setShowCreateAgent] = useState(false);
 
   // Poll swarm health + marketplace earnings every 15s so the cards show live
   // online dots and cumulative USDC earned per specialist.
@@ -120,42 +122,46 @@ export default function MarketplacePage() {
 
   const [leaderboardFailed, setLeaderboardFailed] = useState(false);
 
-  useEffect(() => {
-    getLeaderboard()
-      .then((entries) => {
-        const mapped: Agent[] = entries.map((e) => ({
-          name: agentLabel(e.name),
-          registryName: e.name,
-          emoji: agentEmoji(e.name),
-          skill: e.tags.join(", ") || "Analysis",
-          accuracy: e.accuracy,
-          timesHired: e.totalHires,
-          reputation: e.reputation,
-          pricePerQuery: parseFloat(e.price.replace("$", "")) || 0.001,
-          // Canonical: either a real ERC-7857 token ID from marketplace_agents
-          // or `null`. Callers render "Not minted" for null. We DO NOT
-          // fabricate an ID from totalHires anymore — that was misleading.
-          inftId: e.inftTokenId != null ? `#${e.inftTokenId}` : "",
-          inftTokenId: e.inftTokenId ?? null,
-          storageRootHash: e.storageRootHash ?? null,
-          storageUri: e.storageUri ?? null,
-          model: "glm-5-chat",
-          provider: "0G Sealed TEE",
-          creator: "AlphaDawg",
-          isActive: e.active,
-          walletAddress: e.walletAddress ?? undefined,
-          lastHireAt: e.lastHireAt,
-        }));
-        setAllAgents(mapped);
-        setLeaderboardFailed(false);
-      })
-      .catch(() => {
-        // Surface the failure honestly instead of silently substituting mock data.
-        setAllAgents([]);
-        setLeaderboardFailed(true);
-      })
-      .finally(() => setLoadingMarketplace(false));
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      const entries = await getLeaderboard();
+      const mapped: Agent[] = entries.map((e) => ({
+        name: agentLabel(e.name),
+        registryName: e.name,
+        emoji: agentEmoji(e.name),
+        skill: e.tags.join(", ") || "Analysis",
+        accuracy: e.accuracy,
+        timesHired: e.totalHires,
+        reputation: e.reputation,
+        pricePerQuery: parseFloat(e.price.replace("$", "")) || 0.001,
+        // Canonical: either a real ERC-7857 token ID from marketplace_agents
+        // or `null`. Callers render "Not minted" for null. We DO NOT
+        // fabricate an ID from totalHires anymore — that was misleading.
+        inftId: e.inftTokenId != null ? `#${e.inftTokenId}` : "",
+        inftTokenId: e.inftTokenId ?? null,
+        storageRootHash: e.storageRootHash ?? null,
+        storageUri: e.storageUri ?? null,
+        model: "glm-5-chat",
+        provider: "0G Sealed TEE",
+        creator: "AlphaDawg",
+        isActive: e.active,
+        walletAddress: e.walletAddress ?? undefined,
+        lastHireAt: e.lastHireAt,
+      }));
+      setAllAgents(mapped);
+      setLeaderboardFailed(false);
+    } catch {
+      // Surface the failure honestly instead of silently substituting mock data.
+      setAllAgents([]);
+      setLeaderboardFailed(true);
+    } finally {
+      setLoadingMarketplace(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
   // Marketplace shows ONLY real agents from the leaderboard.
   // Previously this was silently padded with MOCK_AGENTS community entries,
@@ -415,7 +421,10 @@ export default function MarketplacePage() {
           subtitle="Community-built specialists — minted as iNFTs on 0G"
           count={loadingMarketplace ? null : availableCount}
           right={
-            <button className="inline-flex items-center gap-2 rounded-xl border border-gold-400/20 bg-gold-400/10 px-4 py-2 text-sm font-medium text-gold-400 transition-colors hover:border-gold-400/40 hover:bg-gold-400/20">
+            <button
+              onClick={() => setShowCreateAgent(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-gold-400/20 bg-gold-400/10 px-4 py-2 text-sm font-medium text-gold-400 transition-colors hover:border-gold-400/40 hover:bg-gold-400/20"
+            >
               <span className="text-base leading-none">+</span>
               <span>Deploy your agent</span>
             </button>
@@ -461,6 +470,18 @@ export default function MarketplacePage() {
           </div>
         )}
       </section>
+
+      {showCreateAgent && (
+        <CreateAgentModal
+          createdBy={user?.proxyWallet?.address ?? userId ?? null}
+          onClose={() => setShowCreateAgent(false)}
+          onCreated={() => {
+            // Refetch the leaderboard so the newly deployed agent shows up
+            // in the Marketplace grid. The modal closes itself on "Close".
+            void fetchLeaderboard();
+          }}
+        />
+      )}
     </main>
   );
 }

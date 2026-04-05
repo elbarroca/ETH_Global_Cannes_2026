@@ -23,6 +23,15 @@ function getRpcUrl(): string {
 
 let _contract: ethers.Contract | null = null;
 
+/** Serialize Hedera EVM writes so nonce never races under burst emits. */
+let _emitQueue: Promise<unknown> = Promise.resolve();
+
+function enqueueEmit<T>(fn: () => Promise<T>): Promise<T> {
+  const next = _emitQueue.then(() => fn());
+  _emitQueue = next.then(() => undefined).catch(() => undefined);
+  return next;
+}
+
 function getContract(): ethers.Contract {
   if (_contract) return _contract;
   const key = process.env.HEDERA_EVM_PRIVATE_KEY;
@@ -45,19 +54,21 @@ export async function emitCycleEvent(
   asset: string,
   pct: number,
 ): Promise<string | null> {
-  try {
-    const contract = getContract();
-    const tx = await contract.emitCycleCompleted(
-      userAddress, cycleId, action, asset, pct,
-      { gasLimit: GAS_LIMIT },
-    );
-    await tx.wait();
-    console.log(`[naryo] CycleCompleted event emitted: cycle=${cycleId} action=${action} tx=${tx.hash}`);
-    return tx.hash as string;
-  } catch (err) {
-    console.warn("[naryo] emitCycleEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
-    return null;
-  }
+  return enqueueEmit(async () => {
+    try {
+      const contract = getContract();
+      const tx = await contract.emitCycleCompleted(
+        userAddress, cycleId, action, asset, pct,
+        { gasLimit: GAS_LIMIT },
+      );
+      await tx.wait();
+      console.log(`[naryo] CycleCompleted event emitted: cycle=${cycleId} action=${action} tx=${tx.hash}`);
+      return tx.hash as string;
+    } catch (err) {
+      console.warn("[naryo] emitCycleEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      return null;
+    }
+  });
 }
 
 /**
@@ -69,19 +80,21 @@ export async function emitSpecialistEvent(
   specialistName: string,
   costMicroUsd: number,
 ): Promise<string | null> {
-  try {
-    const contract = getContract();
-    const tx = await contract.emitSpecialistHired(
-      userAddress, specialistName, costMicroUsd,
-      { gasLimit: GAS_LIMIT },
-    );
-    await tx.wait();
-    console.log(`[naryo] SpecialistHired event emitted: ${specialistName} tx=${tx.hash}`);
-    return tx.hash as string;
-  } catch (err) {
-    console.warn("[naryo] emitSpecialistEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
-    return null;
-  }
+  return enqueueEmit(async () => {
+    try {
+      const contract = getContract();
+      const tx = await contract.emitSpecialistHired(
+        userAddress, specialistName, costMicroUsd,
+        { gasLimit: GAS_LIMIT },
+      );
+      await tx.wait();
+      console.log(`[naryo] SpecialistHired event emitted: ${specialistName} tx=${tx.hash}`);
+      return tx.hash as string;
+    } catch (err) {
+      console.warn("[naryo] emitSpecialistEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      return null;
+    }
+  });
 }
 
 /**
@@ -93,21 +106,23 @@ export async function emitDepositEvent(
   amountUsd: number,
   newNavUsd: number,
 ): Promise<string | null> {
-  try {
-    const contract = getContract();
-    const amountWei = Math.round(amountUsd * 1e6); // micro-USD
-    const navWei = Math.round(newNavUsd * 1e6);
-    const tx = await contract.emitDepositRecorded(
-      userAddress, amountWei, navWei,
-      { gasLimit: GAS_LIMIT },
-    );
-    await tx.wait();
-    console.log(`[naryo] DepositRecorded event emitted: $${amountUsd} tx=${tx.hash}`);
-    return tx.hash as string;
-  } catch (err) {
-    console.warn("[naryo] emitDepositEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
-    return null;
-  }
+  return enqueueEmit(async () => {
+    try {
+      const contract = getContract();
+      const amountWei = Math.round(amountUsd * 1e6); // micro-USD
+      const navWei = Math.round(newNavUsd * 1e6);
+      const tx = await contract.emitDepositRecorded(
+        userAddress, amountWei, navWei,
+        { gasLimit: GAS_LIMIT },
+      );
+      await tx.wait();
+      console.log(`[naryo] DepositRecorded event emitted: $${amountUsd} tx=${tx.hash}`);
+      return tx.hash as string;
+    } catch (err) {
+      console.warn("[naryo] emitDepositEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      return null;
+    }
+  });
 }
 
 /**
@@ -115,15 +130,17 @@ export async function emitDepositEvent(
  * Non-fatal.
  */
 export async function emitHeartbeatEvent(activeUsers: number): Promise<string | null> {
-  try {
-    const contract = getContract();
-    const tx = await contract.emitHeartbeat(activeUsers, { gasLimit: GAS_LIMIT });
-    await tx.wait();
-    return tx.hash as string;
-  } catch (err) {
-    console.warn("[naryo] emitHeartbeatEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
-    return null;
-  }
+  return enqueueEmit(async () => {
+    try {
+      const contract = getContract();
+      const tx = await contract.emitHeartbeat(activeUsers, { gasLimit: GAS_LIMIT });
+      await tx.wait();
+      return tx.hash as string;
+    } catch (err) {
+      console.warn("[naryo] emitHeartbeatEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      return null;
+    }
+  });
 }
 
 /**
@@ -137,22 +154,24 @@ export async function emitCrossChainEvent(
   eventType: string,
   sourceTxHash: string,
 ): Promise<string | null> {
-  try {
-    const contract = getContract();
-    // Pad/truncate tx hash to bytes32
-    const hashBytes = ethers.zeroPadValue(
-      ethers.getBytes(sourceTxHash.length >= 66 ? sourceTxHash : ethers.id(sourceTxHash)),
-      32,
-    );
-    const tx = await contract.emitCrossChainCorrelation(
-      sourceChain, eventType, hashBytes,
-      { gasLimit: GAS_LIMIT },
-    );
-    await tx.wait();
-    console.log(`[naryo] CrossChainCorrelation: ${sourceChain}/${eventType} tx=${tx.hash}`);
-    return tx.hash as string;
-  } catch (err) {
-    console.warn("[naryo] emitCrossChainEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
-    return null;
-  }
+  return enqueueEmit(async () => {
+    try {
+      const contract = getContract();
+      // Pad/truncate tx hash to bytes32
+      const hashBytes = ethers.zeroPadValue(
+        ethers.getBytes(sourceTxHash.length >= 66 ? sourceTxHash : ethers.id(sourceTxHash)),
+        32,
+      );
+      const tx = await contract.emitCrossChainCorrelation(
+        sourceChain, eventType, hashBytes,
+        { gasLimit: GAS_LIMIT },
+      );
+      await tx.wait();
+      console.log(`[naryo] CrossChainCorrelation: ${sourceChain}/${eventType} tx=${tx.hash}`);
+      return tx.hash as string;
+    } catch (err) {
+      console.warn("[naryo] emitCrossChainEvent failed (non-fatal):", err instanceof Error ? err.message : String(err));
+      return null;
+    }
+  });
 }

@@ -7,7 +7,9 @@ export async function GET() {
   try {
     const prisma = getPrisma();
     const [leaderboard, available, hireRows, chainRows] = await Promise.all([
-      getLeaderboard(10),
+      // Raised from 10 → 50 so user-deployed community agents (which start
+      // at ELO 500) show up in the marketplace alongside the top specialists.
+      getLeaderboard(50),
       discoverSpecialists(),
       // Per-agent aggregate: most recent SPECIALIST_HIRED plus paid-hire count.
       // Keyed by agent name so the downstream map() lookup is O(1).

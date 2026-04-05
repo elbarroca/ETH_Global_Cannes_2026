@@ -12,7 +12,6 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/user-context";
 import {
   getLatestCycle,
-  analyzeCycle,
   approveCycle,
   rejectCycle as rejectCycleApi,
   getPendingCycle,
@@ -26,7 +25,7 @@ import { PreconditionModal } from "@/components/precondition-modal";
 import { TelegramModal } from "@/components/telegram-modal";
 import { FundingModal } from "@/components/funding-modal";
 import { NaryoFeed } from "@/components/naryo-feed";
-import { StreamingHuntPanel } from "@/components/streaming-hunt-panel";
+import { CreateAgentModal } from "@/components/create-agent-modal";
 import { SwarmStatusBar } from "@/components/swarm-status-bar";
 import { SwarmActivityTicker } from "@/components/swarm-activity-ticker";
 // DebateTheater removed — debate data is shown inside ExpandableHuntCard
@@ -52,7 +51,10 @@ export default function DashboardPage() {
     agentBalance,
     agentBalanceFetchedAt,
   } = useUser();
-  const [running, setRunning] = useState(false);
+  // `running` is kept as a boolean flag so the stage indicator and auto-cycle
+  // helpers can read it without plumbing a separate state. It is no longer
+  // flipped from a user input — auto-hunt is the only trigger now.
+  const [running] = useState(false);
   const [approving, setApproving] = useState(false);
   const [liveCycle, setLiveCycle] = useState<Cycle | null>(null);
   const [pendingCycle, setPendingCycle] = useState<PendingCycleResponse | null>(null);
@@ -63,9 +65,9 @@ export default function DashboardPage() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [precondition, setPrecondition] = useState<{ title: string; body: string; ctaLabel: string; ctaHref: string } | null>(null);
-  // User-authored goal text passed to analyzeCycle. Persisted to localStorage
-  // so the input survives reloads — we never want the box to feel amnesiac.
-  const [goal, setGoal] = useState("");
+  // "Create Your Own Agent" modal — opens from the dashboard card that replaced
+  // the old free-text hunt input. Auto-hunt now runs the default goal.
+  const [showCreateAgent, setShowCreateAgent] = useState(false);
 
   // Compute fund stats from user state only.
   // navChange24h and winRate are NOT shown as "0" — we render "—" in the UI
@@ -84,27 +86,6 @@ export default function DashboardPage() {
   } : null;
 
   const cycle = liveCycle;
-
-  // Hydrate goal from localStorage once on mount
-  useEffect(() => {
-    try {
-      const saved = typeof window !== "undefined" ? window.localStorage.getItem("alphadawg.goal") : null;
-      if (saved) setGoal(saved);
-    } catch {
-      /* ignore localStorage failures — private-mode browsers, etc. */
-    }
-  }, []);
-
-  // Persist goal edits back to localStorage
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("alphadawg.goal", goal);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [goal]);
 
   // Fetch latest cycle + check for pending on mount
   useEffect(() => {
@@ -125,35 +106,6 @@ export default function DashboardPage() {
     }, 5000);
     return () => clearInterval(timer);
   }, [running, approving, stages]);
-
-  async function handleHunt() {
-    if (!userId || !user) return;
-
-    // Precondition: check live on-chain balance, not the DB accounting value.
-    // Out-of-band top-ups to the proxy wallet should unblock the hunt immediately.
-    const liveBalance = agentBalance ?? user.fund.depositedUsdc;
-    if (liveBalance < 0.003) {
-      setPrecondition({
-        title: "Insufficient USDC",
-        body: `You need at least $0.003 to pay 3 specialists. Current balance: $${liveBalance.toFixed(4)}`,
-        ctaLabel: "Deposit USDC",
-        ctaHref: "/deposit",
-      });
-      return;
-    }
-
-    setRunning(true);
-    setStageIdx(0);
-    setStages(ANALYZE_STAGES);
-    try {
-      const result = await analyzeCycle(userId, goal.trim() || undefined);
-      setPendingCycle(result);
-    } catch (err) {
-      console.warn("[dashboard] Analysis failed:", err);
-    } finally {
-      setRunning(false);
-    }
-  }
 
   const handleApprove = useCallback(async () => {
     if (!pendingCycle || !userId) return;
@@ -265,11 +217,6 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4">
         <div className="min-w-0 space-y-3">
 
-      {/* Streaming Hunt panel — live SSE-driven view of a cycle as it
-          unfolds. Walks the user through bias → hires → debate → swap in
-          real time. Uses the POST /api/cycle/stream/[userId] endpoint. */}
-      {userId && <StreamingHuntPanel userId={userId} />}
-
       {/* Degraded-cycle banner: only rendered when the last committed cycle
           had a proof failure OR a specialist ran without TEE attestation.
           This replaces the previous silent-degradation behavior so users know
@@ -301,10 +248,12 @@ export default function DashboardPage() {
         agentBalanceFetchedAt={agentBalanceFetchedAt}
       />
 
-      {/* Hunt section — goal input + cycle header + trigger button */}
+      {/* Cycle header — shows the current/last hunt status. Auto-hunt runs
+          against the default goal baked into main-agent.ts, so there is no
+          longer a free-text prompt input on the dashboard. */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="text-sm font-semibold text-void-600 uppercase tracking-wider">
+          <h2 className="text-base sm:text-lg font-semibold text-void-300 uppercase tracking-wide">
             {pendingCycle
               ? `Hunt #${pendingCycle.cycleNumber} \u00b7 Awaiting approval`
               : cycle
@@ -312,44 +261,39 @@ export default function DashboardPage() {
                 : "Ready to hunt"}
           </h2>
           {cycle?.goal && (
-            <span className="text-xs text-void-500 italic truncate max-w-xs" title={cycle.goal}>
+            <span className="text-sm text-void-400 italic truncate max-w-md" title={cycle.goal}>
               &ldquo;{cycle.goal}&rdquo;
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={goal}
-            onChange={(e) => setGoal(e.target.value)}
-            placeholder="What should your pack hunt for? e.g. 'Find a safe ETH entry this week'"
-            disabled={running || approving || !!pendingCycle}
-            className="flex-1 px-3 py-3 bg-void-950 border border-void-800 focus:border-dawg-500 focus:outline-none rounded-xl text-sm text-void-200 placeholder:text-void-600 transition-colors"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !running && !approving && !pendingCycle) handleHunt();
-            }}
-          />
-          {!pendingCycle && (
-            <button
-              onClick={handleHunt}
-              disabled={running || approving}
-              className={`shine-sweep flex items-center gap-2 px-6 py-3 bg-dawg-500 hover:bg-dawg-400 disabled:opacity-60 text-void-950 text-sm font-bold rounded-xl transition-colors shrink-0 ${running ? "hunting" : ""}`}
-            >
-              {running ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-void-950 border-t-transparent rounded-full animate-spin" />
-                  Analyzing…
-                </>
-              ) : (
-                "🐺 Hunt"
-              )}
-            </button>
-          )}
-        </div>
         {(running || approving) && (
-          <p className="text-xs text-void-500 animate-pulse">{stages[stageIdx]}</p>
+          <p className="text-sm text-void-400 animate-pulse">{stages[stageIdx]}</p>
         )}
       </div>
+
+      {/* Build Your Specialist — dashboard entry point for the "Create Your
+          Own Agent" flow. Replaces the free-text Hunt input. The same modal
+          is also launched from the Marketplace header's "Deploy your agent"
+          button, so both surfaces share one component. */}
+      <Card>
+        <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-xs text-void-500 uppercase tracking-wider">
+              Build Your Specialist
+            </span>
+            <span className="text-xs text-void-400 truncate">
+              Describe the edge · 0G crafts the persona · deploy to the pack marketplace.
+            </span>
+          </div>
+          <button
+            onClick={() => setShowCreateAgent(true)}
+            className="inline-flex items-center gap-2 px-4 py-1.5 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-xs font-bold rounded-lg transition-colors shrink-0"
+          >
+            <span className="text-base leading-none">+</span>
+            <span>Create Agent</span>
+          </button>
+        </div>
+      </Card>
 
       {/* Auto-Hunt Config */}
       <Card>
@@ -598,6 +542,12 @@ export default function DashboardPage() {
         </aside>
       </div>
     </main>
+    {showCreateAgent && (
+      <CreateAgentModal
+        createdBy={user?.proxyWallet?.address ?? userId ?? null}
+        onClose={() => setShowCreateAgent(false)}
+      />
+    )}
     </>
   );
 }
