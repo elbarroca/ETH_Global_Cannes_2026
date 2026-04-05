@@ -25,7 +25,7 @@ export function DawgLogo({
   size = 64,
 }: DawgLogoProps) {
   const classes = [
-    "dawg-logo select-none",
+    "dawg-logo select-none rounded-full overflow-hidden",
     animated ? "dawg-logo-animated" : "",
     className ?? "",
   ]

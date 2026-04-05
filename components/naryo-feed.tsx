@@ -33,6 +33,9 @@ const SOURCE_LABELS: Record<string, string> = {
   deposit: "Deposit Event",
   "og-mint": "iNFT Minted",
   "og-metadata": "Metadata Updated",
+  specialist: "Specialist Hired",
+  heartbeat: "Heartbeat",
+  "cross-chain": "Cross-chain Proof",
 };
 
 export function NaryoFeed() {

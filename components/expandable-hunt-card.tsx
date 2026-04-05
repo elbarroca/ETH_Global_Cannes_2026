@@ -615,6 +615,36 @@ function InlineDetail({
                       <span className="text-xs text-void-600">Pending commit</span>
                     )}
                   </div>
+                  {/* Memory Recall — RAG loop proof. Lists the prior-cycle CIDs
+                       that were loaded from 0G Storage at this cycle's start
+                       and fed into the specialist + debate prompts. Turns the
+                       audit chain into a visible DAG: each cycle cites the
+                       cycles it learned from. */}
+                  {cycle.narrative?.priorCids && cycle.narrative.priorCids.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
+                        🧠 Memory Recall — {cycle.narrative.priorCids.length} prior {cycle.narrative.priorCids.length === 1 ? "cycle" : "cycles"} loaded from 0G Storage
+                      </div>
+                      <div className="space-y-1">
+                        {cycle.narrative.priorCids.map((cid, i) => (
+                          <button
+                            key={cid}
+                            type="button"
+                            onClick={() => navigator.clipboard.writeText(cid).catch(() => {})}
+                            className="flex items-center gap-2 text-xs font-mono text-gold-400/80 hover:text-gold-400 transition-colors"
+                            title={`Click to copy: ${cid}`}
+                          >
+                            <span className="text-void-600">{i + 1}.</span>
+                            <span className="break-all">{cid.slice(0, 18)}…{cid.slice(-6)}</span>
+                            <span className="text-void-600 text-[10px]">📋</span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-void-600 mt-1">
+                        Each CID points at the RichCycleRecord of a prior hunt. The 7B specialists + Alpha/Risk/Executor agents read these as RAG context before making this decision.
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">iNFT (ERC-7857)</div>
                     {effectiveInftTokenId != null ? (

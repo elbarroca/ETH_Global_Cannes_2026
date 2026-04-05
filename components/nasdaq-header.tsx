@@ -98,7 +98,12 @@ export function NasdaqHeader({
   // still in flight" — the UI renders "$—" in both cases.
   const depositedIsLive = agentBalance != null;
 
-  const navLabel = fund ? formatCurrency(fund.nav) : "$------";
+  // Headline NAV must match the agent proxy wallet (DEPOSITED / CUSTODY). DB
+  // `fund.nav` can lag deposits or manual top-ups; prefer live Arc USDC.
+  const headlineNav =
+    agentBalance != null ? agentBalance : fund != null ? fund.nav : null;
+  const navLabel =
+    headlineNav != null ? formatCurrency(headlineNav) : "$------";
   const change = fund?.navChange24h ?? 0;
   const hasChange = fund?.navChange24h != null && !Number.isNaN(change);
   const changePositive = change >= 0;
@@ -254,8 +259,8 @@ export function NasdaqHeader({
         {/* ── Row 3: Scrolling crawl (Bloomberg-style marquee) ───────────── */}
         <div className="relative overflow-hidden border-t border-dawg-500/20 bg-black py-2.5">
           <div className="nasdaq-ticker-track whitespace-nowrap text-[20px] uppercase leading-none">
-            <TickerStream fund={fund} liveDeposited={agentBalance} />
-            <TickerStream fund={fund} liveDeposited={agentBalance} aria-hidden />
+            <TickerStream fund={fund} headlineNav={headlineNav} liveDeposited={agentBalance} />
+            <TickerStream fund={fund} headlineNav={headlineNav} liveDeposited={agentBalance} aria-hidden />
           </div>
           {/* Black fade edges so the loop point is invisible */}
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-black to-transparent" />
@@ -317,16 +322,23 @@ function LedSeparator() {
  */
 function TickerStream({
   fund,
+  headlineNav,
   liveDeposited,
   ...props
 }: {
   fund: NasdaqHeaderFund | null;
+  /** Same figure as the hero FUND NAV (live Arc when available). */
+  headlineNav: number | null;
   /** Live Circle MPC proxy balance — shown as CUSTODY so the crawl matches
       the DEPOSITED hero line when the wallet balance endpoint is reachable. */
   liveDeposited: number | null;
 } & React.HTMLAttributes<HTMLDivElement>) {
   const items: Array<{ label: string; value: string; tone: "up" | "neutral" | "bright" }> = [
-    { label: "VMF", value: fund ? formatCurrency(fund.nav) : "$—", tone: "bright" },
+    {
+      label: "VMF",
+      value: headlineNav != null ? formatCurrency(headlineNav) : "$—",
+      tone: "bright",
+    },
     { label: "24H Δ", value: "0.00%", tone: "neutral" },
     {
       label: "CUSTODY",

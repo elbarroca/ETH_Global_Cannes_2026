@@ -1,0 +1,33 @@
+# Backend-only code — NOT reachable from app/** on Vercel.
+# These files run via `npm run backend` (local/Fly), never in a Next.js function.
+# Next.js automatic tracing handles src/** files that ARE imported by app/**.
+
+# Long-running / port-binding backend services
+src/telegram/
+src/agents/heartbeat.ts
+src/agents/specialist-server.ts
+src/index.ts
+src/api/
+
+# Build / deploy tooling
+scripts/
+naryo/
+fly/
+hardhat.config.cjs
+
+# Smart contract artifacts (deployed separately)
+contracts/
+artifacts/
+cache/
+test/
+*.sol
+
+# Docs and progress tracking
+progress/
+docs/
+openclaw/
+
+# Editor / local
+.vscode/
+.idea/
+*.log
