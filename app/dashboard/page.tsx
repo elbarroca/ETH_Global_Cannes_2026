@@ -34,6 +34,7 @@ import {
 } from "@/components/dashboard-onboarding";
 import { SwarmStatusBar } from "@/components/swarm-status-bar";
 import { SwarmActivityTicker } from "@/components/swarm-activity-ticker";
+import { InProgressHuntBanner } from "@/components/in-progress-hunt-banner";
 // DebateTheater removed — debate data is shown inside ExpandableHuntCard
 
 function formatFeedSyncedAge(ms: number): string {
@@ -717,6 +718,13 @@ export default function DashboardPage() {
         </div>
       ) : hunts.length > 0 && userId && cycle ? (
         <>
+          {/* Live "HUNT #N · in progress" banner — populated from agent_actions
+              between committed cycles so the user gets continuous feedback
+              during the ~6 min that a cycle takes to hire specialists, debate,
+              seal to 0G/HCS, and commit. Disappears automatically when the
+              Cycle row lands and the #N card appears in the feed below. */}
+          <InProgressHuntBanner userId={userId} />
+
           <div className="space-y-4">
             {hunts.map((h, i) => (
               <ExpandableHuntCard

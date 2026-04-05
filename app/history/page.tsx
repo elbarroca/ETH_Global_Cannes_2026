@@ -2,6 +2,7 @@
 
 import { DawgSpinner } from "@/components/dawg-spinner";
 import { ExpandableHuntCard } from "@/components/expandable-hunt-card";
+import { InProgressHuntBanner } from "@/components/in-progress-hunt-banner";
 import { useCycleHistory } from "@/hooks/use-vaultmind";
 import { mapEnrichedResponseToCycle } from "@/lib/cycle-mapper";
 import { useUser } from "@/contexts/user-context";
@@ -21,6 +22,12 @@ export default function HistoryPage() {
           All hunts recorded on Hedera HCS + 0G Sealed Inference
         </p>
       </div>
+
+      {/* Live in-progress banner — reads from agent_actions so history shows
+          the cycle currently being analyzed (specialists hired, debate
+          mid-flight) between committed hunts. Disappears once the Cycle row
+          lands for this cycleNumber. */}
+      <InProgressHuntBanner userId={userId} />
 
       {/* Loading */}
       {loading && cycles.length === 0 && (

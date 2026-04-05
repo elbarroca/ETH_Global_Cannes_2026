@@ -16,6 +16,7 @@ const MAX_LIMIT = 100;
 export async function GET(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
   const limitParam = url.searchParams.get("limit");
+  const userIdFilter = url.searchParams.get("userId")?.trim() || null;
   const limit = Math.min(
     MAX_LIMIT,
     Math.max(1, Number.parseInt(limitParam ?? String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT),
@@ -25,6 +26,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   try {
     const rows = await prisma.agentAction.findMany({
+      where: userIdFilter ? { userId: userIdFilter } : undefined,
       orderBy: { createdAt: "desc" },
       take: limit,
       select: {
