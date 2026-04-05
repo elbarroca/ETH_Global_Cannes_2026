@@ -22,6 +22,7 @@
 
 import { logSwarmEvent } from "../hedera/hcs";
 import { storeMemory } from "../og/storage";
+import { logAction } from "../store/action-logger";
 import type {
   SwarmEventRecord,
   RichHireData,
@@ -137,6 +138,18 @@ export async function emitHireWithRichData(
   }
 
   const sh = await persistRichPayload(rich);
+  if (sh) {
+    void logAction({
+      userId: rich.userId,
+      actionType: "OG_HIRE_STORED",
+      payload: {
+        cycleId: rich.cycleId,
+        storageHash: sh,
+        specialist: rich.specialist,
+        hiredBy: rich.hiredBy,
+      },
+    }).catch(() => {});
+  }
   const event: SwarmEventRecord = sh ? { ...baseEvent, sh } : baseEvent;
   const bytes = Buffer.byteLength(JSON.stringify(event), "utf8");
   console.log(`[swarm] → ev=hire bytes=${bytes} ${eventSummary(event)}`);
@@ -162,6 +175,19 @@ export async function emitTurnWithRichData(
   }
 
   const sh = await persistRichPayload(rich);
+  if (sh) {
+    void logAction({
+      userId: rich.userId,
+      actionType: "OG_TURN_STORED",
+      payload: {
+        cycleId: rich.cycleId,
+        storageHash: sh,
+        turnNumber: rich.turnNumber,
+        phase: rich.phase,
+        from: rich.from,
+      },
+    }).catch(() => {});
+  }
   const event: SwarmEventRecord = sh ? { ...baseEvent, sh } : baseEvent;
   const bytes = Buffer.byteLength(JSON.stringify(event), "utf8");
   console.log(`[swarm] → ev=turn bytes=${bytes} ${eventSummary(event)}`);

@@ -840,12 +840,15 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
       }
 
       // Emit swarm-hire events with FULL input/output persisted to 0G Storage.
-      // Each hire event's `sh` field is the 0G rootHash of a RichHireData
-      // payload containing the market data snapshot, full parsed JSON, full
-      // cot, full attestation, payment proof, and reasoning. Done in parallel
-      // via Promise.all so N specialists don't add N × (0G latency) to the
-      // cycle — the batch completes in ~the slowest single upload.
-      await Promise.all(
+      // FIRE-AND-FORGET: the emit helpers serialize through a nonce-safe upload
+      // chain (swarm-emit.ts `serialized0GUpload`) and each 0G upload takes
+      // several seconds. Awaiting a batch of N hires used to add N × (0G
+      // latency) to the user-visible cycle time. The HCS audit events + 0G
+      // rich payloads still complete in the background (the emit helpers own
+      // their error handling and write a secondary OG_HIRE_STORED row when
+      // the upload lands), so judges get the full proof trail — but the cycle
+      // moves on immediately instead of blocking for 30-60s per hunt.
+      void Promise.all(
         specialists.map((spec) =>
           emitHireWithRichData(
             {
@@ -871,10 +874,14 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
       // response (content, parsed, reasoning, attestation) is verifiable.
       // The turns already ran on Fly.io — we reconstruct the input context
       // from the ctx we sent and capture the full response for 0G.
+      //
+      // FIRE-AND-FORGET: same reasoning as the hire batch above — the 0G
+      // backup still runs in the background, but the cycle no longer waits
+      // for three sequential 0G uploads before moving on to commit.
       const hTurn1 = 1;
       const hTurn2 = 2;
       const hTurn3 = 3;
-      await Promise.all([
+      void Promise.all([
         emitTurnWithRichData(
           {
             ev: "turn",
@@ -945,6 +952,36 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
       hierarchicalSucceeded = true;
       specialistPath = "hierarchical_x402"; // debate agents autonomously hired their own specialists
       console.log(`[cycle] Hierarchical debate complete — executor: ${JSON.stringify(debate.executor.parsed)}`);
+
+      // Remote Fly debate returns all three tiers together — log once (flat path logs per stage in adversarial.ts).
+      try {
+        await logAction({
+          userId: user.id,
+          actionType: "DEBATE_ALPHA",
+          agentName: "alpha",
+          attestationHash: alphaResp.attestationHash,
+          teeVerified: alphaResp.teeVerified,
+          payload: alphaResp.parsed as Record<string, unknown>,
+        });
+        await logAction({
+          userId: user.id,
+          actionType: "DEBATE_RISK",
+          agentName: "risk",
+          attestationHash: riskResp.attestationHash,
+          teeVerified: riskResp.teeVerified,
+          payload: riskResp.parsed as Record<string, unknown>,
+        });
+        await logAction({
+          userId: user.id,
+          actionType: "DEBATE_EXECUTOR",
+          agentName: "executor",
+          attestationHash: executorResp.attestationHash,
+          teeVerified: executorResp.teeVerified,
+          payload: executorResp.parsed as Record<string, unknown>,
+        });
+      } catch {
+        // non-fatal
+      }
 
       // ── Round 2: Rebuttal (hybrid — preserves hierarchical hiring, adds swarm dialogue) ──
       //
@@ -1081,10 +1118,14 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     // Emit one swarm-hire event per fulfilled specialist in the flat path,
     // each with a full RichHireData payload persisted to 0G Storage. The
     // hiring agent is "main" because this path hires up-front before any
-    // debate agent has spoken. Done in parallel so N specialists add
-    // ~1 × (0G latency) to the cycle, not N × it.
+    // debate agent has spoken.
+    //
+    // FIRE-AND-FORGET: the 0G upload chain is nonce-serialized and each
+    // hire adds ~5s of 0G latency if awaited. Background the batch so the
+    // cycle proceeds to debate immediately; the emit helpers own their own
+    // error handling and log OG_HIRE_STORED rows when the upload lands.
     const flatHireTask = `Analyze current market conditions for ETH. Risk profile: ${user.agent.riskProfile}. Max allocation: ${user.agent.maxTradePercent}%.`;
-    await Promise.all(
+    void Promise.all(
       specialists.map((sp) =>
         emitHireWithRichData(
           {
@@ -1110,14 +1151,7 @@ export async function analyzeCycle(user: UserRecord, userGoal?: string): Promise
     console.log(`[cycle] Flat debate complete — executor: ${JSON.stringify(debate.executor.parsed)}`);
   }
 
-  // Log debate stages (non-fatal)
-  try {
-    await logAction({ userId: user.id, actionType: "DEBATE_ALPHA", agentName: "alpha", attestationHash: debate.alpha.attestationHash, teeVerified: debate.alpha.teeVerified, payload: debate.alpha.parsed as Record<string, unknown> });
-    await logAction({ userId: user.id, actionType: "DEBATE_RISK", agentName: "risk", attestationHash: debate.risk.attestationHash, teeVerified: debate.risk.teeVerified, payload: debate.risk.parsed as Record<string, unknown> });
-    await logAction({ userId: user.id, actionType: "DEBATE_EXECUTOR", agentName: "executor", attestationHash: debate.executor.attestationHash, teeVerified: debate.executor.teeVerified, payload: debate.executor.parsed as Record<string, unknown> });
-  } catch (err) {
-    console.warn("[cycle] logAction debate failed (non-fatal):", err instanceof Error ? err.message : String(err));
-  }
+  // DEBATE_* rows are logged incrementally inside runAdversarialDebate / runRebuttalRound (adversarial.ts).
 
   // Emit a Naryo SpecialistHired event on Hedera EVM for every specialist
   // that was actually hired this cycle (both hierarchical and flat paths
@@ -1403,10 +1437,22 @@ export async function commitCycle(
             // Recompute NAV with fresh prices so the DB value the dashboard
             // reads is honest. Stablecoins are $1 by definition; non-USDC
             // tokens fall through to getTokenPrice() which hits CoinGecko.
+            // Fetch all prices in parallel — a portfolio of N tokens was
+            // previously serialized through N sequential CoinGecko roundtrips
+            // (~300ms each), so parallelism removes ~1-2s per hunt on users
+            // with 3+ holdings.
             const priceMap: Record<string, number> = { USDC: 1 };
-            for (const token of Object.keys(holdingsUpdate.newHoldings)) {
-              if (token.toUpperCase() === "USDC") continue;
-              const price = await getTokenPrice(token).catch(() => null);
+            const tokensToPrice = Object.keys(holdingsUpdate.newHoldings).filter(
+              (t) => t.toUpperCase() !== "USDC",
+            );
+            const fetchedPrices = await Promise.all(
+              tokensToPrice.map((token) =>
+                getTokenPrice(token)
+                  .catch(() => null)
+                  .then((price) => ({ token, price })),
+              ),
+            );
+            for (const { token, price } of fetchedPrices) {
               if (price && price > 0) priceMap[token.toUpperCase()] = price;
             }
             const newCurrentNav = computeCurrentNav(
@@ -1519,10 +1565,19 @@ export async function commitCycle(
               // holdings map has one fewer token (or a reduced balance), and
               // depositedUsdc has grown by the proceeds — so the honest NAV
               // is computed against these new numbers, not the pre-swap ones.
+              // Fetch all prices in parallel — see BUY branch rationale.
               const priceMap: Record<string, number> = { USDC: 1 };
-              for (const token of Object.keys(holdingsUpdate.newHoldings)) {
-                if (token.toUpperCase() === "USDC") continue;
-                const price = await getTokenPrice(token).catch(() => null);
+              const tokensToPrice = Object.keys(holdingsUpdate.newHoldings).filter(
+                (t) => t.toUpperCase() !== "USDC",
+              );
+              const fetchedPrices = await Promise.all(
+                tokensToPrice.map((token) =>
+                  getTokenPrice(token)
+                    .catch(() => null)
+                    .then((price) => ({ token, price })),
+                ),
+              );
+              for (const { token, price } of fetchedPrices) {
                 if (price && price > 0) priceMap[token.toUpperCase()] = price;
               }
               const newCurrentNav = computeCurrentNav(
@@ -1929,6 +1984,39 @@ export async function commitCycle(
     console.warn("[cycle] logAction CYCLE_COMPLETED failed (non-fatal):", err instanceof Error ? err.message : String(err));
   }
 
+  // 9. Terminal "hunt done" marker — a dedicated actionType so the dashboard
+  //    swarm ticker can render a single prominent "HUNT #N SEALED" row per
+  //    hunt. The generic CYCLE_COMPLETED row above is reused for several
+  //    sub-stages (override_applied, asset_filtered, narrative_ready,
+  //    holdings_updated) which makes the ticker noisy; HUNT_COMPLETE fires
+  //    exactly once, only after the full commit pipeline has run.
+  try {
+    await logAction({
+      userId: user.id,
+      actionType: "HUNT_COMPLETE",
+      durationMs: Date.now() - start,
+      paymentTxHash: swapResult?.success ? swapResult.txHash : undefined,
+      paymentAmount: swapResult?.success && holdingsUpdate?.usdcSpent != null
+        ? holdingsUpdate.usdcSpent.toFixed(6)
+        : undefined,
+      paymentNetwork: swapResult?.success ? "arc" : undefined,
+      payload: {
+        cycleNumber: cycleId,
+        decision: String(execParsed.action ?? "HOLD"),
+        asset: finalAsset,
+        pct: modifiedPct ?? finalPct,
+        headline: narrative.headline,
+        swapTxHash: swapResult?.txHash ?? null,
+        hashscanUrl: hashscanUrl ?? null,
+        storageHash: storageHash ?? null,
+        navAfter: user.fund.currentNav,
+        durationMs: Date.now() - start,
+      },
+    });
+  } catch (err) {
+    console.warn("[cycle] logAction HUNT_COMPLETE failed (non-fatal):", err instanceof Error ? err.message : String(err));
+  }
+
   // Compute final degraded state from tracked proofs + specialist TEE verification.
   // A cycle is "degraded" if ANY critical proof failed OR any specialist was not
   // TEE-verified (meaning its inference didn't come from a sealed 0G enclave).
@@ -1991,7 +2079,41 @@ export async function rejectCycle(
 
 // ── Backward-compat wrapper (used by heartbeat auto-mode) ────────────────────
 
+/**
+ * Per-user in-flight set. Prevents concurrent runCycle calls for the same
+ * user from racing on lastCycleId — without this, the heartbeat's auto-mode
+ * path and a manual dashboard /api/cycle/run trigger (or two dashboard clicks)
+ * could both read the same lastCycleId, compute the same cycleNumber, and
+ * commit duplicate Cycle rows. The process-level heartbeat `isRunning` guard
+ * in heartbeat.ts handles the tick-vs-tick race; THIS guard handles the
+ * tick-vs-manual-trigger race for the same user.
+ *
+ * Set scope is the Node process — sufficient for the local backend loop.
+ * Does NOT cover cross-process races (Vercel cron vs Telegram bot vs local
+ * backend against the same DB), which would need a Postgres advisory lock.
+ */
+const inFlightCycles = new Set<string>();
+
+export class CycleInProgressError extends Error {
+  constructor(userId: string) {
+    super(`A cycle is already in progress for user ${userId}`);
+    this.name = "CycleInProgressError";
+  }
+}
+
 export async function runCycle(user: UserRecord, userGoal?: string): Promise<CycleResult> {
-  const analysis = await analyzeCycle(user, userGoal);
-  return commitCycle(analysis, user);
+  if (inFlightCycles.has(user.id)) {
+    throw new CycleInProgressError(user.id);
+  }
+  inFlightCycles.add(user.id);
+  try {
+    const analysis = await analyzeCycle(user, userGoal);
+    return await commitCycle(analysis, user);
+  } finally {
+    inFlightCycles.delete(user.id);
+  }
+}
+
+export function isCycleInFlight(userId: string): boolean {
+  return inFlightCycles.has(userId);
 }

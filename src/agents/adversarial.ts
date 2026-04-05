@@ -4,6 +4,7 @@ import { getAgentUrl } from "../config/agent-registry";
 import { PROMPTS, parseDualOutput, normalizeCot, normalizeCotFull } from "./prompts";
 import { emitTurnWithRichData } from "./swarm-emit";
 import { formatLiquidityTable } from "./data/liquidity-injector";
+import { logAction } from "../store/action-logger";
 import type {
   SpecialistResult,
   DebateResult,
@@ -14,8 +15,16 @@ import type {
   CycleLiquidity,
 } from "../types/index";
 
-const DELAY_MS = 2000;
-const DELIBERATION_PAUSE_MS = parseInt(process.env.DEBATE_DELIBERATION_PAUSE_MS ?? "10000", 10);
+/**
+ * Inter-stage pause. Used to be 2s "for dramatic effect" but it stacked up —
+ * flat path has 4 delays (8s), rebuttal adds 4 more (16s total) of pure
+ * sleep per cycle. Dropped to 300ms (env-overridable via DEBATE_STAGE_DELAY_MS)
+ * so each stage still yields briefly to the event loop without blocking the
+ * user-visible cycle.
+ */
+const DELAY_MS = parseInt(process.env.DEBATE_STAGE_DELAY_MS ?? "300", 10);
+/** Post-debate pause before returning (was 10s; lower default keeps dashboard “hands” responsive). Override via env. */
+const DELIBERATION_PAUSE_MS = parseInt(process.env.DEBATE_DELIBERATION_PAUSE_MS ?? "500", 10);
 
 // If debate agents are deployed on Fly.io, call them via HTTP
 // If not (localhost), fall back to direct 0G inference
@@ -54,6 +63,28 @@ function isFailedSpecialist(s: SpecialistResult): boolean {
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Writes one agent_action row so the dashboard + swarm advance per inference, not only after full debate. */
+async function logDebateStageAudit(
+  userId: string | undefined,
+  actionType: "DEBATE_ALPHA" | "DEBATE_RISK" | "DEBATE_EXECUTOR",
+  agentName: "alpha" | "risk" | "executor",
+  stage: { parsed: Record<string, unknown>; attestationHash: string; teeVerified: boolean },
+): Promise<void> {
+  if (!userId) return;
+  try {
+    await logAction({
+      userId,
+      actionType,
+      agentName,
+      attestationHash: stage.attestationHash,
+      teeVerified: stage.teeVerified,
+      payload: stage.parsed,
+    });
+  } catch {
+    // non-fatal
+  }
 }
 
 /**
@@ -381,13 +412,21 @@ export async function runRebuttalRound(input: RebuttalRoundInput): Promise<Rebut
   recordTranscript(transcripts, "rebuttal", "main-orchestrator", "alpha", alphaRebuttalMsg, alphaNew.content, alphaNew.attestationHash, alphaNew.teeVerified, alphaDuration);
   if (cycleId != null) {
     const tNum = ++turnCounter;
-    await emitTurnWithRichData(
+    // FIRE-AND-FORGET: 0G upload is nonce-serialized in swarm-emit.ts and
+    // awaiting it blocks the debate pipeline by several seconds per turn.
+    // The emit helper owns its own error handling.
+    void emitTurnWithRichData(
       { ev: "turn", c: cycleId, t: tNum, ph: "rebuttal", from: "alpha", to: "risk", cot: normalizeCotFull((alphaNew.parsed as { cot?: unknown }).cot, alphaNew.reasoning), verdict: alphaNew.parsed, att: alphaNew.attestationHash ?? "" },
       buildRichTurnLocal(tNum, "rebuttal", "alpha", "risk", "alpha", alphaRebuttalMsg, alphaNew, alphaDuration),
     );
   } else {
     turnCounter += 1;
   }
+  await logDebateStageAudit(userId, "DEBATE_ALPHA", "alpha", {
+    parsed: alphaNew.parsed as Record<string, unknown>,
+    attestationHash: alphaNew.attestationHash,
+    teeVerified: alphaNew.teeVerified,
+  });
 
   await delay(DELAY_MS);
 
@@ -399,13 +438,21 @@ export async function runRebuttalRound(input: RebuttalRoundInput): Promise<Rebut
   recordTranscript(transcripts, "rebuttal", "main-orchestrator", "risk", riskRebuttalMsg, riskNew.content, riskNew.attestationHash, riskNew.teeVerified, riskDuration);
   if (cycleId != null) {
     const tNum = ++turnCounter;
-    await emitTurnWithRichData(
+    // FIRE-AND-FORGET: 0G upload is nonce-serialized in swarm-emit.ts and
+    // awaiting it blocks the debate pipeline by several seconds per turn.
+    // The emit helper owns its own error handling.
+    void emitTurnWithRichData(
       { ev: "turn", c: cycleId, t: tNum, ph: "rebuttal", from: "risk", to: "alpha", cot: normalizeCotFull((riskNew.parsed as { cot?: unknown }).cot, riskNew.reasoning), verdict: riskNew.parsed, att: riskNew.attestationHash ?? "" },
       buildRichTurnLocal(tNum, "rebuttal", "risk", "alpha", "risk", riskRebuttalMsg, riskNew, riskDuration),
     );
   } else {
     turnCounter += 1;
   }
+  await logDebateStageAudit(userId, "DEBATE_RISK", "risk", {
+    parsed: riskNew.parsed as Record<string, unknown>,
+    attestationHash: riskNew.attestationHash,
+    teeVerified: riskNew.teeVerified,
+  });
 
   await delay(DELAY_MS);
 
@@ -417,11 +464,19 @@ export async function runRebuttalRound(input: RebuttalRoundInput): Promise<Rebut
   recordTranscript(transcripts, "decision", "main-orchestrator", "executor", executorFinalMsg, executorNew.content, executorNew.attestationHash, executorNew.teeVerified, executorDuration);
   if (cycleId != null) {
     const tNum = ++turnCounter;
-    await emitTurnWithRichData(
+    // FIRE-AND-FORGET: 0G upload is nonce-serialized in swarm-emit.ts and
+    // awaiting it blocks the debate pipeline by several seconds per turn.
+    // The emit helper owns its own error handling.
+    void emitTurnWithRichData(
       { ev: "turn", c: cycleId, t: tNum, ph: "decision", from: "executor", cot: normalizeCotFull((executorNew.parsed as { cot?: unknown }).cot, executorNew.reasoning), verdict: executorNew.parsed, att: executorNew.attestationHash ?? "" },
       buildRichTurnLocal(tNum, "decision", "executor", undefined, "executor", executorFinalMsg, executorNew, executorDuration),
     );
   }
+  await logDebateStageAudit(userId, "DEBATE_EXECUTOR", "executor", {
+    parsed: executorNew.parsed as Record<string, unknown>,
+    attestationHash: executorNew.attestationHash,
+    teeVerified: executorNew.teeVerified,
+  });
 
   return {
     alpha: {
@@ -529,7 +584,10 @@ export async function runAdversarialDebate(
   recordTranscript(transcripts, "opening", "main-orchestrator", "alpha", alphaMsg, alpha.content, alpha.attestationHash, alpha.teeVerified, alphaDuration);
   if (cycleId != null) {
     const tNum = ++turnCounter;
-    await emitTurnWithRichData(
+    // FIRE-AND-FORGET: 0G upload is nonce-serialized in swarm-emit.ts and
+    // awaiting it blocks the debate pipeline by several seconds per turn.
+    // The emit helper owns its own error handling.
+    void emitTurnWithRichData(
       {
         ev: "turn",
         c: cycleId,
@@ -543,6 +601,11 @@ export async function runAdversarialDebate(
       buildRichTurn(tNum, "opening", "alpha", undefined, "alpha", alphaMsg, alpha, alphaDuration),
     );
   }
+  await logDebateStageAudit(userId, "DEBATE_ALPHA", "alpha", {
+    parsed: alpha.parsed as Record<string, unknown>,
+    attestationHash: alpha.attestationHash,
+    teeVerified: alpha.teeVerified,
+  });
 
   await delay(DELAY_MS);
 
@@ -555,7 +618,10 @@ export async function runAdversarialDebate(
   recordTranscript(transcripts, "opening", "main-orchestrator", "risk", riskMsg, risk.content, risk.attestationHash, risk.teeVerified, riskDuration);
   if (cycleId != null) {
     const tNum = ++turnCounter;
-    await emitTurnWithRichData(
+    // FIRE-AND-FORGET: 0G upload is nonce-serialized in swarm-emit.ts and
+    // awaiting it blocks the debate pipeline by several seconds per turn.
+    // The emit helper owns its own error handling.
+    void emitTurnWithRichData(
       {
         ev: "turn",
         c: cycleId,
@@ -570,6 +636,11 @@ export async function runAdversarialDebate(
       buildRichTurn(tNum, "opening", "risk", "alpha", "risk", riskMsg, risk, riskDuration),
     );
   }
+  await logDebateStageAudit(userId, "DEBATE_RISK", "risk", {
+    parsed: risk.parsed as Record<string, unknown>,
+    attestationHash: risk.attestationHash,
+    teeVerified: risk.teeVerified,
+  });
 
   await delay(DELAY_MS);
 
@@ -582,7 +653,10 @@ export async function runAdversarialDebate(
   recordTranscript(transcripts, "decision", "main-orchestrator", "executor", executorMsg, executor.content, executor.attestationHash, executor.teeVerified, executorDuration);
   if (cycleId != null) {
     const tNum = ++turnCounter;
-    await emitTurnWithRichData(
+    // FIRE-AND-FORGET: 0G upload is nonce-serialized in swarm-emit.ts and
+    // awaiting it blocks the debate pipeline by several seconds per turn.
+    // The emit helper owns its own error handling.
+    void emitTurnWithRichData(
       {
         ev: "turn",
         c: cycleId,
@@ -596,6 +670,11 @@ export async function runAdversarialDebate(
       buildRichTurn(tNum, "decision", "executor", undefined, "executor", executorMsg, executor, executorDuration),
     );
   }
+  await logDebateStageAudit(userId, "DEBATE_EXECUTOR", "executor", {
+    parsed: executor.parsed as Record<string, unknown>,
+    attestationHash: executor.attestationHash,
+    teeVerified: executor.teeVerified,
+  });
 
   // ── Round 2: Rebuttal if confidence is low ────────────────────
   const rawConf = (executor.parsed as { confidence?: unknown }).confidence;
@@ -614,7 +693,10 @@ export async function runAdversarialDebate(
     recordTranscript(transcripts, "rebuttal", "main-orchestrator", "alpha", alphaRebuttalMsg, alpha.content, alpha.attestationHash, alpha.teeVerified, alphaDuration);
     if (cycleId != null) {
       const tNum = ++turnCounter;
-      await emitTurnWithRichData(
+      // FIRE-AND-FORGET: 0G upload is nonce-serialized in swarm-emit.ts and
+    // awaiting it blocks the debate pipeline by several seconds per turn.
+    // The emit helper owns its own error handling.
+    void emitTurnWithRichData(
         {
           ev: "turn",
           c: cycleId,
@@ -629,6 +711,11 @@ export async function runAdversarialDebate(
         buildRichTurn(tNum, "rebuttal", "alpha", "risk", "alpha", alphaRebuttalMsg, alpha, alphaDuration),
       );
     }
+    await logDebateStageAudit(userId, "DEBATE_ALPHA", "alpha", {
+      parsed: alpha.parsed as Record<string, unknown>,
+      attestationHash: alpha.attestationHash,
+      teeVerified: alpha.teeVerified,
+    });
 
     await delay(DELAY_MS);
 
@@ -639,7 +726,10 @@ export async function runAdversarialDebate(
     recordTranscript(transcripts, "rebuttal", "main-orchestrator", "risk", riskRebuttalMsg, risk.content, risk.attestationHash, risk.teeVerified, riskDuration);
     if (cycleId != null) {
       const tNum = ++turnCounter;
-      await emitTurnWithRichData(
+      // FIRE-AND-FORGET: 0G upload is nonce-serialized in swarm-emit.ts and
+    // awaiting it blocks the debate pipeline by several seconds per turn.
+    // The emit helper owns its own error handling.
+    void emitTurnWithRichData(
         {
           ev: "turn",
           c: cycleId,
@@ -654,6 +744,11 @@ export async function runAdversarialDebate(
         buildRichTurn(tNum, "rebuttal", "risk", "alpha", "risk", riskRebuttalMsg, risk, riskDuration),
       );
     }
+    await logDebateStageAudit(userId, "DEBATE_RISK", "risk", {
+      parsed: risk.parsed as Record<string, unknown>,
+      attestationHash: risk.attestationHash,
+      teeVerified: risk.teeVerified,
+    });
 
     await delay(DELAY_MS);
 
@@ -664,7 +759,10 @@ export async function runAdversarialDebate(
     recordTranscript(transcripts, "decision", "main-orchestrator", "executor", executorFinalMsg, executor.content, executor.attestationHash, executor.teeVerified, executorDuration);
     if (cycleId != null) {
       const tNum = ++turnCounter;
-      await emitTurnWithRichData(
+      // FIRE-AND-FORGET: 0G upload is nonce-serialized in swarm-emit.ts and
+    // awaiting it blocks the debate pipeline by several seconds per turn.
+    // The emit helper owns its own error handling.
+    void emitTurnWithRichData(
         {
           ev: "turn",
           c: cycleId,
@@ -678,6 +776,11 @@ export async function runAdversarialDebate(
         buildRichTurn(tNum, "decision", "executor", undefined, "executor", executorFinalMsg, executor, executorDuration),
       );
     }
+    await logDebateStageAudit(userId, "DEBATE_EXECUTOR", "executor", {
+      parsed: executor.parsed as Record<string, unknown>,
+      attestationHash: executor.attestationHash,
+      teeVerified: executor.teeVerified,
+    });
   }
 
   // Deliberation pause

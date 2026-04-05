@@ -14,9 +14,18 @@ type ActionType =
   | "DEBATE_EXECUTOR"
   | "HCS_LOGGED"
   | "STORAGE_UPLOADED"
+  | "OG_HIRE_STORED"
+  | "OG_TURN_STORED"
   | "INFT_UPDATED"
   | "TELEGRAM_NOTIFIED"
   | "CYCLE_COMPLETED"
+  /** Terminal "hunt done for the user" marker — logged once at the very end
+   *  of commitCycle so the dashboard ticker can render a single prominent
+   *  "HUNT #N SEALED: BUY 10% WETH" row. Unlike CYCLE_COMPLETED (which is
+   *  reused as a generic audit carrier for override/asset-filter/narrative/
+   *  holdings sub-events), HUNT_COMPLETE appears exactly once per hunt and
+   *  its presence proves the full commit pipeline finished. */
+  | "HUNT_COMPLETE"
   | "PENDING_APPROVAL"
   | "CYCLE_APPROVED"
   | "CYCLE_REJECTED"
