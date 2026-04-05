@@ -99,6 +99,16 @@ export default function ComputePage() {
         .join("\n")
     : "No specialist data available.";
 
+  // RAG proof — prior-cycle CIDs loaded from 0G Storage at this cycle's start
+  // and fed into the specialist + debate prompts. Persisted into the narrative
+  // JSONB column on cycle commit (see src/agents/main-agent.ts). Narrow the
+  // unknown narrative shape defensively so pre-RAG cycles render without error.
+  const priorCids: string[] = (() => {
+    const n = c.narrative as { priorCids?: unknown } | null | undefined;
+    if (!n || !Array.isArray(n.priorCids)) return [];
+    return n.priorCids.filter((x): x is string => typeof x === "string" && x.length > 0);
+  })();
+
   return (
     <main className="max-w-7xl mx-auto px-5 py-5 space-y-4">
       {/* Header */}
@@ -154,6 +164,40 @@ export default function ComputePage() {
           </a>
         )}
       </div>
+
+      {/* Memory Recall — RAG proof for the OpenClaw "evolving memory / RAG" bounty.
+           Lists the 0G Storage CIDs of the prior cycles that were loaded as context
+           at this cycle's start and injected into the specialist + debate prompts. */}
+      {priorCids.length > 0 && (
+        <div className="rounded-2xl border border-gold-400/25 bg-gold-400/[0.03] p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gold-400 uppercase tracking-wider font-semibold">
+              🧠 Memory Recall — {priorCids.length} prior {priorCids.length === 1 ? "cycle" : "cycles"} loaded from 0G Storage
+            </p>
+            <Badge variant="purple">RAG</Badge>
+          </div>
+          <div className="space-y-1">
+            {priorCids.map((cid, i) => (
+              <button
+                key={cid}
+                type="button"
+                onClick={() => navigator.clipboard.writeText(cid).catch(() => {})}
+                className="flex items-center gap-2 text-xs font-mono text-gold-400/80 hover:text-gold-400 transition-colors"
+                title={`Click to copy: ${cid}`}
+              >
+                <span className="text-void-600">{i + 1}.</span>
+                <span className="break-all">{cid.slice(0, 18)}…{cid.slice(-6)}</span>
+                <span className="text-void-600 text-[10px]">📋</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-void-500 mt-2 leading-relaxed">
+            Each CID points at the RichCycleRecord of a prior hunt. 0G Storage is
+            used as evolving agent memory — the 7B specialists + Alpha/Risk/Executor
+            agents read these prior cycles as RAG context before making this decision.
+          </p>
+        </div>
+      )}
 
       {/* 2x2 Agent Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

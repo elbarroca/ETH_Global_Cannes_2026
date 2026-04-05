@@ -49,6 +49,18 @@ const ACTION_STYLES: Record<string, ActionStyle> = {
   AGENT_HIRED:      { label: "PACK+",    tone: "dawg" },
   AGENT_FIRED:      { label: "PACK−",    tone: "void" },
   AGENT_RATED:      { label: "RATE",     tone: "purple" },
+  // Naryo multichain event listener — one label per AuditLog event type.
+  // Rows with these action types are written by src/naryo/event-handler.ts
+  // when Naryo pushes a matched event via the /api/naryo/events/[source] POST.
+  NARYO_HCS_EVENT:         { label: "NARYO·HCS",    tone: "teal" },
+  NARYO_HTS_EVENT:         { label: "NARYO·HTS",    tone: "teal" },
+  NARYO_CYCLE_EVENT:       { label: "NARYO·CYCLE",  tone: "teal" },
+  NARYO_DEPOSIT_EVENT:     { label: "NARYO·DEP",    tone: "teal" },
+  NARYO_OG_EVENT:          { label: "NARYO·0G",     tone: "purple" },
+  NARYO_SPECIALIST_EVENT:  { label: "NARYO·HIRE",   tone: "dawg" },
+  NARYO_HEARTBEAT_EVENT:   { label: "NARYO·BEAT",   tone: "green" },
+  NARYO_CROSS_CHAIN_EVENT: { label: "NARYO·X-DLT",  tone: "purple" },
+  NARYO_CORRELATION:       { label: "NARYO·LINK",   tone: "purple" },
 };
 
 const DEFAULT_STYLE: ActionStyle = { label: "EVENT", tone: "void" };
@@ -223,6 +235,29 @@ function describe(row: SwarmActivityRow): string {
       return agent
         ? `${agent} removed from the pack`
         : "Specialist removed from the pack";
+    // ── Naryo multichain event listener rows ─────────────────────────
+    // Each event arrives at /api/naryo/events/[source] and is logged as an
+    // agent_action with a NARYO_*_EVENT type. Payload carries the source
+    // (hcs/hts/cycle/deposit/specialist/heartbeat/cross-chain/og-mint/
+    // og-metadata) and the underlying chain (hedera / 0g-chain).
+    case "NARYO_HCS_EVENT":
+      return "Naryo captured a Hedera HCS message on the audit topic";
+    case "NARYO_HTS_EVENT":
+      return "Naryo captured an HTS fund token transfer on Hedera";
+    case "NARYO_CYCLE_EVENT":
+      return "Naryo captured CycleCompleted emitted on Hedera EVM";
+    case "NARYO_DEPOSIT_EVENT":
+      return "Naryo captured DepositRecorded emitted on Hedera EVM";
+    case "NARYO_SPECIALIST_EVENT":
+      return "Naryo captured SpecialistHired — x402 payment proven on Hedera EVM";
+    case "NARYO_HEARTBEAT_EVENT":
+      return "Naryo captured HeartbeatEmitted — cadence proof on Hedera EVM";
+    case "NARYO_CROSS_CHAIN_EVENT":
+      return "Naryo captured CrossChainCorrelation — Arc swap bridged to Hedera EVM";
+    case "NARYO_OG_EVENT":
+      return "Naryo captured an iNFT metadata update on 0G Chain";
+    case "NARYO_CORRELATION":
+      return "Naryo linked events across Hedera + 0G into one story";
     default:
       return agent ? `${agent} event` : "Swarm event";
   }

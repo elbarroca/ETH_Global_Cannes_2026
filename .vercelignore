@@ -1,10 +1,9 @@
 # Backend-only code — NOT reachable from app/** on Vercel.
-# These files run via `npm run backend` (local/Fly), never in a Next.js function.
-# Next.js automatic tracing handles src/** files that ARE imported by app/**.
+# Long-running / port-binding services stay excluded. Anything imported by
+# `app/api/**` (Telegram webhook, cron heartbeat) must NOT be listed here or
+# the build fails with "Can't resolve".
 
 # Long-running / port-binding backend services
-src/telegram/
-src/agents/heartbeat.ts
 src/agents/specialist-server.ts
 src/index.ts
 src/api/
