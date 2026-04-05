@@ -319,6 +319,45 @@ export async function triggerCycle(userId: string, goal?: string): Promise<Cycle
   });
 }
 
+// ── In-progress cycle (live state from agent_actions) ────────
+
+export interface InProgressCycleResponse {
+  cycleNumber: number;
+  startedAt: string;
+  phase: "hiring" | "debating" | "sealing" | "committing" | "awaiting_approval";
+  elapsedMs: number;
+  specialists: Array<{
+    name: string;
+    signal: string | null;
+    confidence: number | null;
+    hiredBy: string | null;
+    hiredAt: string;
+  }>;
+  flags: {
+    hasAlpha: boolean;
+    hasRisk: boolean;
+    hasExecutor: boolean;
+    hasStorage: boolean;
+    hasHcs: boolean;
+  };
+}
+
+/**
+ * Fetch the currently-running cycle for a user (derived from agent_actions,
+ * not the `cycles` table). Returns null when no cycle is in flight. Used by
+ * the dashboard + history pages to show a live "HUNT #N running..." banner
+ * between committed cycles — without this, the UI looks frozen for 6 minutes
+ * while the backend is actually very busy.
+ */
+export async function getInProgressCycle(
+  userId: string,
+): Promise<InProgressCycleResponse | null> {
+  return apiFetch<InProgressCycleResponse | null>(
+    `/api/cycle/in-progress/${userId}`,
+    { cache: "no-store" },
+  ).catch(() => null);
+}
+
 // ── Pending cycle (two-phase approval flow) ──────────────────
 
 export interface PendingCycleResponse {

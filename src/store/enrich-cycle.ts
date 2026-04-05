@@ -81,16 +81,44 @@ interface StoredSpecialist {
   picks?: TokenPick[] | null;
 }
 
-export async function enrichCycleRow(cycle: Cycle): Promise<EnrichedCycleResponse> {
+/** Preloaded lookups for batch enrichment — lets /history amortize the
+ *  per-cycle agent_actions + user reads across N rows instead of 2×N queries. */
+export interface EnrichmentContext {
+  /** Map from cycleId (UUID) → SPECIALIST_HIRED rows for that cycle. */
+  actionsByCycle: Map<string, Array<{
+    agentName: string | null;
+    paymentTxHash: string | null;
+    attestationHash: string | null;
+    payload: unknown;
+  }>>;
+  /** Current user holdings (shared across all cycles for the same user). */
+  holdings: Record<string, number>;
+}
+
+export async function enrichCycleRow(
+  cycle: Cycle,
+  ctx?: EnrichmentContext,
+): Promise<EnrichedCycleResponse> {
   const prisma = getPrisma();
 
   // Fetch the SPECIALIST_HIRED audit actions for canonical hiredBy attribution.
   // These rows are written at the same moment hierarchical hiring completes,
   // so they always beat the Prisma cycle row. We key on cycleId (UUID).
-  const actions = await prisma.agentAction.findMany({
-    where: { cycleId: cycle.id, actionType: "SPECIALIST_HIRED" },
-    orderBy: { createdAt: "asc" },
-  });
+  //
+  // When a caller provides a preloaded EnrichmentContext (e.g. /history
+  // fetching 20 cycles), we skip this per-row query entirely.
+  const actions = ctx
+    ? ctx.actionsByCycle.get(cycle.id) ?? []
+    : await prisma.agentAction.findMany({
+        where: { cycleId: cycle.id, actionType: "SPECIALIST_HIRED" },
+        orderBy: { createdAt: "asc" },
+        select: {
+          agentName: true,
+          paymentTxHash: true,
+          attestationHash: true,
+          payload: true,
+        },
+      });
 
   const hiredByIndex = new Map<string, { hiredBy: string; paymentTxHash: string; attestationHash: string }>();
   for (const a of actions) {
@@ -144,12 +172,20 @@ export async function enrichCycleRow(cycle: Cycle): Promise<EnrichedCycleRespons
   // Holdings come from the user record's JSONB `fund.holdings` sub-field,
   // updated atomically after each successful swap (see main-agent.ts step 1c).
   // A user who never traded has no `holdings` key → empty object.
-  const user = await prisma.user.findUnique({
-    where: { id: cycle.userId },
-    select: { fund: true },
-  });
-  const holdings =
-    ((user?.fund ?? {}) as { holdings?: Record<string, number> }).holdings ?? {};
+  //
+  // Preloaded holdings from EnrichmentContext avoid N identical user reads
+  // when enriching a history page full of cycles from the same user.
+  let holdings: Record<string, number>;
+  if (ctx) {
+    holdings = ctx.holdings;
+  } else {
+    const user = await prisma.user.findUnique({
+      where: { id: cycle.userId },
+      select: { fund: true },
+    });
+    holdings =
+      ((user?.fund ?? {}) as { holdings?: Record<string, number> }).holdings ?? {};
+  }
 
   // Narrative is cached as a JSON column — written by commitCycle's
   // logCycleRecord call. Legacy cycles (pre-narrative) will have null here.

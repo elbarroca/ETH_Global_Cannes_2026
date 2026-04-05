@@ -142,6 +142,12 @@ export default function DashboardPage() {
   // triggered from non-dashboard surfaces (Telegram /run, auto-heartbeat) show
   // up without requiring a page refresh. Pauses while the tab is hidden to
   // reduce DB load; catches up immediately on visibilitychange → visible.
+  //
+  // Limit is kept deliberately small (5) because each enriched cycle row
+  // carries the full narrative + payments + specialist picks JSON — loading
+  // 15 rows every 6s was ~3× the payload judges actually look at. The
+  // /history page still serves the full archive for users who want deeper
+  // context.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
@@ -149,7 +155,7 @@ export default function DashboardPage() {
     const poll = async () => {
       try {
         const [history, pending] = await Promise.all([
-          getCycleHistory(userId, 15, 0),
+          getCycleHistory(userId, 5, 0),
           getPendingCycle(userId),
         ]);
         if (cancelled) return;
@@ -250,7 +256,7 @@ export default function DashboardPage() {
       const committed = mapCycleResultToCycle(result);
       setHunts((prev) => {
         const deduped = prev.filter((h) => h.id !== committed.id);
-        return [committed, ...deduped].slice(0, 15);
+        return [committed, ...deduped].slice(0, 5);
       });
       setPendingCycle(null);
     } catch (err) {

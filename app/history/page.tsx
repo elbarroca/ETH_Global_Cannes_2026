@@ -9,7 +9,11 @@ import { useUser } from "@/contexts/user-context";
 
 export default function HistoryPage() {
   const { userId } = useUser();
-  const { history, loading, hasMore, loadMore } = useCycleHistory(20);
+  // Smaller page size so the first paint lands quickly; users can still
+  // "Load more" for deeper history. Each enriched row is heavy (narrative +
+  // payments + specialist picks + debate reasoning), so 8/page keeps the
+  // initial payload in a reasonable range on slow networks.
+  const { history, loading, hasMore, loadMore } = useCycleHistory(8);
 
   const cycles = history.map((record) => mapEnrichedResponseToCycle(record));
 
@@ -61,8 +65,13 @@ export default function HistoryPage() {
         </div>
       )}
 
-      {/* Load more */}
-      {hasMore && (
+      {/* Load more — only rendered after the initial page has landed.
+          Previously the double-spinner scenario ("Loading hunt history…" AND
+          "Loading more…" stacked) happened because hasMore defaulted to true
+          and the same `loading` flag drove both indicators during first
+          fetch. Guard on cycles.length > 0 so the load-more affordance only
+          appears once there's something to append to. */}
+      {hasMore && cycles.length > 0 && (
         loading ? (
           <div className="flex w-full justify-center py-3">
             <DawgSpinner size={32} label="Loading more…" />
