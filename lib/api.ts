@@ -55,6 +55,9 @@ export interface UserRecord {
     cycleCount?: number;
     cyclePeriodMs?: number;
     cyclesRemaining?: number;
+    /** Persistent per-user hunt goal (max 280 chars). Empty string = unset —
+     *  the cycle-analyze fallback will use the risk-profile template. */
+    goal?: string;
   };
   fund: {
     depositedUsdc: number;
@@ -261,6 +264,8 @@ export async function configure(
     approvalMode?: string;
     cycleCount?: number;
     cyclePeriodMs?: number;
+    /** Persistent hunt goal. Max 280 chars. Empty string clears it. */
+    goal?: string;
   }
 ): Promise<UserRecord> {
   return apiFetch("/api/configure", {
