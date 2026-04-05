@@ -16,21 +16,73 @@ const DEFAULT_PERIOD_MS = 5 * 60 * 1000; // 5 minutes default
 const NARYO_HEARTBEAT_EVERY_TICKS = 6;
 let heartbeatTickCount = 0;
 
-export async function runHeartbeat(): Promise<void> {
+export interface HeartbeatOptions {
+  /**
+   * Soft time budget in milliseconds. When set, the heartbeat checks the
+   * deadline BEFORE starting each user's cycle work and short-circuits if
+   * exceeded. Used by the Vercel cron route to fit within the 60s Hobby
+   * function cap. Unset = no budget (local `npm run backend` behavior).
+   *
+   * A cycle that has already started will NOT be interrupted — the budget
+   * only guards the decision to begin the NEXT user's cycle.
+   */
+  budgetMs?: number;
+}
+
+export interface HeartbeatResult {
+  totalUsers: number;
+  processed: number;
+  skippedBudget: number;
+  skippedTiming: number;
+  durationMs: number;
+  budgetExceeded: boolean;
+}
+
+export async function runHeartbeat(
+  opts: HeartbeatOptions = {},
+): Promise<HeartbeatResult> {
+  const started = Date.now();
+  const deadline = opts.budgetMs != null ? started + opts.budgetMs : Infinity;
+  const result: HeartbeatResult = {
+    totalUsers: 0,
+    processed: 0,
+    skippedBudget: 0,
+    skippedTiming: 0,
+    durationMs: 0,
+    budgetExceeded: false,
+  };
+
   const users = await getActiveUsers();
+  result.totalUsers = users.length;
   if (users.length === 0) {
     console.log("[heartbeat] No active users — skipping");
-    return;
+    result.durationMs = Date.now() - started;
+    return result;
   }
 
-  console.log(`[heartbeat] Processing ${users.length} active user(s)...`);
+  console.log(
+    `[heartbeat] Processing ${users.length} active user(s)${
+      opts.budgetMs != null ? ` (budget ${opts.budgetMs}ms)` : ""
+    }...`,
+  );
 
   for (const user of users) {
+    // Budget guard — skip remaining users if we're out of time. The in-flight
+    // cycle (if any) has already completed by this point because we await it
+    // sequentially; the deadline only gates the START of new work.
+    if (Date.now() >= deadline) {
+      result.budgetExceeded = true;
+      result.skippedBudget += 1;
+      console.warn(`[heartbeat] Budget exceeded — skipping user ${user.id}`);
+      continue;
+    }
+
     try {
       // Per-user timing: skip if not enough time has elapsed
       const periodMs = user.agent.cyclePeriodMs ?? DEFAULT_PERIOD_MS;
       const lastAt = user.agent.lastCycleAt ? new Date(user.agent.lastCycleAt).getTime() : 0;
       if (lastAt > 0 && Date.now() - lastAt < periodMs) {
+        result.skippedTiming += 1;
         continue; // Not time yet for this user
       }
 
@@ -44,9 +96,10 @@ export async function runHeartbeat(): Promise<void> {
 
       if (approvalMode === "auto") {
         // Existing behavior — full cycle, no pause
-        const result = await runCycle(user);
-        notifyUser(user, result);
+        const cycleResult = await runCycle(user);
+        notifyUser(user, cycleResult);
         await decrementCyclesRemaining(user.id);
+        result.processed += 1;
         continue;
       }
 
@@ -79,11 +132,13 @@ export async function runHeartbeat(): Promise<void> {
         }
 
         console.log(`[heartbeat] Pending approval for user ${user.id}: ${pending.id}`);
+        result.processed += 1;
       } else {
         // Auto-approve (HOLD in trades_only mode)
-        const result = await commitCycle(analysis, user);
-        notifyUser(user, result);
+        const cycleResult = await commitCycle(analysis, user);
+        notifyUser(user, cycleResult);
         await decrementCyclesRemaining(user.id);
+        result.processed += 1;
       }
     } catch (err) {
       console.error(`[heartbeat] Cycle failed for user ${user.id}:`, err);
@@ -127,7 +182,11 @@ export async function runHeartbeat(): Promise<void> {
     console.warn("[heartbeat] pick evaluator tick failed (non-fatal):", err instanceof Error ? err.message : String(err));
   });
 
-  console.log("[heartbeat] Done.");
+  result.durationMs = Date.now() - started;
+  console.log(
+    `[heartbeat] Done in ${result.durationMs}ms (processed=${result.processed}, skippedBudget=${result.skippedBudget}, skippedTiming=${result.skippedTiming})`,
+  );
+  return result;
 }
 
 async function decrementCyclesRemaining(userId: string): Promise<void> {

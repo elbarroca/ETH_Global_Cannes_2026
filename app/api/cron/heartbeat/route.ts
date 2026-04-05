@@ -56,10 +56,23 @@ function isAuthorized(request: NextRequest): boolean {
   return false;
 }
 
+// Soft budget passed to runHeartbeat() so it skips starting new user cycles
+// when the deadline is near. Leaves ~8s of headroom under Vercel Hobby's 60s
+// function cap for checkExpiredPendingCycles + response serialization + the
+// in-flight cycle to finish committing.
+const HEARTBEAT_BUDGET_MS = 50_000;
+
 interface CronResult {
   ok: boolean;
   durationMs: number;
-  heartbeat: { ok: boolean; error?: string };
+  heartbeat: {
+    ok: boolean;
+    error?: string;
+    processed?: number;
+    skippedBudget?: number;
+    skippedTiming?: number;
+    budgetExceeded?: boolean;
+  };
   timeoutCheck: { ok: boolean; error?: string };
 }
 
@@ -72,7 +85,9 @@ async function runCron(): Promise<CronResult> {
     timeoutCheck: { ok: true },
   };
 
-  // 1. Resolve any expired pending cycles first — always fast, always do it.
+  // 1. Resolve any expired pending cycles first — fast (<1s), always runs.
+  //    Critical for the Telegram approval flow: without this, pending cycles
+  //    never time out and users stay stuck on "waiting for approval".
   try {
     await checkExpiredPendingCycles();
   } catch (err) {
@@ -81,10 +96,19 @@ async function runCron(): Promise<CronResult> {
     result.ok = false;
   }
 
-  // 2. Run a heartbeat tick. Per-user timing inside runHeartbeat() ensures
-  //    we only actually run cycles for users whose cyclePeriodMs has elapsed.
+  // 2. Run a heartbeat tick with a time budget so we don't get killed by
+  //    Vercel's 60s function cap. runHeartbeat processes as many users as
+  //    fit in the budget; the next tick picks up where we left off (per-user
+  //    lastCycleAt guards already prevent double-runs).
   try {
-    await runHeartbeat();
+    const hb = await runHeartbeat({ budgetMs: HEARTBEAT_BUDGET_MS });
+    result.heartbeat = {
+      ok: true,
+      processed: hb.processed,
+      skippedBudget: hb.skippedBudget,
+      skippedTiming: hb.skippedTiming,
+      budgetExceeded: hb.budgetExceeded,
+    };
   } catch (err) {
     console.error("[cron] heartbeat failed:", err);
     result.heartbeat = { ok: false, error: err instanceof Error ? err.message : String(err) };
