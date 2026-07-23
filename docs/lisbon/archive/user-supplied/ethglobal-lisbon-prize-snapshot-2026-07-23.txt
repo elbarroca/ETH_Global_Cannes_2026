@@ -1,0 +1,995 @@
+Events
+ETHConf New
+Plus
+Packs
+Showcase
+Faucet
+Swag
+About
+
+Open user menu
+Avatar
+ETHGlobal Lisbon 2026 logo
+ETHGlobal Lisbon 2026
+Overview
+Dashboard
+Project
+Team
+Mentors
+Info
+FAQ
+8 Prizes
+1inch logo
+1inch
+
+$7,000
+
+The Graph logo
+The Graph
+
+$15,000
+
+World logo
+World
+
+$15,000
+
+Hedera logo
+Hedera
+
+$15,000
+
+0G logo
+0G
+
+$15,000
+
+Uniswap logo
+Uniswap Foundation
+
+$10,000
+
+Sui logo
+Sui
+
+$6,000
+
+ENS logo
+ENS
+
+$5,000
+
+1inch logo
+1inch
+$7,000
+
+1inch.com
+1inch
+Open page →
+About
+1inch is a network of decentralized protocols that focus on unifying DeFi liquidity. Most known for our DEX aggregator launched in 2019, we have continued to improve and ship protocol, maintaining our position as one of the premiere players in the token swapping space.
+
+Our most recent release, Aqua, reimagines how DEXes are designed and is a perfect candidate for creative hackathon teams.
+
+Prizes
+💧 Build an Aqua App ⸺ $5,000
+🥇
+1st place
+$2,500
+🥈
+2nd place
+$1,500
+🥉
+3rd place
+$1,000
+Create a custom Aqua app that implements a sophisticated DeFi position. If you use SwapVM, you may modify SwapVM opcodes and define your own instructions. The final positions must be demonstrated through tests scripts or UI.
+
+Projects that utilize SwapVM will be scored higher during the final judging.
+
+Qualification Requirements
+Official Aqua/SwapVM contracts must be used (redeployments of a modified SwapVM contract is allowed)
+Onchain execution of token transfers should be presented during the final demo (local forks are ok)
+Proper Git commit history (no single-commit entries on the final day)
+Links and Resources
+The Art of AMM - Workshop by Anton Bukov
+https://www.youtube.com/watch?v=bdhba23BEzg
+↗
+Aqua Whitepaper
+https://github.com/1inch/aqua/blob/main/docs/whitepaper-aqua-1.0.pdf
+↗
+Aqua Smart Contracts
+https://github.com/1inch/aqua
+↗
+Aqua SDK
+https://github.com/1inch/sdks/tree/master/typescript/aqua
+↗
+SwapVM Whitepaper
+https://github.com/1inch/swap-vm/blob/release/1.1/docs/whitepaper-swap-vm-1.0.pdf
+↗
+SwapVM Contracts
+https://github.com/1inch/aqua/tree/main/docs
+↗
+SwapVM Template
+https://github.com/1inch/swap-vm-template
+↗
+💧 Build an Aqua App - Continuity Track ⸺ $2,000
+🆕  This prize is only available to Continuity Track participants →
+🥇
+1st place
+$1,500
+🥈
+2nd place
+$500
+Create a custom Aqua app that implements a sophisticated DeFi position. If you use SwapVM, you may modify SwapVM opcodes and define your own instructions. The final positions must be demonstrated through tests scripts or UI.
+
+Projects that utilize SwapVM will be scored higher during the final judging.
+
+Qualification Requirements
+Official Aqua/SwapVM contracts must be used (redeployments of a modified SwapVM contract is allowed)
+Onchain execution of token transfers should be presented during the final demo (local forks are ok)
+Proper Git commit history (no single-commit entries on the final day)
+Links and Resources
+The Art of AMM - Workshop by Anton Bukov
+https://www.youtube.com/watch?v=bdhba23BEzg
+↗
+Aqua Whitepaper
+https://github.com/1inch/aqua/blob/main/docs/whitepaper-aqua-1.0.pdf
+↗
+Aqua Smart Contracts
+https://github.com/1inch/aqua
+↗
+Aqua SDK
+https://github.com/1inch/sdks/tree/master/typescript/aqua
+↗
+SwapVM Whitepaper
+https://github.com/1inch/swap-vm/blob/release/1.1/docs/whitepaper-swap-vm-1.0.pdf
+↗
+SwapVM Contracts
+https://github.com/1inch/aqua/tree/main/docs
+↗
+SwapVM Template
+https://github.com/1inch/swap-vm-template
+↗
+Resources
+SwapVM Whitepaper
+https://github.com/1inch/swap-vm/blob/release/1.1/docs/whitepaper-swap-vm-1.0.pdf
+↗
+Aqua Whitepaper
+https://github.com/1inch/aqua/blob/main/docs/whitepaper-aqua-1.0.pdf
+↗
+Workshop
+🛠️ Reimagining the AMM with 1inch Aqua
+Explore how 1inch Aqua rethinks liquidity by letting one self-custodial balance support multiple on-chain strategie...
+
+This workshop is happening in-person
+05:30 PM WEST — Friday, Jul 24, 2026 in Workshop Room
+
+Jobs
+
+Software Engineer Blockchain / Web3
+1inch
+→
+The Graph logo
+The Graph
+$15,000
+
+thegraph.com
+graphprotocol
+Open page →
+About
+The Graph is the indexing and query layer of web3, giving developers and AI agents structured, real-time access to blockchain data across 50+ networks. Build with Subgraphs, Substreams, the Subgraph MCP, and more.
+
+At EthGlobal Lisbon, The Graph is awarding $15,000 across three tracks.
+
+In the AI Tooling track, prizes are $3,000 (1st), $2,000 (2nd), and $2,000 (3rd).
+In the other two tracks on Best AI Use Case and Best Use of Composable/Standardized Graph Data Products, prizes are $2,500 (1st), $1,500 (2nd), and $1,000 (3rd).
+Prizes
+🏆 Best AI Tooling for The Graph ⸺ $7,000
+🥇
+1st place
+$3,000
+🥈
+2nd place
+$2,000
+🥉
+3rd place
+$2,000
+Build a tool that makes The Graph easier to use from AI environments like Claude, Cursor, and ChatGPT. Think reusable infrastructure, not a single app: new or extended MCP servers, agent SKILLs, x402 payment tooling, A2A integrations, framework plugins, or one-click client configs. Featured challenge from the Substreams team: use the Substreams SKILLs to deliver the best one-prompt deployment, going from a single natural-language prompt to a working, deployed Substreams pipeline.
+
+Examples:
+
+A one-prompt Substreams deployment flow using the Substreams SKILLs
+A cross-protocol MCP that fans one query across every protocol on a shared standard schema
+A layered MCP that unifies several Standardized Subgraph schemas behind one agent interface
+A reusable agent SKILL that stands up a new cross-protocol MCP in minutes
+A project built on Nuthatch, extending its MCP tools, adding new SKILLs, or wiring its output into an agent workflow.
+New integrations with web3 protocols (e.g. a SKILL/MCP integrated with Chainlink's AI tooling)
+A SKILL paired with the Subgraph MCP that turns multi-Subgraph queries into market research or blog posts
+Judging criteria: Usefulness to other builders (30%) · Reusability & completeness (25%) · Effective use of The Graph (20%) · Technical execution (15%) · Innovation (10%)
+
+Qualification Requirements
+Submit reusable tooling or infrastructure (MCP server, SKILL, plugin, client config, or payment tooling), not a single end-user app.
+The tooling must work against live blockchain data, whether from a Graph provider (for example Subgraph Studio for Subgraphs or The Graph Market for Substreams) or a self-hosted indexer such as Nuthatch. Purely mocked or static datasets do not qualify.
+Open-source the code with a clear README or SKILL.md.
+Extending or improving an existing tool is welcome if clearly additive.
+Submit a public repository and a 2–4 minute demo video.
+Links and Resources
+Help with MCP Servers and SKILLs
+https://thegraph.com/docs/en/ai-overview/
+↗
+Using x402 to Pay for Subgraph Data on The Graph Network
+https://thegraph.com/docs/en/subgraphs/tooling/x402-payments/
+↗
+Substreams & SKILLS
+https://github.com/streamingfast/substreams-skills
+↗
+GitHub - Lending MCP
+https://glama.ai/mcp/servers/PaulieB14/graph-lending-mcp
+↗
+Standardized Subgraphs
+http://thegraph.com/docs/en/subgraphs/existing-subgraphs/standard-subgraphs
+↗
+🏆 Best AI Use Case of The Graph ⸺ $4,000
+🥇
+1st place
+$2,000
+🥈
+2nd place
+$1,000
+🥉
+3rd place
+$1,000
+Build an AI agent or application that uses The Graph as its live source of blockchain data. Rewards research assistants, trading/execution agents, portfolio copilots, risk monitors, and more. Query 15,000+ Subgraphs through the Subgraph MCP, stream data with Substreams, or let your agent pay per query with x402.
+
+Examples:
+
+A DeFi research agent answering natural-language questions via the Subgraph MCP
+A trading/execution agent reading live liquidity data and paying per query with x402
+A portfolio/PnL copilot reading balances, transfers, and swaps across chains
+A risk-monitoring agent watching lending positions for liquidations
+A governance assistant summarizing DAO proposals and voting activity
+A dapp-embedded chat copilot grounded in live Subgraph data
+Bonus: extra credit for teams that also ship a reusable SKILL or MCP server.
+
+Judging criteria: Effective use of The Graph (35%) · Usefulness & impact (25%) · Technical execution (20%) · Innovation (10%) · Demo & clarity (10%)
+
+Qualification Requirements
+Use The Graph as a load-bearing source of blockchain data (Subgraphs, Subgraph MCP, or Substreams).
+Consume live data from a Graph provider. Mocked or static data does not qualify.
+Include an AI/agent component that reasons over or acts on the data, not just prints a raw query result.
+Submit a public repository and a 2–4 minute demo video.
+Briefly describe how The Graph is used (which Subgraphs, endpoints, tools).
+Build the project during the event; open-source starter kits are fine.
+Links and Resources
+Subgraphs | Graph Explorer
+https://thegraph.com/explorer
+↗
+Substreams
+https://substreams.dev
+↗
+🏆 Best Use of Composable or Standardized Graph Products ⸺ $4,000
+🥇
+1st place
+$2,000
+🥈
+2nd place
+$1,000
+🥉
+3rd place
+$1,000
+Build on The Graph's composable and standardized data products. Use Standardized Subgraphs (one shared schema across every protocol of a type) to run a single query across many protocols, compose reusable Substreams packages into new pipelines, or layer the Subgraph MCP for cross-protocol analysis. New composable Substreams modules for emerging standards (e.g. ERC-4626 vault flows) also count.
+
+Examples:
+
+A cross-protocol analytics dashboard comparing TVL/revenue across ten lending markets with one Lending/CDP standard-schema query
+A DEX revenue comparator running one query pattern across every AMM on the DEX AMM standard
+A layered MCP comparing lending, DEX, and derivatives markets side by side
+A pipeline composing reusable Substreams packages (.spkg) into a new sink (Postgres, ClickHouse, Kafka, files)
+A new composable Substreams module for an emerging standard (e.g. ERC-4626)
+A new Standardized Subgraph for a protocol category that lacks one
+Judging criteria: Leverage of composability/standards (35%) · Breadth (20%) · Technical execution (20%) · Usefulness (15%) · Demo & clarity (10%)
+
+Qualification Requirements
+Either compose two or more of The Graph's products, or build meaningfully on a standardized schema (e.g. Messari Standardized Subgraphs).
+Consume live data from a Graph provider. Mocked or static data does not qualify.
+Simply querying one Subgraph with no composition or standardization does not qualify.
+Authoring/extending a Standardized Subgraph, or contributing a reusable composable Substreams module, is in scope.
+Make the standards leverage clear — show what became easier because of a shared schema or composed product.
+Submit a public repository and a 2–4 minute demo video.
+Links and Resources
+Standardized Subgraphs
+https://thegraph.com/docs/en/subgraphs/existing-subgraphs/standard-subgraphs/
+↗
+ERC-4626 tokenized-vault flows
+https://github.com/pinax-network/substreams-evm/commit/1535a557975fb79d1e78517bf3e5bd6d18a1635a
+↗
+Resources
+AI Tooling Overview
+https://thegraph.com/docs/en/ai-overview/
+↗
+Hackathon Resources
+https://thegraph.com/blog/hackathon-resources/
+↗
+Substreams Docs and Package Registry
+https://substreams.dev
+↗
+Substreams Skills
+https://github.com/streamingfast/substreams-skills
+↗
+Messari Standardized Subgraphs (schemas and reference implementations)
+https://github.com/messari/subgraphs
+↗
+Standardized Protocol Substreams
+https://github.com/streamingfast/substreams-chain-modules
+↗
+Standardized Primitive Substreams
+https://github.com/pinax-network/substreams-evm
+↗
+Get an API key in Subgraph Studio
+https://thegraph.com/studio/
+↗
+Browse data in Graph Explorer
+https://thegraph.com/explorer
+↗
+Subgraph MCP
+https://thegraph.com/docs/en/subgraphs/tooling/subgraph-mcp/introduction/
+↗
+Find Public Subgraphs in Graph Explorer
+https://thegraph.com/explorer
+↗
+Workshop
+🛠️ Building AI Agents on The Graph
+AI agents can discuss crypto all day but can't see on-chain data. This workshop fixes that with The Graph: querying...
+
+This workshop is happening in-person
+03:30 PM WEST — Friday, Jul 24, 2026 in Workshop Room
+
+World logo
+World
+$15,000
+
+world.org
+worldnetwork
+Open page →
+About
+World’s developer stack helps builders create products for verified humans and AI-assisted interactions. World ID enables apps to confirm someone is a unique human without revealing their identity. AgentKit helps identify when agents are backed by real humans rather than bots or scripts, letting products grant access, authorization, or execution rights on that basis. Selfie Check offers a low-friction, selfie-based credential that confirms a real, live person is behind the screen, without requiring an Orb. Identity Attestations let apps request verified identity attributes like age or jurisdiction to support eligibility, compliance, and trust decisions beyond simple proof of human.
+
+Selfie and Identity check full access will be available for developers during the hackathon's weekend.
+
+Prizes
+🤖 AgentKit New Use Cases ⸺ $8,000
+🥇
+1st place
+$4,000
+🥈
+2nd place
+$2,500
+🥉
+3rd place
+$1,500
+New AgentKit use cases where a service can tell the difference between "a bot" and "an agent acting on behalf of a real, unique human." Explore where Human-Backed Agents change access, authorization, rate limits, economic terms, payments, commerce, moderation, or accountability.
+
+Qualification Requirements
+Uses AgentKit in a meaningful way
+Verifies an agent is human-backed before granting access, limits, pricing, authorization, or execution rights
+Shows a working end-to-end flow, not just a wrapper or static demo
+Will not qualify Projects that reuse patterns from prior hackathons without a genuinely new workflow, vertical, or trust model, for example:
+
+Agent reputation
+Human-backed agent interactions in simple content generation use cases
+Human-backed benefits for AI agents (i. e API calls,discounts)
+Links and Resources
+Agent Kit Docs
+https://docs.world.org/agents/agent-kit/integrate
+↗
+🤳 Selfie Check Beta ⸺ $3,500
+🥇
+1st place
+$2,000
+🥈
+2nd place
+$1,500
+Selfie Check is a low-friction, selfie-based credential confirming a real, live person without requiring an Orb. This track is a beta test: build a project using Selfie Check and deliver testing documentation covering both developer feedback (SDK/API friction, docs gaps, setup issues) and user feedback (UX friction, comprehension, drop-off, camera/selfie flow issues).
+
+Qualification Requirements
+Required
+
+Uses Selfie Check in a meaningful way (risk, eligibility, fairness, continuity, or abuse-prevention signal, not generic login)
+Includes testing documentation with both developer feedback and user feedback
+Shows a working app or end-to-end prototype
+Links and Resources
+Selfie Check Docs
+https://docs.world.org/world-id/credentials/11
+↗
+🪪 Identity Check Beta Test ⸺ $3,500
+🥇
+1st place
+$2,000
+🥈
+2nd place
+$1,500
+Identity Check let a product ask for verified identity attributes (age, jurisdiction, uniqueness, document-backed signals) beyond simple proof of human. This track is a beta test: build a project using Identity Attestations and deliver testing documentation covering both developer feedback (SDK/API friction, docs gaps, setup issues) and user feedback (UX friction, comprehension, consent, drop-off).
+
+Qualification Requirements
+Required
+
+Uses Identity Attestations / Identity Check in a meaningful way (risk, eligibility, compliance, personalization, or abuse-prevention signal, not generic login)
+Includes testing documentation with both developer feedback and user feedback
+Shows a working app or end-to-end prototype
+Explains why the requested attribute is necessary and how the app minimizes data collection
+Links and Resources
+Identity Check Docs
+https://docs.world.org/world-id/idkit/credentials#identity-check-preview
+↗
+Resources
+World Docs
+https://docs.world.org/
+↗
+Docs MCP
+https://docs.world.org/model-context-protocol
+↗
+Dev Portal MCP
+https://docs.world.org/model-context-protocol/developer-portal
+↗
+Workshop
+🛠️ World Workshop: Our new products
+This workshop covers the three tracks behind our prize pool. AgentKit, Selfie Check, and Identity Check: what's re...
+
+This workshop is happening in-person
+04:30 PM WEST — Friday, Jul 24, 2026 in Workshop Room
+
+Hedera logo
+Hedera
+$15,000
+
+hedera.com
+hedera
+Open page →
+About
+Hedera is a leading EVM blockchain through its distinctive developer experience, enabling developers of all backgrounds to leverage familiar tools like Solidity or JavaScript SDK.
+
+Prizes
+🤖 AI & Agentic Payments on Hedera ⸺ $6,000
+Up to 2 teams will receive $3,000
+Build AI agents that move value autonomously on Hedera. The agentic economy needs payment infrastructure that works at machine speed: sub-second finality, predictable sub-cent fees, and native token operations without smart contract overhead. Hedera is built for this.
+
+Use the Hedera Agent Kit, OpenClaw's Agent Commerce Protocol, the x402 payment standard, or any combination of agentic tooling to build agents that discover services, negotiate terms, and settle payments on Hedera. Whether it's micropayment streaming, agent-to-agent commerce, or autonomous DeFi, the best projects will demonstrate real payment flows between agents or between agents and services.
+
+Ideas to get you started:
+
+Agent-to-Agent Marketplace — Services register via OpenClaw ACP, discover peers, negotiate pricing, settle in HBAR/HTS automatically.
+x402 Pay-Per-Use Gateway — Wrap APIs with x402 payments. Agents pay per request in HBAR, no keys or subscriptions.
+Micropayment Streaming — Real-time micro-payments for compute, data, or inference. Settle on Hedera every few seconds.
+Autonomous Escrow — Hold funds, verify delivery via oracle/HCS, auto-release payments on condition match.
+DeFi Copilot — Monitor token prices, execute swaps, rebalance HTS portfolios based on user-defined strategies.
+Subscription Manager — Recurring payments via Scheduled Transactions. Auto-handle renewals, cancellations, prorated refunds.
+Qualification Requirements
+Qualification Requirements:
+
+Build an AI agent or multi-agent system that executes at least one payment, token transfer, or financial operation on Hedera Testnet.
+Use one or more of the following: Hedera Agent Kit (JS/TS or Python), OpenClaw ACP, x402, A2A protocol, or Hedera SDKs directly.
+Provide source code in a public GitHub repo with a README covering setup, architecture, and how the payment flow works.
+Include a ≤ 5-minute demo video showing the agent performing autonomous payment actions.
+Optional enhancements (extra points):
+
+Multi-agent payment negotiation and settlement using A2A or OpenClaw ACP
+Implementation of x402 for pay-per-request API or service access
+On-chain agent identity using ERC-8004 or HCS-14 (Universal Agent IDs via Hedera Consensus Service)
+Agent discovery and communication via UCP (Universal Commerce Protocol)
+Token creation, custom fee schedules, or royalty flows via the Hedera Token Service (HTS)
+Scheduled or recurring payments using Hedera Scheduled Transactions
+Verifiable payment audit trails using Hedera Consensus Service (HCS)
+Use of the Hedera CLI for agent workflow automation
+Links and Resources
+Hedera Agent Kit (JS/TS)
+https://github.com/hashgraph/hedera-agent-kit
+↗
+Hedera Discord
+https://hedera.com/discord
+↗
+Hedera Code Snippets
+https://github.com/hedera-dev/hedera-code-snippets
+↗
+Getting Started with Hedera
+https://docs.hedera.com/hedera/getting-started
+↗
+Hedera Consensus Service
+https://docs.hedera.com/hedera/sdks-and-apis/sdks/consensus-service
+↗
+Hedera Token Service
+https://docs.hedera.com/hedera/sdks-and-apis/sdks/token-service
+↗
+A2A Protocol
+https://developers.google.com/agent-to-agent
+↗
+HCS Standards (including HCS-14)
+https://hashgraphonline.com/docs/standards/
+↗
+ERC-8004: Trustless Agents
+https://eips.ethereum.org/EIPS/eip-8004
+↗
+x402 Protocol
+https://www.x402.org/
+↗
+OpenClaw ACP Docs
+https://docs.openclaw.ai/tools/acp-agents
+↗
+Hedera Agent Kit (Python)
+https://github.com/hashgraph/hedera-agent-kit-python
+↗
+templates/x402-pay-per-use
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/x402-pay-per-use
+↗
+templates/payments-scheduler
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/payments-scheduler
+↗
+templates/cross-chain-dca
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/cross-chain-dca
+↗
+x402 Hedera Example
+https://github.com/matevszm/x402-hedera-example
+↗
+🪙 Tokenization on Hedera ⸺ $3,000
+Up to 2 teams will receive $1,500
+Build a working application on Hedera using only the Hedera SDK. No Solidity, no smart contracts. Use native Hedera services directly: create tokens, post messages to the Consensus Service, schedule transactions, manage accounts, or combine multiple services into something new.
+
+This bounty is designed for developers who are new to Hedera or new to blockchain. Hedera's SDK lets you do things that typically require smart contracts on other chains: create fungible and non-fungible tokens, set up custom fee schedules, schedule future transactions, and publish verifiable messages, all with a few lines of JavaScript or Python.
+
+Ideas to get you started:
+
+Tokenized Fund Shares — Create a fund token with KYC-gated transfers and automated dividend distributions via custom fees.
+Invoice Factoring — Tokenize invoices as HTS tokens, allow buyers to purchase them at a discount, and settle on maturity via Scheduled Transactions.
+Carbon Credit Registry — Mint carbon credits as HTS tokens with provenance tracked on HCS and retirement enforced by burning.
+Fractionalized Real Estate — Tokenize property ownership with royalty fees that distribute rental income to holders on every transfer.
+Commodity Receipts — Issue warehouse receipts as HTS tokens backed by oracle-verified commodity prices.
+Qualification Requirements
+Qualification Requirements:
+
+Create, manage, or interact with tokens using the Hedera Token Service (via SDK, system contracts, or both).
+Deploy and demonstrate on Hedera Testnet.
+Provide source code in a public GitHub repo. Smart contracts verified on Hashscan if applicable.
+Include a ≤ 5-minute demo video showing token creation, configuration, and at least one lifecycle operation (transfer, compliance check, fee distribution, etc.).
+Optional enhancements (extra points):
+
+Use the @hiero-ledger/hiero-contracts NPM package for HTS system contract imports
+Implement compliance controls: KYC grants, account freezing, or token pause
+Custom fee schedules (fixed fees, fractional fees, royalty fees on transfers)
+Cross-chain token operations using LayerZero, CCIP, or HashPort
+Oracle integration (Chainlink, Pyth, Supra) for asset pricing or external data
+Scheduled token operations (vesting, distributions) using Hedera Scheduled Transactions
+Links and Resources
+Getting Started (EVM)
+https://docs.hedera.com/hedera/getting-started/evm-developers
+↗
+Hedera Discord
+https://hedera.com/discord
+↗
+Hedera Code Snippets
+https://github.com/hedera-dev/hedera-code-snippets
+↗
+Contract Verification on Hashscan
+https://docs.hedera.com/hedera/tutorials/smart-contracts/how-to-verify-a-smart-contract-on-hashscan
+↗
+@hiero-ledger/hiero-contracts NPM
+https://www.npmjs.com/package/@hiero-ledger/hiero-contracts
+↗
+HTS System Contracts Guide
+https://docs.hedera.com/hedera/smart-contracts/hts-system-contracts
+↗
+Hedera Token Service Docs
+https://docs.hedera.com/hedera/sdks-and-apis/sdks/token-service
+↗
+templates/tokenise-subscriptions
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/tokenise-subscriptions
+↗
+templates/blank-template
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/blank-template
+↗
+templates/hedera-demo
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/hedera-demo
+↗
+templates/bridge
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/bridge
+↗
+templates/oracles
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/oracles
+↗
+🛠️ "No Solidity Allowed" — Build with Hedera SDKs ⸺ $3,000
+Up to 3 teams will receive $1,000
+Build a working application on Hedera using only the Hedera SDK. No Solidity, no smart contracts. Use native Hedera services directly: create tokens, post messages to the Consensus Service, schedule transactions, manage accounts, or combine multiple services into something new.
+
+This bounty is designed for developers who are new to Hedera or new to blockchain. Hedera's SDK lets you do things that typically require smart contracts on other chains: create fungible and non-fungible tokens, set up custom fee schedules, schedule future transactions, and publish verifiable messages, all with a few lines of JavaScript or Python.
+
+Ideas to get you started:
+
+Timestamped Proof System — Use HCS to create verifiable timestamps for documents, media, or events. Mint an HTS token as a receipt for each proof.
+Token-Gated Access — Mint HTS tokens that grant access to a service, event, or community. Check balances via Mirror Node to authorize users.
+Scheduled Payment Bot — Automate recurring HBAR or token payments using Scheduled Transactions. Build a simple UI to configure payment schedules.
+Supply Chain Tracker — Log product journey events to HCS and issue HTS tokens as certificates at each checkpoint.
+Verifiable Messaging — Build a chat or notification system where all messages are logged to HCS for tamper-proof, auditable history.
+Qualification Requirements
+Qualification Requirements:
+
+Use the Hedera JavaScript/TypeScript SDK (@hashgraph/sdk) or Python SDK. No Solidity smart contracts.
+Incorporate at least two native Hedera services (e.g., HTS + HCS, HTS + Scheduled Transactions, HCS + Mirror Node).
+Provide source code in a public GitHub repo with a README covering setup and usage.
+Include a ≤ 5-minute demo video showing the application in action.
+Optional enhancements (extra points):
+
+Coherent end-to-end user experience (not just API calls)
+Integration with the Hedera Mirror Node REST API for querying network data
+Creative use of Hedera Consensus Service for data integrity, logging, or messaging
+Use of the Hedera Agent Kit for AI-driven workflows (counts as SDK usage)
+Thoughtful security approach (key management, access controls)
+Links and Resources
+Hedera Discord
+https://hedera.com/discord
+↗
+Hedera Code Snippets
+https://github.com/hedera-dev/hedera-code-snippets
+↗
+Mirror Node REST API
+https://docs.hedera.com/hedera/sdks-and-apis/rest-api
+↗
+Scheduled Transactions
+https://docs.hedera.com/hedera/sdks-and-apis/sdks/schedule-transaction
+↗
+Hedera Consensus Service
+https://docs.hedera.com/hedera/sdks-and-apis/sdks/consensus-service
+↗
+Hedera Token Service
+https://docs.hedera.com/hedera/sdks-and-apis/sdks/token-service
+↗
+Hedera Python SDK
+https://github.com/hashgraph/hedera-sdk-python
+↗
+Hedera JavaScript SDK
+https://github.com/hashgraph/hedera-sdk-js
+↗
+Getting Started with Hedera
+https://docs.hedera.com/hedera/getting-started
+↗
+templates/hedera-demo
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/hedera-demo
+↗
+⏱️ Cross-Chain Automation Hub — Hedera Schedule Service + Axelar ⸺ $2,000
+Up to 2 teams will receive $1,000
+Build an automation platform that uses Hedera as the decentralized hub for multi-chain automation — scheduling and triggering smart contract calls on other chains, fully on-chain, with no bots, keepers, or off-chain cron. Combine the Hedera Schedule Service with Axelar General Message Passing (GMP) so a scheduled transaction on Hedera fires when its conditions and signatures are met, then dispatches a message through Axelar that executes a contract call on a destination chain. Most chains rely on centralized keepers for automation — Hedera flips it: scheduling is a native primitive, Axelar GMP handles decentralized message passing, and together they enable trustless cross-chain automation.
+
+Focus on real-world workflows: cross-chain payroll, treasury rebalancing, recurring DCA into assets on another chain, scheduled liquidity actions, or time-locked governance execution. The strongest projects will feel production-ready — something a DAO, finance team, or protocol could adopt immediately — and will prove the entire trigger-to-execution loop happens on-chain, with zero centralized servers.
+
+Ideas to get you started: Cross-Chain DCA Cross-Chain Treasury Rebalancing Cross-Chain Payroll Scheduled Cross-Chain Liquidity Time-Locked Cross-Chain Governance Contributor Payroll (single-chain) Governance-Gated Treasury (single-chain)
+
+Qualification Requirements
+Qualification Requirements:
+
+Use the Hedera Schedule Service (via SDK, system contracts) to create and execute scheduled transactions on Hedera Testnet.
+Dispatch Axelar GMP cross-chain message triggered by scheduled Hedera transaction — fully on-chain, zero off-chain relayers or keepers.
+Execute a real future or conditional cross-chain action end to end: scheduled trigger on Hedera → Axelar GMP message → execution on the destination chain.
+User workflow to create, approve, and manage scheduled cross-chain actions.
+Source code with README covering setup, architecture, and scheduling/cross-chain dispatch flow.
+Demo video (≤5 min): user creates schedule → Hedera executes trigger → cross-chain execution visible.
+Optional enhancements (extra points):
+
+Cross-chain approvals (multi-sig, DAO voting, role-based)
+Conditional execution combining time, on-chain state, approvals
+Composable automation via Hedera system contracts into EVM, then Axelar GMP
+Dashboard for schedules, pending executions, cross-chain status tracking
+Cost/reliability comparison vs off-chain solutions
+Audit trails via Hedera Consensus Service (HCS)
+Single-chain Hedera automation fallback
+Links and Resources
+Scheduled Airdrop Tutorial
+https://github.com/hedera-dev/tutorial-hello-scheduled-airdrop
+↗
+Hello Scheduled World Tutorial
+https://github.com/hedera-dev/devday-tutorial-hello-scheduled-world
+↗
+Hedera Schedule Service Documentation
+https://docs.hedera.com/hedera/core-concepts/smart-contracts/system-smart-contracts/hedera-schedule-service
+↗
+Axelar General Message Passing (GMP) Overview
+https://docs.axelar.dev/dev/general-message-passing/overview/
+↗
+Axelar Developer Docs
+https://docs.axelar.dev/
+↗
+templates/cross-chain-dca
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/cross-chain-dca
+↗
+templates/payments-scheduler
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/payments-scheduler
+↗
+⏱️ Autonomous On-Chain Automation Platform ⸺ $1,000
+🆕  This prize is only available to Continuity Track participants →
+Build a production-ready automation platform that lets users schedule, approve, and execute on-chain actions using the Hedera Schedule Service, with no bots, keepers, or off-chain cron infrastructure. Most chains lean on centralized keepers or off-chain schedulers to fire future transactions. Hedera makes scheduling a native primitive: submit a transaction, collect the signatures it needs, and let the network execute it when the conditions are met.
+
+This bounty is focused on real-world automation workflows: payroll for contributors, treasury actions gated by governance approval, recurring subscription payments, or time-locked protocol upgrades. Think in terms of users and workflows, not just transactions. The strongest projects will feel like something a DAO, finance team, protocol operator, or business could adopt tomorrow.
+
+Ideas to get you started: Contributor Payroll Governance-Gated Treasury Subscription Manager Time-Locked Upgrades Conditional Escrow
+
+Qualification Requirements
+Use the Hedera Schedule Service (via SDK, system contracts, or both) to create and execute scheduled transactions on Hedera Testnet. Expose a user-facing workflow to create, approve, and manage scheduled actions. Execute at least one real future or conditional transaction end to end. Provide source code in a public GitHub repo with a README covering setup, architecture, and how the scheduling flow works. Include a ≤ 5-minute demo video showing a user creating a scheduled action and the network executing it.
+
+Optional enhancements (extra points):
+
+Approval flows: multi-sig, DAO voting, or role-based signoff before execution Conditional execution logic that combines time, on-chain state, and approvals
+Composable automation: scheduled calls into EVM smart contracts via system contracts A dashboard or UI to create schedules, inspect pending executions, and track execution history A clear cost, reliability, and trust comparison against off-chain bots or keepers Verifiable execution audit trails using the Hedera Consensus Service (HCS)
+Links and Resources
+Hedera Schedule Service
+https://docs.hedera.com/evm/hedera-services/system-contracts/schedule-service
+↗
+Hello Scheduled World Tutorial
+https://github.com/hedera-dev/devday-tutorial-hello-scheduled-world
+↗
+Scheduled Airdrop Tutorial
+https://github.com/hedera-dev/tutorial-hello-scheduled-airdrop
+↗
+Workshop
+Watch Video →
+Hedera x Claude Code: AI Skills for Hackathon...
+Go from zero to a scored hackathon submission plan in under an hour. This workshop walks through Hedera's open-sour...
+
+This workshop is happening in-person
+05:00 PM WEST — Friday, Jul 24, 2026 in Workshop Room
+
+0G logo
+0G
+$15,000
+
+0g.ai
+0g_labs
+Open page →
+About
+0G is the blockchain for AI agents. Verifiable compute, sealed inference, and decentralized storage in one modular stack - so developers can build autonomous AI agents whose every action (inference, memory, execution) is cryptographically verified and settled onchain instead of blindly trusted.
+
+Prizes
+🧠 Best AI Product on 0G ⸺ $6,000
+🥇
+1st place
+$3,000
+🥈
+2nd place
+$2,000
+🥉
+3rd place
+$1,000
+The product layer. Build the best end-user applications and agents on 0G: things people, or other agents, actually use. Because you build on 0G Compute / Private Computer, your inference is private and verifiable by default (TEE-sealed), so you can focus on shipping a real product. Combine with 0G Storage for persistent encrypted memory, Agentic IDs for ownership and composability, and 0G Chain for on-chain actions and micropayments.
+
+This track is for what you ship, not what others build on. If you are building a framework, SDK, or developer tooling, submit to the Infrastructure track instead.
+
+Ideas to get you started: 🔹 Private personal "Digital Twin" or coding agent on 0G Compute with evolving encrypted memory on 0G Storage 🔹 Verifiable research or analysis agent that self-fact-checks, with TEE-attested proof of every result, and optional on-chain provenance 🔹 Agentic browser companion or extension with tradeable memory via Agentic ID 🔹 Consumer on-chain AI app, DeFi experience, RWA tool, or AI x gaming dApp with persistent-memory agents and automatic royalty splits 🔹 Agent minted as an Agentic ID with embedded intelligence (encrypted on 0G Storage), persistent memory, and dynamic upgrades
+
+Qualification Requirements
+Submission requirements:
+
+🔹 Project name and a short description 🔹 Contract deployment addresses 🔹 Public GitHub repo (README + setup instructions) 🔹 Demo video & live demo link (keep the video under 3 mins!) 🔹 Explain which 0G features or SDKs you used 🔹 Team member names and contact info (Telegram & X) You must also include: 🔹 A working, demoable product: a live link or a runnable build, not just a repo 🔹 Proof you use 0G Compute / Private Computer for inference (this is what makes your product private and verifiable) 🔹 For Agentic ID projects: link to the minted Agentic ID on the 0G explorer
+
+🛠️ Best Infrastructure & Tooling on 0G ⸺ $4,500
+Up to 3 teams will receive $1,500
+The builder layer. Build the frameworks, SDKs, primitives, and developer tooling that other teams will build their 0G applications and agents on top of. This track celebrates the work that makes the whole ecosystem faster, safer, and more capable.
+
+If you are shipping an end-user product, submit to the Application track instead.
+
+Ideas to get you started: 🔹 Agent framework or SDK natively integrated with 0G Compute sealed inference and 0G Storage memory 🔹 Model-routing or provenance layer across 0G's hosted models, with verification tracked on-chain 🔹 Agentic ID composability library: breeding, merging, or fine-tuning agents together 🔹 No-code or low-code visual agent builder with one-click deploy to 0G Compute and Storage 🔹 Verification, guardrail, or auditor layer for on-chain agent actions 🔹 Memory-layer abstraction over 0G Storage
+
+Qualification Requirements
+Submission requirements: 🔹 Project name and a short description 🔹 Contract deployment addresses 🔹 Public GitHub repo (README + setup instructions) 🔹 Demo video & live demo link (keep the video under 3 mins!) 🔹 Explain which 0G features or SDKs you used 🔹 Team member names and contact info (Telegram & X)
+
+You must also include: 🔹 At least one working example agent or app built using your framework or tooling (include the example code or link in the README) 🔹 An architecture diagram (optional but strongly recommended) showing how your tooling integrates with the 0G stack (Compute, Storage, Chain, Agentic ID)
+
+🚀 Keep Building on 0G ⸺ $4,500
+🆕  This prize is only available to Continuity Track participants →
+Up to 3 teams will receive $1,500
+For teams iterating on an existing 0G project started at ETHGlobal Cannes, the online agent hackathon, Zero Cup, or independent prior work. We are not judging polish on old demos. We are judging meaningful progress during the Lisbon hackathon window: new features, production hardening, user readiness, and trajectory toward real usage.
+
+Ideas to get you started:
+
+🔹 Evolve a Cannes or online-hackathon prototype into a deployed product with persistent 0G Storage memory and on-chain settlement on 0G Chain 🔹 Harden an existing project with verifiable inference on 0G Compute, error recovery, and robust state management 🔹 Integrate a missing stack layer: move inference to 0G Compute, memory to 0G Storage, or identity to an Agentic ID,
+
+Qualification Requirements
+Submission requirements: 🔹 Project name and a short description 🔹 Contract deployment addresses 🔹 Public GitHub repo (README + setup instructions) 🔹 Demo video & live demo link (keep the video under 3 mins!) 🔹 Explain which 0G features or SDKs you used 🔹 Team member names and contact info (Telegram & X)
+
+Additional requirements for Continuity (on top of standard rules): 🔹 Link to prior state: a dated commit hash or the previous ETHGlobal submission page marking where you started 🔹 Dated changelog of work done during the Lisbon hackathon window 🔹 Short "What's next" statement to show trajectory
+
+Resources
+Builder Hub
+https://build.0g.ai
+↗
+Docs
+https://docs.0g.ai
+↗
+Private Computer
+https://pc.0g.ai
+↗
+Workshop
+🛠️ 0G Workshop
+Description coming soon..
+
+This workshop is happening in-person
+02:30 PM WEST — Friday, Jul 24, 2026 in Workshop Room
+
+Uniswap Foundation logo
+Uniswap Foundation
+$10,000
+
+uniswapfoundation.org
+uniswapfnd
+Open page →
+About
+The Uniswap Protocol is one of the largest decentralized exchange protocol for swapping value onchain across Ethereum and other supported blockchains. The Uniswap ecosystem has evolved into a full stack platform for onchain finance, including smart contracts such as v2, v3, and v4, developer tools, APIs, and emerging infrastructure like Unichain. This enables developers to build applications on top of shared, permissionless liquidity.
+
+Prizes
+🤖 Best Uniswap API Integration ⸺ $7,000
+🥇
+1st place
+$4,000
+🥈
+2nd place
+$2,000
+🥉
+3rd place
+$1,000
+Build with the Uniswap API to access liquidity and execute value onchain. Projects must integrate the Uniswap API with a valid API key from the Uniswap Developer Platform for core functionality such as trade execution, routing, payments, liquidity provision or coordination between agents or systems. This may include trading applications, agent-based systems, automated strategies, or new financial primitives, leveraging Uniswap's permissionless liquidity and emerging capabilities such as AI-driven systems.
+
+The Uniswap API now also supports tokenized stocks, giving teams a new asset class to build on top of.
+
+Qualification Requirements
+A public GitHub repository with open-source code, a FEEDBACK.md file, and a completed submission to the Uniswap Developer Feedback Form (https://developers.uniswap.org/hackathon-feedback) that includes the link to your FEEDBACK.md file.
+
+Submissions without it will be reviewed and audited before winners are finalized. Make sure your README clearly points to the relevant contracts and lines of code so we can verify your integration.
+
+🦄 Best Uniswap Stack Contribution ⸺ $3,000
+🆕  This prize is only available to Continuity Track participants →
+🥇
+1st place
+$1,000
+🥈
+2nd place
+$1,000
+🥉
+3rd place
+$1,000
+Build on or extend the Uniswap open-source ecosystem using any part of the Uniswap stack. This includes projects that integrate the Uniswap AMM (v2, v3, or v4) or any Uniswap protocol such as CCA, new v4 hooks, extensions or improvements to official Uniswap repositories, and tooling or solutions built for the broader ecosystem.
+
+Qualification Requirements
+A public GitHub repository with open-source code, a FEEDBACK.md file, and a completed submission to the Uniswap Developer Feedback Form (https://developers.uniswap.org/hackathon-feedback) that includes the link to your FEEDBACK.md file.
+
+Submissions without it will be reviewed and audited before winners are finalized. Make sure your README clearly points to the relevant contracts and lines of code so we can verify your integration.
+
+Resources
+Uniswap Docs
+https://developers.uniswap.org/docs?utm_medium=eco&utm_source=platform&utm_campaign=20260724-ethglobal_lisbon&utm_content=callout&utm_term=self-serve
+↗
+Uniswap Developer Support
+https://developers.uniswap.org/docs?form=help&utm_medium=eco&utm_source=platform&utm_campaign=20260724-ethglobal_lisbon&utm_content=callout&utm_term=self-serve
+↗
+Uniswap AI
+https://github.com/Uniswap/uniswap-ai
+↗
+Uniswap Hackathon Feedback
+https://developers.uniswap.org/hackathon-feedback?utm_medium=eco&utm_source=platform&utm_campaign=20260724-ethglobal_lisbon&utm_content=callout&utm_term=self-serve
+↗
+Uniswap Developer Platform
+https://developers.uniswap.org/dashboard?utm_medium=eco&utm_source=platform&utm_campaign=20260724-ethglobal_lisbon&utm_content=callout&utm_term=self-serve
+↗
+Workshop
+How to Navigate the Uniswap Stack 🦄
+A hands-on intro to the full Uniswap ecosystem: the Uniswap API, v4 hooks, Uniswap AI, and open-source tooling. Cov...
+
+This workshop is happening in-person
+03:00 PM WEST — Friday, Jul 24, 2026 in Workshop Room
+
+Sui logo
+Sui
+$6,000
+
+sui.io
+suinetwork
+Open page →
+About
+The Sui Stack is a modular ecosystem of composable infrastructure layers purpose-built for trustless coordination, privacy-preserving data workflows, and scalable app logic. Rather than provide a one-size-fits-all platform, the stack empowers builders to compose decentralized functionality — storage, access control, compute, and coordination — based on their specific use case.
+
+Prizes
+🌊 Best app built on Sui ⸺ $4,000
+Up to 2 teams will receive $2,000
+For teams starting something new this weekend and building it on Sui. We want to see market-viable products — real apps people would actually use — that make Sui and its stack do genuine work: Move smart contracts and the object model, Walrus for decentralized storage, Seal for access control, DeepBook for on-chain liquidity and order books, zkLogin for seamless onboarding, and everything else Sui offers. Depth beats breadth: the strongest submissions have a clear product and Sui-native primitives doing real work, not a superficial add-on bolted on to qualify. Coming from EVM? Walrus is the most natural entry point — it's chain-agnostic and drops straight in — but the deeper you reach into the Sui stack, the stronger the submission.
+
+Qualification Requirements
+The project must be newly developed during the hackathon.
+The project must be built on Sui and make meaningful use of the Sui stack (not a superficial add-on).
+A working demo deployed to Sui testnet or mainnet must be submitted.
+🔁 Best existing app integrating or porting the Sui stack ⸺ $2,000
+🆕  This prize is only available to Continuity Track participants →
+For teams that already have a product and, this weekend, integrate a part of the Sui stack into it — or port it to Sui outright. Bring an app real users would reach for and put Sui underneath it: swap in Walrus for storage, add Seal for access control, use zkLogin for auth, tap DeepBook for liquidity, or migrate your logic to Move. We care more about depth than breadth: the strongest submissions show a clear before/after with the Sui integration doing genuine work, not a quick add-on to qualify. Walrus is chain-agnostic, so it slots in wherever your app already lives — including EVM — making it the easiest first step if you're on IPFS, Arweave, Filecoin, or S3.
+
+Qualification Requirements
+The project must be an existing product (not built from scratch this weekend) adopting or porting part of the Sui stack during the hackathon.
+The integration/port must be a core part of the app (e.g. read/write to Walrus, Seal, DeepBook, zkLogin, or Move logic).
+A working demo of the integration must be submitted.
+Resources
+Build Full Stack
+https://sui.io
+↗
+EVM x Sui
+https://mystenlabs.github.io/evm-sui/
+↗
+Walrus Docs
+https://docs.wal.app/
+↗
+Workshop
+💧 EVM x Sui
+A fast session for EVM devs: three tools to ship on Sui this weekend — 13 Solidity→Move patterns, Walrus storage be...
+
+This workshop is happening in-person
+04:00 PM WEST — Friday, Jul 24, 2026 in Workshop Room
+
+ENS logo
+ENS
+$5,000
+
+ens.domains
+ensdomains
+Open page →
+About
+ENS is the universal pointer for anything on the internet. It turns wallet addresses into human-readable names like yourname.eth — a portable, onchain profile that works across every app, chain, and wallet.
+
+Developers use ENS to replace raw addresses with real identities, build decentralized websites, and create scalable subname ecosystems. As AI agents become first-class onchain actors, ENS is how you give them a name, a reputation, and a place to be found.
+
+Prizes
+✨ Most Creative Use of ENS ⸺ $1,500
+Most people know ENS for name → address lookups. We want to see what else it can do. Store verifiable credentials or zk proofs in text records. Build privacy features with auto-rotating addresses on each resolution. Use subnames as access tokens. Surprise us!
+
+Qualification Requirements
+ENS should clearly improve the product. Demo must be functional (no hard-coded values). Submit with a video or live demo link and present at the ENS booth in person on Sunday morning.
+
+🤖 Best ENS Integration for AI Agents ⸺ $1,500
+AI agents need persistent, human-readable identities too. Use ENS to name agents, resolve their addresses, spin up subname registries for agent fleets, store agent metadata in text records, or build systems where agents can register and discover each other onchain. If you're building anything agentic this weekend, think about how ENS can be the identity layer.
+
+Qualification Requirements
+It should be obvious how ENS improves your agent's identity or discoverability — not just a cosmetic add-on. Demo must be functional (no hard-coded values). Submit with a video or live demo link and present at the ENS booth in person on Sunday morning.
+
+Links and Resources
+AI Agent Registry ENS Name Verification
+https://docs.ens.domains/ensip/25/
+↗
+Agent Text Records
+https://docs.ens.domains/ensip/26/
+↗
+Agent-native CLI
+https://github.com/ensdomains/ens-cli
+↗
+🔄 Best ENS Continuity Integration ⸺ $2,000
+🆕  This prize is only available to Continuity Track participants →
+Already building something real? Keep going. This prize is for the best project that meaningfully extends an existing product or open source project with ENS. Add ENS where it makes the product better: identity, discovery, onboarding, payments, profiles, subnames, records, or entirely new UX. We want to see ENS used to ship a meaningful new capability, not just added as a cosmetic integration.
+
+Qualification Requirements
+It should be clear what ENS-powered feature was built during the hackathon and how it improves the existing product. Demo must be functional (no hard-coded values). Submit with a video or live demo link and present at the ENS booth in person on Sunday morning.
+
+Resources
+ENS Docs
+https://docs.ens.domains/
+↗
+Building with AI
+https://docs.ens.domains/building-with-ai/
+↗
+Sign up to get the latest news and updates on ETHGlobal
+Your email address
+
+Products
+ETHConf
+Events
+Pragma
+Packs
+Plus New
+Faucet
+Legal
+Rules & Conduct
+Privacy Policy
+Company
+About
+Brand
+Careers Hiring
+© 2026 ETHGlobal. All rights reserved.
+
+ETHGlobal
