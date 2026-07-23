@@ -52,4 +52,34 @@ acceptance_evidence:
 status: complete
 ```
 
+```yaml
+owner: Codex under project-owner direction
+task_id: A0-LIVE-RECONCILIATION
+branch: developer
+start_sha: 2adaa1c165cdb76a762acea1e9177ba08cd65558
+token: 396822ef-3f71-4418-845a-995e9ec987fa
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-23T19:19:55Z
+expires_at: 2026-07-23T20:19:55Z
+allowed_paths:
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/BASELINE.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+  - docs/lisbon/FRESH-CLONE.md
+  - docs/lisbon/evidence/**
+started_at: 2026-07-23T19:19:55Z
+expected_exit: reconcile A0 live authority, P0/E0/U0 results, mirror audit boundary, and current release blockers in one docs-only commit
+acceptance_evidence:
+  - current official ETHGlobal and sponsor requirements timestamped
+  - A0 release audit remains fail-closed
+  - P0, E0, and U0 exact verdicts recorded
+  - byte-preserved archive excluded explicitly from authored-whitespace gate
+  - Markdown links, CSV, manifest, and git diff checks pass
+status: active
+```
+
 Read-only probes/auditors may overlap but must not edit, install, format, commit, push, deploy, sign, transact, submit forms, or spend.

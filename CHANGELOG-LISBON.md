@@ -14,5 +14,7 @@ Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 - Reconciled the protected track portfolio to 0G + stable ENS, with Uniswap Stack conditional and regular Uniswap API rejected absent written Continuity admission.
 - Added a repository-global atomic writer lease, owner-only parameter-bound external-effect authorization, pinned-SHA audits, and a clean-core replay gate before optional scope.
 - Restricted asynchronous 0G/ENS/Uniswap probes to read-only compatibility research; all live effects belong to serialized implementation/release sprints.
+- Reconciled live A0 authority plus P0/E0/U0: A1 remains blocked before official H0 and clearance; 0G static compatibility failed on proof binding/readback, stable ENS passed static/fork checks, and only a reusable upstream Uniswap Stack contribution was admitted conditionally.
+- Preserved the byte-for-byte research archive and split its SHA-256 integrity gate from authored-control whitespace checks after independent post-commit audit.
 - Reconciled the independent premortem and submission audits; sprint and split-prompt IDs now use `C0/A1/P0/E0/U0/A2/A2R/A3/A4/A5/A6-A7/VA` consistently.
 - No dependency install, feature code, push, deployment, signature, transaction, form submission, spend, or track promotion occurred.

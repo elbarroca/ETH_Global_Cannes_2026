@@ -1,10 +1,12 @@
 # AlphaDawg Lisbon Baseline
 
-Status: `CONDITIONAL_GO_LOCAL_NO_EXTERNAL_EFFECTS`
+Status: `BLOCKED_A0_PRE_H0_AND_CLEARANCE`
 
 ## Start authority
 
 At 2026-07-23 18:06:32 WEST, the project owner explicitly authorized AlphaDawg Continuity work to proceed. This authorizes local implementation and commits on `developer`. It does not authorize external spend, signatures, transactions, deployment, push, or prize claims.
+
+The controlling Goal 00 nevertheless makes `A0-LIVE-AUTHORITY` blocking. The 2026-07-23 19:46 WEST official-source recheck confirmed that hacking begins on 2026-07-24 at 21:00 WEST. Until that signal and the fatal clearance rows below pass, product writers remain closed and all claims remain `research_only_not_promotable`. Documentation-only control work may continue under the atomic writer lease.
 
 ## Immutable prior state
 
@@ -37,11 +39,13 @@ Live payments/trading, Sui, Crawbot claims, legacy OpenClaw success fallbacks, a
 
 ## Gates still open
 
+- Official H0/live dashboard signal at or after 2026-07-24 21:00 WEST.
 - Former-contributor reuse and MIT-license authorization.
 - Lisbon team and changed-team Continuity evidence.
 - Named operational owners and backup.
 - 0G, ENS, optional Sui, database, and hosting access readiness.
 - Explicit testnet spend caps and approvers.
 - Push, deployment, signature, transaction, and public-claim authorization.
+- A proof-capable official 0G Storage readback path; P0 found the current TypeScript SDK proof flag inert.
 
 Blank or missing evidence fails closed.

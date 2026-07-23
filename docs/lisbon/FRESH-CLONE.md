@@ -1,6 +1,8 @@
 # Fresh-Clone Verification
 
-Status: `NOT_RUN`
+Status: `BLOCKED_A0_NO_RELEASE_SHA`
+
+Current state: local `developer` exists, but `origin/developer` does not and push is `NOT_AUTHORIZED`. The control-only checkout is not a release candidate. A local clean clone may be used after A4 when a frozen core SHA exists; the remote fresh-clone proof remains blocked until the exact push is authorized.
 
 Run only on the frozen remote release candidate:
 
