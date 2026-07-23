@@ -4,6 +4,28 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Codex under project-owner direction
+task_id: P0-0G-PROOF-PATH-CONTROL
+branch: developer
+start_sha: de6dec613bb6d0e5c3861d3de0953cf258f61c85
+token: 040153A7-DC21-4736-97DD-7532BCBCEDD5
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-23T23:30:13Z
+expires_at: 2026-07-24T00:30:13Z
+allowed_paths:
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/BASELINE.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/evidence/P0-0G-PROOF-PATH-REFRESH.md
+started_at: 2026-07-23T23:30:13Z
+expected_exit: narrow P0 from no proof-capable path to a pinned official Go remediation path while keeping product and live claims blocked
+status: active
+```
+
+```yaml
+owner: Codex under project-owner direction
 task_id: A0-CONTINUITY-CLARIFICATION
 branch: developer
 start_sha: 3cd11943faddcf5f6d7ed7455fec783dcfd6325f

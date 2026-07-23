@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - 0G proof-path refresh
+
+- Verified that the latest official TypeScript Storage SDK still ignores proof validation.
+- Identified the pinned official Go Storage client `v1.3.0` path that validates segment proofs and the final file Merkle root.
+- Kept P0 product/live blocked until the verifier is integrated, Compute response content is fatally bound to its verified signature, and authorized tamper/live checks pass.
+- Performed no product change, dependency install, provider call, push, deployment, signature, transaction, spend, or claim promotion.
+
 ## 2026-07-24 - Continuity timing clarification
 
 - Recorded the project owner's clarification that H0 constrains the From Scratch project, not local AlphaDawg Continuity work.

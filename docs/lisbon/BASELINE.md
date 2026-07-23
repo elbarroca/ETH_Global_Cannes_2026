@@ -46,6 +46,6 @@ Live payments/trading, Sui, Crawbot claims, legacy OpenClaw success fallbacks, a
 - 0G, ENS, optional Sui, database, and hosting access readiness.
 - Explicit testnet spend caps and approvers.
 - Push, deployment, signature, transaction, and public-claim authorization.
-- A proof-capable official 0G Storage readback path; P0 found the current TypeScript SDK proof flag inert.
+- A pinned product integration of the official Go Storage proof verifier; the current TypeScript SDK proof flag remains inert.
 
 Blank or missing evidence fails closed.

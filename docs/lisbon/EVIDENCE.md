@@ -44,6 +44,7 @@ status: PASS | FAIL | BLOCKED
 | `A1-FOUNDATION-001` | Foundation | `NOT_RUN` | Await Goal A1. |
 | `A1-FOUNDATION-PREFLIGHT-002` | Foundation preflight | `BLOCKED` | `npx tsc --noEmit` passed. `npm run lint` failed on inherited code with 23 errors and 28 warnings. `npm test` failed because no test script exists. Build was not run after the red gate. A1 must repair these without weakening checks before product sprints open. |
 | `P0-0G-001` | 0G compatibility | `FAIL` | Current Compute response binding is fail-open and Storage SDK `1.2.10` ignores proof-enabled download. Live subgate `BLOCKED`; no Lisbon live ID. |
+| `P0-0G-002` | 0G proof-path refresh | `PASS_STATIC_PATH; PRODUCT_AND_LIVE_BLOCKED` | Official Go client `v1.3.0` verifies segment proofs and the final file root. The current TS SDK still ignores proof, no Go verifier is integrated, and Compute content remains unbound. Exact packet: `evidence/P0-0G-PROOF-PATH-REFRESH.md`. |
 | `E0-ENS-001` | ENS compatibility | `PASS` | Stable viem/Registry/Public Resolver/Universal Resolver path passed live reads and local-fork refusal tests; public write subgate `BLOCKED`; direct ENSv2 `BLOCKED`. |
 | `U0-UNISWAP-001` | Uniswap admission | `PASS` | `ADMIT_STACK_CONTINUITY` only for a reusable upstream Node 22 ESM SDK fix; existing Arc/custom-router path rejected; optional writer remains closed. |
 
