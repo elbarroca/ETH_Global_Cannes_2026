@@ -34,19 +34,22 @@ branch: developer
 start_sha: b000ba993e753a580f2c0b09d4fec8f0eac8d337
 token: d17cd3a9-21a1-434a-a052-9bb5bb82a77e
 lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
-heartbeat_at: 2026-07-23T19:12:11Z
+heartbeat_at: 2026-07-23T19:13:32Z
 expires_at: 2026-07-23T20:12:11Z
 allowed_paths:
   - CHANGELOG-LISBON.md
   - docs/lisbon/**
 started_at: 2026-07-23T18:55:09Z
 expected_exit: full research-vault mirror, internal file map, link closure validation, and local commit
+exit_sha: 11de852d0ca89563634f0512b45f1ca987670447
+completed_at: 2026-07-23T19:13:32Z
+lock_release: remove the matching physical lease immediately after the closure commit
 acceptance_evidence:
   - all research-vault files mirrored byte-for-byte
   - all Obsidian and Markdown references resolve internally or are external URLs
   - execution prompts remain AlphaDawg-only
   - independent read-only audit reconciled
-status: active
+status: complete
 ```
 
 Read-only probes/auditors may overlap but must not edit, install, format, commit, push, deploy, sign, transact, submit forms, or spend.

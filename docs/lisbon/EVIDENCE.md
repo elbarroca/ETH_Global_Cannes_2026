@@ -34,7 +34,7 @@ status: PASS | FAIL | BLOCKED
 | `A0-LOCK-001` | Writer serialization | `PASS` | Atomic common-dir lease exists; physical and mirrored tokens match. |
 | `A0-AUDIT-001` | Independent prompt audit | `PASS` | Concurrency, live-probe, naming, and lock-mirror findings reconciled; independent result was `PASS_IF_A0_CLOSED`; A0 content commit `41325b6564c338d8b681c2756228add3a7b4dac3` satisfied the condition. |
 | `A0-ARCHIVE-001` | Repo-local context | `PASS` | All 244 research-vault files mirrored byte-for-byte and indexed in `ALPHADAWG-FILE-MANIFEST.csv`; 1,033 internal file links resolve; two preserved stale heading names have repo-local redirects in `ALPHADAWG-FILE-MAP.md`; the only two direct root-level research files were archived safely. |
-| `A0-MIRROR-001` | Internal accessibility | `PASS_IF_COMMITTED_AND_LOCK_RELEASED` | Exact results in `evidence/A0-CONTEXT-MIRROR-VALIDATION.md`; independent read-only audit agrees. |
+| `A0-MIRROR-001` | Internal accessibility | `PASS` | Content commit `11de852d0ca89563634f0512b45f1ca987670447`; exact results in `evidence/A0-CONTEXT-MIRROR-VALIDATION.md`; independent read-only audit returned `PASS_IF_COMMITTED_AND_LOCK_RELEASED`. |
 | `A1-FOUNDATION-001` | Foundation | `NOT_RUN` | Await Goal A1. |
 | `A3-0G-001` | 0G | `NOT_RUN` | No Lisbon live ID. |
 | `A4-ENS-001` | ENS | `NOT_RUN` | No Lisbon live ID. |
