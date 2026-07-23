@@ -73,13 +73,16 @@ allowed_paths:
   - docs/lisbon/evidence/**
 started_at: 2026-07-23T19:19:55Z
 expected_exit: reconcile A0 live authority, P0/E0/U0 results, mirror audit boundary, and current release blockers in one docs-only commit
+exit_sha: fa8bebbc624599f7ef1277a2a466ef72863b3142
+completed_at: 2026-07-23T19:23:05Z
+lock_release: remove the matching physical lease immediately after the closure commit
 acceptance_evidence:
   - current official ETHGlobal and sponsor requirements timestamped
   - A0 release audit remains fail-closed
   - P0, E0, and U0 exact verdicts recorded
   - byte-preserved archive excluded explicitly from authored-whitespace gate
   - Markdown links, CSV, manifest, and git diff checks pass
-status: active
+status: complete
 ```
 
 Read-only probes/auditors may overlap but must not edit, install, format, commit, push, deploy, sign, transact, submit forms, or spend.
