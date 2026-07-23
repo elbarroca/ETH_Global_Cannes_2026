@@ -21,7 +21,18 @@ allowed_paths:
   - docs/lisbon/evidence/P0-0G-PROOF-PATH-REFRESH.md
 started_at: 2026-07-23T23:30:13Z
 expected_exit: narrow P0 from no proof-capable path to a pinned official Go remediation path while keeping product and live claims blocked
-status: active
+completed_at: 2026-07-23T23:31:43Z
+exit_sha: 4c58b310bc35db6ecb4860cef4f93ca90e04c471
+lock_release: remove only token 040153A7-DC21-4736-97DD-7532BCBCEDD5 after the closure commit succeeds
+acceptance_evidence:
+  - official TypeScript Storage SDK 1.2.10 still ignores proof validation
+  - official Go Storage client v1.3.0 verifies segment proofs and the complete file Merkle root
+  - the repository does not yet integrate the Go verifier and Compute content remains unbound
+  - package versions, commits, integrity, licenses, exact APIs, verifier lines, and fatal Compute equality requirements are recorded
+  - git diff and added-line secret scans passed; TypeScript passed
+  - inherited lint remains at 23 errors and 28 warnings; npm test remains missing
+audit_verdict: pending_pinned_exit_audit
+status: complete
 ```
 
 ```yaml
