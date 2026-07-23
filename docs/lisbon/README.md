@@ -4,10 +4,10 @@ Start a new Codex project at this repository root, then open [`GOALS.md`](GOALS.
 
 ## Run first
 
-1. Paste **Goal C0** into the primary coordinator thread.
-2. After A0 closes, paste **Goal A1** into the only code-writing thread.
-3. Run **P0**, **E0**, **U0**, and **Goal VA** in separate read-only threads.
-4. Continue writer goals sequentially only when the coordinator opens their gate.
+1. Open one Codex project on `developer` and paste **Goal C0 only**.
+2. C0 reads the split prompt files and dispatches bounded subagents itself; never launch A1/P0/E0/U0/VA or another writer manually.
+3. Treat existing sidebar tasks as stopped, unverified reports until C0 ingests a complete SHA-bound handoff.
+4. Current expected state is `NARROW / WAIT_GATE`: A0 and P0 block product work, so C0 must not open A1 yet.
 
 ## Controls
 

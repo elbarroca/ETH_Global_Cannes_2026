@@ -85,4 +85,47 @@ acceptance_evidence:
 status: complete
 ```
 
+```yaml
+owner: Codex under project-owner direction
+task_id: A0-DEEP-C0
+branch: developer
+start_sha: de802b30a36680f6db05cf6f903f3e67d2b9ed66
+token: d2bf7b68-c0e3-4a6c-a1ba-32d2add7e81e
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-23T22:06:27Z
+expires_at: 2026-07-23T23:06:27Z
+allowed_paths:
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/README.md
+  - docs/lisbon/prompts/C0-COORDINATOR.md
+  - docs/lisbon/prompts/README.md
+  - docs/lisbon/prompts/A1-FOUNDATION.md
+  - docs/lisbon/prompts/P0-PROBE-0G.md
+  - docs/lisbon/prompts/E0-PROBE-ENS.md
+  - docs/lisbon/prompts/U0-PROBE-UNISWAP.md
+  - docs/lisbon/prompts/A2-AUTH-MARKETPLACE.md
+  - docs/lisbon/prompts/A2R-SHARED-RUNTIME-CLEANUP.md
+  - docs/lisbon/prompts/A3-0G.md
+  - docs/lisbon/prompts/A4-ENS.md
+  - docs/lisbon/prompts/A5-UNISWAP-CONDITIONAL.md
+  - docs/lisbon/prompts/A6-A7-DEPLOY-RELEASE.md
+  - docs/lisbon/prompts/VA-INDEPENDENT-AUDIT.md
+started_at: 2026-07-23T22:06:27Z
+expected_exit: one deeper C0 master goal plus C0-issued dispatch guards in every connected sprint prompt, with peer-goal handoff, monitoring, recovery, audit, and cut/stop controls
+exit_sha: returned_in_canonical_handoff
+exit_sha_note: a single candidate commit cannot contain its own commit SHA
+completed_at: 2026-07-23T22:23:21Z
+lock_release: remove only the matching physical lease after the candidate commit
+acceptance_evidence:
+  - current A0/P0/E0/U0 state embedded accurately
+  - C0 is the sole dispatcher and never duplicates writers
+  - peer-task reports remain unverified until pinned-SHA evidence passes
+  - independent read-only prompt audit reconciled
+  - Markdown structure, fences, local links, dispatch parity, allowed paths, diff hygiene, and added-line secret patterns pass
+status: complete
+```
+
 Read-only probes/auditors may overlap but must not edit, install, format, commit, push, deploy, sign, transact, submit forms, or spend.
