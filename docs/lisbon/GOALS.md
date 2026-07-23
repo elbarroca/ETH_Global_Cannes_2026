@@ -323,7 +323,7 @@ MONITORING AND EARLY RESULTS
 - Two missed heartbeats: request status once. Three missed: inspect agent/process/lease/repo state before interruption or replacement.
 - Any result returned in under 15 minutes becomes `EARLY_RESULT_REVIEW`, never automatic PASS. C0 may accept it only after independently validating every acceptance item and recording why no observation window was needed.
 - Concurrency, outage, restart, replay, timeout, resilience, two-demo, or live-finality tasks cannot waive their required observation/replay window.
-- At 75% of a timebox, require finish-or-narrow. At 100%, CUT optional work; protected work becomes FAIL/BLOCKED/STOP.
+- At 75% of a timebox, require finish-or-narrow. At 100%, CUT optional work; protected sprint work becomes `FAIL` or `BLOCKED` and returns to repair/reconciliation. Only expiry of the global project deadline may trigger deadline-expired `STOP`.
 
 RECONCILIATION AND PINNED AUDIT
 1. C0 recomputes every acceptance item. An agent's proposed verdict cannot promote a gate.
@@ -338,7 +338,7 @@ RETRY, RECOVERY, AND CUTS
 - One retry maximum. A retry gets a new instance and generation; every older generation becomes `REVOKED_LATE_RESULT` and cannot reopen a gate.
 - Transient read-only/tool failure: retry the same pinned packet once after proving no mutation.
 - Deterministic evidence failure: no blind retry; allow one root-cause remediation on the same scope if time remains.
-- Second protected failure, unresolved writer ambiguity, red auth/state/idempotency/strict-verification/replay guarantee, or missed protected deadline returns STOP/BLOCK.
+- Second protected failure, unresolved writer ambiguity, red auth/state/idempotency/strict-verification/replay guarantee, or a missed protected sprint deadline returns `BLOCKED` with a narrowed repair/reconciliation packet. `STOP` remains reserved for explicit project-owner cancellation, expiry of the global project deadline, or unrecoverable repository integrity.
 - Optional timeout, failed removal test, missed hour gate, or threat to the core replay reserve returns CUT.
 - Writer crash: preserve worktree and lease; never self-clear. Require process/token/diff/effect adjudication.
 - Coordinator restart: reconstruct registry from Git, all worktrees, physical/mirrored lease, evidence, task instances, and known agent IDs before dispatch.

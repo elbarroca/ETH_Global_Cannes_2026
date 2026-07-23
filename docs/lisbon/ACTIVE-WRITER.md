@@ -196,9 +196,42 @@ acceptance_evidence:
   - BUILD, NARROW, WAIT_GATE, BLOCKED, CUT, and FAIL loop to reconciliation or waiting
   - STOP is limited to owner cancellation, deadline expiry, or unrecoverable repository integrity
   - A6/A7 returns blockers and remediation instead of stopping on a red guarantee
-  - docs-only validation passes; pinned independent audit is the next gate
+  - docs-only validation passed
 completed_at: 2026-07-23T22:46:27Z
 lock_release: release only token 175370F5-49D5-4F5F-AD69-DF61C2982A6E after the candidate commit
+exit_sha: a89bb157e4cd5af0b07e67444b65b78e7b96b41c
+audit_verdict: BLOCK
+audit_findings:
+  - protected timebox failure still allowed a generic STOP
+  - retry and writer-ambiguity failure still allowed a generic STOP
+status: rejected_for_remediation
+```
+
+```yaml
+owner: C0 coordinator thread 019f910a-2546-7c82-8a45-72b8678565fc
+task_id: A0-C0-REPAIR
+task_instance_id: A0-C0-REPAIR:g4:EB730834
+generation: 4
+branch: developer
+start_sha: a89bb157e4cd5af0b07e67444b65b78e7b96b41c
+control_sha: a89bb157e4cd5af0b07e67444b65b78e7b96b41c
+token: EB730834-6C8C-4C8C-84C6-1E612B0F42F3
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-23T22:50:36Z
+expires_at: 2026-07-23T23:49:12Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/prompts/C0-COORDINATOR.md
+started_at: 2026-07-23T22:49:12Z
+expected_exit: reserve STOP exclusively for the three owner-authorized terminal conditions
+acceptance_evidence:
+  - protected sprint timebox failures become FAIL or BLOCKED and stay in repair
+  - repeated protected failures and writer ambiguity become BLOCKED and stay in reconciliation
+  - only exact global deadline expiry may trigger deadline-expired STOP
+  - docs-only validation passes; pinned independent audit is the next gate
+completed_at: 2026-07-23T22:50:36Z
+lock_release: release only token EB730834-6C8C-4C8C-84C6-1E612B0F42F3 after the candidate commit
 status: handoff_pending_audit
 ```
 
