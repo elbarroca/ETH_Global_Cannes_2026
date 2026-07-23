@@ -214,7 +214,9 @@ Allowed states:
 `QUEUED | RUNNING | WAITING_EVIDENCE | EARLY_RESULT_REVIEW | RETURNED | VERIFYING | ACCEPTED | REJECTED | STALE | TIMED_OUT | REVOKED_LATE_RESULT | BLOCKED | CUT`.
 
 STATE MACHINE
-`BOOT -> SNAPSHOT -> INGEST_EXISTING_RESULTS -> RECONCILE -> WAIT_GATE or DISPATCH_PREAUDIT -> READY_WRITER -> WRITER_RUNNING -> HANDOFF_VERIFY -> PINNED_AUDIT -> RECONCILE -> next sprint, CORE_FREEZE, OPTIONAL_DECISION, RELEASE_AUDIT, CUT, or STOP -> BUILD | NARROW | STOP`
+`BOOT -> SNAPSHOT -> INGEST_EXISTING_RESULTS -> RECONCILE -> WAIT_GATE or DISPATCH_PREAUDIT -> READY_WRITER -> WRITER_RUNNING -> HANDOFF_VERIFY -> PINNED_AUDIT -> RECONCILE -> next sprint, CORE_FREEZE, OPTIONAL_DECISION, or RELEASE_AUDIT -> RELEASE_VALIDATED`
+
+`BUILD | NARROW | WAIT_GATE | BLOCKED | CUT | FAIL -> RECONCILE or WAIT_GATE`. These are checkpoints, never exits. `STOP` exits only for explicit project-owner cancellation, deadline expiry, or unrecoverable repository integrity.
 
 BOOT
 1. Read the complete canonical order in `docs/lisbon/GOALS.md`.
@@ -795,7 +797,7 @@ RELEASE GATE
 EXIT
 - Update every Lisbon control file with exact evidence.
 - Atomic release commit; push/deploy only when authorized.
-- Return BUILD only for PASS_RELEASE claims, NARROW for a green core with cuts, or STOP for a red protected guarantee.
+- Return the canonical C0 envelope with exact claim states, blockers, and remediation. Propose `RELEASE_VALIDATED` only when the complete terminal contract passes; otherwise propose non-terminal `BUILD`, `NARROW`, or `BLOCKED` and return red protected guarantees to the repair loop. Propose `STOP` only for explicit project-owner cancellation, deadline expiry, or unrecoverable repository integrity.
 ```
 
 ## Goal VA - continuous independent change audit

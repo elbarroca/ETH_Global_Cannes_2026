@@ -161,9 +161,44 @@ acceptance_evidence:
   - RELEASE_VALIDATED is the only successful terminal state
   - BUILD, NARROW, and BLOCKED remain non-terminal checkpoints
   - prior A0-DEEP-C0 exit SHA is exact
-  - full docs-only validation passes; pinned independent audit is the next gate
+  - full docs-only validation passed
 completed_at: 2026-07-23T22:41:00Z
 lock_release: release only token C17AB9DF-A4A0-4FAA-BC5A-C868E9961ED1 after the candidate commit
+exit_sha: 225d82cafa831cad92d9357ccba81e3b4bd2b0c7
+audit_verdict: BLOCK
+audit_findings:
+  - stale state-machine tail still terminated at BUILD, NARROW, or broad STOP
+  - A6/A7 still used STOP for a red protected guarantee
+status: rejected_for_remediation
+```
+
+```yaml
+owner: C0 coordinator thread 019f910a-2546-7c82-8a45-72b8678565fc
+task_id: A0-C0-REPAIR
+task_instance_id: A0-C0-REPAIR:g3:175370F5
+generation: 3
+branch: developer
+start_sha: 225d82cafa831cad92d9357ccba81e3b4bd2b0c7
+control_sha: 225d82cafa831cad92d9357ccba81e3b4bd2b0c7
+token: 175370F5-49D5-4F5F-AD69-DF61C2982A6E
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-23T22:46:27Z
+expires_at: 2026-07-23T23:44:57Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/prompts/C0-COORDINATOR.md
+  - docs/lisbon/prompts/A6-A7-DEPLOY-RELEASE.md
+started_at: 2026-07-23T22:44:57Z
+expected_exit: remove every stale early-terminal path and keep red guarantees in the repair loop
+acceptance_evidence:
+  - state machine exits successfully only at RELEASE_VALIDATED
+  - BUILD, NARROW, WAIT_GATE, BLOCKED, CUT, and FAIL loop to reconciliation or waiting
+  - STOP is limited to owner cancellation, deadline expiry, or unrecoverable repository integrity
+  - A6/A7 returns blockers and remediation instead of stopping on a red guarantee
+  - docs-only validation passes; pinned independent audit is the next gate
+completed_at: 2026-07-23T22:46:27Z
+lock_release: release only token 175370F5-49D5-4F5F-AD69-DF61C2982A6E after the candidate commit
 status: handoff_pending_audit
 ```
 
