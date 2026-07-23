@@ -229,10 +229,21 @@ acceptance_evidence:
   - protected sprint timebox failures become FAIL or BLOCKED and stay in repair
   - repeated protected failures and writer ambiguity become BLOCKED and stay in reconciliation
   - only exact global deadline expiry may trigger deadline-expired STOP
-  - docs-only validation passes; pinned independent audit is the next gate
+  - docs-only validation passed
 completed_at: 2026-07-23T22:50:36Z
 lock_release: release only token EB730834-6C8C-4C8C-84C6-1E612B0F42F3 after the candidate commit
-status: handoff_pending_audit
+exit_sha: a97b2a15a5b346f3d212f325746600ecc801f2b1
+audit_target_sha: a97b2a15a5b346f3d212f325746600ecc801f2b1
+audit_verdict: PASS_TO_NEXT_GATE
+audit_findings: []
+audit_scope:
+  - exact three-file allowed-path diff
+  - clean developer and absent physical lock
+  - STOP limited to owner cancellation, global deadline expiry, or unrecoverable repository integrity
+  - protected failures return to repair or reconciliation
+  - RELEASE_VALIDATED is the only successful terminal state
+  - A0, P0, and external-effect blocks remain intact
+status: complete
 ```
 
 Read-only probes/auditors may overlap but must not edit, install, format, commit, push, deploy, sign, transact, submit forms, or spend.
