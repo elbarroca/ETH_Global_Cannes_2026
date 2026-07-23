@@ -17,7 +17,7 @@ allowed_paths:
 started_at: 2026-07-24T00:03:30+01:00
 expected_exit: lean canonical contract, sprint ledger, reusable executor/auditor prompts, and verified local commit
 completed_at: 2026-07-24T00:12:41+01:00
-exit_sha: commit containing this closure record
+exit_sha: 5e5b0282daea08d5d4937e54d687580ab8c3dbd7
 lock_release: remove only token 35E26400-39E6-47C1-BD25-C0CCE1773013 after the commit succeeds
 acceptance_evidence:
   - current prompt surface reduced from 13 files to 4
@@ -26,6 +26,10 @@ acceptance_evidence:
   - TypeScript passed; inherited lint and missing test script remain explicit A1 blockers
   - independent read-only audit returned PASS after reconciliation
 audit_verdict: PASS
+closure_token: F5A1FCBE-FE70-462B-900D-4B086F16D48C
+closure_start_sha: 5e5b0282daea08d5d4937e54d687580ab8c3dbd7
+closure_reason: record the exact content exit SHA after commit
+closure_completed_at: 2026-07-24T00:14:34+01:00
 status: complete
 ```
 
