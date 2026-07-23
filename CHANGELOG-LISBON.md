@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - Continuity timing clarification
+
+- Recorded the project owner's clarification that H0 constrains the From Scratch project, not local AlphaDawg Continuity work.
+- Reconciled current ETHGlobal rules: Continuity may build on existing code, but pre-H0 work remains disclosed prior work and only substantive event-window additions count as Lisbon-new.
+- Kept A1 blocked on rights/license/team/owner, required access/caps, 0G proof compatibility, and independent A0 audit.
+- Performed no product change, dependency install, push, deployment, signature, transaction, form, spend, or claim promotion.
+
 ## 2026-07-24 - Lean autonomous sprint pack
 
 - Replaced the duplicated all-in-one and per-domain prompt pack with one execution contract, one `A0-A7` sprint ledger, one C0 launch prompt, one reusable writer, and one reusable independent auditor.

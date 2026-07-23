@@ -1,12 +1,12 @@
 # AlphaDawg Lisbon Baseline
 
-Status: `BLOCKED_A0_PRE_H0_AND_CLEARANCE`
+Status: `BLOCKED_A0_CLEARANCE_AND_STATIC_COMPATIBILITY`
 
 ## Start authority
 
-At 2026-07-23 18:06:32 WEST, the project owner explicitly authorized AlphaDawg Continuity work to proceed. This authorizes local implementation and commits on `developer`. It does not authorize external spend, signatures, transactions, deployment, push, or prize claims.
+At 2026-07-23 18:06:32 WEST, the project owner explicitly authorized AlphaDawg Continuity work to proceed. At 2026-07-24 00:20 WEST, the owner clarified that the official-start restriction applies to the From Scratch project, while AlphaDawg Continuity may begin locally before H0. This authorizes local implementation and commits on `developer`. It does not authorize external spend, signatures, transactions, deployment, push, or prize claims.
 
-The controlling Goal 00 nevertheless makes `A0-LIVE-AUTHORITY` blocking. The 2026-07-23 19:46 WEST official-source recheck confirmed that hacking begins on 2026-07-24 at 21:00 WEST. Until that signal and the fatal clearance rows below pass, product writers remain closed and all claims remain `research_only_not_promotable`. Documentation-only control work may continue under the atomic writer lease.
+Current ETHGlobal rules confirm that only Classic From Scratch projects must begin at kickoff and that Continuity may build on an existing codebase. They also require substantive new Continuity functionality to be developed during the event and all prior work to be disclosed. H0 therefore no longer blocks local Continuity work, but pre-H0 commits remain disclosed prior work and cannot be promoted as Lisbon-window additions. Product writers remain closed on the fatal rights, team, access, and static-compatibility gates below; all claims remain `research_only_not_promotable`.
 
 ## Immutable prior state
 
@@ -39,7 +39,7 @@ Live payments/trading, Sui, Crawbot claims, legacy OpenClaw success fallbacks, a
 
 ## Gates still open
 
-- Official H0/live dashboard signal at or after 2026-07-24 21:00 WEST.
+- Official H0/live dashboard signal at or after 2026-07-24 21:00 WEST before any commit is classified as Lisbon-window work.
 - Former-contributor reuse and MIT-license authorization.
 - Lisbon team and changed-team Continuity evidence.
 - Named operational owners and backup.

@@ -6,7 +6,7 @@ These are acceptance cards, not standalone prompts. C0 runs them in order using 
 
 | Sprint | Timebox | Mode | Depends on | Exit |
 |---|---:|---|---|---|
-| `A0` readiness and eligibility | 60-90 min | Read-only research + control writer | Owner authority | Current provenance, H0, rights, access, rules, and track gates are evidence-backed. |
+| `A0` readiness and eligibility | 60-90 min | Read-only research + control writer | Owner authority | Current provenance, Continuity timing boundary, rights, access, rules, and track gates are evidence-backed. |
 | `A1` deterministic foundation | 3-4 h | Writer | A0 | Clean install, real verification scripts, CI, schema, lint, typecheck, tests, and build pass. |
 | `A2` authenticated kernel and runtime | 5-7 h | Writer | A1 | Immutable hiring flow and one restart-safe worker reject forgery and duplication. |
 | `A3` strict 0G | 3-5 h | Writer | A2 + 0G static gate | Verified inference and proof-enabled Storage readback are mandatory for delivery. |
@@ -29,7 +29,7 @@ Deliver:
 - Confirm named owners, credentials/access readiness, testnet budgets, and each external-effect row without exposing secret values.
 - Update `BASELINE.md`, `TRACK-MATRIX.md`, `CLAIM-MATRIX.md`, and `EVIDENCE.md` only where current evidence changes them.
 
-Gate: unresolved H0, rights, eligibility, required access, or static compatibility stays `BLOCKED`; A1 does not open. URL reachability alone proves nothing.
+Gate: H0 does not block local Continuity work, but it remains the boundary for Lisbon-new evidence. Unresolved rights, eligibility, required access, or static compatibility stays `BLOCKED`; A1 does not open. URL reachability alone proves nothing.
 
 ## A1 - deterministic foundation
 

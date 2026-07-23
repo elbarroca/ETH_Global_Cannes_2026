@@ -4,7 +4,7 @@
 |---|---|---|
 | Clean Cannes baseline | `CONFIRMED` | Commit/tree/lock hashes and clean event worktree. |
 | Local Continuity implementation authority | `CONFIRMED_LOCAL_ONLY` | Project-owner thread authorization. |
-| A0 release authority | `BLOCKED_PRE_H0_AND_CLEARANCE` | Live H0, rights/license/team/owners, exact evidence, and independent `PASS_TO_NEXT_GATE`. |
+| A0 release authority | `BLOCKED_CLEARANCE_AND_STATIC_COMPATIBILITY` | Rights/license/team/owners, required access, compatible 0G proof path, exact evidence, and independent `PASS_TO_NEXT_GATE`; H0 remains the boundary for Lisbon-new evidence. |
 | Open-source/license authority | `PENDING` | Contributor authorization and root license. |
 | 0G Keep qualification | `research_only_not_promotable; P0_FAIL_STATIC_LIVE_BLOCKED` | Proof-capable Storage path, A3 `PASS_LIVE`, then A7 `PASS_RELEASE`. |
 | ENS Continuity qualification | `research_only_not_promotable; E0_PASS_STABLE_STATIC_LIVE_BLOCKED` | A4 live identifiers, refusal proof, booth/demo artifacts, A7. |

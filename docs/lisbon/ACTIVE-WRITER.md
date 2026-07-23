@@ -4,6 +4,29 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Codex under project-owner direction
+task_id: A0-CONTINUITY-CLARIFICATION
+branch: developer
+start_sha: 3cd11943faddcf5f6d7ed7455fec783dcfd6325f
+token: 1517BEF5-9BC1-42B2-878C-9600F6A8DC8A
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-23T23:25:13Z
+expires_at: 2026-07-24T00:25:13Z
+allowed_paths:
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/BASELINE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/SPRINTS.md
+  - docs/lisbon/evidence/A0-CONTINUITY-CLARIFICATION.md
+  - docs/lisbon/prompts/C0-COORDINATOR.md
+started_at: 2026-07-23T23:25:13Z
+expected_exit: reconcile the project-owner Continuity timing clarification with current official rules without promoting pre-H0 work
+status: active
+```
+
+```yaml
+owner: Codex under project-owner direction
 task_id: A0-LEAN-GOAL-PACK
 branch: developer
 start_sha: eedcdc58a93065410d430db2d9c7d602927793b1
