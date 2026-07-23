@@ -22,7 +22,19 @@ allowed_paths:
   - docs/lisbon/prompts/C0-COORDINATOR.md
 started_at: 2026-07-23T23:25:13Z
 expected_exit: reconcile the project-owner Continuity timing clarification with current official rules without promoting pre-H0 work
-status: active
+completed_at: 2026-07-23T23:29:14Z
+exit_sha: 03b1e1e22c543f7d90eb8d8c0ab17ef111894fbb
+lock_release: remove only token 1517BEF5-9BC1-42B2-878C-9600F6A8DC8A after the closure commit succeeds
+acceptance_evidence:
+  - current ETHGlobal rules and project-owner clarification clear H0 only as a local Continuity-build blocker
+  - pre-H0 commits remain disclosed prior work and cannot become Lisbon-window evidence
+  - branch, baseline ancestry, both worktrees, remotes, repository visibility, contributor count, root license, and root environment-file presence were rechecked
+  - current official source response hashes and remaining A0 blockers are recorded in evidence/A0-CONTINUITY-CLARIFICATION.md
+  - git diff checks and TypeScript passed
+  - inherited lint remains at 23 errors and 28 warnings; npm test remains missing
+  - independent read-only audit required these exact control updates and retained the remaining A0 blockers
+audit_verdict: pending_pinned_exit_audit
+status: complete
 ```
 
 ```yaml
