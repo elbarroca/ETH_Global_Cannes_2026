@@ -6,8 +6,8 @@ These are acceptance cards, not standalone prompts. C0 runs them in order using 
 
 | Sprint | Timebox | Mode | Depends on | Exit |
 |---|---:|---|---|---|
-| `A0` readiness and eligibility | 60-90 min | Read-only research + control writer | Owner authority | Current provenance, Continuity timing boundary, rights, access, rules, and track gates are evidence-backed. |
-| `A1` deterministic foundation | 3-4 h | Writer | A0 | Clean install, real verification scripts, CI, schema, lint, typecheck, tests, and build pass. |
+| `A0` local admission + release/eligibility controls | 60-90 min | Read-only research + control writer | Owner authority | `A0_LOCAL` passes on Git provenance, local owner authority, and writer serialization; other gaps remain isolated release/claim/live blockers. |
+| `A1` deterministic foundation | 3-4 h | Writer | A0_LOCAL | Clean install, real verification scripts, CI, schema, lint, typecheck, tests, and build pass. |
 | `A2` authenticated kernel and runtime | 5-7 h | Writer | A1 | Immutable hiring flow and one restart-safe worker reject forgery and duplication. |
 | `A3` strict 0G | 3-5 h | Writer | A2 + 0G static gate | Verified inference and proof-enabled Storage readback are mandatory for delivery. |
 | `A4` ENS authority | 2-4 h | Writer | A3 + ENS static gate | Fresh creator/agent records gate 0G before and after execution. |
@@ -19,17 +19,17 @@ Only read-only A0 research and audits may overlap a product writer. A0 control e
 
 ## A0 - readiness and eligibility
 
-Objective: decide `BUILD`, `NARROW`, or `WAIT_GATE` from current facts before product work.
+Objective: admit safe local work independently from release, claim, and live-effect readiness.
 
 Deliver:
 
 - Verify repository root, branch, HEAD, baseline ancestry, worktrees, remotes, clean state, and writer lease.
-- Recheck official H0, category, Continuity/change rules, team and IP/license rights, deadlines, prize rules, mandatory artifacts, and sponsor primitive requirements from current primary sources.
+- Preserve current H0, category, Continuity/change, team/IP/license, deadline, prize, mandatory-artifact, and sponsor requirements as release/claim controls; refresh time-sensitive sources before promotion or release.
 - Reconcile existing 0G, ENS, and Uniswap research instead of rerunning it blindly. Refresh only stale, contradicted, or implementation-version-dependent evidence.
-- Confirm named owners, credentials/access readiness, testnet budgets, and each external-effect row without exposing secret values.
+- Keep missing named owners, credentials/access readiness, and testnet budgets fail-closed for release or the affected live effect without exposing secret values.
 - Update `BASELINE.md`, `TRACK-MATRIX.md`, `CLAIM-MATRIX.md`, and `EVIDENCE.md` only where current evidence changes them.
 
-Gate: H0 does not block local Continuity work, but it remains the boundary for Lisbon-new evidence. Unresolved rights, eligibility, required access, or static compatibility stays `BLOCKED`; A1 does not open. URL reachability alone proves nothing.
+Gate: `A0_LOCAL` passes only when Git provenance, local owner authority, and writer serialization pass. It opens safe local A1 and authorizes later A2/offline A3 after their sequential prerequisites pass. Rights/license/team/owner/access/cap gaps, H0/event-window evidence, and P0 live proof remain `RELEASE_BLOCKED`, claim-blocked, or `LIVE_EFFECT_BLOCKED`; they do not close A1. URL reachability alone proves nothing.
 
 ## A1 - deterministic foundation
 
@@ -63,7 +63,7 @@ Verify: forgery, cross-user access, malformed signatures, illegal transitions, 2
 
 Objective: make verified 0G output and proof-capable Storage readback load-bearing.
 
-Entry: A2 passes and the exact installed 0G versions/APIs have current static proof. The recorded static failure blocks implementation until resolved; never code around it with a success flag.
+Entry: A2 passes and the pinned official Go proof-verifier path plus exact installed 0G versions/APIs have current static evidence. The TypeScript Storage SDK proof limitation does not block implementing the Go boundary; it forbids treating the TypeScript proof flag as success. Live calls and promotion remain separately blocked.
 
 Deliver:
 
@@ -73,7 +73,7 @@ Deliver:
 - Persist redacted request, proof, output, storage identifiers, and ambiguity-reconciliation state.
 - Keep all local/mock/OpenClaw fallbacks non-authoritative.
 
-Verify: success when separately authorized; missing/invalid/tampered proof, one-byte tamper, malformed response, timeout, outage, duplicate retry, and kill/restart produce no false success or replacement effect.
+Verify: local fixtures and integration first; missing/invalid/tampered proof, one-byte tamper, malformed response, timeout, outage, duplicate retry, and kill/restart produce no false success or replacement effect. `PASS_LIVE` requires separate exact authorization and public identifiers.
 
 ## A4 - ENS authority
 

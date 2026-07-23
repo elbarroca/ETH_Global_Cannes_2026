@@ -3,10 +3,11 @@
 | Claim | State | Required promotion evidence |
 |---|---|---|
 | Clean Cannes baseline | `CONFIRMED` | Commit/tree/lock hashes and clean event worktree. |
-| Local Continuity implementation authority | `CONFIRMED_LOCAL_ONLY` | Project-owner thread authorization. |
-| A0 release authority | `BLOCKED_CLEARANCE_AND_STATIC_COMPATIBILITY` | Rights/license/team/owners, required access, compatible 0G proof path, exact evidence, and independent `PASS_TO_NEXT_GATE`; H0 remains the boundary for Lisbon-new evidence. |
+| Local Continuity implementation authority | `LOCAL_BUILD_AUTHORIZED` | A0_LOCAL Git provenance, project-owner local authority, and writer serialization. |
+| Release and claim authority | `RELEASE_BLOCKED` | Rights/license/team/owners, required access/caps, event-window classification, same-SHA release evidence, and independent release audit; H0 remains the boundary for Lisbon-new evidence. |
+| Sponsor and shared-system effects | `LIVE_EFFECT_BLOCKED` | Exact current effect-specific authorization, provider/network/scope/cap, and resulting public identifiers. |
 | Open-source/license authority | `PENDING` | Contributor authorization and root license. |
-| 0G Keep qualification | `research_only_not_promotable; P0_GO_PATH_FOUND_TS_FAIL_PRODUCT_LIVE_BLOCKED` | Pin and integrate the official Go proof verifier, make Compute binding fatal, pass A3 live/tamper gates, then A7 `PASS_RELEASE`. |
+| 0G Keep qualification | `research_only_not_promotable; P0_GO_PATH_FOUND; LIVE_EFFECT_BLOCKED` | Integrate the pinned official Go proof verifier, make Compute binding fatal, pass A3 fixture/integration, obtain exact live authority and identifiers, then pass A7 release validation. |
 | ENS Continuity qualification | `research_only_not_promotable; E0_PASS_STABLE_STATIC_LIVE_BLOCKED` | A4 live identifiers, refusal proof, booth/demo artifacts, A7. |
 | Uniswap Stack qualification | `U0_ADMITTED_CONDITIONAL_NOT_OPEN` | Green frozen A5 core, A6 admission, upstream reusable contribution, live proof if applicable, FEEDBACK.md/form, A7. |
 | Uniswap API qualification | `REJECTED_WITHOUT_WRITTEN_ADMISSION` | Written admission, A6 live API/onchain lifecycle, and A7. |

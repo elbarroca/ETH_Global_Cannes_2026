@@ -3,6 +3,46 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator task /root
+task_id: A0-LOCAL-ADMISSION-20260724T0045WEST
+task_instance_id: A0-LOCAL-ADMISSION-20260724T0045WEST:EC59B765
+sprint: A0
+mode: sole_writer
+branch: developer
+start_sha: 2dd242d4ae217fd6cd370e598d3ffca3250ab1f7
+control_sha: 2dd242d4ae217fd6cd370e598d3ffca3250ab1f7
+token: EC59B765-2E1D-4FEF-B0DD-463DD4F9E48F
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-23T23:54:55Z
+expires_at: 2026-07-24T00:45:00Z
+allowed_paths:
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/BASELINE.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/SPRINTS.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/evidence/A0-LOCAL-BUILD-ADMISSION.md
+started_at: 2026-07-23T23:48:00Z
+expected_exit: admit A0_LOCAL while preserving independent release, claim, and live-effect blocks
+lock_release: release only token EC59B765-2E1D-4FEF-B0DD-463DD4F9E48F after the atomic commit
+completed_at: 2026-07-23T23:54:55Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - A0_LOCAL passes on Git provenance, local project-owner authority, and writer serialization only
+  - LOCAL_BUILD_AUTHORIZED, RELEASE_BLOCKED, and LIVE_EFFECT_BLOCKED are independent
+  - A1 opens while release, claim, and affected live-effect gaps stay fail-closed
+  - pre-H0 work remains disclosed prior/pre-window work
+  - allowed-path, Markdown/link, diff, vocabulary, stale-state, and changed-line secret checks pass
+  - no product change or external effect occurred
+audit_verdict: pending_pinned_exit_audit
+status: complete
+```
+
+```yaml
 owner: Codex under project-owner direction
 task_id: P0-0G-PROOF-PATH-CONTROL
 branch: developer

@@ -12,12 +12,15 @@ Uniswap is optional. It may run only after the protected path is frozen, repeata
 
 ## Authority and scope
 
+- `LOCAL_BUILD_AUTHORIZED`: A0_LOCAL admits safe local A1 and, after their sequential prerequisites pass, A2 and offline A3 work plus atomic commits on `developer`.
+- `RELEASE_BLOCKED`: rights/license, team/owner, access/cap, event-window, same-SHA, submission, and promotion evidence remain release/claim gates.
+- `LIVE_EFFECT_BLOCKED`: only an exact `AUTHORIZED` row may open its named sponsor/API call, managed database effect, deployment, signature, transaction, form, or spend; mainnet value remains prohibited.
 - Project: AlphaDawg only.
 - Immutable prior baseline: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 - Implementation branch: `developer`.
 - Current authority and state come from `BASELINE.md`, `EXTERNAL-EFFECTS.md`, `TRACK-MATRIX.md`, `CLAIM-MATRIX.md`, and `EVIDENCE.md`; never from a timestamp embedded in a prompt.
 - Previous Cannes code is reusable input, not Lisbon eligibility or release evidence.
-- Local files and commits are the only pre-authorized effects. Push, deploy, provision, migrate, call paid APIs, sign, transact, submit forms, spend, or publish claims only when `EXTERNAL-EFFECTS.md` contains exact current authorization.
+- Local files, tests, loopback processes, disposable local databases, and commits are the only pre-authorized effects. Push, deploy, provision, migrate a managed database, call sponsor/paid APIs, sign, transact, submit forms, spend, or publish claims only when `EXTERNAL-EFFECTS.md` contains exact current authorization.
 - Mainnet value remains prohibited.
 
 ## Read order
@@ -42,6 +45,8 @@ The archive is provenance only. It cannot direct current work.
 - Use the matching specialist already registered in `AGENTS.md`; do not invent roles or run broad agent swarms.
 - Every task is pinned to a start or audit SHA, exact scope, deadline, evidence, and allowed effects.
 - Unknown dirty state, branch mismatch, stale evidence, ambiguous writer state, or missing authority blocks mutation.
+
+`A0_LOCAL` passes only on Git provenance, local project-owner authority, and writer serialization. Once those pass, release/claim/live-effect gaps do not block A1 or later A2/offline A3 after their code prerequisites pass; they remain isolated at their affected gates.
 
 ## Autonomous loop
 
