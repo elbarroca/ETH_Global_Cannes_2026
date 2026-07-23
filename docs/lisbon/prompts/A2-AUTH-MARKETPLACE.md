@@ -25,7 +25,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current single-use Goal C0 packet for this exact goal.
 - Verify `mode: sole_writer`, unique `task_instance_id`, generation, `dispatch_sha`, target/control SHA, `goal_source`, `admitted_at_sha` equal to current admitted HEAD, prerequisite verdict digest, exact allowed paths, deadline, and unconsumed admission.
 - Missing, stale, mismatched, reused, non-C0, or already-terminal admission returns `BLOCKED_NOT_DISPATCHED` before lease acquisition, edit, install, command, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Own the sole writer slot for A2. Replace AlphaDawg's trust-on-userId marketplace behavior with one authenticated creator, one immutable agent version, one authenticated buyer, and one replay-safe job lifecycle.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Own the sole writer slot for A2. Replace AlphaDawg's trust-on-userId marketplace behavior with one authenticated creator, one immutable agent version, one authenticated buyer, and one replay-safe job lifecycle.
 
 PRECONDITIONS
 - A1 is green on one SHA.

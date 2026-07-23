@@ -115,8 +115,7 @@ allowed_paths:
   - docs/lisbon/prompts/VA-INDEPENDENT-AUDIT.md
 started_at: 2026-07-23T22:06:27Z
 expected_exit: one deeper C0 master goal plus C0-issued dispatch guards in every connected sprint prompt, with peer-goal handoff, monitoring, recovery, audit, and cut/stop controls
-exit_sha: returned_in_canonical_handoff
-exit_sha_note: a single candidate commit cannot contain its own commit SHA
+exit_sha: 4a9015f24913f33283fdf7063673f8982f7005d2
 completed_at: 2026-07-23T22:23:21Z
 lock_release: remove only the matching physical lease after the candidate commit
 acceptance_evidence:
@@ -126,6 +125,46 @@ acceptance_evidence:
   - independent read-only prompt audit reconciled
   - Markdown structure, fences, local links, dispatch parity, allowed paths, diff hygiene, and added-line secret patterns pass
 status: complete
+```
+
+```yaml
+owner: C0 coordinator thread 019f910a-2546-7c82-8a45-72b8678565fc
+task_id: A0-C0-REPAIR
+task_instance_id: A0-C0-REPAIR:g2:C17AB9DF
+generation: 2
+branch: developer
+start_sha: 4a9015f24913f33283fdf7063673f8982f7005d2
+control_sha: 4a9015f24913f33283fdf7063673f8982f7005d2
+token: C17AB9DF-A4A0-4FAA-BC5A-C868E9961ED1
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-23T22:41:00Z
+expires_at: 2026-07-23T23:36:54Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/prompts/C0-COORDINATOR.md
+  - docs/lisbon/prompts/A1-FOUNDATION.md
+  - docs/lisbon/prompts/P0-PROBE-0G.md
+  - docs/lisbon/prompts/E0-PROBE-ENS.md
+  - docs/lisbon/prompts/U0-PROBE-UNISWAP.md
+  - docs/lisbon/prompts/A2-AUTH-MARKETPLACE.md
+  - docs/lisbon/prompts/A2R-SHARED-RUNTIME-CLEANUP.md
+  - docs/lisbon/prompts/A3-0G.md
+  - docs/lisbon/prompts/A4-ENS.md
+  - docs/lisbon/prompts/A5-UNISWAP-CONDITIONAL.md
+  - docs/lisbon/prompts/A6-A7-DEPLOY-RELEASE.md
+  - docs/lisbon/prompts/VA-INDEPENDENT-AUDIT.md
+started_at: 2026-07-23T22:36:54Z
+expected_exit: exact RELEASE_VALIDATED terminal contract, separated dispatch guards, and exact prior closure SHA
+acceptance_evidence:
+  - every split prompt keeps its task body separate from the dispatch guard
+  - RELEASE_VALIDATED is the only successful terminal state
+  - BUILD, NARROW, and BLOCKED remain non-terminal checkpoints
+  - prior A0-DEEP-C0 exit SHA is exact
+  - full docs-only validation passes; pinned independent audit is the next gate
+completed_at: 2026-07-23T22:41:00Z
+lock_release: release only token C17AB9DF-A4A0-4FAA-BC5A-C868E9961ED1 after the candidate commit
+status: handoff_pending_audit
 ```
 
 Read-only probes/auditors may overlap but must not edit, install, format, commit, push, deploy, sign, transact, submit forms, or spend.

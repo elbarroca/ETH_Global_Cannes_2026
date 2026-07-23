@@ -362,10 +362,11 @@ EXTERNAL AUTHORITY
 - Persist approval digest and signed bytes/hash before broadcast; reconcile `UNKNOWN` by the same identifier; never replace blindly.
 
 TERMINAL DECISIONS
-- `BUILD`: every promoted claim is `PASS_RELEASE` on one unchanged SHA; every task instance terminal; no pending/unobservable task; no lease; all worktrees clean; final independent audit passes.
-- `NARROW`: protected core is release-green; optional work explicitly CUT; claims match evidence.
-- `WAIT_GATE/BLOCKED`: exact human/external evidence, owner, deadline, and restart condition are named; no safe autonomous transition exists.
-- `STOP`: any protected guarantee stays red, release evidence is stale, or required authority cannot be obtained in time.
+- `RELEASE_VALIDATED` is the only successful terminal state. Declare it only when every required gate independently passes; every promoted claim is `PASS_RELEASE`; optional gates are `PASS_RELEASE` or evidence-backed `CUT`; no critical/high finding remains; one exact release SHA passes clean-checkout install, Prisma validation, lint, strict typecheck, tests, build, start, secret scan, and required migrations; two resettable end-to-end replays pass without manual repair or duplicate effects; separately authorized deployments and public evidence use that SHA; `TRACK-MATRIX.md`, `CLAIM-MATRIX.md`, `EVIDENCE.md`, `FRESH-CLONE.md`, the changelog, and public identifiers agree; every task instance is terminal; every worktree is clean; and the writer lease is released.
+- `BUILD` and `NARROW` are non-terminal program decisions. They never complete or stop the persistent C0 goal.
+- `WAIT_GATE/BLOCKED` is non-terminal. Name the exact missing evidence, owner action, affected gates, deadline or wake condition, and all work completed meanwhile; keep the goal active.
+- `STOP` is terminal only for explicit project-owner cancellation, deadline-expired stop, or an unrecoverable repository-integrity blocker.
+- A fixable failure, audit finding, missing authority, missing credential, future H0, or red protected guarantee is never terminal while safe runnable work remains.
 
 STATUS OUTPUT AFTER EVERY TRANSITION
 STATUS_OUTPUT_BEGIN
@@ -385,7 +386,7 @@ LAUNCH
 1. Open one Codex project at the AlphaDawg Lisbon repository root on `developer`.
 2. Paste only C0. Treat all split prompt files as C0-owned templates.
 3. Existing 15-minute sidebar tasks stay stopped; ingest their canonical handoffs or ignore them. Never launch peer writers manually.
-4. On first boot, expect `NARROW / WAIT_GATE`: A0 is blocked and P0 failed static validation. Do not open A1.
+4. On first boot, expect `NARROW / WAIT_GATE`: A0 is blocked and P0 failed static validation. This is a non-terminal checkpoint; do not open A1.
 5. Resume this same C0 after official H0 and missing human evidence arrive. Do not create a second coordinator unless the first is proven terminal.
 6. Launching C0 authorizes no push, deployment, provisioning, sponsor call, signature, transaction, form, or spend.
 ```
@@ -399,7 +400,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current single-use Goal C0 packet for this exact goal.
 - Verify `mode: sole_writer`, unique `task_instance_id`, generation, `dispatch_sha`, target/control SHA, `goal_source`, `admitted_at_sha` equal to current admitted HEAD, prerequisite verdict digest, exact allowed paths, deadline, and unconsumed admission.
 - Missing, stale, mismatched, reused, non-C0, or already-terminal admission returns `BLOCKED_NOT_DISPATCHED` before lease acquisition, edit, install, command, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Own the sole writer slot for A1. Make the existing AlphaDawg repository reproducibly install, validate, test, lint, typecheck, build, and migrate without touching sponsor behavior or external systems.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Own the sole writer slot for A1. Make the existing AlphaDawg repository reproducibly install, validate, test, lint, typecheck, build, and migrate without touching sponsor behavior or external systems.
 
 PRECONDITIONS
 - Read docs/lisbon/GOALS.md and all required context.
@@ -443,7 +446,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current Goal C0 packet for this exact read-only goal.
 - Verify `mode: read_only`, unique `task_instance_id`, generation, pinned target/control SHA, `goal_source`, acceptance items, expiry, deadline, and explicit no-mutation boundary.
 - Missing, stale, mismatched, duplicate, or non-C0 dispatch returns `BLOCKED_NOT_DISPATCHED` before install, product edit, live call, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Probe current official 0G Compute/Private Computer and Storage compatibility for AlphaDawg without modifying the product checkout.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Probe current official 0G Compute/Private Computer and Storage compatibility for AlphaDawg without modifying the product checkout.
 
 BOUNDARY
 - Product repo is read-only. Use a disposable directory for packages, builds, caches, and logs.
@@ -473,7 +478,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current Goal C0 packet for this exact read-only goal.
 - Verify `mode: read_only`, unique `task_instance_id`, generation, pinned target/control SHA, `goal_source`, acceptance items, expiry, deadline, and explicit no-mutation boundary.
 - Missing, stale, mismatched, duplicate, or non-C0 dispatch returns `BLOCKED_NOT_DISPATCHED` before install, product edit, live call, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Probe the current stable ENS write/update/resolve path and direct ENSv2 readiness without modifying the AlphaDawg product checkout.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Probe the current stable ENS write/update/resolve path and direct ENSv2 readiness without modifying the AlphaDawg product checkout.
 
 BOUNDARY
 - Product repo is read-only; use a disposable project.
@@ -502,7 +509,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current Goal C0 packet for this exact read-only goal.
 - Verify `mode: read_only`, unique `task_instance_id`, generation, pinned target/control SHA, `goal_source`, acceptance items, expiry, deadline, and explicit no-mutation boundary.
 - Missing, stale, mismatched, duplicate, or non-C0 dispatch returns `BLOCKED_NOT_DISPATCHED` before install, product edit, live call, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Determine the smallest honest Uniswap path for AlphaDawg and prove SDK/API compatibility without modifying the product checkout or executing value.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Determine the smallest honest Uniswap path for AlphaDawg and prove SDK/API compatibility without modifying the product checkout or executing value.
 
 BOUNDARY
 - Product repo is read-only; use a disposable directory.
@@ -532,7 +541,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current single-use Goal C0 packet for this exact goal.
 - Verify `mode: sole_writer`, unique `task_instance_id`, generation, `dispatch_sha`, target/control SHA, `goal_source`, `admitted_at_sha` equal to current admitted HEAD, prerequisite verdict digest, exact allowed paths, deadline, and unconsumed admission.
 - Missing, stale, mismatched, reused, non-C0, or already-terminal admission returns `BLOCKED_NOT_DISPATCHED` before lease acquisition, edit, install, command, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Own the sole writer slot for A2. Replace AlphaDawg's trust-on-userId marketplace behavior with one authenticated creator, one immutable agent version, one authenticated buyer, and one replay-safe job lifecycle.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Own the sole writer slot for A2. Replace AlphaDawg's trust-on-userId marketplace behavior with one authenticated creator, one immutable agent version, one authenticated buyer, and one replay-safe job lifecycle.
 
 PRECONDITIONS
 - A1 is green on one SHA.
@@ -577,7 +588,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current single-use Goal C0 packet for this exact goal.
 - Verify `mode: sole_writer`, unique `task_instance_id`, generation, `dispatch_sha`, target/control SHA, `goal_source`, `admitted_at_sha` equal to current admitted HEAD, prerequisite verdict digest, exact allowed paths, deadline, and unconsumed admission.
 - Missing, stale, mismatched, reused, non-C0, or already-terminal admission returns `BLOCKED_NOT_DISPATCHED` before lease acquisition, edit, install, command, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Own the sole writer slot for the post-A2 cleanup gate. Remove dead or unsafe critical-path behavior, isolate OpenClaw/Crawbot legacy surfaces, and optimize only measured demo bottlenecks without changing the A2 contract.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Own the sole writer slot for the post-A2 cleanup gate. Remove dead or unsafe critical-path behavior, isolate OpenClaw/Crawbot legacy surfaces, and optimize only measured demo bottlenecks without changing the A2 contract.
 
 PRECONDITIONS
 - A1 and A2 pass.
@@ -621,7 +634,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current single-use Goal C0 packet for this exact goal.
 - Verify `mode: sole_writer`, unique `task_instance_id`, generation, `dispatch_sha`, target/control SHA, `goal_source`, `admitted_at_sha` equal to current admitted HEAD, prerequisite verdict digest, exact allowed paths, deadline, and unconsumed admission.
 - Missing, stale, mismatched, reused, non-C0, or already-terminal admission returns `BLOCKED_NOT_DISPATCHED` before lease acquisition, edit, install, command, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Own the sole writer slot for A3. Integrate one strict 0G Compute/Private Computer and proof-enabled Storage path into the authenticated A2 job lifecycle.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Own the sole writer slot for A3. Integrate one strict 0G Compute/Private Computer and proof-enabled Storage path into the authenticated A2 job lifecycle.
 
 PRECONDITIONS
 - A1, A2, cleanup gate, and P0 pass.
@@ -661,7 +676,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current single-use Goal C0 packet for this exact goal.
 - Verify `mode: sole_writer`, unique `task_instance_id`, generation, `dispatch_sha`, target/control SHA, `goal_source`, `admitted_at_sha` equal to current admitted HEAD, prerequisite verdict digest, exact allowed paths, deadline, and unconsumed admission.
 - Missing, stale, mismatched, reused, non-C0, or already-terminal admission returns `BLOCKED_NOT_DISPATCHED` before lease acquisition, edit, install, command, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Own the sole writer slot for A4. Make creator-controlled ENS identity a mandatory runtime authority boundary for the same A3 job.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Own the sole writer slot for A4. Make creator-controlled ENS identity a mandatory runtime authority boundary for the same A3 job.
 
 PRECONDITIONS
 - A3 and E0 `PASS_STATIC_STABLE`.
@@ -699,7 +716,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current single-use Goal C0 packet for this exact goal.
 - Verify `mode: sole_writer`, unique `task_instance_id`, generation, `dispatch_sha`, target/control SHA, `goal_source`, `admitted_at_sha` equal to current admitted HEAD, prerequisite verdict digest, exact allowed paths, deadline, and unconsumed admission.
 - Missing, stale, mismatched, reused, non-C0, or already-terminal admission returns `BLOCKED_NOT_DISPATCHED` before lease acquisition, edit, install, command, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Own the sole writer slot for the conditional Uniswap slice. Implement nothing unless Goal U0 and the coordinator explicitly admit an honest product or Continuity path.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Own the sole writer slot for the conditional Uniswap slice. Implement nothing unless Goal U0 and the coordinator explicitly admit an honest product or Continuity path.
 
 ADMISSION
 - A1-A4 pass; protected 0G+ENS core is frozen and green.
@@ -741,7 +760,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current single-use Goal C0 packet for this exact goal.
 - Verify `mode: sole_writer`, unique `task_instance_id`, generation, `dispatch_sha`, target/control SHA, `goal_source`, `admitted_at_sha` equal to current admitted HEAD, prerequisite verdict digest, exact allowed paths, deadline, and unconsumed admission.
 - Missing, stale, mismatched, reused, non-C0, or already-terminal admission returns `BLOCKED_NOT_DISPATCHED` before lease acquisition, edit, install, command, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Own the sole writer slot for deployment and release. Freeze features, deploy the same SHA autonomously where authorized, verify the complete story, and fail closed on missing credentials or evidence.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Own the sole writer slot for deployment and release. Freeze features, deploy the same SHA autonomously where authorized, verify the complete story, and fail closed on missing credentials or evidence.
 
 PRECONDITIONS
 - Required code gates pass; optional tracks are PASS_LIVE or explicitly CUT.
@@ -788,7 +809,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current Goal C0 packet for this exact read-only goal.
 - Verify `mode: read_only`, unique `task_instance_id`, generation, pinned target/control SHA, `goal_source`, acceptance items, expiry, deadline, and explicit no-mutation boundary.
 - Missing, stale, mismatched, duplicate, or non-C0 dispatch returns `BLOCKED_NOT_DISPATCHED` before install, product edit, live call, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Continuously audit all AlphaDawg Lisbon changes on `developer` without repairing them. Compare current state with baseline bfa7bd37c573e2e49525d965f7f937210e170d72 and fail closed.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Continuously audit all AlphaDawg Lisbon changes on `developer` without repairing them. Compare current state with baseline bfa7bd37c573e2e49525d965f7f937210e170d72 and fail closed.
 
 BOUNDARY
 - Read-only: no edits, installs, formatters, commits, pushes, deployments, signatures, transactions, forms, or spend.

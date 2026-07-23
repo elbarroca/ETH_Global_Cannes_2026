@@ -25,7 +25,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current single-use Goal C0 packet for this exact goal.
 - Verify `mode: sole_writer`, unique `task_instance_id`, generation, `dispatch_sha`, target/control SHA, `goal_source`, `admitted_at_sha` equal to current admitted HEAD, prerequisite verdict digest, exact allowed paths, deadline, and unconsumed admission.
 - Missing, stale, mismatched, reused, non-C0, or already-terminal admission returns `BLOCKED_NOT_DISPATCHED` before lease acquisition, edit, install, command, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Own the sole writer slot for A4. Make creator-controlled ENS identity a mandatory runtime authority boundary for the same A3 job.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Own the sole writer slot for A4. Make creator-controlled ENS identity a mandatory runtime authority boundary for the same A3 job.
 
 PRECONDITIONS
 - A3 and E0 `PASS_STATIC_STABLE`.

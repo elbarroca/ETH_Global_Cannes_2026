@@ -207,10 +207,11 @@ EXTERNAL AUTHORITY
 - Persist approval digest and signed bytes/hash before broadcast; reconcile `UNKNOWN` by the same identifier; never replace blindly.
 
 TERMINAL DECISIONS
-- `BUILD`: every promoted claim is `PASS_RELEASE` on one unchanged SHA; every task instance terminal; no pending/unobservable task; no lease; all worktrees clean; final independent audit passes.
-- `NARROW`: protected core is release-green; optional work explicitly CUT; claims match evidence.
-- `WAIT_GATE/BLOCKED`: exact human/external evidence, owner, deadline, and restart condition are named; no safe autonomous transition exists.
-- `STOP`: any protected guarantee stays red, release evidence is stale, or required authority cannot be obtained in time.
+- `RELEASE_VALIDATED` is the only successful terminal state. Declare it only when every required gate independently passes; every promoted claim is `PASS_RELEASE`; optional gates are `PASS_RELEASE` or evidence-backed `CUT`; no critical/high finding remains; one exact release SHA passes clean-checkout install, Prisma validation, lint, strict typecheck, tests, build, start, secret scan, and required migrations; two resettable end-to-end replays pass without manual repair or duplicate effects; separately authorized deployments and public evidence use that SHA; `TRACK-MATRIX.md`, `CLAIM-MATRIX.md`, `EVIDENCE.md`, `FRESH-CLONE.md`, the changelog, and public identifiers agree; every task instance is terminal; every worktree is clean; and the writer lease is released.
+- `BUILD` and `NARROW` are non-terminal program decisions. They never complete or stop the persistent C0 goal.
+- `WAIT_GATE/BLOCKED` is non-terminal. Name the exact missing evidence, owner action, affected gates, deadline or wake condition, and all work completed meanwhile; keep the goal active.
+- `STOP` is terminal only for explicit project-owner cancellation, deadline-expired stop, or an unrecoverable repository-integrity blocker.
+- A fixable failure, audit finding, missing authority, missing credential, future H0, or red protected guarantee is never terminal while safe runnable work remains.
 
 STATUS OUTPUT AFTER EVERY TRANSITION
 STATUS_OUTPUT_BEGIN
@@ -230,7 +231,7 @@ LAUNCH
 1. Open one Codex project at the AlphaDawg Lisbon repository root on `developer`.
 2. Paste only C0. Treat all split prompt files as C0-owned templates.
 3. Existing 15-minute sidebar tasks stay stopped; ingest their canonical handoffs or ignore them. Never launch peer writers manually.
-4. On first boot, expect `NARROW / WAIT_GATE`: A0 is blocked and P0 failed static validation. Do not open A1.
+4. On first boot, expect `NARROW / WAIT_GATE`: A0 is blocked and P0 failed static validation. This is a non-terminal checkpoint; do not open A1.
 5. Resume this same C0 after official H0 and missing human evidence arrive. Do not create a second coordinator unless the first is proven terminal.
 6. Launching C0 authorizes no push, deployment, provisioning, sponsor call, signature, transaction, form, or spend.
 ```

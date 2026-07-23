@@ -25,7 +25,9 @@ DISPATCH GUARD
 - Do not self-start. Require a current Goal C0 packet for this exact read-only goal.
 - Verify `mode: read_only`, unique `task_instance_id`, generation, pinned target/control SHA, `goal_source`, acceptance items, expiry, deadline, and explicit no-mutation boundary.
 - Missing, stale, mismatched, duplicate, or non-C0 dispatch returns `BLOCKED_NOT_DISPATCHED` before install, product edit, live call, or external action.
-- Return only the canonical C0 envelope; this task cannot open its own gate.Determine the smallest honest Uniswap path for AlphaDawg and prove SDK/API compatibility without modifying the product checkout or executing value.
+- Return only the canonical C0 envelope; this task cannot open its own gate.
+
+Determine the smallest honest Uniswap path for AlphaDawg and prove SDK/API compatibility without modifying the product checkout or executing value.
 
 BOUNDARY
 - Product repo is read-only; use a disposable directory.
