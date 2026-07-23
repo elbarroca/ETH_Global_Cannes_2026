@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - Lean autonomous sprint pack
+
+- Replaced the duplicated all-in-one and per-domain prompt pack with one execution contract, one `A0-A7` sprint ledger, one C0 launch prompt, one reusable writer, and one reusable independent auditor.
+- Added a dedicated A5 gate for functional API coverage, automated critical-path UI tests, accessibility, desktop/mobile states, and deterministic replay.
+- Kept eligibility, live sponsor evidence, external effects, same-SHA deployment, documentation, and final bounty validation fail-closed.
+- No product code, dependency, push, deployment, signature, transaction, form, spend, or claim promotion was performed.
+
 ## 2026-07-23 - A0 control pack
 
 - Project owner authorized local Continuity implementation.

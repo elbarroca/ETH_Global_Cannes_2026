@@ -30,7 +30,8 @@ status: PASS | FAIL | BLOCKED
 |---|---|---|---|
 | `A0-BASELINE-001` | Baseline | `PASS` | `BASELINE.md` and Git object/hash checks. |
 | `A0-AUTH-001` | Local start | `PASS_LOCAL_ONLY` | Thread authorization; external effects remain denied. |
-| `A0-PROMPT-001` | Prompt pack | `PASS` | `GOALS.md` contains the dependency matrix, subagent contract, validation ladder, premortems, and 12 consistently named split prompts. Markdown fences, local links, prompt headers, and async no-effect boundaries passed. |
+| `A0-PROMPT-001` | Historical prompt pack | `PASS_SUPERSEDED` | The former all-in-one contract and 12 split prompts passed their original checks; `A0-PROMPT-LEAN-002` replaces this architecture. |
+| `A0-PROMPT-LEAN-002` | Lean prompt pack | `PASS` | `GOALS.md` is the canonical contract, `SPRINTS.md` defines A0-A7, and `prompts/` contains only C0 plus reusable executor/auditor templates. Nine-file Markdown links/fences, sprint/header coverage, deleted-prompt reference checks, `git diff --check`, added-line secret patterns, and physical/mirrored lock-token equality passed. Independent read-only audit findings were reconciled. |
 | `A0-LOCK-001` | Writer serialization | `PASS` | Atomic common-dir lease exists; physical and mirrored tokens match. |
 | `A0-AUDIT-001` | Independent prompt audit | `PASS` | Concurrency, live-probe, naming, and lock-mirror findings reconciled; independent result was `PASS_IF_A0_CLOSED`; A0 content commit `41325b6564c338d8b681c2756228add3a7b4dac3` satisfied the condition. |
 | `A0-ARCHIVE-001` | Repo-local context | `PASS` | All 244 research-vault files mirrored byte-for-byte and indexed in `ALPHADAWG-FILE-MANIFEST.csv`; 1,033 internal file links resolve; two preserved stale heading names have repo-local redirects in `ALPHADAWG-FILE-MAP.md`; the only two direct root-level research files were archived safely. |
@@ -40,6 +41,7 @@ status: PASS | FAIL | BLOCKED
 | `A0-EXIT-AUDIT-002` | Independent A0 release audit | `BLOCKED` | Pinned audit of `b000ba993e753a580f2c0b09d4fec8f0eac8d337` contradicted H0, clearance, evidence, handoff, and privacy gates. A1 stays closed. |
 | `A0-LIVE-RECONCILE-003` | Live authority and probe reconciliation | `BLOCKED` | Content commit `fa8bebbc624599f7ef1277a2a466ef72863b3142` records A0/P0/E0/U0 and the archive acceptance repair. The gate remains blocked; independent closure audit is required before any later writer. |
 | `A1-FOUNDATION-001` | Foundation | `NOT_RUN` | Await Goal A1. |
+| `A1-FOUNDATION-PREFLIGHT-002` | Foundation preflight | `BLOCKED` | `npx tsc --noEmit` passed. `npm run lint` failed on inherited code with 23 errors and 28 warnings. `npm test` failed because no test script exists. Build was not run after the red gate. A1 must repair these without weakening checks before product sprints open. |
 | `P0-0G-001` | 0G compatibility | `FAIL` | Current Compute response binding is fail-open and Storage SDK `1.2.10` ignores proof-enabled download. Live subgate `BLOCKED`; no Lisbon live ID. |
 | `E0-ENS-001` | ENS compatibility | `PASS` | Stable viem/Registry/Public Resolver/Universal Resolver path passed live reads and local-fork refusal tests; public write subgate `BLOCKED`; direct ENSv2 `BLOCKED`. |
 | `U0-UNISWAP-001` | Uniswap admission | `PASS` | `ADMIT_STACK_CONTINUITY` only for a reusable upstream Node 22 ESM SDK fix; existing Arc/custom-router path rejected; optional writer remains closed. |

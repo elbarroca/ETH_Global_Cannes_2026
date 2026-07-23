@@ -9,8 +9,9 @@ Use this precedence whenever files disagree:
 1. `../EXTERNAL-EFFECTS.md`
 2. `../BASELINE.md`
 3. `../GOALS.md`
-4. `../TRACK-MATRIX.md`, `../CLAIM-MATRIX.md`, and `../EVIDENCE.md`
-5. this context directory
-6. `../archive/`
+4. `../SPRINTS.md`
+5. `../TRACK-MATRIX.md`, `../CLAIM-MATRIX.md`, and `../EVIDENCE.md`
+6. this context directory
+7. `../archive/`
 
 The project owner has authorized local AlphaDawg Continuity files and commits on `developer`. Pushes, deployments, signatures, transactions, forms, spend, and public claims remain independently gated. Execute only the prompts under `../prompts/`; never execute an archived prompt.

@@ -6,8 +6,9 @@ Everything needed to inspect AlphaDawg directly or through its research referenc
 
 ## Current execution surface
 
-- [`GOALS.md`](GOALS.md): canonical all-in-one sprint and `/goal` pack.
-- [`prompts/`](prompts/): split copy-ready prompts using `C0/A1/P0/E0/U0/A2/A2R/A3/A4/A5/A6-A7/VA` IDs.
+- [`GOALS.md`](GOALS.md): canonical execution and release contract.
+- [`SPRINTS.md`](SPRINTS.md): `A0-A7` sprint acceptance ledger.
+- [`prompts/`](prompts/): C0 launch prompt plus reusable sprint executor and auditor.
 - [`README.md`](README.md): control-center entry point.
 - [`BASELINE.md`](BASELINE.md), [`TRACK-MATRIX.md`](TRACK-MATRIX.md), [`CLAIM-MATRIX.md`](CLAIM-MATRIX.md), [`EVIDENCE.md`](EVIDENCE.md), and [`EXTERNAL-EFFECTS.md`](EXTERNAL-EFFECTS.md): current authority, claims, evidence, and effect gates.
 
@@ -45,9 +46,10 @@ Main internal entry points:
 1. `EXTERNAL-EFFECTS.md`
 2. `BASELINE.md`
 3. `GOALS.md`
-4. live track, claim, and evidence controls
-5. `context/`
-6. `archive/`
+4. `SPRINTS.md`
+5. live track, claim, and evidence controls
+6. `context/`
+7. `archive/`
 
 Project B and general winner-research files are mirrored only because AlphaDawg planning links to separation rules and comparative evidence. They cannot supply AlphaDawg code, state, receipts, claims, or execution instructions. Current official sponsor sources outrank every archived snapshot.
 

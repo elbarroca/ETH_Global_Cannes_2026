@@ -4,6 +4,33 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Codex under project-owner direction
+task_id: A0-LEAN-GOAL-PACK
+branch: developer
+start_sha: eedcdc58a93065410d430db2d9c7d602927793b1
+token: 35E26400-39E6-47C1-BD25-C0CCE1773013
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-23T23:12:41Z
+expires_at: 2026-07-24T01:03:30Z
+allowed_paths:
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/**
+started_at: 2026-07-24T00:03:30+01:00
+expected_exit: lean canonical contract, sprint ledger, reusable executor/auditor prompts, and verified local commit
+completed_at: 2026-07-24T00:12:41+01:00
+exit_sha: commit containing this closure record
+lock_release: remove only token 35E26400-39E6-47C1-BD25-C0CCE1773013 after the commit succeeds
+acceptance_evidence:
+  - current prompt surface reduced from 13 files to 4
+  - Markdown structure, links, A0-A7 coverage, diff hygiene, and secret patterns passed
+  - physical and mirrored writer tokens match
+  - TypeScript passed; inherited lint and missing test script remain explicit A1 blockers
+  - independent read-only audit returned PASS after reconciliation
+audit_verdict: PASS
+status: complete
+```
+
+```yaml
+owner: Codex under project-owner direction
 task_id: A0-CONTROL-PACK
 branch: developer
 start_sha: bfa7bd37c573e2e49525d965f7f937210e170d72

@@ -8,9 +8,9 @@
 | Open-source/license authority | `PENDING` | Contributor authorization and root license. |
 | 0G Keep qualification | `research_only_not_promotable; P0_FAIL_STATIC_LIVE_BLOCKED` | Proof-capable Storage path, A3 `PASS_LIVE`, then A7 `PASS_RELEASE`. |
 | ENS Continuity qualification | `research_only_not_promotable; E0_PASS_STABLE_STATIC_LIVE_BLOCKED` | A4 live identifiers, refusal proof, booth/demo artifacts, A7. |
-| Uniswap Stack qualification | `U0_ADMITTED_CONDITIONAL_NOT_OPEN` | Green frozen 0G+ENS core, upstream reusable contribution, live proof if applicable, FEEDBACK.md/form, A7. |
-| Uniswap API qualification | `REJECTED_WITHOUT_WRITTEN_ADMISSION` | Written admission plus live API/onchain lifecycle and A7. |
-| Sui qualification | `NOT_ADMITTED` | Explicit A5 admission and live causal evidence. |
+| Uniswap Stack qualification | `U0_ADMITTED_CONDITIONAL_NOT_OPEN` | Green frozen A5 core, A6 admission, upstream reusable contribution, live proof if applicable, FEEDBACK.md/form, A7. |
+| Uniswap API qualification | `REJECTED_WITHOUT_WRITTEN_ADMISSION` | Written admission, A6 live API/onchain lifecycle, and A7. |
+| Sui qualification | `NOT_ADMITTED` | No sprint is allocated; a material scope change and new evidence gate are required. |
 | Production ready | `REJECTED_CURRENTLY` | Every required A1-A7 gate on one SHA. |
 | Expected winnings | `UNPROVEN`; floor `$0` | Sponsor decision. |
 
