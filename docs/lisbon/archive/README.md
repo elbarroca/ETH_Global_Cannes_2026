@@ -1,6 +1,6 @@
 # AlphaDawg Research Archive
 
-This directory is a repository-local provenance snapshot, not an execution surface. It carries the AlphaDawg-specific strategy files, prior prompt files, protocol notes, source ledger, event/track snapshots, and the user-supplied Lisbon prize-page text that existed in the separate research workspace on 2026-07-23.
+This directory is a repository-local provenance snapshot, not an execution surface. `research-vault/` is a byte-for-byte mirror of all 244 files from the separate research workspace as copied on 2026-07-23. The full mirror guarantees that every direct or recursive AlphaDawg index, wikilink, source ledger, precedent, protocol note, dashboard, Base, Canvas, and separation reference remains available inside this repository.
 
 Rules:
 
@@ -12,11 +12,8 @@ Rules:
 
 Included snapshot groups:
 
-- `research-vault/strategy/alphadawg/`: complete AlphaDawg strategy series `00` through `22` plus the master plan.
-- `research-vault/prompts/`: prior AlphaDawg prompt history, retained only for decision provenance.
-- `research-vault/protocols/`: 0G, ENSv2, and Uniswap research notes.
-- `research-vault/sources/` and `registers/`: AlphaDawg source and track ledgers.
-- `research-vault/events/`: Lisbon event snapshot.
+- `research-vault/`: complete mirror, including its `.obsidian/` configuration, indexes, strategies, prompts, protocols, sources, registers, events, projects, repositories, teams, winner research, and templates.
+- `research-repo/`: the research repository's AlphaDawg-relevant root README and operating contract. `AGENTS.md` is deliberately stored as `RESEARCH-AGENTS.md` so it remains evidence rather than a nested instruction file. The README's 15 vault links are adjusted only to point at the internal mirror.
 - `user-supplied/`: raw prize-page text supplied in the Codex thread.
 
-The active, reconciled source of truth is `../GOALS.md` plus the control files listed in `../README.md`.
+The active, reconciled source of truth is `../GOALS.md` plus the control files listed in `../README.md`. Use `../ALPHADAWG-FILE-MAP.md` and `../ALPHADAWG-FILE-MANIFEST.csv` for navigation and integrity checks.

@@ -1,0 +1,11 @@
+event,track_or_theme,category,source_url,access_date,source_quality,notes
+ETHGlobal Cannes 2026,Zero Knowledge Proofs,theme,https://ethglobal.com/events/cannes2026,2026-06-22,official/dynamic,Listed as event theme.
+ETHGlobal Cannes 2026,AI x Crypto,theme,https://ethglobal.com/events/cannes2026,2026-06-22,official/dynamic,Listed as event theme.
+ETHGlobal Cannes 2026,DeFi,theme,https://ethglobal.com/events/cannes2026,2026-06-22,official/dynamic,Listed as event theme.
+ETHGlobal Cannes 2026,Privacy & Security,theme,https://ethglobal.com/events/cannes2026,2026-06-22,official/dynamic,Listed as event theme.
+ETHGlobal New York 2026,From Scratch,event track,https://ethglobal.com/events/newyork2026,2026-06-22,official/dynamic,Empty repo classic track.
+ETHGlobal New York 2026,Extend Open Source,event track,https://ethglobal.com/events/newyork2026,2026-06-22,official/dynamic,Bring an existing open-source repo and ship a feature.
+ETHGlobal New York 2026,Ship a Feature,event track,https://ethglobal.com/events/newyork2026,2026-06-22,official/dynamic,Build a new feature on an existing product and ship it open source.
+ETHGlobal Lisbon 2026,Classic Track,event track,https://ethglobal.com/events/lisbon2026/info/details,2026-07-16,official/dynamic,Project-specific work must begin after kickoff.
+ETHGlobal Lisbon 2026,Extend Open Source,event track,https://ethglobal.com/events/lisbon2026/info/start,2026-07-16,official/dynamic,Bring an existing maintained open-source repository and ship substantive new functionality.
+ETHGlobal Lisbon 2026,Ship a Feature,event track,https://ethglobal.com/events/lisbon2026/info/start,2026-07-16,official/dynamic,Extend an existing private or commercial product and release the Lisbon feature as open source.

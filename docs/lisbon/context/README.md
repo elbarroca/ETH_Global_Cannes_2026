@@ -1,6 +1,6 @@
 # Context Snapshot Contract
 
-These files are dated technical and premortem snapshots copied from the separate ETHGlobal research vault on 2026-07-23 so a new Codex project can operate from this repository alone.
+These files are dated technical and premortem snapshots copied from the separate ETHGlobal research vault on 2026-07-23 so a new Codex project can operate from this repository alone. The complete source vault is mirrored under `../archive/research-vault/`; see `../ALPHADAWG-FILE-MAP.md`.
 
 They preserve historical wording, including pre-H0 freezes, obsolete branch names, local paths, old track alternatives, and unresolved Obsidian links. Those fields are provenance, not current execution authority.
 

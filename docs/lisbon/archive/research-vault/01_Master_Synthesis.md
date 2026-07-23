@@ -1,0 +1,44 @@
+# Master Synthesis
+
+Status: reviewed baseline; dynamic ETHGlobal pages require recheck before external use.
+
+## Decision Dashboard
+
+| area | status | source_quality | external_safe | caveat |
+|---|---|---|---|---|
+| Cannes 2026 event baseline | confirmed | official/dynamic | yes with access date | Recheck before deck use because ETHGlobal pages are dynamic. |
+| New York 2026 event baseline | confirmed | official/dynamic | yes with access date | Recheck before deck use because ETHGlobal pages are dynamic. |
+| Lisbon 2026 event baseline | refreshed 2026-07-23 | official/dynamic | yes with access date | The supplied official snapshot exposes $88,000 across eight partners and 23 released tracks; an older official post states $100,000, so $12,000 remains unresolved. |
+| Prior winner patterns | inferred | official project pages + analysis | internal-only | Reasoning is useful for ideation, not proof of future judging outcome. |
+| Lisbon idea selection | in progress | official prize page + inferred sponsor fit | internal-only | Build choice must be rechecked against live Lisbon partner requirements. |
+| Deep winner reasoning | expanded | official/dynamic + official/social-dynamic + inference | internal-only | "Why it won" is analytical inference, not official jury commentary. |
+| Weekly protocol radar | active automation | official docs + GitHub + EIPs | internal-only | Radar sources are current as of 2026-06-22 and should refresh weekly. |
+
+## Reviewed Findings
+
+| finding | source_task_id | confidence | source_urls | decision_use | caveat |
+|---|---|---|---|---|---|
+| ETHGlobal Cannes 2026 ran April 3-5, 2026 in Cannes, France and advertised themes including ZK, AI x Crypto, DeFi, consumer crypto, L2s, interoperability, public goods, privacy/security, TEEs, data availability, identity, and DevTools. | TASK-001 | confirmed | https://ethglobal.com/events/cannes2026 | Prior-event baseline. | Official page is dynamic; access date 2026-06-22. |
+| ETHGlobal New York 2026 ran June 12-14, 2026 in New York City and introduced a model where builders could bring an existing repo via From Scratch, Extend Open Source, or Ship a Feature tracks. | TASK-002 | confirmed | https://ethglobal.com/events/newyork2026 | Rule-change baseline for Lisbon prep. | Official page is dynamic; access date 2026-06-22. |
+| ETHGlobal Lisbon 2026 is scheduled for July 24-26, 2026 in Lisbon, Portugal, with current prize partners The Graph, World, Hedera, 0G, Uniswap Foundation, Sui, ENS, and 1inch. | TASK-012 | confirmed | https://ethglobal.com/events/lisbon2026 ; https://ethglobal.com/events/lisbon2026/prizes | Lisbon track targeting. | The Graph and World details are published; the latest supplied snapshot exposes $88,000 while an older official post states $100,000. |
+| Prior winners cluster around agent identity, human verification, private execution, onchain payments, DeFi risk tools, and sponsor-native integrations. | TASK-004 | inferred | https://ethglobal.com/showcase/dive-5hxbp ; https://ethglobal.com/showcase/veil-vpn-c643n ; https://ethglobal.com/showcase/proof-of-human-1cg2d ; https://ethglobal.com/showcase/nyx-prk3o | Lisbon brainstorming filter. | Pattern analysis is not a judging guarantee. |
+| The strongest Lisbon opportunities should combine one clear user pain with at least two current Lisbon sponsor surfaces, but only if the integration is necessary to the product. | TASK-004 | inferred | https://ethglobal.com/events/lisbon2026/prizes | Product strategy. | Partner requirements may change before the event. |
+| AlphaDawg should continue through Extend Open Source by extracting an agent-commerce kit: ERC-8004/A2A discovery and reputation, Hedera settlement, 0G delivery verification, and policy-bounded Uniswap execution. | TASK-013 | inferred | https://ethglobal.com/showcase/alpha-dawg-fh6vm ; https://ethglobal.com/events/lisbon2026/prizes ; https://eips.ethereum.org/EIPS/eip-8004 | Lisbon build decision. | Requires former-contributor permission, an agreed open-source license, organizer confirmation, and strict 36-hour scope. |
+| AlphaDawg's Lisbon acceptance contract is dynamic registration, signed RFQ, verified delivery, post-verification Hedera settlement, constrained Uniswap execution, and an idempotent unified receipt. | TASK-014 | inferred | https://github.com/elbarroca/ETH_Global_Cannes_2026 ; https://ethglobal.com/events/lisbon2026/prizes | Engineering scope and judge demo. | Non-Continuity sponsor categories remain conditional until written eligibility confirmation. |
+| In the active Hedera, 0G and 1inch portfolio, only 0G Keep Building is currently confirmed for AlphaDawg Continuity; Hedera Agentic Payments and 1inch Aqua are officially classified from scratch. | TASK-015 | confirmed | https://ethglobal.com/events/lisbon2026/prizes ; https://ethglobal.com/events/lisbon2026/info/details | Fail-closed eligibility and prize planning. | A written organizer/sponsor ruling could change eligibility. |
+| The final AlphaDawg portfolio should replace 1inch with Uniswap: target 0G Keep Building and Uniswap Stack Contribution as confirmed Continuity tracks, plus Hedera Agentic Payments conditionally; preserve Arc x402 only for legacy built-in specialists. | TASK-016 | mixed | https://ethglobal.com/events/lisbon2026/prizes/0g ; https://ethglobal.com/events/lisbon2026/prizes/hedera ; https://ethglobal.com/events/lisbon2026/prizes/uniswap-foundation | Final partner and architecture decision. | Hedera remains contingent on written Continuity eligibility. |
+| AlphaDawg can be architected for all compatible 0G, Hedera and Uniswap tracks, but Hedera No Solidity conflicts with the existing Solidity repo and Cross-Chain Automation; Product vs Infrastructure is also a sponsor-classification choice rather than a guaranteed double award. | TASK-017 | inferred | https://ethglobal.com/events/lisbon2026/prizes/0g ; https://ethglobal.com/events/lisbon2026/prizes/hedera ; https://ethglobal.com/events/lisbon2026/prizes/uniswap-foundation ; https://ethglobal.com/events/lisbon2026/info/details | Maximal track planning. | Every non-Continuity-labelled category needs partner confirmation. |
+| Cannes 2026 finalist coverage now includes a top-10 slate from official/social-indexed ETHGlobal sources: ENShell, DIVE, maki, Defi, ALMA, npmguard, VEIL VPN, PaintGlobal, EVM PORST, and Corpus. | TASK-007 | mixed | https://x.com/ETHGlobal/status/2040805061899723200 ; https://ethglobal.com/showcase/dive-5hxbp ; https://ethglobal.com/showcase/maki-564eg ; https://ethglobal.com/showcase/npmguard-aeihd | Coverage tracking. | ALMA remains unresolved at project-page depth; social-source extraction is brittle. |
+| The most reusable prior-winner pattern is a sponsor-native proof artifact: identity proof, ENS record, CRE workflow, Hedera consensus message, hardware signing approval, indexed reputation score, storage proof, or escrow state. | TASK-007 | inferred | https://ethglobal.com/showcase/enshell-6t95y ; https://ethglobal.com/showcase/proof-of-human-1cg2d ; https://ethglobal.com/showcase/agentindex-psxxo ; https://ethglobal.com/showcase/better-wallet-yvjdh | Demo planning. | Artifact quality still needs repo/demo verification. |
+| Current Lisbon protocol radar should watch World AgentKit, x402, ERC-8004, Uniswap v4 hooks, The Graph Substreams, 0G, ENSv2/developer stack, 1inch Aqua, Yellow state channels, Hedera/Hiero, Chainlink CRE privacy, and Walrus. | TASK-008 | inferred | https://github.com/worldcoin/agentkit ; https://docs.x402.org/introduction ; https://eips.ethereum.org/EIPS/eip-8004 ; https://github.com/1inch/aqua | Ideation input. | APIs and sponsor tracks can change before July 24, 2026. |
+
+## Lisbon Build Filters
+
+| filter | reason | use |
+|---|---|---|
+| Sponsor-native, not sponsor-sticker | Prior winners make the sponsor primitive part of the core product. | Reject ideas where the protocol is only a wallet/login wrapper. |
+| Live demo over architecture promise | ETHGlobal project pages foreground demo/source links and concrete "How it's Made" sections. | Prefer tiny working workflows over broad platforms. |
+| Human/agent trust boundary | Cannes and New York winners repeatedly solve Sybil, agent, identity, or authorization problems. | Strong default vertical for Lisbon. |
+| Payments plus policy | Lisbon currently has 1inch, ENS, World, Hedera, 0G, The Graph, Uniswap, and Sui. | Good ideas can route money/data/actions with explicit permission and auditability. |
+| Failure handling | New York agent-commerce winners/patterns point to escrow, disputes, chargebacks, reputation, and reversals. | Add failure states to x402/agent payment ideas. |
+| Decision metric | DeFi examples such as Carry and Ballast turn hidden risk into a concrete recommendation. | Prefer measurable improvement over another generic dashboard. |

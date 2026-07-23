@@ -1,0 +1,191 @@
+{
+  "main": {
+    "id": "74ca2ea5de0daa88",
+    "type": "split",
+    "children": [
+      {
+        "id": "d25055f4f4462d63",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a4be0ed1c6627ff5",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "89ea0c40586c9841",
+    "type": "split",
+    "children": [
+      {
+        "id": "7d537fc35da7657e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "38f98e7f02da5756",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "e40ab0320e2d5b13",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "9697638ddc42ac80",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "ccfa382b3e5f7fdf",
+    "type": "split",
+    "children": [
+      {
+        "id": "e9bc296f8bcfaedb",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b6ee324091cd4d00",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "synthesis/all-findings-aggregated-depth.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for all-findings-aggregated-depth"
+            }
+          },
+          {
+            "id": "634dbf2c39a10d78",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "synthesis/all-findings-aggregated-depth.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from all-findings-aggregated-depth"
+            }
+          },
+          {
+            "id": "df2cabc34e300a01",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "d82649888a0cb999",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "ac383ad2bc88f0b5",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "synthesis/all-findings-aggregated-depth.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of all-findings-aggregated-depth"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "a4be0ed1c6627ff5",
+  "lastOpenFiles": [
+    "projects/sentinel.md",
+    "dwasd.md",
+    "events/ethglobal-new-york-2026.md",
+    "synthesis/all-findings-aggregated-depth.md",
+    "04_Findings_Database.md",
+    "Untitled"
+  ]
+}

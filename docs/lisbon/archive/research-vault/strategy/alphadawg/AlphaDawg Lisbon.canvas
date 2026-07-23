@@ -1,0 +1,157 @@
+{
+  "nodes": [
+    {
+      "id": "a11d0a0a00000001",
+      "type": "file",
+      "x": 0,
+      "y": 0,
+      "width": 400,
+      "height": 300,
+      "file": "strategy/alphadawg/00_Command_Center.md",
+      "color": "5"
+    },
+    {
+      "id": "a11d0a0a00000002",
+      "type": "file",
+      "x": 500,
+      "y": -320,
+      "width": 400,
+      "height": 300,
+      "file": "strategy/alphadawg/01_Cannes_Baseline_and_Lisbon_Delta.md",
+      "color": "6"
+    },
+    {
+      "id": "a11d0a0a00000003",
+      "type": "file",
+      "x": 500,
+      "y": 100,
+      "width": 400,
+      "height": 300,
+      "file": "strategy/alphadawg/02_Track_Strategy.md",
+      "color": "3"
+    },
+    {
+      "id": "a11d0a0a00000004",
+      "type": "file",
+      "x": 1000,
+      "y": -320,
+      "width": 400,
+      "height": 300,
+      "file": "strategy/alphadawg/03_Engineering_Plan.md",
+      "color": "4"
+    },
+    {
+      "id": "a11d0a0a00000005",
+      "type": "file",
+      "x": 1000,
+      "y": 100,
+      "width": 400,
+      "height": 300,
+      "file": "strategy/alphadawg/04_E2E_Validation.md",
+      "color": "2"
+    },
+    {
+      "id": "a11d0a0a00000006",
+      "type": "file",
+      "x": 1500,
+      "y": 100,
+      "width": 400,
+      "height": 300,
+      "file": "strategy/alphadawg/05_Automation_Runbook.md",
+      "color": "5"
+    },
+    {
+      "id": "a11d0a0a00000007",
+      "type": "link",
+      "x": 1500,
+      "y": -320,
+      "width": 400,
+      "height": 220,
+      "url": "https://ethglobal.com/events/lisbon2026/prizes"
+    },
+    {
+      "id": "a11d0a0a00000008",
+      "type": "text",
+      "x": 0,
+      "y": 400,
+      "width": 400,
+      "height": 220,
+      "text": "# Winning vertical\n\nRegister → quote → deliver → verify → settle → execute → score\n\n**No verified delivery = no payment = no trade.**",
+      "color": "1"
+    }
+  ],
+  "edges": [
+    {
+      "id": "ed9e000000000001",
+      "fromNode": "a11d0a0a00000002",
+      "fromSide": "left",
+      "toNode": "a11d0a0a00000001",
+      "toSide": "right",
+      "toEnd": "arrow",
+      "label": "defines baseline"
+    },
+    {
+      "id": "ed9e000000000002",
+      "fromNode": "a11d0a0a00000003",
+      "fromSide": "left",
+      "toNode": "a11d0a0a00000001",
+      "toSide": "right",
+      "toEnd": "arrow",
+      "label": "sets targets"
+    },
+    {
+      "id": "ed9e000000000003",
+      "fromNode": "a11d0a0a00000001",
+      "fromSide": "right",
+      "toNode": "a11d0a0a00000004",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "authorizes build"
+    },
+    {
+      "id": "ed9e000000000004",
+      "fromNode": "a11d0a0a00000003",
+      "fromSide": "right",
+      "toNode": "a11d0a0a00000004",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "constrains scope"
+    },
+    {
+      "id": "ed9e000000000005",
+      "fromNode": "a11d0a0a00000004",
+      "fromSide": "bottom",
+      "toNode": "a11d0a0a00000005",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "must pass"
+    },
+    {
+      "id": "ed9e000000000006",
+      "fromNode": "a11d0a0a00000006",
+      "fromSide": "left",
+      "toNode": "a11d0a0a00000003",
+      "toSide": "right",
+      "toEnd": "arrow",
+      "label": "refreshes evidence"
+    },
+    {
+      "id": "ed9e000000000007",
+      "fromNode": "a11d0a0a00000007",
+      "fromSide": "left",
+      "toNode": "a11d0a0a00000003",
+      "toSide": "right",
+      "toEnd": "arrow",
+      "label": "official source"
+    },
+    {
+      "id": "ed9e000000000008",
+      "fromNode": "a11d0a0a00000001",
+      "fromSide": "bottom",
+      "toNode": "a11d0a0a00000008",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "demo contract"
+    }
+  ]
+}

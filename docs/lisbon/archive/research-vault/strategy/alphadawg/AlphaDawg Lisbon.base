@@ -1,0 +1,60 @@
+filters:
+  and:
+    - 'file.inFolder("strategy/alphadawg")'
+    - 'file.ext == "md"'
+
+formulas:
+  status_icon: 'if(status == "ready", "✅", if(status == "active", "🔄", if(status == "planned", "🧭", "⚠️")))'
+  freshness_days: 'if(updated, (today() - date(updated)).days, "")'
+
+properties:
+  formula.status_icon:
+    displayName: ""
+  area:
+    displayName: Area
+  status:
+    displayName: Status
+  priority:
+    displayName: Priority
+  owner:
+    displayName: Owner
+  gate:
+    displayName: Gate
+  confidence:
+    displayName: Confidence
+  updated:
+    displayName: Updated
+  formula.freshness_days:
+    displayName: "Age (days)"
+
+views:
+  - type: table
+    name: "Active Work"
+    filters:
+      and:
+        - 'status != "ready"'
+    order:
+      - formula.status_icon
+      - file.name
+      - area
+      - status
+      - priority
+      - owner
+      - gate
+      - confidence
+      - updated
+      - formula.freshness_days
+    groupBy:
+      property: area
+      direction: ASC
+
+  - type: table
+    name: "All AlphaDawg Notes"
+    order:
+      - formula.status_icon
+      - file.name
+      - area
+      - status
+      - gate
+      - updated
+

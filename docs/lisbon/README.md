@@ -12,6 +12,8 @@ Start a new Codex project at this repository root, then open [`GOALS.md`](GOALS.
 ## Controls
 
 - [`BASELINE.md`](BASELINE.md): immutable prior state and authorization boundary.
+- [`ALPHADAWG-FILE-MAP.md`](ALPHADAWG-FILE-MAP.md): internal entry points and complete file-coverage contract.
+- [`ALPHADAWG-FILE-MANIFEST.csv`](ALPHADAWG-FILE-MANIFEST.csv): SHA-256 manifest for all 244 mirrored research files.
 - [`GOALS.md`](GOALS.md): copy-ready autonomous and asynchronous `/goal` prompts.
 - [`ACTIVE-WRITER.md`](ACTIVE-WRITER.md): one-writer lock.
 - [`EXTERNAL-EFFECTS.md`](EXTERNAL-EFFECTS.md): push/deploy/sign/transaction/spend authorization.
@@ -21,7 +23,7 @@ Start a new Codex project at this repository root, then open [`GOALS.md`](GOALS.
 - [`FRESH-CLONE.md`](FRESH-CLONE.md): release reproduction record.
 - [`AI-DISCLOSURE.md`](AI-DISCLOSURE.md): assisted-work disclosure.
 - [`context/`](context/): copied technical plans plus their precedence notice.
-- [`archive/`](archive/): complete AlphaDawg research/prompt/source snapshot and user-supplied prize text; provenance only.
+- [`archive/`](archive/): full byte-for-byte research-vault mirror plus user-supplied evidence; provenance only.
 - [`evidence/workshop/`](evidence/workshop/): supplied ENSv2 workshop photograph and evidence note.
 
 All implementation stays on `developer`. No prompt may silently broaden authority granted by `EXTERNAL-EFFECTS.md`.

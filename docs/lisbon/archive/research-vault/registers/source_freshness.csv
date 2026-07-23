@@ -1,0 +1,155 @@
+source_url,source_quality,access_date,recheck_by,recheck_reason,owner
+https://ethglobal.com/events/cannes2026,official/dynamic,2026-06-22,2026-07-21,"Prior event page can change or archive content.",TASK-001
+https://ethglobal.com/events/cannes2026/prizes,official/dynamic,2026-06-22,2026-07-21,"Prize details can change or be reorganized.",TASK-001
+https://ethglobal.com/showcase?events=cannes2026,official/dynamic,2026-06-22,2026-07-21,"Showcase pagination/order can change.",TASK-001
+https://ethglobal.com/events/newyork2026,official/dynamic,2026-06-22,2026-07-21,"Prior event page can change or archive content.",TASK-002
+https://ethglobal.com/events/newyork2026/prizes,official/dynamic,2026-06-22,2026-07-21,"Prize details can change or be reorganized.",TASK-002
+https://ethglobal.com/showcase?events=newyork2026,official/dynamic,2026-06-22,2026-07-21,"Showcase pagination/order can change.",TASK-002
+https://ethglobal.com/events/lisbon2026,official/dynamic,2026-06-22,2026-07-21,"Future event page will likely change before July 24.",TASK-003
+https://ethglobal.com/events/lisbon2026/prizes,official/dynamic,2026-06-22,2026-07-21,"Prize requirements are current-event inputs.",TASK-003
+https://ethglobal.com/events/lisbon2026/apply,official/dynamic,2026-06-22,2026-07-21,"Registration/event details may change.",TASK-003
+https://ethglobal.com/showcase/dive-5hxbp,official/dynamic,2026-06-22,2026-07-21,"Project page can change; verify before publication.",TASK-004
+https://ethglobal.com/showcase/veil-vpn-c643n,official/dynamic,2026-06-22,2026-07-21,"Project page can change; verify before publication.",TASK-004
+https://ethglobal.com/showcase/enshell-6t95y,official/dynamic,2026-06-22,2026-07-21,"Project page can change; verify before publication.",TASK-004
+https://ethglobal.com/showcase/proof-of-human-1cg2d,official/dynamic,2026-06-22,2026-07-21,"Project page can change; verify before publication.",TASK-004
+https://ethglobal.com/showcase/nyx-prk3o,official/dynamic,2026-06-22,2026-07-21,"Project page can change; verify before publication.",TASK-004
+https://ethglobal.com/showcase/agentranker-0mo6w,official/dynamic,2026-06-22,2026-07-21,"Project page can change; verify before publication.",TASK-004
+https://ethglobal.com/showcase/azimuth-7w256,official/dynamic,2026-06-22,2026-07-21,"Project page can change; verify before publication.",TASK-004
+https://ethglobal.com/showcase/clawback-vpmw2,official/dynamic,2026-06-22,2026-07-21,"Project page can change; verify before publication.",TASK-004
+https://ethglobal.com/showcase/veryclear-vu8i7,official/dynamic,2026-06-22,2026-07-21,"Light project row; verify before publication.",TASK-001
+https://ethglobal.com/showcase/smile-fictr,official/dynamic,2026-06-22,2026-07-21,"Light project row; verify before publication.",TASK-002
+https://ethglobal.com/showcase/better-wallet-yvjdh,official/dynamic,2026-06-22,2026-07-21,"Light project row; verify before publication.",TASK-002
+https://ethglobal.com/showcase/ballast-7jpyp,official/dynamic,2026-06-22,2026-07-21,"Light project row; verify before publication.",TASK-002
+https://ethglobal.com/showcase/maki-564eg,official/dynamic,2026-06-22,2026-07-21,"Project page can change; finalist/winner enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/npmguard-aeihd,official/dynamic,2026-06-22,2026-07-21,"Project page can change; finalist/winner enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/paintglobal-v4pwo,official/dynamic,2026-06-22,2026-07-21,"Project page can change; finalist/winner enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/corpus-j7an5,official/dynamic,2026-06-22,2026-07-21,"Project page can change; finalist enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/defi-e9zii,official/dynamic,2026-06-22,2026-07-21,"Project page can change; finalist enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/evm-porst-kkcfo,official/dynamic,2026-06-22,2026-07-21,"Project page can change; finalist enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/opencompliance-b89x9,official/dynamic,2026-06-22,2026-07-21,"Project page can change; track-winner enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/sentinel-91nv5,official/dynamic,2026-06-22,2026-07-21,"Project page can change; track-winner enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/shawarma-orchestrate-rfyhe,official/dynamic,2026-06-22,2026-07-21,"Project page can change; track-winner enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/agentindex-psxxo,official/dynamic,2026-06-22,2026-07-21,"Project page can change; New York winner enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/agentrankr-xe2vj,official/dynamic,2026-06-22,2026-07-21,"Project page can change; New York winner enrichment should be rechecked.",TASK-007
+https://ethglobal.com/showcase/carry-b4wcm,official/dynamic,2026-06-22,2026-07-21,"Project page can change; pattern row should be rechecked.",TASK-007
+https://ethglobal.com/showcase/scoutxyz-rwueo,official/dynamic,2026-06-22,2026-07-21,"Project page can change; pattern row should be rechecked.",TASK-007
+https://ethglobal.com/showcase/kickoff-aivy-studio-f6o10,official/dynamic,2026-06-22,2026-07-21,"Unresolved prize metadata; recheck official project page.",TASK-007
+https://ethglobal.com/showcase/ensfromwei-m3nj7,official/dynamic,2026-06-22,2026-07-21,"Unresolved prize metadata; recheck official project page.",TASK-007
+https://ethglobal.com/showcase/tap-tap-revolution-fnvdt,official/dynamic,2026-06-22,2026-07-21,"Unresolved prize metadata; recheck official project page.",TASK-007
+https://ethglobal.com/showcase/preo-rg0m9,official/dynamic,2026-06-22,2026-07-21,"Unresolved prize metadata; recheck official project page.",TASK-007
+https://x.com/ETHGlobal/status/2040805061899723200,official/social-dynamic,2026-06-22,2026-07-21,"Official social finalist list can be hard to access; verify with ETHGlobal if publishing.",TASK-007
+https://x.com/ETHGlobal/status/2066247659661545564,official/social-dynamic,2026-06-22,2026-07-21,"Official social finalist list can be hard to access; verify with ETHGlobal if publishing.",TASK-007
+https://github.com/worldcoin/agentkit,official/open-source,2026-06-22,2026-07-21,"AgentKit API and examples can change quickly before Lisbon.",TASK-008
+https://docs.world.org/agents/agent-kit,official/dynamic,2026-06-22,2026-07-21,"AgentKit docs can change quickly before Lisbon.",TASK-008
+https://docs.x402.org/introduction,official/open-standard,2026-06-22,2026-07-21,"x402 protocol docs are active and should be rechecked.",TASK-008
+https://github.com/x402-foundation/x402,official/open-source,2026-06-22,2026-07-21,"x402 repo can change quickly.",TASK-008
+https://eips.ethereum.org/EIPS/eip-8004,official/open-standard,2026-06-22,2026-07-21,"EIP status/details can change.",TASK-008
+https://github.com/erc-8004/erc-8004-contracts,official/open-source,2026-06-22,2026-07-21,"Reference contracts can change.",TASK-008
+https://developers.uniswap.org/docs/protocols/v4/concepts/hooks,official/dynamic,2026-06-22,2026-07-21,"Uniswap v4 hook docs can change.",TASK-008
+https://github.com/Uniswap/v4-hooks-public,official/open-source,2026-06-22,2026-07-21,"Hook examples can change.",TASK-008
+https://thegraph.com/docs/en/substreams/introduction/,official/dynamic,2026-06-22,2026-07-21,"Substreams docs can change.",TASK-008
+https://docs.substreams.dev/,official/dynamic,2026-06-22,2026-07-21,"Substreams docs can change.",TASK-008
+https://docs.0g.ai/,official/dynamic,2026-06-22,2026-07-21,"0G docs and product surfaces can change.",TASK-008
+https://github.com/0glabs/0g-compute-ts-starter-kit,official/open-source,2026-06-22,2026-07-21,"0G starter kit can change.",TASK-008
+https://docs.ens.domains/,official/dynamic,2026-06-22,2026-07-21,"ENS docs can change.",TASK-008
+https://ens.domains/ensv2,official/dynamic,2026-06-22,2026-07-21,"ENSv2 material can change.",TASK-008
+https://ens.domains/blog/post/ens-staying-on-ethereum,official/dynamic,2026-06-22,2026-07-21,"ENSv2 roadmap context should be rechecked.",TASK-008
+https://github.com/1inch/aqua,official/open-source,2026-06-22,2026-07-21,"Aqua repo can change.",TASK-008
+https://1inch.com/blog/post/aqua-developer-release,official/dynamic,2026-06-22,2026-07-21,"Aqua developer-release context should be rechecked.",TASK-008
+https://www.yellow.org/,official/dynamic,2026-06-22,2026-07-21,"Yellow product/docs can change.",TASK-008
+https://docs.yellow.org/whitepaper/,official/dynamic,2026-06-22,2026-07-21,"Yellow whitepaper can change.",TASK-008
+https://hedera.com/learning/open-source-at-hedera,official/dynamic,2026-06-22,2026-07-21,"Hedera/Hiero open-source details can change.",TASK-008
+https://docs.chain.link/oracle-platform/privacy-standard,official/dynamic,2026-06-22,2026-07-21,"Chainlink privacy standard docs can change.",TASK-008
+https://docs.chain.link/cre/guides/workflow/using-confidential-http-client,official/dynamic,2026-06-22,2026-07-21,"CRE confidential HTTP docs can change.",TASK-008
+https://docs.wal.app/,official/dynamic,2026-06-22,2026-07-21,"Walrus docs can change.",TASK-008
+https://github.com/MystenLabs/walrus,official/open-source,2026-06-22,2026-07-21,"Walrus repo can change.",TASK-008
+https://docs.ens.domains/ensip/25/,official/open-standard,2026-06-29,2026-07-21,"ENSIP agent-record details can change while agent standards mature.",TASK-010
+https://docs.ens.domains/ensip/26/,official/open-standard,2026-06-29,2026-07-21,"ENSIP service-discovery details can change while agent standards mature.",TASK-010
+https://eips.ethereum.org/EIPS/eip-4337,official/open-standard,2026-06-29,2026-07-21,"Account-abstraction details and ecosystem expectations can change.",TASK-010
+https://eips.ethereum.org/EIPS/eip-7702,official/open-standard,2026-06-29,2026-07-21,"EIP-7702 wallet behavior and tooling expectations can change.",TASK-010
+https://github.com/eth-infinitism/account-abstraction,official/open-source,2026-06-29,2026-07-21,"Reference implementation and examples can change quickly.",TASK-010
+https://eips.ethereum.org/EIPS/eip-7683,official/open-standard,2026-06-29,2026-07-21,"Cross-chain intent standard details can change.",TASK-010
+https://docs.across.to/guides/concepts/erc-7683,official/dynamic,2026-06-29,2026-07-21,"Across routing and settlement docs can change.",TASK-010
+https://semaphore.pse.dev/,official/dynamic,2026-06-29,2026-07-21,"Semaphore docs and API guidance can change.",TASK-010
+https://github.com/semaphore-protocol/semaphore,official/open-source,2026-06-29,2026-07-21,"Semaphore implementation and examples can change.",TASK-010
+https://docs.sui.io/sui-stack/zklogin-integration/zklogin,official/dynamic,2026-06-29,2026-07-21,"Sui zkLogin integration guidance can change.",TASK-010
+https://github.com/MystenLabs/sui,official/open-source,2026-06-29,2026-07-21,"Sui protocol implementation can change.",TASK-010
+https://efdn.notion.site/The-Open-Intents-Framework-permissionless-cross-chain-interop-to-all-chains-29cd9895554181e2966fe6585980ca9b,official/dynamic,2026-07-06,2026-07-21,"OIF docs and repo links can change as the framework matures.",TASK-011
+https://github.com/openintentsframework,official/open-source,2026-07-06,2026-07-21,"OIF repositories are active and should be rechecked before Lisbon.",TASK-011
+https://eips.ethereum.org/EIPS/eip-7579,official/open-standard,2026-07-06,2026-07-21,"ERC status and details can change.",TASK-011
+https://erc7579.com/,official/dynamic,2026-07-06,2026-07-21,"ERC-7579 docs and ecosystem examples can change.",TASK-011
+https://eips.ethereum.org/EIPS/eip-7715,official/open-standard,2026-07-06,2026-07-21,"ERC status and permission guidance can change.",TASK-011
+https://github.com/MetaMask/templated-gator-7715,official/open-source,2026-07-06,2026-07-21,"ERC-7715 example code can change.",TASK-011
+https://docs.attest.org/,official/dynamic,2026-07-06,2026-07-21,"EAS docs and deployment guidance can change.",TASK-011
+https://github.com/ethereum-attestation-service/eas-contracts,official/open-source,2026-07-06,2026-07-21,"EAS contract repo can change.",TASK-011
+https://github.com/ethereum-attestation-service/eas-sdk,official/open-source,2026-07-06,2026-07-21,"EAS SDK can change.",TASK-011
+https://developers.circle.com/cctp,official/dynamic,2026-07-06,2026-07-21,"CCTP supported chains, fees, hooks, and API docs can change.",TASK-011
+https://github.com/circlefin/evm-cctp-contracts,official/open-source,2026-07-06,2026-07-21,"CCTP contract repo can change.",TASK-011
+https://developers.uniswap.org/docs/protocols/the-compact/overview,official/dynamic,2026-07-06,2026-07-21,"The Compact docs and deployments can change.",TASK-011
+https://github.com/Uniswap/the-compact,official/open-source,2026-07-06,2026-07-21,"The Compact contracts and issues can change.",TASK-011
+https://layr-labs.github.io/eigenda/,official/dynamic,2026-07-06,2026-07-21,"EigenDA protocol spec can change.",TASK-011
+https://github.com/Layr-Labs/eigenda,official/open-source,2026-07-06,2026-07-21,"EigenDA repo can change.",TASK-011
+https://ethglobal.com/rules,official/dynamic,2026-07-16,2026-07-23,"Continuity and disclosure rules can change before kickoff.",TASK-012
+https://ethglobal.com/events/lisbon2026/info/start,official/dynamic,2026-07-16,2026-07-23,"Team and event instructions can change before kickoff.",TASK-012
+https://ethglobal.com/events/lisbon2026/info/details,official/dynamic,2026-07-16,2026-07-23,"Submission and judging requirements can change before kickoff.",TASK-012
+https://ethglobal.com/events/lisbon2026/prizes,official/dynamic,2026-07-16,2026-07-23,"Partner tracks and totals remain dynamic.",TASK-012
+https://ethglobal.com/showcase/alpha-dawg-fh6vm,official/dynamic,2026-07-16,2026-07-23,"Showcase metadata can change.",TASK-012
+https://github.com/elbarroca/ETH_Global_Cannes_2026,public-source/no-license,2026-07-16,2026-07-23,"Repo baseline and licensing can change before kickoff.",TASK-012
+https://www.linkedin.com/pulse/were-changing-how-hackathons-work-ethglobal-4pvpc,official/social-dynamic,2026-07-16,2026-07-23,"Continuity program article can move or be updated.",TASK-012
+https://www.linkedin.com/posts/ethglobal_ethglobal-ethglobalnyc-nyc-activity-7472972964779446272-0LjH,official/social-dynamic,2026-07-16,2026-07-23,"Official New York wrap post is socially hosted and dynamic.",TASK-012
+https://developers.uniswap.org/docs/trading/swapping-api/supported-chains,official/dynamic,2026-07-16,2026-07-23,"Supported chains and routers can change.",TASK-012
+https://developers.uniswap.org/docs/trading/swapping-api/integration-guide,official/dynamic,2026-07-16,2026-07-23,"Uniswap API workflow and schemas can change.",TASK-012
+https://eips.ethereum.org/EIPS/eip-8004,official/open-standard,2026-07-16,2026-07-23,"ERC status and registry deployment references can change.",TASK-013
+https://github.com/hedera-dev/hedera-agent-kit,official/open-source,2026-07-16,2026-07-23,"Hedera Agent Kit APIs and examples can change.",TASK-013
+https://github.com/hashgraph-online/conversational-agent,official/community-open-source,2026-07-16,2026-07-23,"HCS-10 agent implementation guidance can change.",TASK-013
+https://developers.uniswap.org/docs/trading/swapping-api/getting-started,official/dynamic,2026-07-16,2026-07-23,"Uniswap API execution flow can change.",TASK-013
+https://ethglobal.com/events/lisbon2026/prizes,official/dynamic,2026-07-16,2026-07-17,"Released tracks and Continuity category labels can change daily before kickoff.",TASK-014
+https://ethglobal.com/rules,official/dynamic,2026-07-16,2026-07-17,"Continuity and partner-eligibility rules can change before kickoff.",TASK-014
+https://ethglobal.com/showcase/alpha-dawg-fh6vm,official/dynamic,2026-07-16,2026-07-23,"Showcase metadata can change.",TASK-014
+https://github.com/elbarroca/ETH_Global_Cannes_2026,public-source/no-license,2026-07-16,2026-07-23,"Repository baseline, contributors, and licensing can change before kickoff.",TASK-014
+https://eips.ethereum.org/EIPS/eip-8004,official/open-standard,2026-07-16,2026-07-23,"ERC status and registry deployment references can change.",TASK-014
+https://ethglobal.com/events/lisbon2026/prizes/1inch,official/dynamic,2026-07-16,2026-07-17,"1inch track category, payout and Aqua requirements can change before kickoff.",TASK-015
+https://ethglobal.com/events/lisbon2026/prizes/hedera,official/dynamic,2026-07-16,2026-07-17,"Hedera category and Agentic Payments requirements can change before kickoff.",TASK-015
+https://ethglobal.com/events/lisbon2026/prizes/0g,official/dynamic,2026-07-16,2026-07-17,"0G Continuity requirements and payouts can change before kickoff.",TASK-015
+https://ethglobal.com/events/lisbon2026/info/details,official/dynamic,2026-07-16,2026-07-17,"Submission, eligibility and Finalist information can change before kickoff.",TASK-015
+https://github.com/1inch/aqua,official/open-source,2026-07-16,2026-07-23,"Aqua contracts, deployments and documentation can change.",TASK-015
+https://github.com/1inch/swap-vm-template,official/open-source,2026-07-16,2026-07-23,"SwapVM template and dependency surface can change.",TASK-015
+https://ethglobal.com/events/cannes2026/prizes,official/dynamic,2026-07-16,2026-07-23,"Historical Finalist prize page can change; it is not Lisbon evidence.",TASK-015
+https://ethglobal.com/packs/cannes2026-finalist,official/dynamic,2026-07-16,2026-07-23,"Historical Finalist Pack benefits can change and do not establish Lisbon benefits.",TASK-015
+https://ethglobal.com/events/lisbon2026/prizes/0g,official/dynamic,2026-07-16,2026-07-17,"0G track labels and submission requirements can change before kickoff.",TASK-016
+https://ethglobal.com/events/lisbon2026/prizes/hedera,official/dynamic,2026-07-16,2026-07-17,"Hedera eligibility and Agentic Payments requirements can change before kickoff.",TASK-016
+https://ethglobal.com/events/lisbon2026/prizes/uniswap-foundation,official/dynamic,2026-07-16,2026-07-17,"Uniswap Continuity requirements and feedback artifacts can change before kickoff.",TASK-016
+https://ethglobal.com/events/lisbon2026/prizes/1inch,official/dynamic,2026-07-16,2026-07-17,"1inch Aqua category can change; currently rejected from the portfolio.",TASK-016
+https://github.com/elbarroca/ETH_Global_Cannes_2026,public-source/no-license,2026-07-16,2026-07-23,"Arc legacy implementation and licensing state can change.",TASK-016
+https://ethglobal.com/events/lisbon2026/info/details,official/dynamic,2026-07-16,2026-07-17,"Multiple-track and Continuity eligibility guidance can change before kickoff.",TASK-017
+https://ethglobal.com/showcase/thurman-protocol-q8iiy,official/dynamic,2026-07-16,2026-07-23,"New York precedent page can change and does not establish Lisbon eligibility.",TASK-017
+https://ethglobal.com/showcase/immunity-eg56a,official/dynamic,2026-07-16,2026-07-23,"New York precedent page can change and does not establish Lisbon eligibility.",TASK-017
+https://ethglobal.com/showcase/pampalo-private-swap-2g5bs,official/dynamic,2026-07-16,2026-07-23,"New York precedent page can change and does not establish Lisbon eligibility.",TASK-017
+https://ethglobal.com/events/lisbon2026/info,official/dynamic,2026-07-23,2026-07-24,"Confirmed Hacking Begins at 2026-07-24 21:00 WEST; recheck the authenticated dashboard at A0.",TASK-018
+https://ethglobal.com/events/lisbon2026/info/details,official/dynamic,2026-07-16,2026-07-23,"Submission and Continuity guidance can change.",TASK-018
+https://ethglobal.com/events/lisbon2026/prizes/0g,official/dynamic,2026-07-16,2026-07-23,"0G classification and proof requirements can change.",TASK-018
+https://ethglobal.com/events/lisbon2026/prizes/hedera,official/dynamic,2026-07-16,2026-07-23,"Hedera eligibility and contradictory wording need recheck.",TASK-018
+https://ethglobal.com/events/lisbon2026/prizes/uniswap-foundation,official/dynamic,2026-07-16,2026-07-23,"Uniswap requirements and feedback link can change.",TASK-018
+https://github.com/elbarroca/ETH_Global_Cannes_2026,public-source/no-license,2026-07-16,2026-07-23,"Baseline remote HEAD, rights and license can change.",TASK-018
+https://a2a-protocol.org/latest/specification,official/open-standard,2026-07-16,2026-07-23,"A2A specification and SDK compatibility can change.",TASK-018
+https://docs.x402.org/guides/migration-v1-to-v2,official/dynamic,2026-07-16,2026-07-23,"x402 v2 guidance can change.",TASK-018
+https://build.0g.ai/compute,official/dynamic,2026-07-16,2026-07-23,"0G providers, SDK and proof surface can change.",TASK-018
+https://0g.ai/blog/0g-private-computer,official/dynamic,2026-07-16,2026-07-23,"0G Private Computer attestation surface can change.",TASK-018
+https://build.0g.ai/sdks,official/dynamic,2026-07-16,2026-07-23,"0G Storage SDK and networks can change.",TASK-018
+https://docs.hedera.com/api-reference/topics/list-topic-messages-by-id,official/dynamic,2026-07-16,2026-07-23,"Mirror API and evidence behavior can change.",TASK-018
+https://developers.uniswap.org/docs/trading/swapping-api/integration-guide,official/dynamic,2026-07-16,2026-07-23,"Uniswap API schema and route behavior can change.",TASK-018
+https://developers.uniswap.org/docs/trading/swapping-api/chained-actions,official/dynamic,2026-07-16,2026-07-23,"Chained route workflow can change.",TASK-018
+https://ethglobal.com/events/lisbon2026/prizes,official/dynamic,2026-07-16,2026-07-24,"Prize tracks and requirements can change before kickoff.",TASK-021
+https://ethglobal.com/rules,official/dynamic,2026-07-16,2026-07-24,"Event rules control project provenance and eligibility.",TASK-021
+https://ethglobal.com/events/lisbon2026/info/details,official/dynamic,2026-07-16,2026-07-24,"Deadline and submission guidance can change.",TASK-021
+https://docs.hedera.com/hedera/core-concepts/scheduled-transaction,official/dynamic,2026-07-16,2026-07-24,"Schedule support and semantics can change.",TASK-021
+https://github.com/1inch/aqua,official/open-source,2026-07-16,2026-07-24,"Starter and contract HEAD can change.",TASK-021
+https://docs.wal.app/docs/typescript-sdk/sdks,official/dynamic,2026-07-16,2026-07-24,"SDK versions and Testnet package IDs can change.",TASK-021
+https://developers.uniswap.org/hackathon-feedback,official/live,2026-07-18,2026-07-24,"Mandatory form is live; completion and FEEDBACK.md link still need event-window verification.",TASK-021
+https://ethglobal.com/events/lisbon2026/prizes/world,official/dynamic,2026-07-18,2026-07-24,"World tracks and payout split remain unpublished.",TASK-021
+https://ethglobal.com/events/lisbon2026/prizes/the-graph,official/dynamic,2026-07-18,2026-07-24,"The Graph details are newly published; monitor only unless AlphaDawg scope changes.",TASK-021
+https://github.com/hedera-dev/scaffold-hbar/tree/templates/cross-chain-dca,official/open-source,2026-07-16,2026-07-24,"Starter branch and deployment assumptions can change.",TASK-021
+https://ethglobal.com/events/lisbon2026/prizes/0g,official/dynamic,2026-07-16,2026-07-24,"0G payout ladder and track classification can change before kickoff.",TASK-021
+https://ethglobal.com/events/lisbon2026/prizes/hedera,official/dynamic,2026-07-16,2026-07-24,"Hedera payout ladder and same-project track treatment need H0 recheck.",TASK-021
+https://ethglobal.com/events/lisbon2026/prizes/uniswap-foundation,official/dynamic,2026-07-18,2026-07-24,"Uniswap payout ladder and mandatory feedback path can change.",TASK-021
+https://ethglobal.com/events/lisbon2026/prizes/ens,official/dynamic,2026-07-16,2026-07-24,"ENS added AI Agent and Continuity tracks; recheck before selection.",TASK-021

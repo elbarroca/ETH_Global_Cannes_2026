@@ -1,0 +1,31 @@
+# Repository Index
+
+- [[repositories/agentindex-psxxo|AgentIndex]] - https://github.com/scryptedai/agentindex
+- [[repositories/agentranker-0mo6w|AgentRanker]] - https://github.com/Hitakshi02/AgentRank
+- [[repositories/agentrankr-xe2vj|AgentRankr]] - https://github.com/zambrose/agentrank
+- [[repositories/azimuth-7w256|Azimuth]] - https://github.com/vaibhav-vemula/azimuth
+- [[repositories/ballast-7jpyp|Ballast]] - https://github.com/mcmoodoo/Ballast
+- [[repositories/better-wallet-yvjdh|Better Wallet]] - https://github.com/BetterWallet/betterwallet-nfc
+- [[repositories/carry-b4wcm|Carry]] - https://github.com/ben-harper27/ethglobal-nyc-26
+- [[repositories/clawback-vpmw2|Clawback]] - https://github.com/EdwardJXLi/Clawback
+- [[repositories/corpus-j7an5|Corpus]] - https://github.com/spock-mark1/corpus-protocol
+- [[repositories/dive-5hxbp|DIVE]] - https://github.com/derek2403/cannes2026
+- [[repositories/defi-e9zii|Defi]] - https://github.com/Camillemtd/dueldefi
+- [[repositories/ensfromwei-m3nj7|ENSFromWei]] - https://github.com/mdengler/egnyc26
+- [[repositories/enshell-6t95y|ENShell]] - https://github.com/0xenshell/contract
+- [[repositories/evm-porst-kkcfo|EVM PORST]] - https://github.com/duncancmt/porst
+- [[repositories/kickoff-aivy-studio-f6o10|Kickoff Aivy Studio]] - https://github.com/jmgomezl/aivy-studio
+- [[repositories/nyx-prk3o|Nyx]] - https://github.com/ybapat/ethny26
+- [[repositories/opencompliance-b89x9|OpenCompliance]] - https://github.com/fraVlaca/open-compliance-network
+- [[repositories/paintglobal-v4pwo|PaintGlobal]] - https://github.com/Lasssssa/PaintGlobal
+- [[repositories/preo-rg0m9|Preo]] - https://github.com/alycz/Preo
+- [[repositories/proof-of-human-1cg2d|Proof-of-Human]] - https://github.com/JackREscowitz/Proof-Of-Human-Drops
+- [[repositories/sentinel-91nv5|SENTINEL]] - https://github.com/Ayoub-ouederni/SENTINEL
+- [[repositories/scoutxyz-rwueo|Scoutxyz]] - https://github.com/JuampiHernandez/scout-networking-agents
+- [[repositories/shawarma-orchestrate-rfyhe|Shawarma Orchestrate]] - https://github.com/chevoisiatesalvati/schwarma-orchestrator
+- [[repositories/smile-fictr|Smile]] - https://github.com/oslinin/Smile
+- [[repositories/tap-tap-revolution-fnvdt|Tap Tap Revolution]] - https://github.com/jcruzfff/taptap-revolution
+- [[repositories/veil-vpn-c643n|VEIL VPN]] - https://github.com/itublockchain/veil-vpn
+- [[repositories/veryclear-vu8i7|Veryclear]] - https://github.com/lfglabs-dev/explain.md
+- [[repositories/maki-564eg|maki]] - https://github.com/slaviquee/maki
+- [[repositories/npmguard-aeihd|npmguard]] - https://github.com/kryczkal/EthCannes2026

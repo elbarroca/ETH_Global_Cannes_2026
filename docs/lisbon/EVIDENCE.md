@@ -33,7 +33,8 @@ status: PASS | FAIL | BLOCKED
 | `A0-PROMPT-001` | Prompt pack | `PASS` | `GOALS.md` contains the dependency matrix, subagent contract, validation ladder, premortems, and 12 consistently named split prompts. Markdown fences, local links, prompt headers, and async no-effect boundaries passed. |
 | `A0-LOCK-001` | Writer serialization | `PASS` | Atomic common-dir lease exists; physical and mirrored tokens match. |
 | `A0-AUDIT-001` | Independent prompt audit | `PASS` | Concurrency, live-probe, naming, and lock-mirror findings reconciled; independent result was `PASS_IF_A0_CLOSED`; A0 content commit `41325b6564c338d8b681c2756228add3a7b4dac3` satisfied the condition. |
-| `A0-ARCHIVE-001` | Repo-local context | `PASS` | 42 copied provenance inputs plus `archive/README.md`; supplied prize-text SHA-256 `630007d7...bf774`; ENS workshop image SHA-256 `0760b12c...3724`. |
+| `A0-ARCHIVE-001` | Repo-local context | `PASS` | All 244 research-vault files mirrored byte-for-byte and indexed in `ALPHADAWG-FILE-MANIFEST.csv`; 1,033 internal file links resolve; two preserved stale heading names have repo-local redirects in `ALPHADAWG-FILE-MAP.md`; the only two direct root-level research files were archived safely. |
+| `A0-MIRROR-001` | Internal accessibility | `PASS_IF_COMMITTED_AND_LOCK_RELEASED` | Exact results in `evidence/A0-CONTEXT-MIRROR-VALIDATION.md`; independent read-only audit agrees. |
 | `A1-FOUNDATION-001` | Foundation | `NOT_RUN` | Await Goal A1. |
 | `A3-0G-001` | 0G | `NOT_RUN` | No Lisbon live ID. |
 | `A4-ENS-001` | ENS | `NOT_RUN` | No Lisbon live ID. |
@@ -44,3 +45,7 @@ HTTP `200`, a database flag, UI badge, inherited receipt, or mock is not termina
 ## A0 verification scope
 
 This gate changes documentation and control state only. It ran Markdown structure/link checks, prompt-set and header checks, async no-effect checks, common-dir lock/token equality, branch/baseline verification, active-doc secret-pattern scanning, and `git diff --check`. Application lint, typecheck, tests, build, migrations, and live sponsor smokes remain `NOT_RUN` for A1 and later code sprints; `node_modules` was absent and no dependency installation occurred.
+
+## Downstream boundary
+
+Completing the context mirror does not open Goal A1. The independent A0 release audit remains `BLOCKED` on pre-H0 timing, rights/license/team/owner gaps, evidence/atomicity defects, and external-effect authorization.

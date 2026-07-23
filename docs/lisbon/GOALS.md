@@ -23,14 +23,15 @@ This file is the copy/paste control surface for a new Codex project opened at th
 1. `AGENTS.md`
 2. `docs/lisbon/README.md`
 3. `docs/lisbon/BASELINE.md`
-4. `docs/lisbon/context/README.md`
-5. `docs/lisbon/context/RUNBOOK.md`
-6. `docs/lisbon/context/MASTER.md`
-7. `docs/lisbon/context/ENGINEERING-AUDIT.md`
-8. `docs/lisbon/TRACK-MATRIX.md`
-9. `docs/lisbon/CLAIM-MATRIX.md`
-10. `docs/lisbon/EVIDENCE.md`
-11. `docs/lisbon/EXTERNAL-EFFECTS.md`
+4. `docs/lisbon/ALPHADAWG-FILE-MAP.md`
+5. `docs/lisbon/context/README.md`
+6. `docs/lisbon/context/RUNBOOK.md`
+7. `docs/lisbon/context/MASTER.md`
+8. `docs/lisbon/context/ENGINEERING-AUDIT.md`
+9. `docs/lisbon/TRACK-MATRIX.md`
+10. `docs/lisbon/CLAIM-MATRIX.md`
+11. `docs/lisbon/EVIDENCE.md`
+12. `docs/lisbon/EXTERNAL-EFFECTS.md`
 
 ## Sprint execution matrix
 
