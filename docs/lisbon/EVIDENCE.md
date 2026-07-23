@@ -32,7 +32,7 @@ status: PASS | FAIL | BLOCKED
 | `A0-AUTH-001` | Local start | `PASS_LOCAL_ONLY` | Thread authorization; external effects remain denied. |
 | `A0-PROMPT-001` | Prompt pack | `PASS` | `GOALS.md` contains the dependency matrix, subagent contract, validation ladder, premortems, and 12 consistently named split prompts. Markdown fences, local links, prompt headers, and async no-effect boundaries passed. |
 | `A0-LOCK-001` | Writer serialization | `PASS` | Atomic common-dir lease exists; physical and mirrored tokens match. |
-| `A0-AUDIT-001` | Independent prompt audit | `PASS_IF_A0_CLOSED` | Concurrency, live-probe, naming, and lock-mirror findings reconciled; final condition is the A0 content commit and clean lock release. |
+| `A0-AUDIT-001` | Independent prompt audit | `PASS` | Concurrency, live-probe, naming, and lock-mirror findings reconciled; independent result was `PASS_IF_A0_CLOSED`; A0 content commit `41325b6564c338d8b681c2756228add3a7b4dac3` satisfied the condition. |
 | `A0-ARCHIVE-001` | Repo-local context | `PASS` | 42 copied provenance inputs plus `archive/README.md`; supplied prize-text SHA-256 `630007d7...bf774`; ENS workshop image SHA-256 `0760b12c...3724`. |
 | `A1-FOUNDATION-001` | Foundation | `NOT_RUN` | Await Goal A1. |
 | `A3-0G-001` | 0G | `NOT_RUN` | No Lisbon live ID. |
