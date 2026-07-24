@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { EnvironmentValidationError, validateEnvironment } from "../../src/config/env";
 import { canonicalJson } from "../../src/kernel/canonical";
@@ -7,6 +10,7 @@ import {
   runStorageProofVerifier,
   StorageVerifierError,
   type StorageVerificationRequest,
+  type StorageVerifierOptions,
 } from "../../src/og/storage-verifier";
 
 function digest(value: string): string {
@@ -51,42 +55,21 @@ function nodeOutputScript(output: string): readonly string[] {
   return ["-e", `process.stdout.write(${JSON.stringify(output)})`];
 }
 
-test("strict live mode requires exact server-only funding and spend authority", () => {
+test("retired A3 live settings are rejected and runtime remains disabled", () => {
   assert.deepEqual(validateEnvironment({ NODE_ENV: "test" }).strictA3, { mode: "disabled" });
   assert.throws(() => validateEnvironment({
     NODE_ENV: "test",
     A3_0G_LIVE_ENABLED: "true",
-    A3_0G_FUNDING_AUTHORIZED: "false",
-  }), (error: unknown) => {
-    assert.ok(error instanceof EnvironmentValidationError);
-    assert.match(error.message, /exact live funding authorization/);
-    assert.match(error.message, /must bind the exact provider, model, and cap/);
-    return true;
-  });
-
-  const provider = "0x3333333333333333333333333333333333333333";
-  const model = "fixture-tee-model-v1";
-  const strict = validateEnvironment({
-    NODE_ENV: "test",
-    A3_0G_LIVE_ENABLED: "true",
     A3_0G_FUNDING_AUTHORIZED: "true",
     A3_0G_MAX_SPEND_ATOMIC: "1000",
-    A3_0G_SPEND_AUTHORIZATION: `0g-live-v1:${provider}:${model}:1000`,
-    OG_PROVIDER_ADDRESS: provider,
-    OG_COMPUTE_MODEL: model,
-    OG_RPC_URL: "https://rpc.invalid",
-    OG_STORAGE_INDEXER: "https://indexer.invalid",
-    OG_STORAGE_VERIFIER_PATH: "/opt/alphadawg/0g-storage-verifier",
-    OG_PRIVATE_KEY: `0x${"1".repeat(64)}`,
-  }).strictA3;
-  assert.deepEqual(strict, {
-    mode: "live",
-    provider,
-    model,
-    rpcUrl: "https://rpc.invalid",
-    storageIndexerUrl: "https://indexer.invalid",
-    storageVerifierPath: "/opt/alphadawg/0g-storage-verifier",
-    maxSpendAtomic: 1000,
+    A3_0G_SPEND_AUTHORIZATION: "0g-live-v1:any:any:1000",
+  }), (error: unknown) => {
+    assert.ok(error instanceof EnvironmentValidationError);
+    assert.match(error.message, /A3_0G_LIVE_ENABLED: retired/);
+    assert.match(error.message, /A3_0G_FUNDING_AUTHORIZED: retired/);
+    assert.match(error.message, /A3_0G_MAX_SPEND_ATOMIC: retired/);
+    assert.match(error.message, /A3_0G_SPEND_AUTHORIZATION: retired/);
+    return true;
   });
 });
 
@@ -143,38 +126,81 @@ test("Node verifier boundary requires exact typed output, not verified:true alon
   }
 });
 
-test("Node verifier boundary kills oversize, nonzero, signal, timeout, and aborted subprocesses", async () => {
+test("Node verifier boundary terminates cooperatively, falls back, and removes every temp tree", async () => {
   const request = requestFixture();
-  await expectVerifierError(runStorageProofVerifier(request, {
-    executablePath: process.execPath,
-    args: ["-e", "process.stdout.write('x'.repeat(70000))"],
-    timeoutMs: 2_000,
-  }), "A3_STORAGE_VERIFIER_OUTPUT_LIMIT");
+  const tempRoot = await mkdtemp(join(tmpdir(), "alphadawg-verifier-parent-test-"));
+  const marker = "require('node:fs').writeFileSync(" +
+    "require('node:path').join(process.env.TMPDIR,'orphan'),'x');";
+  const invoke = async (
+    args: readonly string[],
+    expectedCode: string,
+    options: Partial<StorageVerifierOptions> = {},
+  ): Promise<void> => {
+    await expectVerifierError(runStorageProofVerifier(request, {
+      executablePath: process.execPath,
+      args,
+      tempRoot,
+      timeoutMs: 2_000,
+      ...options,
+    }), expectedCode);
+    assert.deepEqual(await readdir(tempRoot), []);
+  };
+  try {
+    await invoke(
+      ["-e", `${marker}process.stdout.write('x'.repeat(70000))`],
+      "A3_STORAGE_VERIFIER_OUTPUT_LIMIT",
+    );
+    await invoke(
+      ["-e", `${marker}process.stderr.write('x'.repeat(70000))`],
+      "A3_STORAGE_VERIFIER_OUTPUT_LIMIT",
+    );
+    await invoke(["-e", `${marker}process.exit(7)`], "A3_STORAGE_VERIFIER_NONZERO_EXIT");
+    await invoke(["-e", `${marker}process.abort()`], "A3_STORAGE_VERIFIER_NONZERO_EXIT");
+    await invoke(
+      ["-e", `${marker}process.kill(process.pid, 'SIGTERM')`],
+      "A3_STORAGE_VERIFIER_NONZERO_EXIT",
+    );
+    await invoke(
+      ["-e", `${marker}setInterval(() => undefined, 1000)`],
+      "A3_STORAGE_VERIFIER_TIMEOUT",
+      { timeoutMs: 30 },
+    );
 
-  await expectVerifierError(runStorageProofVerifier(request, {
-    executablePath: process.execPath,
-    args: ["-e", "process.exit(7)"],
-    timeoutMs: 2_000,
-  }), "A3_STORAGE_VERIFIER_NONZERO_EXIT");
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 30);
+    await invoke(
+      ["-e", `${marker}setInterval(() => undefined, 1000)`],
+      "A3_STORAGE_VERIFIER_ABORTED",
+      { signal: controller.signal },
+    );
 
-  await expectVerifierError(runStorageProofVerifier(request, {
-    executablePath: process.execPath,
-    args: ["-e", "process.kill(process.pid, 'SIGTERM')"],
-    timeoutMs: 2_000,
-  }), "A3_STORAGE_VERIFIER_NONZERO_EXIT");
+    const preAborted = new AbortController();
+    preAborted.abort();
+    await invoke(
+      ["-e", `${marker}setInterval(() => undefined, 1000)`],
+      "A3_STORAGE_VERIFIER_ABORTED",
+      { signal: preAborted.signal },
+    );
 
-  await expectVerifierError(runStorageProofVerifier(request, {
-    executablePath: process.execPath,
-    args: ["-e", "setInterval(() => undefined, 1000)"],
-    timeoutMs: 20,
-  }), "A3_STORAGE_VERIFIER_TIMEOUT");
+    await invoke(
+      [
+        "-e",
+        `${marker}process.on('SIGTERM',()=>{});setInterval(() => undefined, 1000)`,
+      ],
+      "A3_STORAGE_VERIFIER_TIMEOUT",
+      { terminationGraceMs: 20, timeoutMs: 100 },
+    );
 
-  const controller = new AbortController();
-  setTimeout(() => controller.abort(), 20);
-  await expectVerifierError(runStorageProofVerifier(request, {
-    executablePath: process.execPath,
-    args: ["-e", "setInterval(() => undefined, 1000)"],
-    timeoutMs: 2_000,
-    signal: controller.signal,
-  }), "A3_STORAGE_VERIFIER_ABORTED");
+    await invoke(
+      [
+        "-e",
+        `${marker}require('node:fs').writeFileSync(` +
+          "require('node:path').join(process.env.TMPDIR,'oversize'),Buffer.alloc(2*1024*1024));" +
+          "process.exit(9)",
+      ],
+      "A3_STORAGE_VERIFIER_NONZERO_EXIT",
+    );
+  } finally {
+    await rm(tempRoot, { force: true, recursive: true });
+  }
 });

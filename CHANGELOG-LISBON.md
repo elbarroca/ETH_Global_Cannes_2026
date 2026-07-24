@@ -2,13 +2,23 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A3 independent-audit remediation G1
+
+- Removed the conditional production live A3 runtime entirely. Retired enable/funding/spend settings are rejected, the example environment no longer advertises them, and the default adapter returns terminal `A3_LIVE_BLOCKED` before any broker, signer-status, billing-header, funding, Storage, verifier, upload, or network construction/import.
+- Moved immutable `READBACK_VERIFIED` reconstruction and proof validation ahead of adapter construction and into exception/expired-lease recovery. Both in-process and hard-kill recovery pass at `attempt=max`; the expired path invokes the recovery adapter zero times and creates one effect/receipt/settlement/commission with no refund or `ATTEMPTS_EXHAUSTED`.
+- Bound every injected Compute, Storage, and verifier operation to one combined claim-loss/canonical-deadline signal with register-then-recheck listener ordering and deterministic cleanup. Never-resolving request and signature retrieval now terminate promptly and produce no usable output or success artifact.
+- Made Node own and recursively clean a fresh per-invocation verifier `TMPDIR`; termination is cooperative `SIGTERM` followed by a short bounded `SIGKILL` fallback. Added stdout/stderr, crash, nonzero, timeout, abort/pre-abort, oversized temporary output, and forced-fallback cleanup coverage.
+- Applied Unix `RLIMIT_FSIZE` before official Go proof download and added `SIGXFSZ` to signal-aware contexts while preserving the independent logical 1 MiB limit, non-FullTrusted client, and `Download(..., true)`.
+- Passed 12/12 focused A3 tests, three pinned-Go tests plus production verifier build, combined integration 17/17 plus both migration lanes, and the complete cold local gate. No package lock, schema, migration, or CI file changed.
+- Performed no sponsor/provider/indexer/RPC call, shared/managed database effect, upload, deployment, push, user signature, network transaction, form, spend, mainnet action, public identifier, live proof, or claim promotion. `PASS_LIVE` is `NOT_RUN; LIVE_EFFECT_BLOCKED`; A3 returns `PASS_TO_REAUDIT`, not release approval.
+
 ## 2026-07-24 - A3 strict 0G fixture and integration
 
 - Replaced the authoritative `A3_NOT_CONFIGURED` worker seam with a disabled-by-default strict 0G adapter while retaining the old protected adapter only as an explicit A2 compatibility fixture.
 - Added exact creator/buyer/version/manifest/input/provider/model/nonce/deadline/policy/job/effect request binding, fatal signed-text UTF-8 equality, acknowledged separated-TEE signer validation, exact response/signature schemas, and removal of malformed-proof re-hashing.
 - Added a unique-by-effect staged A3 journal with immutable bindings/evidence, legal versioned transitions, current owner+epoch+claim-version fencing at every mutation, ambiguous-dispatch refusal, and zero-repeat crash recovery.
 - Added a Go `1.23.10` stdin/stdout verifier pinned to official `0g-storage-client v1.3.0`; production uses a non-FullTrusted indexer and `Download(..., true)`, bounded temporary readback, exact canonical receipt/root/digest/size checks, and nonzero fail-closed exits.
-- Added server-only exact live provider/model/funding/cap gates; disabled and fixture paths load no broker/indexer and perform no funding call. CI now installs Go `1.23.10` and runs the Go/A3 lanes.
+- Added server-only exact live provider/model/funding/cap gates in the original A3 generation; the remediation above supersedes and removes that conditional live authority. CI installs Go `1.23.10` and runs the Go/A3 lanes.
 - Passed 8/8 focused A3 TypeScript tests, two Go tests, combined integration 13/13 plus both three-migration replay lanes, and the full local cold gate. Fourteen terminal mutations created zero receipt, settlement, commission, rating, trade action, second effect, or fake proof.
 - Performed no sponsor/provider/indexer/RPC call, shared/managed database effect, upload, deployment, push, user signature, network transaction, form, spend, mainnet action, public identifier, live proof, or claim promotion. `PASS_LIVE`, release, and 0G qualification remain blocked.
 

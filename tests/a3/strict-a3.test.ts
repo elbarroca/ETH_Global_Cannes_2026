@@ -25,7 +25,7 @@ import {
   type StorageVerificationRequest,
   type StorageVerificationResult,
 } from "../../src/og/storage-verifier";
-import type { AdapterExecutionRequest } from "../../src/worker/adapter";
+import type { AdapterExecutionRequest, KernelAdapter } from "../../src/worker/adapter";
 import { runWorkerOnce } from "../../src/worker/runner";
 import {
   acquireWorkerLease,
@@ -85,8 +85,10 @@ type ComputeFailure =
   | "signature-false"
   | "signature-missing"
   | "signature-malformed"
+  | "signature-stall"
   | "wrong-signer"
   | "compute-tamper"
+  | "send-stall"
   | "crash-after-request-sent";
 
 class FixtureCompute implements StrictComputeTransport {
@@ -128,6 +130,9 @@ class FixtureCompute implements StrictComputeTransport {
 
   async sendRequest(): Promise<StrictComputeResponse> {
     this.calls.send += 1;
+    if (this.failure === "send-stall") {
+      return new Promise<StrictComputeResponse>(() => undefined);
+    }
     const content = this.failure === "compute-tamper" ? `${this.content}!` : this.content;
     return {
       status: 200,
@@ -140,6 +145,9 @@ class FixtureCompute implements StrictComputeTransport {
 
   async fetchSignature(): Promise<unknown> {
     this.calls.signature += 1;
+    if (this.failure === "signature-stall") {
+      return new Promise<unknown>(() => undefined);
+    }
     if (this.failure === "signature-missing") return {};
     if (this.failure === "signature-malformed") return { text: this.content, signature: "bad" };
     const account = this.failure === "wrong-signer" ? wrongSigner : signer;
@@ -194,6 +202,14 @@ type VerifierFailure =
   | "missing-output"
   | "unknown-output";
 
+type ProcessVerifierFailure =
+  | "abort"
+  | "crash"
+  | "malformed"
+  | "nonzero"
+  | "oversize"
+  | "timeout";
+
 function fixtureVerifier(
   content: string,
   failure: VerifierFailure,
@@ -241,6 +257,42 @@ function fixtureVerifier(
   };
 }
 
+function processFailureVerifier(
+  failure: ProcessVerifierFailure,
+  counter: { calls: number },
+): (request: StorageVerificationRequest, signal: AbortSignal) => Promise<StorageVerificationResult> {
+  return async (request, signal) => {
+    counter.calls += 1;
+    const controller = new AbortController();
+    const onParentAbort = (): void => controller.abort(signal.reason);
+    signal.addEventListener("abort", onParentAbort, { once: true });
+    if (signal.aborted) onParentAbort();
+    const abortTimer = failure === "abort"
+      ? setTimeout(() => controller.abort(), 30)
+      : null;
+    const script = failure === "malformed"
+      ? "process.stdout.write('{')"
+      : failure === "crash"
+        ? "process.abort()"
+        : failure === "nonzero"
+          ? "process.exit(17)"
+          : failure === "oversize"
+            ? "process.stdout.write('x'.repeat(70000))"
+            : "setInterval(() => undefined, 1000)";
+    try {
+      return await runStorageProofVerifier(request, {
+        executablePath: process.execPath,
+        args: ["-e", script],
+        signal: controller.signal,
+        timeoutMs: failure === "timeout" ? 30 : 2_000,
+      });
+    } finally {
+      if (abortTimer) clearTimeout(abortTimer);
+      signal.removeEventListener("abort", onParentAbort);
+    }
+  };
+}
+
 async function setupKernel(database: DisposableDatabase): Promise<string> {
   configureDatabaseEnvironment(database.url);
   await database.sql`
@@ -284,8 +336,13 @@ function fixtureAdapter(
     wrongRoot?: boolean;
     storageCrash?: boolean;
     hooks?: StrictA3Hooks;
+    deadlineMs?: number;
     now?: Date;
     onResolve?: () => Promise<void>;
+    verifierOverride?: (
+      request: StorageVerificationRequest,
+      signal: AbortSignal,
+    ) => Promise<StorageVerificationResult>;
   } = {},
 ): {
   adapter: StrictA3Adapter;
@@ -305,13 +362,15 @@ function fixtureAdapter(
       sql: database.sql,
       now: options.now ?? BASE_TIME,
       hooks: options.hooks,
+      deadlineMs: options.deadlineMs,
       fixture: {
         provider: PROVIDER,
         model: MODEL,
         storageIndexerUrl: INDEXER,
         compute,
         storage,
-        verifier: fixtureVerifier(content, options.verifierFailure ?? "none", verifier),
+        verifier: options.verifierOverride ??
+          fixtureVerifier(content, options.verifierFailure ?? "none", verifier),
       },
     }),
   };
@@ -320,6 +379,7 @@ function fixtureAdapter(
 async function terminalSnapshot(database: DisposableDatabase, jobId: string) {
   const rows = await database.sql<{
     job_state: string;
+    last_error_code: string | null;
     effect_state: string;
     effects: number;
     receipts: number;
@@ -333,6 +393,7 @@ async function terminalSnapshot(database: DisposableDatabase, jobId: string) {
   }[]>`
     SELECT
       j.state AS job_state,
+      j.last_error_code,
       e.state AS effect_state,
       (SELECT count(*)::int FROM effects WHERE job_id = j.id) AS effects,
       (SELECT count(*)::int FROM receipts WHERE job_id = j.id) AS receipts,
@@ -388,6 +449,7 @@ test("strict fixture binds signed Compute bytes to proved Storage readback and o
     assert.match(successSnapshot.proof_hash ?? "", /^[0-9a-f]{64}$/);
     assert.deepEqual({ ...successSnapshot, proof_hash: "<verified>" }, {
       job_state: "SUCCEEDED",
+      last_error_code: null,
       effect_state: "SUCCEEDED",
       effects: 1,
       receipts: 1,
@@ -487,13 +549,198 @@ test("all Compute, Storage, receipt, and verifier failures produce no delivery o
     };
     const disabled = new StrictA3Adapter({
       sql: database.sql,
-      environment: { NODE_ENV: "test" },
+      environment: {
+        NODE_ENV: "production",
+        A3_0G_LIVE_ENABLED: "true",
+        A3_0G_FUNDING_AUTHORIZED: "true",
+        A3_0G_MAX_SPEND_ATOMIC: "999999999",
+        A3_0G_SPEND_AUTHORIZATION: "0g-live-v1:any:any:999999999",
+        OG_PROVIDER_ADDRESS: PROVIDER,
+        OG_COMPUTE_MODEL: MODEL,
+        OG_RPC_URL: "https://rpc.invalid",
+        OG_STORAGE_INDEXER: INDEXER,
+        OG_STORAGE_VERIFIER_PATH: "/tmp/live-verifier",
+        OG_PRIVATE_KEY: `0x${"1".repeat(64)}`,
+      },
     });
     assert.deepEqual(await disabled.execute(directRequest), {
       ok: false,
       errorCode: "A3_LIVE_BLOCKED",
       retryable: false,
     });
+
+    const blockedNow = new Date(BASE_TIME.getTime() + 60_000);
+    const blocked = await submit(
+      database,
+      agentVersionId,
+      "a3-live-authority-blocked",
+      blockedNow,
+    );
+    const retiredSettings = {
+      A3_0G_LIVE_ENABLED: "true",
+      A3_0G_FUNDING_AUTHORIZED: "true",
+      A3_0G_MAX_SPEND_ATOMIC: "999999999",
+      A3_0G_SPEND_AUTHORIZATION: "0g-live-v1:any:any:999999999",
+      OG_PROVIDER_ADDRESS: PROVIDER,
+      OG_COMPUTE_MODEL: MODEL,
+      OG_RPC_URL: "https://rpc.invalid",
+      OG_STORAGE_INDEXER: INDEXER,
+      OG_STORAGE_VERIFIER_PATH: "/tmp/live-verifier",
+      OG_PRIVATE_KEY: `0x${"1".repeat(64)}`,
+    };
+    const previousSettings = Object.fromEntries(
+      Object.keys(retiredSettings).map((key) => [key, process.env[key]]),
+    );
+    const originalFetch = globalThis.fetch;
+    let networkCalls = 0;
+    Object.assign(process.env, retiredSettings);
+    globalThis.fetch = (async () => {
+      networkCalls += 1;
+      throw new Error("unexpected A3 network call");
+    }) as typeof fetch;
+    try {
+      await runWorkerOnce({
+        ownerId: "a3-live-blocked-worker",
+        concurrency: 1,
+        leaseSeconds: 30,
+        sql: database.sql,
+        now: blockedNow,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      for (const [key, value] of Object.entries(previousSettings)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+    assert.equal(networkCalls, 0);
+    assert.deepEqual(await terminalSnapshot(database, blocked.jobId), {
+      job_state: "FAILED",
+      last_error_code: "A3_LIVE_BLOCKED",
+      effect_state: "FAILED",
+      effects: 1,
+      receipts: 0,
+      settlements: 0,
+      commissions: 0,
+      refunds: 1,
+      ratings: 0,
+      trade_actions: 0,
+      journal_stage: null,
+      proof_hash: null,
+    });
+  } finally {
+    await database.close();
+  }
+});
+
+test("subprocess malformed, crash, nonzero, timeout, abort, and oversize failures stay fail-closed end-to-end", async () => {
+  const database = await startDisposableDatabase("a3-procf");
+  try {
+    const agentVersionId = await setupKernel(database);
+    const cases: Array<{ failure: ProcessVerifierFailure; errorCode: string }> = [
+      { failure: "malformed", errorCode: "A3_STORAGE_VERIFIER_MALFORMED_OUTPUT" },
+      { failure: "crash", errorCode: "A3_STORAGE_VERIFIER_NONZERO_EXIT" },
+      { failure: "nonzero", errorCode: "A3_STORAGE_VERIFIER_NONZERO_EXIT" },
+      { failure: "timeout", errorCode: "A3_STORAGE_VERIFIER_TIMEOUT" },
+      { failure: "abort", errorCode: "A3_STORAGE_VERIFIER_ABORTED" },
+      { failure: "oversize", errorCode: "A3_STORAGE_VERIFIER_OUTPUT_LIMIT" },
+    ];
+    for (let index = 0; index < cases.length; index += 1) {
+      const item = cases[index];
+      const now = new Date(BASE_TIME.getTime() + 30_000 + index * 1_000);
+      const submitted = await submit(
+        database,
+        agentVersionId,
+        `a3-process-${item.failure}`,
+        now,
+      );
+      const processCalls = { calls: 0 };
+      const fixture = fixtureAdapter(database, {
+        now,
+        verifierOverride: processFailureVerifier(item.failure, processCalls),
+      });
+      await runWorkerOnce({
+        ownerId: "a3-process-worker",
+        concurrency: 1,
+        leaseSeconds: 30,
+        adapter: fixture.adapter,
+        sql: database.sql,
+        now,
+      });
+      assert.equal(processCalls.calls, 1, item.failure);
+      assert.deepEqual([
+        fixture.compute.calls.send,
+        fixture.storage.calls,
+      ], [1, 1], item.failure);
+      const snapshot = await terminalSnapshot(database, submitted.jobId);
+      assert.equal(snapshot.job_state, "FAILED", item.failure);
+      assert.equal(snapshot.last_error_code, item.errorCode, item.failure);
+      assert.equal(snapshot.effect_state, "FAILED", item.failure);
+      assert.equal(snapshot.journal_stage, "FAILED", item.failure);
+      assert.equal(snapshot.receipts, 0, item.failure);
+      assert.equal(snapshot.settlements, 0, item.failure);
+      assert.equal(snapshot.commissions, 0, item.failure);
+      assert.equal(snapshot.refunds, 1, item.failure);
+      assert.equal(snapshot.ratings, 0, item.failure);
+      assert.equal(snapshot.trade_actions, 0, item.failure);
+      assert.deepEqual(await runWorkerOnce({
+        ownerId: "a3-process-worker",
+        concurrency: 1,
+        leaseSeconds: 30,
+        adapter: fixture.adapter,
+        sql: database.sql,
+        now: new Date(now.getTime() + 100),
+      }), { leaseAcquired: true, claimed: 0 });
+      assert.equal(processCalls.calls, 1, item.failure);
+    }
+  } finally {
+    await database.close();
+  }
+});
+
+test("canonical deadline aborts stalled Compute request and signature retrieval", async () => {
+  const database = await startDisposableDatabase("a3-deadline");
+  try {
+    const agentVersionId = await setupKernel(database);
+    const cases: Array<{ name: string; failure: ComputeFailure; signatureCalls: number }> = [
+      { name: "send", failure: "send-stall", signatureCalls: 0 },
+      { name: "signature", failure: "signature-stall", signatureCalls: 1 },
+    ];
+    for (let index = 0; index < cases.length; index += 1) {
+      const item = cases[index];
+      const now = new Date(BASE_TIME.getTime() + 45_000 + index * 1_000);
+      const submitted = await submit(database, agentVersionId, `a3-deadline-${item.name}`, now);
+      const fixture = fixtureAdapter(database, {
+        computeFailure: item.failure,
+        deadlineMs: 30,
+        now,
+      });
+      const startedAt = Date.now();
+      await runWorkerOnce({
+        ownerId: "a3-deadline-worker",
+        concurrency: 1,
+        leaseSeconds: 30,
+        adapter: fixture.adapter,
+        sql: database.sql,
+        now,
+      });
+      assert.ok(Date.now() - startedAt < 1_000, item.name);
+      assert.equal(fixture.compute.calls.send, 1, item.name);
+      assert.equal(fixture.compute.calls.signature, item.signatureCalls, item.name);
+      assert.equal(fixture.storage.calls, 0, item.name);
+      assert.equal(fixture.verifier.calls, 0, item.name);
+      const snapshot = await terminalSnapshot(database, submitted.jobId);
+      assert.equal(snapshot.job_state, "FAILED", item.name);
+      assert.equal(snapshot.last_error_code, "A3_REQUEST_DEADLINE_EXPIRED", item.name);
+      assert.equal(snapshot.effect_state, "FAILED", item.name);
+      assert.equal(snapshot.journal_stage, "FAILED", item.name);
+      assert.equal(snapshot.receipts, 0, item.name);
+      assert.equal(snapshot.settlements, 0, item.name);
+      assert.equal(snapshot.commissions, 0, item.name);
+      assert.equal(snapshot.refunds, 1, item.name);
+      assert.equal(snapshot.ratings, 0, item.name);
+      assert.equal(snapshot.trade_actions, 0, item.name);
+    }
   } finally {
     await database.close();
   }
@@ -511,7 +758,6 @@ test("crash recovery skips every completed remote stage and retains one effect",
       { name: "afterPrepared", stage: "PREPARED", firstCounts: [0, 0, 0] },
       { name: "afterResponseVerified", stage: "RESPONSE_VERIFIED", firstCounts: [1, 0, 0] },
       { name: "afterStorageCommitted", stage: "STORAGE_COMMITTED", firstCounts: [1, 1, 0] },
-      { name: "afterReadbackVerified", stage: "READBACK_VERIFIED", firstCounts: [1, 1, 1] },
     ];
     for (let index = 0; index < phases.length; index += 1) {
       const phase = phases[index];
@@ -567,13 +813,145 @@ test("crash recovery skips every completed remote stage and retains one effect",
         assert.equal(fixture.compute.calls.send, callsAfterCrash.compute.send, phase.name);
         assert.equal(fixture.compute.calls.signature, callsAfterCrash.compute.signature, phase.name);
       }
-      if (phase.stage === "STORAGE_COMMITTED" || phase.stage === "READBACK_VERIFIED") {
+      if (phase.stage === "STORAGE_COMMITTED") {
         assert.equal(fixture.storage.calls, callsAfterCrash.storage, phase.name);
       }
-      if (phase.stage === "READBACK_VERIFIED") {
-        assert.equal(fixture.verifier.calls, callsAfterCrash.verifier, phase.name);
-      }
     }
+  } finally {
+    await database.close();
+  }
+});
+
+test("READBACK_VERIFIED recovers in-process and finalizes without a second adapter call", async () => {
+  const database = await startDisposableDatabase("a3-rbi");
+  try {
+    const agentVersionId = await setupKernel(database);
+    const submitted = await submit(database, agentVersionId, "a3-readback-inline");
+    await database.sql`
+      UPDATE jobs SET max_attempts = 1 WHERE id = ${submitted.jobId}::uuid
+    `;
+    let crashed = false;
+    const fixture = fixtureAdapter(database, {
+      hooks: {
+        afterReadbackVerified: async () => {
+          if (crashed) return;
+          crashed = true;
+          throw new A3SimulatedCrashError();
+        },
+      },
+    });
+    let adapterCalls = 0;
+    const adapter: KernelAdapter = {
+      key: "protected-a3",
+      requiresVerifiedJournal: true,
+      execute: async (request) => {
+        adapterCalls += 1;
+        return fixture.adapter.execute(request);
+      },
+    };
+    await runWorkerOnce({
+      ownerId: "a3-readback-inline-worker",
+      concurrency: 1,
+      leaseSeconds: 30,
+      adapter,
+      sql: database.sql,
+      now: BASE_TIME,
+    });
+    assert.equal(adapterCalls, 1);
+    assert.deepEqual([
+      fixture.compute.calls.send,
+      fixture.storage.calls,
+      fixture.verifier.calls,
+    ], [1, 1, 1]);
+    const snapshot = await terminalSnapshot(database, submitted.jobId);
+    assert.equal(snapshot.job_state, "SUCCEEDED");
+    assert.equal(snapshot.last_error_code, null);
+    assert.equal(snapshot.receipts, 1);
+    assert.equal(snapshot.settlements, 1);
+    assert.equal(snapshot.commissions, 1);
+    assert.equal(snapshot.refunds, 0);
+  } finally {
+    await database.close();
+  }
+});
+
+test("expired attempt=max READBACK_VERIFIED finalizes before exhaustion with zero adapter calls", async () => {
+  const database = await startDisposableDatabase("a3-rbe");
+  try {
+    const agentVersionId = await setupKernel(database);
+    const submitted = await submit(database, agentVersionId, "a3-readback-expired");
+    await database.sql`
+      UPDATE jobs SET max_attempts = 1 WHERE id = ${submitted.jobId}::uuid
+    `;
+    assert.equal((await acquireWorkerLease("a3-readback-owner-a", 30, {
+      now: BASE_TIME,
+      sql: database.sql,
+    })).acquired, true);
+    const claim = (await claimJobs("a3-readback-owner-a", 1, 30, {
+      now: BASE_TIME,
+      sql: database.sql,
+    }))[0];
+    if (!claim) throw new Error("A3_TEST_CLAIM_MISSING");
+    assert.equal(claim.attempt, claim.maxAttempts);
+
+    const fixture = fixtureAdapter(database, {
+      hooks: {
+        afterReadbackVerified: async () => {
+          throw new A3SimulatedCrashError();
+        },
+      },
+    });
+    await assert.rejects(
+      fixture.adapter.execute(requestFromClaim(claim, new AbortController().signal)),
+      /A3_SIMULATED_CRASH/,
+    );
+    const afterKill = await terminalSnapshot(database, submitted.jobId);
+    assert.equal(afterKill.job_state, "RUNNING");
+    assert.equal(afterKill.effect_state, "RUNNING");
+    assert.equal(afterKill.journal_stage, "READBACK_VERIFIED");
+
+    const recoveryTime = new Date(BASE_TIME.getTime() + 31_000);
+    const expiredHeartbeat = new Date(BASE_TIME.getTime() - 2_000);
+    const expiredLease = new Date(BASE_TIME.getTime() - 1_000);
+    await database.sql`
+      UPDATE worker_leases
+      SET heartbeat_at = ${expiredHeartbeat}, expires_at = ${expiredLease}
+      WHERE key = ${KERNEL_WORKER_LEASE_KEY}
+    `;
+    await database.sql`
+      UPDATE jobs SET lease_expires_at = ${expiredLease}
+      WHERE id = ${submitted.jobId}::uuid
+    `;
+    let recoveryAdapterCalls = 0;
+    const recoveryAdapter: KernelAdapter = {
+      key: "protected-a3",
+      requiresVerifiedJournal: true,
+      execute: async () => {
+        recoveryAdapterCalls += 1;
+        throw new Error("RECOVERY_ADAPTER_MUST_NOT_RUN");
+      },
+    };
+    assert.deepEqual(await runWorkerOnce({
+      ownerId: "a3-readback-owner-b",
+      concurrency: 1,
+      leaseSeconds: 30,
+      adapter: recoveryAdapter,
+      sql: database.sql,
+      now: recoveryTime,
+    }), { leaseAcquired: true, claimed: 0 });
+    assert.equal(recoveryAdapterCalls, 0);
+    assert.deepEqual([
+      fixture.compute.calls.send,
+      fixture.storage.calls,
+      fixture.verifier.calls,
+    ], [1, 1, 1]);
+    const recovered = await terminalSnapshot(database, submitted.jobId);
+    assert.equal(recovered.job_state, "SUCCEEDED");
+    assert.equal(recovered.last_error_code, null);
+    assert.equal(recovered.receipts, 1);
+    assert.equal(recovered.settlements, 1);
+    assert.equal(recovered.commissions, 1);
+    assert.equal(recovered.refunds, 0);
   } finally {
     await database.close();
   }

@@ -4,6 +4,59 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator task /root
+task_id: A3-STRICT-0G-REMEDIATION-G1-20260724
+task_instance_id: A3-STRICT-0G-REMEDIATION-G1-20260724:E83BB3D9
+generation: 1
+sprint: A3_remediation
+mode: sole_writer
+branch: developer
+start_sha: 879072a728f0bec7a4b7a541594a7920cd815d69
+control_sha: 879072a728f0bec7a4b7a541594a7920cd815d69
+token: E83BB3D9-81C2-4FFF-9DE3-C64CD847F3EC
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T05:47:13Z
+expires_at: 2026-07-24T17:10:51Z
+allowed_paths:
+  - .env.example
+  - src/config/env.ts
+  - src/og/strict-a3.ts
+  - src/og/storage-verifier.ts
+  - src/worker/runner.ts
+  - src/worker/store.ts
+  - tests/a3/**
+  - tests/integration/worker-fencing.test.ts
+  - tools/0g-storage-verifier/**
+  - docs/lisbon/evidence/A3-STRICT-0G.md
+  - docs/lisbon/evidence/A2-AUTHENTICATED-KERNEL.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-24T05:10:51Z
+expected_exit: unconditionally block production live A3, recover durable readback with zero adapter calls at max attempts, cooperatively terminate and clean bounded verifier subprocesses, enforce canonical deadlines, and pass end-to-end failure regressions
+lock_release: release only token E83BB3D9-81C2-4FFF-9DE3-C64CD847F3EC after one atomic remediation commit or a recorded BLOCKED closeout
+completed_at: 2026-07-24T05:47:13Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - production live A3 is unconditionally unavailable and former enable funding and spend settings are rejected
+  - default adapter with every former live flag permissive made zero network calls and terminalized A3_LIVE_BLOCKED without a journal or success artifact
+  - immutable readback recovery runs before adapter construction exception requeue and expired attempt exhaustion
+  - in-process and expired attempt-max recovery created one receipt settlement and commission no refund and zero recovery adapter calls
+  - Node owns and removes each verifier temp tree after cooperative termination bounded forced kill crash timeout abort overflow and oversize exits
+  - Go applies RLIMIT_FSIZE before official non-FullTrusted proof download and handles SIGXFSZ through its context
+  - twelve focused A3 tests three pinned-Go tests and build combined integration seventeen of seventeen both migration lanes and the full cold gate passed
+  - package lock schema migrations and CI remained unchanged and no external effect occurred
+remaining_blocks:
+  - independent pinned remediation exit SHA re-audit is pending
+  - PASS_LIVE is NOT_RUN and LIVE_EFFECT_BLOCKED because production live A3 is intentionally unavailable
+  - release claim rights event-window dependency README deployment and A7 gates remain blocked
+audit_verdict: pending_pinned_exit_reaudit
+result: PASS_TO_REAUDIT
+status: closed
+```
+
+```yaml
+owner: C0 coordinator task /root
 task_id: A3-STRICT-0G-FIXTURE-INTEGRATION-20260724
 task_instance_id: A3-STRICT-0G-FIXTURE-INTEGRATION-20260724:3EFB753E
 sprint: A3

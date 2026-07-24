@@ -1,28 +1,26 @@
 import { createHash } from "node:crypto";
 import { canonicalJson, domainHash, type CanonicalValue } from "../kernel/canonical";
 import { getDb } from "../config/database";
-import { validateEnvironment, type StrictA3Environment } from "../config/env";
 import type { DatabaseClient } from "../kernel/service";
 import type {
   AdapterExecutionRequest,
   AdapterExecutionResult,
   KernelAdapter,
 } from "../worker/adapter";
-import { currentClaimHeld, type ClaimedJob } from "../worker/store";
 import {
-  runStorageProofVerifier,
+  currentClaimHeld,
+  deriveA3VerifiedJournalPayload,
+  type ClaimedJob,
+} from "../worker/store";
+import {
   StorageVerifierError,
   type StorageVerificationRequest,
   type StorageVerificationResult,
-  type StorageVerifierOptions,
 } from "./storage-verifier";
-import type { OGBroker, OgService } from "../config/og-compute";
 
 const POLICY_VERSION = "strict-0g-v1";
 const REQUEST_DEADLINE_MS = 5 * 60 * 1_000;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
-const MAX_SIGNATURE_BYTES = 128 * 1024;
-const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const ROOT_PATTERN = /^0x[0-9a-f]{64}$/;
 const ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
 
@@ -243,6 +241,83 @@ function checkAbort(signal: AbortSignal): void {
   if (signal.aborted) throw new A3ClaimLostError();
 }
 
+interface ExecutionDeadline {
+  signal: AbortSignal;
+  expired: () => boolean;
+  cleanup: () => void;
+}
+
+function executionDeadline(parent: AbortSignal, remainingMs: number): ExecutionDeadline {
+  const controller = new AbortController();
+  let deadlineExpired = false;
+  let cleaned = false;
+  const onParentAbort = (): void => controller.abort(parent.reason);
+  const onDeadline = (): void => {
+    deadlineExpired = true;
+    controller.abort(new Error("A3_REQUEST_DEADLINE_EXPIRED"));
+  };
+  parent.addEventListener("abort", onParentAbort, { once: true });
+  if (parent.aborted) onParentAbort();
+  const timer = setTimeout(onDeadline, Math.max(0, remainingMs));
+  if (remainingMs <= 0) onDeadline();
+  return {
+    signal: controller.signal,
+    expired: () => deadlineExpired,
+    cleanup: () => {
+      if (cleaned) return;
+      cleaned = true;
+      clearTimeout(timer);
+      parent.removeEventListener("abort", onParentAbort);
+    },
+  };
+}
+
+async function awaitWithSignal<T>(operation: () => Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) throw signal.reason instanceof Error
+    ? signal.reason
+    : new Error("A3_OPERATION_ABORTED");
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const cleanup = (): void => signal.removeEventListener("abort", onAbort);
+    const onAbort = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(signal.reason instanceof Error ? signal.reason : new Error("A3_OPERATION_ABORTED"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    let pending: Promise<T>;
+    try {
+      pending = operation();
+    } catch (error) {
+      settled = true;
+      cleanup();
+      reject(error);
+      return;
+    }
+    pending.then((value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    }, (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    });
+  });
+}
+
+function checkExecutionAbort(parent: AbortSignal, deadline: ExecutionDeadline): void {
+  if (parent.aborted) throw new A3ClaimLostError();
+  if (deadline.expired()) throw new A3TerminalError("A3_REQUEST_DEADLINE_EXPIRED");
+}
+
 function claimFromRequest(request: AdapterExecutionRequest): ClaimedJob {
   return {
     jobId: request.jobId,
@@ -260,204 +335,6 @@ function claimFromRequest(request: AdapterExecutionRequest): ClaimedJob {
     claimVersion: request.claimVersion,
     leaseExpiresAt: request.leaseExpiresAt,
   };
-}
-
-async function boundedResponseText(response: Response, maximum: number): Promise<string> {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const item = await reader.read();
-      if (item.done) break;
-      total += item.value.length;
-      if (total > maximum) {
-        await reader.cancel();
-        throw new A3TerminalError("A3_HTTP_RESPONSE_TOO_LARGE");
-      }
-      chunks.push(item.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8");
-}
-
-class LiveComputeTransport implements StrictComputeTransport {
-  private brokerPromise: Promise<OGBroker> | null = null;
-
-  constructor(
-    private readonly provider: string,
-    private readonly model: string,
-    private readonly maxSpendAtomic: number,
-  ) {}
-
-  private async broker(): Promise<OGBroker> {
-    if (!this.brokerPromise) {
-      this.brokerPromise = import("../config/og-compute").then(({ getBroker }) => getBroker());
-    }
-    return this.brokerPromise;
-  }
-
-  async resolveService(
-    provider: string,
-    model: string,
-    signal: AbortSignal,
-  ): Promise<StrictComputeService> {
-    if (provider !== this.provider || model !== this.model) {
-      throw new A3TerminalError("A3_PROVIDER_MODEL_POLICY_MISMATCH");
-    }
-    checkAbort(signal);
-    const broker = await this.broker();
-    const matches: OgService[] = [];
-    for (let offset = 0; offset < 1_000; offset += 50) {
-      checkAbort(signal);
-      const page = await broker.inference.listService(offset, 50, true);
-      matches.push(...page.filter((service) => service.provider.toLowerCase() === provider));
-      if (page.length < 50) break;
-    }
-    if (matches.length !== 1) throw new A3TerminalError("A3_PROVIDER_NOT_UNIQUE");
-    const service = matches[0];
-    if (
-      service.model !== model ||
-      service.inputPrice < 0n ||
-      service.outputPrice < 0n ||
-      service.inputPrice > BigInt(this.maxSpendAtomic) ||
-      service.outputPrice > BigInt(this.maxSpendAtomic)
-    ) {
-      throw new A3TerminalError("A3_PROVIDER_MODEL_POLICY_MISMATCH");
-    }
-    const [metadata, signerStatus] = await Promise.all([
-      broker.inference.getServiceMetadata(provider),
-      broker.inference.checkProviderSignerStatus(provider),
-    ]);
-    checkAbort(signal);
-    if (
-      metadata.model !== model ||
-      !signerStatus.isAcknowledged ||
-      signerStatus.teeSignerAddress.toLowerCase() !== service.teeSignerAddress.toLowerCase()
-    ) {
-      throw new A3TerminalError("A3_SIGNER_NOT_ACKNOWLEDGED");
-    }
-    return {
-      provider: service.provider.toLowerCase(),
-      model: service.model,
-      baseUrl: service.url,
-      endpoint: metadata.endpoint,
-      verifiability: service.verifiability,
-      teeSignerAddress: service.teeSignerAddress.toLowerCase(),
-      teeSignerAcknowledged: service.teeSignerAcknowledged,
-      additionalInfo: service.additionalInfo,
-    };
-  }
-
-  async getRequestHeaders(
-    service: StrictComputeService,
-    requestBytes: string,
-    signal: AbortSignal,
-  ): Promise<Record<string, string>> {
-    checkAbort(signal);
-    const headers = await (await this.broker()).inference.getRequestHeaders(
-      service.provider,
-      requestBytes,
-    );
-    checkAbort(signal);
-    if (Object.values(headers).some((value) => typeof value !== "string")) {
-      throw new A3TerminalError("A3_COMPUTE_HEADERS_INVALID");
-    }
-    return headers;
-  }
-
-  async sendRequest(
-    service: StrictComputeService,
-    requestBytes: string,
-    headers: Readonly<Record<string, string>>,
-    signal: AbortSignal,
-  ): Promise<StrictComputeResponse> {
-    const response = await fetch(`${service.endpoint.replace(/\/$/, "")}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
-      body: requestBytes,
-      signal,
-    });
-    const raw = await boundedResponseText(response, MAX_RESPONSE_BYTES);
-    let body: unknown;
-    try {
-      body = JSON.parse(raw);
-    } catch {
-      throw new A3TerminalError("A3_COMPUTE_RESPONSE_MALFORMED");
-    }
-    return {
-      status: response.status,
-      provider: service.provider,
-      model: service.model,
-      requestId: response.headers.get("ZG-Res-Key"),
-      body,
-    };
-  }
-
-  async fetchSignature(
-    service: StrictComputeService,
-    requestId: string,
-    signal: AbortSignal,
-  ): Promise<unknown> {
-    const url = `${service.baseUrl.replace(/\/$/, "")}/v1/proxy/signature/` +
-      `${encodeURIComponent(requestId)}?model=${encodeURIComponent(service.model)}`;
-    const response = await fetch(url, { method: "GET", signal });
-    if (response.status !== 200) throw new A3TerminalError("A3_COMPUTE_SIGNATURE_FETCH_FAILED");
-    const raw = await boundedResponseText(response, MAX_SIGNATURE_BYTES);
-    try {
-      return JSON.parse(raw);
-    } catch {
-      throw new A3TerminalError("A3_COMPUTE_SIGNATURE_MALFORMED");
-    }
-  }
-
-  async verifySignature(
-    signedText: string,
-    signature: string,
-    expectedSigner: string,
-  ): Promise<boolean> {
-    // The installed verifier is loaded only in authorized live mode. We do not
-    // use processResponse because it does not bind the accepted content bytes.
-    const { getInferenceVerifier } = await import("../config/og-compute");
-    return getInferenceVerifier().verifySignature(signedText, signature, expectedSigner) === true;
-  }
-}
-
-class LiveStorageTransport implements StrictStorageTransport {
-  constructor(
-    private readonly indexerUrl: string,
-    private readonly rpcUrl: string,
-  ) {}
-
-  async store(
-    request: { effectId: string; bytes: Uint8Array; digest: string },
-    signal: AbortSignal,
-  ): Promise<unknown> {
-    checkAbort(signal);
-    const [{ Indexer, MemData }, { getOgWallet }] = await Promise.all([
-      import("@0gfoundation/0g-ts-sdk"),
-      import("../config/og-compute"),
-    ]);
-    checkAbort(signal);
-    const file = new MemData(Buffer.from(request.bytes));
-    const [result, uploadError] = await new Indexer(this.indexerUrl).upload(
-      file,
-      this.rpcUrl,
-      getOgWallet() as never,
-    );
-    checkAbort(signal);
-    if (uploadError) throw new A3TerminalError("A3_STORAGE_UPLOAD_FAILED");
-    const output = plainRecord(result);
-    const root = output && typeof output.rootHash === "string"
-      ? output.rootHash
-      : output && Array.isArray(output.rootHashes) && typeof output.rootHashes[0] === "string"
-        ? output.rootHashes[0]
-        : null;
-    return { root };
-  }
 }
 
 function validateService(
@@ -661,12 +538,6 @@ function strictErrorCode(error: unknown): string {
   return "A3_INTERNAL_FAILURE";
 }
 
-function runtimeFromEnvironment(
-  source: Record<string, string | undefined>,
-): StrictA3Environment {
-  return validateEnvironment(source).strictA3;
-}
-
 export class StrictA3Adapter implements KernelAdapter {
   readonly key = "protected-a3" as const;
   readonly requiresVerifiedJournal = true;
@@ -694,7 +565,7 @@ export class StrictA3Adapter implements KernelAdapter {
       ? () => new Date(suppliedClock.getTime())
       : suppliedClock ?? (() => new Date());
     this.deadlineMs = options.deadlineMs ?? REQUEST_DEADLINE_MS;
-    if (!Number.isSafeInteger(this.deadlineMs) || this.deadlineMs < 1_000 || this.deadlineMs > 3_600_000) {
+    if (!Number.isSafeInteger(this.deadlineMs) || this.deadlineMs < 10 || this.deadlineMs > 3_600_000) {
       throw new Error("A3_INVALID_DEADLINE_POLICY");
     }
     this.hooks = options.hooks ?? {};
@@ -702,29 +573,10 @@ export class StrictA3Adapter implements KernelAdapter {
       this.runtime = options.fixture;
       return;
     }
-    const environment = runtimeFromEnvironment(options.environment ?? process.env);
-    if (environment.mode === "disabled") {
-      this.runtime = null;
-      return;
-    }
-    const verifierOptions: StorageVerifierOptions = {
-      executablePath: environment.storageVerifierPath,
-    };
-    this.runtime = {
-      provider: environment.provider,
-      model: environment.model,
-      storageIndexerUrl: environment.storageIndexerUrl,
-      compute: new LiveComputeTransport(
-        environment.provider,
-        environment.model,
-        environment.maxSpendAtomic,
-      ),
-      storage: new LiveStorageTransport(environment.storageIndexerUrl, environment.rpcUrl),
-      verifier: (request, signal) => runStorageProofVerifier(
-        request,
-        { ...verifierOptions, signal },
-      ),
-    };
+    // Production authority is intentionally absent. Only an explicit local
+    // fixture can construct a runtime capable of Compute or Storage effects.
+    void options.environment;
+    this.runtime = null;
   }
 
   private async withCurrentClaim<T>(
@@ -1070,117 +922,12 @@ export class StrictA3Adapter implements KernelAdapter {
     result: CanonicalValue;
     proofHash: string;
   } {
-    if (
-      !journal.request_id ||
-      !journal.signer_address ||
-      !journal.response_content ||
-      !journal.response_hash ||
-      !journal.compute_receipt_bytes ||
-      !journal.compute_receipt_digest ||
-      !journal.storage_receipt_bytes ||
-      !journal.storage_receipt_digest ||
-      !journal.expected_root ||
-      !journal.expected_digest ||
-      journal.expected_size === null
-    ) {
-      throw new A3TerminalError("A3_JOURNAL_TERMINAL_DATA_MISSING");
-    }
-    if (
-      sha256Hex(journal.response_content) !== journal.response_hash ||
-      sha256Hex(journal.compute_receipt_bytes) !== journal.compute_receipt_digest ||
-      sha256Hex(journal.storage_receipt_bytes) !== journal.storage_receipt_digest ||
-      !ROOT_PATTERN.test(journal.expected_root) ||
-      !HASH_PATTERN.test(journal.expected_digest)
-    ) {
-      throw new A3TerminalError("A3_JOURNAL_TERMINAL_DATA_MISMATCH");
-    }
-    let computeReceiptValue: unknown;
-    try {
-      computeReceiptValue = JSON.parse(journal.compute_receipt_bytes);
-    } catch {
-      throw new A3TerminalError("A3_COMPUTE_RECEIPT_MALFORMED");
-    }
-    const computeReceipt = plainRecord(computeReceiptValue);
-    if (
-      !computeReceipt ||
-      !exactKeys(computeReceipt, [
-        "contentHash",
-        "effectId",
-        "model",
-        "provider",
-        "requestHash",
-        "requestId",
-        "schemaVersion",
-        "signature",
-        "signerAddress",
-      ]) ||
-      canonicalJson(asCanonicalValue(computeReceipt)) !== journal.compute_receipt_bytes ||
-      computeReceipt.schemaVersion !== 1 ||
-      computeReceipt.effectId !== journal.effect_id ||
-      computeReceipt.model !== journal.model ||
-      computeReceipt.provider !== journal.provider ||
-      computeReceipt.requestHash !== journal.request_hash ||
-      computeReceipt.requestId !== journal.request_id ||
-      computeReceipt.contentHash !== journal.response_hash ||
-      computeReceipt.signerAddress !== journal.signer_address ||
-      typeof computeReceipt.signature !== "string" ||
-      !/^0x[0-9a-fA-F]{130}$/.test(computeReceipt.signature)
-    ) {
-      throw new A3TerminalError("A3_COMPUTE_RECEIPT_BINDING_MISMATCH");
-    }
-    let storageReceiptValue: unknown;
-    try {
-      storageReceiptValue = JSON.parse(journal.storage_receipt_bytes);
-    } catch {
-      throw new A3TerminalError("A3_STORAGE_RECEIPT_MALFORMED");
-    }
-    const storageReceipt = plainRecord(storageReceiptValue);
-    if (
-      !storageReceipt ||
-      !exactKeys(storageReceipt, ["digest", "effectId", "root", "schemaVersion", "size"]) ||
-      canonicalJson(asCanonicalValue(storageReceipt)) !== journal.storage_receipt_bytes ||
-      storageReceipt.schemaVersion !== 1 ||
-      storageReceipt.effectId !== journal.effect_id ||
-      storageReceipt.root !== journal.expected_root ||
-      storageReceipt.digest !== journal.expected_digest ||
-      storageReceipt.size !== journal.expected_size
-    ) {
-      throw new A3TerminalError("A3_STORAGE_RECEIPT_BINDING_MISMATCH");
-    }
-    const result: CanonicalValue = {
-      content: journal.response_content,
-      effectId: journal.effect_id,
-      model: journal.model,
-      provider: journal.provider,
-      requestId: journal.request_id,
-      storage: {
-        digest: journal.expected_digest,
-        receiptDigest: journal.storage_receipt_digest,
-        root: journal.expected_root,
-        size: journal.expected_size,
-      },
-    };
-    const proofHash = domainHash("a3-proof", {
-      computeReceiptDigest: journal.compute_receipt_digest,
-      effectId: journal.effect_id,
-      responseHash: journal.response_hash,
-      storageDigest: journal.expected_digest,
-      storageReceiptDigest: journal.storage_receipt_digest,
-      storageRoot: journal.expected_root,
-      storageSize: journal.expected_size,
-    });
-    if (journal.stage === "READBACK_VERIFIED") {
-      if (
-        journal.readback_root !== journal.expected_root ||
-        journal.readback_digest !== journal.expected_digest ||
-        journal.readback_size !== journal.expected_size ||
-        journal.proof_hash !== proofHash ||
-        canonicalJson(asCanonicalValue(journal.result)) !== canonicalJson(result)
-      ) {
-        throw new A3TerminalError("A3_READBACK_JOURNAL_MISMATCH");
-      }
-    }
-    return { result, proofHash };
+    const payload = deriveA3VerifiedJournalPayload(
+      journal,
+      journal.stage === "READBACK_VERIFIED",
+    );
+    if (!payload.ok) throw new A3TerminalError(payload.errorCode);
+    return payload;
   }
 
   private validateVerifierResult(
@@ -1216,11 +963,13 @@ export class StrictA3Adapter implements KernelAdapter {
   }
 
   async execute(request: AdapterExecutionRequest): Promise<AdapterExecutionResult> {
-    if (!this.runtime) {
+    const runtime = this.runtime;
+    if (!runtime) {
       return { ok: false, errorCode: "A3_LIVE_BLOCKED", retryable: false };
     }
     const job = claimFromRequest(request);
     let journal: A3JournalRow | null = null;
+    let deadline: ExecutionDeadline | null = null;
     try {
       checkAbort(request.signal);
       journal = await this.loadOrPrepare(request, job);
@@ -1241,57 +990,75 @@ export class StrictA3Adapter implements KernelAdapter {
       if (journal.stage === "STORAGE_REQUESTED") {
         throw new A3TerminalError("A3_AMBIGUOUS_STORAGE_REQUEST");
       }
+      deadline = executionDeadline(
+        request.signal,
+        new Date(journal.deadline_at).getTime() - this.clock().getTime(),
+      );
+      const activeDeadline = deadline;
+      checkExecutionAbort(request.signal, activeDeadline);
 
       if (journal.stage === "PREPARED") {
         await this.hooks.afterPrepared?.();
-        checkAbort(request.signal);
+        checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
+        const preparedJournal = journal;
         const service = validateService(
-          await this.runtime.compute.resolveService(
-            journal.provider,
-            journal.model,
-            request.signal,
+          await awaitWithSignal(
+            () => runtime.compute.resolveService(
+              preparedJournal.provider,
+              preparedJournal.model,
+              activeDeadline.signal,
+            ),
+            activeDeadline.signal,
           ),
           journal.provider,
           journal.model,
         );
+        checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
-        if (this.clock() >= new Date(journal.deadline_at)) {
-          throw new A3TerminalError("A3_REQUEST_DEADLINE_EXPIRED");
-        }
         journal = await this.markRequestSent(job, journal);
 
         await this.assertCurrentClaim(job);
-        const headers = await this.runtime.compute.getRequestHeaders(
-          service,
-          journal.request_bytes,
-          request.signal,
+        const sentJournal = journal;
+        const headers = await awaitWithSignal(
+          () => runtime.compute.getRequestHeaders(
+            service,
+            sentJournal.request_bytes,
+            activeDeadline.signal,
+          ),
+          activeDeadline.signal,
         );
+        checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
         const response = validateComputeResponse(
-          await this.runtime.compute.sendRequest(
-            service,
-            journal.request_bytes,
-            headers,
-            request.signal,
+          await awaitWithSignal(
+            () => runtime.compute.sendRequest(
+              service,
+              sentJournal.request_bytes,
+              headers,
+              activeDeadline.signal,
+            ),
+            activeDeadline.signal,
           ),
           journal.provider,
           journal.model,
         );
+        checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
-        if (this.clock() >= new Date(journal.deadline_at)) {
-          throw new A3TerminalError("A3_REQUEST_DEADLINE_EXPIRED");
-        }
-        const signature = validateSignature(await this.runtime.compute.fetchSignature(
-          service,
-          response.requestId,
-          request.signal,
+        const signature = validateSignature(await awaitWithSignal(
+          () => runtime.compute.fetchSignature(
+            service,
+            response.requestId,
+            activeDeadline.signal,
+          ),
+          activeDeadline.signal,
         ));
+        checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
         if (!Buffer.from(signature.text, "utf8").equals(Buffer.from(response.content, "utf8"))) {
           throw new A3TerminalError("A3_COMPUTE_CONTENT_MISMATCH");
         }
-        if (!await this.runtime.compute.verifySignature(
+        if (!await runtime.compute.verifySignature(
           signature.text,
           signature.signature,
           service.expectedSigner,
@@ -1329,11 +1096,16 @@ export class StrictA3Adapter implements KernelAdapter {
         const contentDigest = sha256Hex(contentBytes);
         journal = await this.markStorageRequested(job, journal);
         await this.assertCurrentClaim(job);
-        const storageRoot = validateStorageRoot(await this.runtime.storage.store({
-          effectId: journal.effect_id,
-          bytes: contentBytes,
-          digest: contentDigest,
-        }, request.signal));
+        const storageJournal = journal;
+        const storageRoot = validateStorageRoot(await awaitWithSignal(
+          () => runtime.storage.store({
+            effectId: storageJournal.effect_id,
+            bytes: contentBytes,
+            digest: contentDigest,
+          }, activeDeadline.signal),
+          activeDeadline.signal,
+        ));
+        checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
         const storageReceiptBytes = canonicalJson({
           digest: contentDigest,
@@ -1367,16 +1139,20 @@ export class StrictA3Adapter implements KernelAdapter {
           effectId: journal.effect_id,
           expectedDigest: journal.expected_digest,
           expectedSize: journal.expected_size,
-          indexerUrl: this.runtime.storageIndexerUrl,
+          indexerUrl: runtime.storageIndexerUrl,
           receiptBytes: journal.storage_receipt_bytes,
           receiptDigest: journal.storage_receipt_digest,
           root: journal.expected_root,
         };
         await this.assertCurrentClaim(job);
         this.validateVerifierResult(
-          await this.runtime.verifier(verifierRequest, request.signal),
+          await awaitWithSignal(
+            () => runtime.verifier(verifierRequest, activeDeadline.signal),
+            activeDeadline.signal,
+          ),
           verifierRequest,
         );
+        checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
         const completed = this.successfulPayload(journal);
         journal = await this.markReadbackVerified(job, journal, completed);
@@ -1391,11 +1167,15 @@ export class StrictA3Adapter implements KernelAdapter {
     } catch (error) {
       if (error instanceof A3SimulatedCrashError) throw error;
       if (error instanceof A3ClaimLostError || request.signal.aborted) throw new A3ClaimLostError();
-      const errorCode = strictErrorCode(error);
+      const errorCode = deadline?.expired()
+        ? "A3_REQUEST_DEADLINE_EXPIRED"
+        : strictErrorCode(error);
       if (journal && journal.stage !== "READBACK_VERIFIED" && journal.stage !== "FAILED") {
         journal = await this.markFailed(job, journal, errorCode);
       }
       return { ok: false, errorCode, retryable: false };
+    } finally {
+      deadline?.cleanup();
     }
   }
 }

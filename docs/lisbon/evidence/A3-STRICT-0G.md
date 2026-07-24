@@ -1,30 +1,30 @@
-# A3 Strict 0G Fixture and Integration Evidence
+# A3 Strict 0G Remediation G1 Evidence
 
-- Task: `A3-STRICT-0G-FIXTURE-INTEGRATION-20260724`
-- Sprint: `A3`
-- Start/control SHA: `dd336b840edb4de97fc382298c5a0c0c658f6f9f`
+- Task: `A3-STRICT-0G-REMEDIATION-G1-20260724`
+- Sprint: `A3_remediation`
+- Start/control SHA: `879072a728f0bec7a4b7a541594a7920cd815d69`
 - Branch: `developer`
-- Observed through: `2026-07-24T04:41:00Z`
+- Observed through: `2026-07-24T05:47:13Z`
 - Exit SHA: derive from the commit containing this packet
-- Result: `PASS_FIXTURE; PASS_INTEGRATION; PASS_TO_AUDIT; LOCAL_ONLY`
+- Result: `PASS_FIXTURE; PASS_INTEGRATION; PASS_TO_REAUDIT; LOCAL_ONLY`
 - Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
 
 ## Result and boundary
 
-A3 replaces the authoritative worker's `A3_NOT_CONFIGURED` seam with one strict, fail-closed 0G adapter. A deterministic local Compute fixture, an actual structured Go subprocess, and disposable loopback PostgreSQL complete one lawful result, receipt, settlement, and commission. Every negative fixture terminates with one failed effect and refund and creates zero receipt, settlement, commission, rating, trade action, second effect, or proof hash.
+A3 remediation G1 retains the strict local fixture integration while removing production live authority completely. The production adapter cannot construct or import a broker, signer, Storage client, verifier executable, funding path, uploader, or network transport from environment settings. Only an explicitly injected local fixture can execute Compute or Storage behavior. A deterministic local Compute fixture, an actual structured Go subprocess, and disposable loopback PostgreSQL complete one lawful result, receipt, settlement, and commission. Every negative fixture terminates with one failed effect and refund and creates zero receipt, settlement, commission, rating, trade action, second effect, or proof hash.
 
 This is offline fixture and integration evidence only. No 0G provider, indexer, RPC, storage node, sponsor service, shared database, wallet, transaction, deployment, user signature, spend, push, form, or public identifier was contacted or created. `PASS_LIVE` remains blocked. This packet does not claim release, production readiness, bounty qualification, or Lisbon-window work classification.
 
-The writer started clean on exact SHA `dd336b840edb4de97fc382298c5a0c0c658f6f9f`, branch `developer`, atomically acquired common-Git-dir token `3EFB753E-44AB-4FC5-AC06-DF67929282E8`, and mirrored it before implementation. The package lock remains byte-identical with SHA-256 `b4a1aed30a52a74d1b4396da9f1d6535a5e475da1b40a99a6c744aae1a8c6b33`.
+The writer started clean on exact SHA `879072a728f0bec7a4b7a541594a7920cd815d69`, branch `developer`, atomically acquired common-Git-dir token `E83BB3D9-81C2-4FFF-9DE3-C64CD847F3EC`, and mirrored it before implementation. The package lock remains byte-identical with SHA-256 `b4a1aed30a52a74d1b4396da9f1d6535a5e475da1b40a99a6c744aae1a8c6b33`. The independent audit of `879072a728f0bec7a4b7a541594a7920cd815d69` returned `FIX_REQUIRED`; this is the single permitted remediation generation and requires pinned-exit-SHA re-audit.
 
 ## Strict Compute boundary
 
-- The default runtime is disabled. Live construction requires server-only `A3_0G_LIVE_ENABLED=true`, explicit funding authority, a bounded spend cap, and an authorization value that exactly binds the lowercase provider, model, and cap. It also requires exact HTTPS RPC/indexer URLs, a normalized verifier executable path, and a private key. Disabled and fixture execution do not load the broker module, construct a broker/indexer, request billing headers, or fund an account.
-- The installed `@0glabs/0g-serving-broker@0.7.4` CommonJS module is loaded only inside the authorized live boundary. The adapter never calls `processResponse` and never acknowledges or replaces a signer.
-- Service selection requires one exact provider, exact model, `TeeML`, HTTPS base/endpoint equality, an already acknowledged service signer, strict known-key `additionalInfo`, `TargetSeparated: true`, and a lowercase `TargetTeeAddress`.
+- Production live A3 is unconditionally unavailable, regardless of environment values. The retired `A3_0G_LIVE_ENABLED`, `A3_0G_FUNDING_AUTHORIZED`, `A3_0G_MAX_SPEND_ATOMIC`, and `A3_0G_SPEND_AUTHORIZATION` settings are rejected by environment validation and are absent from `.env.example`.
+- Without an explicit injected fixture, `StrictA3Adapter` stores no runtime and immediately returns terminal `A3_LIVE_BLOCKED`. Its production construction path contains no dynamic or static import of the broker or TypeScript Storage SDK and cannot construct a broker, query signer status, request billing headers, fund an account, sign, upload, run the verifier, or call the network. A regression supplies every former flag and credential permissively, intercepts `fetch`, and proves zero network calls plus one failed effect/refund and no journal or success artifact.
+- The explicitly local fixture service still requires one exact provider, exact model, `TeeML`, HTTPS base/endpoint equality, an acknowledged signer, strict known-key `additionalInfo`, `TargetSeparated: true`, and a lowercase `TargetTeeAddress`.
 - The complete canonical request is constructed and durably hashed before any single-use billing header is requested. It binds creator ID/wallet, buyer ID/wallet, immutable agent version and manifest hash, JobIntent/input hash, provider/model, deterministic nonce, deadline, policy version, intent/job/effect IDs, instructions, and prompt.
-- Live HTTP request and signature fetch receive the worker `AbortSignal`. Only a non-empty `ZG-Res-Key` is accepted; there is no response-ID fallback. Status, provider, model, response shape, and bounded assistant content are validated.
-- Exactly one signature object is fetched. Its schema and signature shape must be exact, the installed `InferenceVerifier.verifySignature` must return `true` against the separated TEE signer, and UTF-8 bytes of signed text must equal UTF-8 bytes accepted downstream. A request ID, `verified` flag, cached output, local model, or proof-looking string cannot substitute.
+- Every injected Compute operation receives one combined signal binding worker claim loss to the canonical journal deadline. Abort listeners are registered before invocation and rechecked, and every listener/timer is removed. A stalled request or exact-one signature fetch terminates promptly with `A3_REQUEST_DEADLINE_EXPIRED`, even while leases remain healthy.
+- Exactly one signature object is fetched by the local fixture path. Its schema and signature shape must be exact, the injected verifier must return `true` against the separated TEE signer, and UTF-8 bytes of signed text must equal UTF-8 bytes accepted downstream. A request ID, `verified` flag, cached output, local model, or proof-looking string cannot substitute.
 
 ## Durable recovery and claim authority
 
@@ -52,8 +52,10 @@ Recovery rules are fail-closed:
 - `RESPONSE_VERIFIED` skips every Compute call and proceeds to Storage.
 - A recovered `STORAGE_REQUESTED` becomes `A3_AMBIGUOUS_STORAGE_REQUEST`; upload is not called again.
 - `STORAGE_COMMITTED` skips Compute and upload and repeats proof-enabled readback only.
-- `READBACK_VERIFIED` returns the exact persisted result/proof with zero Compute, Storage, or verifier calls.
+- `READBACK_VERIFIED` is reconstructed and re-proved from the immutable journal before adapter construction. It finalizes with zero adapter, Compute, Storage, or verifier calls.
 - Heartbeat lease loss aborts active HTTP/subprocess work. Every later database mutation remains independently fenced if cancellation races.
+
+The same journal-first recovery runs inside the adapter-exception path and expired-lease reconciliation. A hard kill after durable readback at `attempt=max` is recognized before attempt exhaustion, creates exactly one effect/receipt/settlement/commission, creates no refund, and invokes a supplied recovery adapter zero times. The in-process post-readback exception case passes at `attempt=max` without requeue or `ATTEMPTS_EXHAUSTED`.
 
 The runner no longer turns malformed proof text into a valid-looking hash. A successful strict adapter must return one lowercase 64-hex proof already bound to the verified journal, or the effect fails.
 
@@ -68,26 +70,29 @@ The verifier is a small stdin/stdout Go module under `tools/0g-storage-verifier`
 - Production construction: `indexer.NewClient(indexerURL, indexer.IndexerClientOption{FullTrusted: false})`.
 - Proof path: `Download(ctx, root, temporaryFile, true)`.
 
-The Go boundary limits stdin, receipt, and downloaded file sizes; uses `DisallowUnknownFields`; rejects arrays, missing/wrong/unknown fields, non-lowercase roots/digests, noncanonical receipt JSON, and trailing JSON; binds receipt effect/root/digest/size; uses a private temporary directory; cleans it recursively; hashes exact downloaded bytes with SHA-256; and emits one typed JSON object only on success. All failures exit nonzero.
+Before official `Download`, the Go process applies Unix `RLIMIT_FSIZE` at 1 MiB (or a pre-existing lower hard limit) and includes `SIGXFSZ` in its signal-aware context. This kernel bound prevents an oversized regular file from first consuming unbounded disk. The logical 1 MiB check remains independent. The Go boundary also limits stdin and receipt sizes; uses `DisallowUnknownFields`; rejects arrays, missing/wrong/unknown fields, non-lowercase roots/digests, noncanonical receipt JSON, and trailing JSON; binds receipt effect/root/digest/size; hashes exact downloaded bytes with SHA-256; and emits one typed JSON object only on success. All failures exit nonzero.
 
-The Node boundary uses `spawn` with `shell: false`, bounded stdout/stderr, timeout and claim-loss kills, strict exact-key/type parsing, and independent effect/root/digest/size comparisons. `verified: true` alone is insufficient. The production request schema has no fixture path, fixture content, root derivation, or transport selector. The separate test command obtains fixture bytes only through a test-only environment value and rejects a root not derived from those bytes.
+The Node boundary owns a fresh per-invocation `TMPDIR` and recursively removes it only after the child closes, including malformed output, crash, nonzero exit, timeout, caller abort, stdout/stderr overflow, oversized temporary output, cooperative termination, and forced-kill fallback. It registers abort before rechecking the signal, removes every timer/listener, sends `SIGTERM` first, then uses a short bounded `SIGKILL` fallback. It retains `spawn` with `shell: false`, 64 KiB stdout/stderr bounds, strict exact-key/type parsing, and independent effect/root/digest/size comparisons. `verified: true` alone is insufficient.
 
 ## Negative and recovery evidence
 
-Eight focused TypeScript tests pass. The fixture matrix covers:
+Twelve focused TypeScript tests pass. The fixture matrix covers:
 
 - deterministic signed-content plus Go proof/readback success and twenty identical submissions converging to one effect;
 - signature verifier `false`, missing/malformed signature objects, wrong signer, and one-byte Compute-content mismatch;
 - one-byte Storage readback mutation, wrong root, digest, size, schema, missing receipt field, unknown receipt field, missing verifier output, and unknown verifier output;
-- malformed JSON, array, wrong output type, unknown field, `verified: true` alone, wrong binding, extra JSON object, oversized stdout, nonzero exit, process signal, timeout, and caller abort;
-- crashes before any Compute call, after `RESPONSE_VERIFIED`, after `STORAGE_COMMITTED`, and after `READBACK_VERIFIED`, proving stage-specific zero-repeat behavior;
+- malformed JSON, array, wrong output type, unknown field, `verified: true` alone, wrong binding, extra JSON object, oversized stdout/stderr, nonzero exit, process signal/crash, timeout, caller abort, pre-abort, forced-kill fallback, and per-exit temporary-tree cleanup;
+- malformed Go-style output, process crash, nonzero exit, timeout, abort, and oversized output through the full strict adapter, journal, worker, failure, and refund path;
+- never-resolving Compute send and signature retrieval under the canonical deadline, with no accepted output or downstream effect;
+- crashes before any Compute call, after `RESPONSE_VERIFIED`, after `STORAGE_COMMITTED`, and after `READBACK_VERIFIED`, proving stage-specific zero-repeat behavior plus same-process terminal recovery;
+- expired `attempt=max` readback recovery before exhaustion with zero adapter calls;
 - recovered ambiguous Compute and Storage dispatch markers, proving no blind retry;
 - A-to-B lease replacement during service resolution, proving no later A journal, header, request, signature, upload, readback, receipt, settlement, or commission mutation; and
 - illegal skipped transition and terminal-journal mutation refusal.
 
-All fourteen terminal mutation cases produced a failed job/effect, one refund, zero receipt/settlement/commission/rating/trade action, one effect total, a `FAILED` journal, and a null proof hash.
+The 14 original terminal mutation cases plus six subprocess-process failures, two deadline stalls, and one permissive-live-settings attempt each produced a failed job/effect, one refund, zero receipt/settlement/commission/rating/trade action, one effect total, and no accepted proof. Process and deadline cases also produced a terminal `FAILED` journal; the production-authority block stopped before journal preparation.
 
-Two Go tests independently prove `withProof=true`, exact byte/digest/size success, strict request JSON, and one-byte downloaded-content rejection. The combined integration command passed 13/13 reported TypeScript tests: eight A3 tests plus the five pre-existing database URL and A2 worker-fencing tests.
+Three Go tests independently prove `withProof=true`, exact byte/digest/size success, strict request JSON, one-byte downloaded-content rejection, and kernel rejection of a regular file exceeding 1 MiB. The combined integration command passed 17/17 reported TypeScript tests: twelve A3 tests plus the five pre-existing database URL and A2 worker-fencing tests.
 
 ## Migration replay
 
@@ -115,8 +120,8 @@ Toolchain: Node `v22.22.3`, npm `10.9.8`, Prisma/Client `6.19.3`, TypeScript `5.
 | `npm test` | 0 | 9/9 foundation and pure kernel tests passed. |
 | `npm run test:auth` | 0 | 7/7 authentication tests passed. |
 | `npm run test:kernel` | 0 | 13/13 reported A2 kernel tests passed. |
-| `npm run test:go` | 0 | Two Go tests passed; production verifier command built. |
-| `npm run test:integration` | 0 | 13/13 TypeScript tests plus both migration lanes passed. |
+| `npm run test:go` | 0 | Three Go tests passed; production verifier command built with pinned Go `1.23.10`. |
+| `npm run test:integration` | 0 | 17/17 TypeScript tests plus both migration lanes passed. |
 | `npm run test:e2e` | 0 | 4/4 protected CLI/boot/entrypoint tests passed. |
 | `npm run test:resilience` | 0 | 1/1 cleanup test passed. |
 | `npm run test:redaction` | 0 | 3/3 redaction tests passed. |
@@ -130,7 +135,7 @@ The atomic commit and physical lease release are verified immediately after the 
 
 ## Remaining blocks
 
-- `PASS_LIVE` is `NOT_RUN` and `LIVE_EFFECT_BLOCKED`: no exact external-effect authorization or public Compute request, signer, Storage root, proof, transaction, or explorer identifier exists.
+- `PASS_LIVE` is `NOT_RUN` and `LIVE_EFFECT_BLOCKED`: production A3 live execution is unconditionally unavailable in this remediation, and no provider/indexer/RPC call, public Compute request, signer, Storage root, proof, transaction, or explorer identifier exists.
 - Rights/license/team/owner records, event-window classification, sponsor access/caps, inherited dependency findings, README first-viewport claim drift, deployment, push, forms, and independent release audit remain unresolved.
 - A3 local fixture/integration success does not establish 0G bounty qualification, production readiness, release validity, or expected winnings.
 

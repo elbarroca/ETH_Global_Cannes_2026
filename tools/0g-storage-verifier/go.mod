@@ -4,7 +4,10 @@ go 1.23.0
 
 toolchain go1.23.10
 
-require github.com/0gfoundation/0g-storage-client v1.3.0
+require (
+	github.com/0gfoundation/0g-storage-client v1.3.0
+	golang.org/x/sys v0.30.0
+)
 
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
@@ -100,7 +103,6 @@ require (
 	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/sync v0.11.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect

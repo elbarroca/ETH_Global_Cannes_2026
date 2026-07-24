@@ -10,6 +10,7 @@ import {
   MAX_WORKER_CONCURRENCY,
   persistFailedEffect,
   persistSuccessfulEffect,
+  recoverVerifiedA3Effect,
   reconcileExpiredJobs,
   requeueAfterTransientFailure,
   type ClaimedJob,
@@ -26,15 +27,31 @@ export interface WorkerRunOptions {
   afterTerminalEffectPersisted?: (job: ClaimedJob) => Promise<void>;
 }
 
+async function finalizeRecoveredJournal(
+  job: ClaimedJob,
+  options: WorkerRunOptions,
+  leaseLost: () => boolean,
+): Promise<boolean> {
+  const recovery = await recoverVerifiedA3Effect(job, { now: options.now, sql: options.sql });
+  if (recovery.status === "none") return false;
+  if (!recovery.persisted || leaseLost()) return true;
+  await options.afterTerminalEffectPersisted?.(job);
+  if (!leaseLost()) {
+    await finalizePersistedEffect(job, { now: options.now, sql: options.sql });
+  }
+  return true;
+}
+
 async function processClaimedJob(
   job: ClaimedJob,
   options: WorkerRunOptions,
   leaseLost: () => boolean,
   signal: AbortSignal,
 ): Promise<void> {
+  if (leaseLost()) return;
+  if (await finalizeRecoveredJournal(job, options, leaseLost)) return;
   const adapter = options.adapter ?? new StrictA3Adapter({ sql: options.sql, now: options.now });
   if (adapter.key !== job.adapterKey) throw new Error("WORKER_ADAPTER_POLICY_MISMATCH");
-  if (leaseLost()) return;
   let result;
   try {
     result = await adapter.execute({
@@ -55,6 +72,7 @@ async function processClaimedJob(
     });
   } catch {
     if (leaseLost()) return;
+    if (await finalizeRecoveredJournal(job, options, leaseLost)) return;
     await requeueAfterTransientFailure(job, { now: options.now, sql: options.sql });
     return;
   }

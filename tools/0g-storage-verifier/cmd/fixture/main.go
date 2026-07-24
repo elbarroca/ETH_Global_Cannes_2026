@@ -45,8 +45,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, "fixture content is missing or malformed")
 		os.Exit(1)
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGXFSZ,
+	)
 	defer stop()
+	if err := verifier.ApplyFileSizeLimit(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 	response, err := verifier.Verify(ctx, os.Stdin, func(string) (verifier.Downloader, func(), error) {
 		return fixtureDownloader{payload: payload}, func() {}, nil
 	})

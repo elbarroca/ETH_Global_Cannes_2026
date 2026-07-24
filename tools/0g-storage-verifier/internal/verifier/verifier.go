@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -62,6 +64,29 @@ type Downloader interface {
 }
 
 type Factory func(indexerURL string) (Downloader, func(), error)
+
+// ApplyFileSizeLimit bounds every regular file created by this process before
+// the official downloader receives a path. The logical size validation remains
+// necessary, but this kernel limit prevents an untrusted download from first
+// consuming unbounded disk space.
+func ApplyFileSizeLimit() error {
+	var limit unix.Rlimit
+	if err := unix.Getrlimit(unix.RLIMIT_FSIZE, &limit); err != nil {
+		return fmt.Errorf("read file-size limit: %w", err)
+	}
+	maximum := uint64(MaxPayloadBytes)
+	if limit.Max < maximum {
+		maximum = limit.Max
+	}
+	if limit.Cur <= maximum {
+		return nil
+	}
+	limit.Cur = maximum
+	if err := unix.Setrlimit(unix.RLIMIT_FSIZE, &limit); err != nil {
+		return fmt.Errorf("set file-size limit: %w", err)
+	}
+	return nil
+}
 
 func decodeOneStrict[T any](raw []byte) (T, error) {
 	var value T

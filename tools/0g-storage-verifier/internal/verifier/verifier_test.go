@@ -7,6 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"os/exec"
+	"os/signal"
+	"path/filepath"
+	"syscall"
 	"testing"
 )
 
@@ -81,5 +85,33 @@ func TestVerifyRejectsTamperAndStrictJSON(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("one-byte downloaded-content mutation was accepted")
+	}
+}
+
+func TestApplyFileSizeLimitRejectsOversizeRegularFile(t *testing.T) {
+	if os.Getenv("ALPHADAWG_RLIMIT_CHILD") == "1" {
+		signal.Ignore(syscall.SIGXFSZ)
+		if err := ApplyFileSizeLimit(); err != nil {
+			os.Exit(2)
+		}
+		path := filepath.Join(os.Getenv("ALPHADAWG_RLIMIT_TEMP"), "oversize.bin")
+		if err := os.WriteFile(path, make([]byte, MaxPayloadBytes+1), 0o600); err == nil {
+			os.Exit(3)
+		}
+		info, err := os.Stat(path)
+		if err != nil || info.Size() > MaxPayloadBytes {
+			os.Exit(4)
+		}
+		os.Exit(0)
+	}
+
+	temporary := t.TempDir()
+	command := exec.Command(os.Args[0], "-test.run=^TestApplyFileSizeLimitRejectsOversizeRegularFile$")
+	command.Env = append(os.Environ(),
+		"ALPHADAWG_RLIMIT_CHILD=1",
+		"ALPHADAWG_RLIMIT_TEMP="+temporary,
+	)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("file-size limit child failed: %v: %s", err, output)
 	}
 }

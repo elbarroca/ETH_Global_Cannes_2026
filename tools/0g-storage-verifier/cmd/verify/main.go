@@ -13,8 +13,17 @@ import (
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGXFSZ,
+	)
 	defer stop()
+	if err := verifier.ApplyFileSizeLimit(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 
 	response, err := verifier.Verify(ctx, os.Stdin, func(indexerURL string) (verifier.Downloader, func(), error) {
 		client, createErr := indexer.NewClient(indexerURL, indexer.IndexerClientOption{FullTrusted: false})

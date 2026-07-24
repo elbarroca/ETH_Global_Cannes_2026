@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { getDb } from "../config/database";
-import { domainHash, type CanonicalValue } from "../kernel/canonical";
+import { canonicalJson, domainHash, type CanonicalValue } from "../kernel/canonical";
 import { commissionAmount, type DatabaseClient } from "../kernel/service";
 import type { JobState } from "../kernel/types";
 
@@ -72,8 +73,204 @@ interface ReconcileContextRow extends TerminalContextRow {
   cancel_requested_at: Date | null;
 }
 
+interface A3VerifiedJournalRow {
+  effect_id: string;
+  job_id: string;
+  stage: string;
+  provider: string;
+  model: string;
+  request_hash: string;
+  request_id: string | null;
+  signer_address: string | null;
+  response_content: string | null;
+  response_hash: string | null;
+  compute_receipt_bytes: string | null;
+  compute_receipt_digest: string | null;
+  storage_receipt_bytes: string | null;
+  storage_receipt_digest: string | null;
+  expected_root: string | null;
+  expected_digest: string | null;
+  expected_size: number | null;
+  readback_root: string | null;
+  readback_digest: string | null;
+  readback_size: number | null;
+  result: unknown;
+  proof_hash: string | null;
+}
+
+export type A3VerifiedPayloadResult =
+  | { ok: true; result: CanonicalValue; proofHash: string }
+  | { ok: false; errorCode: string };
+
 function transactionClient(transaction: unknown): DatabaseClient {
   return transaction as DatabaseClient;
+}
+
+function sha256Hex(value: string | Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function plainRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return actual.length === sortedExpected.length &&
+    actual.every((key, index) => key === sortedExpected[index]);
+}
+
+function asCanonicalValue(value: unknown): CanonicalValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error("A3_NON_CANONICAL_DATA");
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(asCanonicalValue);
+  const object = plainRecord(value);
+  if (!object) throw new Error("A3_NON_CANONICAL_DATA");
+  return Object.fromEntries(
+    Object.entries(object).map(([key, entry]) => [key, asCanonicalValue(entry)]),
+  );
+}
+
+export function deriveA3VerifiedJournalPayload(
+  journal: A3VerifiedJournalRow,
+  requireReadback: boolean,
+): A3VerifiedPayloadResult {
+  const hashPattern = /^[0-9a-f]{64}$/;
+  const rootPattern = /^0x[0-9a-f]{64}$/;
+  const addressPattern = /^0x[0-9a-f]{40}$/;
+  if (
+    !journal.request_id ||
+    !journal.signer_address ||
+    !journal.response_content ||
+    !journal.response_hash ||
+    !journal.compute_receipt_bytes ||
+    !journal.compute_receipt_digest ||
+    !journal.storage_receipt_bytes ||
+    !journal.storage_receipt_digest ||
+    !journal.expected_root ||
+    !journal.expected_digest ||
+    journal.expected_size === null
+  ) {
+    return { ok: false, errorCode: "A3_JOURNAL_TERMINAL_DATA_MISSING" };
+  }
+  if (
+    sha256Hex(journal.response_content) !== journal.response_hash ||
+    sha256Hex(journal.compute_receipt_bytes) !== journal.compute_receipt_digest ||
+    sha256Hex(journal.storage_receipt_bytes) !== journal.storage_receipt_digest ||
+    journal.expected_digest !== journal.response_hash ||
+    journal.expected_size !== Buffer.byteLength(journal.response_content, "utf8") ||
+    journal.expected_size < 1 ||
+    journal.expected_size > 1024 * 1024 ||
+    !hashPattern.test(journal.request_hash) ||
+    !addressPattern.test(journal.provider) ||
+    !addressPattern.test(journal.signer_address) ||
+    !rootPattern.test(journal.expected_root) ||
+    !hashPattern.test(journal.expected_digest)
+  ) {
+    return { ok: false, errorCode: "A3_JOURNAL_TERMINAL_DATA_MISMATCH" };
+  }
+
+  let computeReceipt: Record<string, unknown> | null;
+  try {
+    computeReceipt = plainRecord(JSON.parse(journal.compute_receipt_bytes));
+    if (!computeReceipt || canonicalJson(asCanonicalValue(computeReceipt)) !== journal.compute_receipt_bytes) {
+      return { ok: false, errorCode: "A3_COMPUTE_RECEIPT_MALFORMED" };
+    }
+  } catch {
+    return { ok: false, errorCode: "A3_COMPUTE_RECEIPT_MALFORMED" };
+  }
+  if (
+    !exactKeys(computeReceipt, [
+      "contentHash",
+      "effectId",
+      "model",
+      "provider",
+      "requestHash",
+      "requestId",
+      "schemaVersion",
+      "signature",
+      "signerAddress",
+    ]) ||
+    computeReceipt.schemaVersion !== 1 ||
+    computeReceipt.effectId !== journal.effect_id ||
+    computeReceipt.model !== journal.model ||
+    computeReceipt.provider !== journal.provider ||
+    computeReceipt.requestHash !== journal.request_hash ||
+    computeReceipt.requestId !== journal.request_id ||
+    computeReceipt.contentHash !== journal.response_hash ||
+    computeReceipt.signerAddress !== journal.signer_address ||
+    typeof computeReceipt.signature !== "string" ||
+    !/^0x[0-9a-fA-F]{130}$/.test(computeReceipt.signature)
+  ) {
+    return { ok: false, errorCode: "A3_COMPUTE_RECEIPT_BINDING_MISMATCH" };
+  }
+
+  let storageReceipt: Record<string, unknown> | null;
+  try {
+    storageReceipt = plainRecord(JSON.parse(journal.storage_receipt_bytes));
+    if (!storageReceipt || canonicalJson(asCanonicalValue(storageReceipt)) !== journal.storage_receipt_bytes) {
+      return { ok: false, errorCode: "A3_STORAGE_RECEIPT_MALFORMED" };
+    }
+  } catch {
+    return { ok: false, errorCode: "A3_STORAGE_RECEIPT_MALFORMED" };
+  }
+  if (
+    !exactKeys(storageReceipt, ["digest", "effectId", "root", "schemaVersion", "size"]) ||
+    storageReceipt.schemaVersion !== 1 ||
+    storageReceipt.effectId !== journal.effect_id ||
+    storageReceipt.root !== journal.expected_root ||
+    storageReceipt.digest !== journal.expected_digest ||
+    storageReceipt.size !== journal.expected_size
+  ) {
+    return { ok: false, errorCode: "A3_STORAGE_RECEIPT_BINDING_MISMATCH" };
+  }
+
+  const result: CanonicalValue = {
+    content: journal.response_content,
+    effectId: journal.effect_id,
+    model: journal.model,
+    provider: journal.provider,
+    requestId: journal.request_id,
+    storage: {
+      digest: journal.expected_digest,
+      receiptDigest: journal.storage_receipt_digest,
+      root: journal.expected_root,
+      size: journal.expected_size,
+    },
+  };
+  const proofHash = domainHash("a3-proof", {
+    computeReceiptDigest: journal.compute_receipt_digest,
+    effectId: journal.effect_id,
+    responseHash: journal.response_hash,
+    storageDigest: journal.expected_digest,
+    storageReceiptDigest: journal.storage_receipt_digest,
+    storageRoot: journal.expected_root,
+    storageSize: journal.expected_size,
+  });
+  if (requireReadback && (
+    journal.stage !== "READBACK_VERIFIED" ||
+    journal.readback_root !== journal.expected_root ||
+    journal.readback_digest !== journal.expected_digest ||
+    journal.readback_size !== journal.expected_size ||
+    journal.proof_hash !== proofHash
+  )) {
+    return { ok: false, errorCode: "A3_READBACK_JOURNAL_MISMATCH" };
+  }
+  if (requireReadback) {
+    try {
+      if (canonicalJson(asCanonicalValue(journal.result)) !== canonicalJson(result)) {
+        return { ok: false, errorCode: "A3_READBACK_JOURNAL_MISMATCH" };
+      }
+    } catch {
+      return { ok: false, errorCode: "A3_READBACK_JOURNAL_MISMATCH" };
+    }
+  }
+  return { ok: true, result, proofHash };
 }
 
 export async function acquireWorkerLease(
@@ -428,6 +625,124 @@ export async function persistSuccessfulEffect(
   });
 }
 
+async function persistRecoveredVerifiedEffectLocked(
+  tx: DatabaseClient,
+  jobId: string,
+  effectId: string,
+  payload: { result: CanonicalValue; proofHash: string },
+  now: Date,
+): Promise<boolean> {
+  const resultHash = domainHash("effect-result", payload.result);
+  const effects = await tx<{ id: string }[]>`
+    UPDATE effects
+    SET state = 'SUCCEEDED', result_hash = ${resultHash}, result = ${tx.json(payload.result)},
+        error_code = NULL, terminal_at = ${now}, updated_at = ${now}
+    WHERE id = ${effectId} AND job_id = ${jobId}::uuid AND state = 'RUNNING'
+    RETURNING id
+  `;
+  if (effects.length === 1) {
+    const receipts = await tx<{ id: string }[]>`
+      INSERT INTO receipts (
+        job_id, effect_id, verified, adapter_key, proof_hash, result_hash, created_at
+      ) VALUES (
+        ${jobId}::uuid, ${effectId}, true, 'protected-a3',
+        ${payload.proofHash}, ${resultHash}, ${now}
+      )
+      ON CONFLICT (job_id) DO NOTHING
+      RETURNING id
+    `;
+    if (receipts.length !== 1) throw new Error("WORKER_RECEIPT_CONFLICT");
+    return true;
+  }
+  const existing = await tx<{
+    state: EffectState;
+    result_hash: string | null;
+    proof_hash: string | null;
+    receipt_result_hash: string | null;
+  }[]>`
+    SELECT e.state, e.result_hash, r.proof_hash, r.result_hash AS receipt_result_hash
+    FROM effects e
+    LEFT JOIN receipts r ON r.effect_id = e.id AND r.job_id = e.job_id
+    WHERE e.id = ${effectId} AND e.job_id = ${jobId}::uuid
+  `;
+  const persisted = existing[0];
+  return persisted?.state === "SUCCEEDED" &&
+    persisted.result_hash === resultHash &&
+    persisted.proof_hash === payload.proofHash &&
+    persisted.receipt_result_hash === resultHash;
+}
+
+async function persistInvalidRecoveredEffectLocked(
+  tx: DatabaseClient,
+  jobId: string,
+  effectId: string,
+  errorCode: string,
+  now: Date,
+): Promise<boolean> {
+  const effects = await tx<{ id: string }[]>`
+    UPDATE effects
+    SET state = 'FAILED', error_code = ${errorCode}, terminal_at = ${now}, updated_at = ${now}
+    WHERE id = ${effectId} AND job_id = ${jobId}::uuid AND state = 'RUNNING'
+    RETURNING id
+  `;
+  if (effects.length === 1) return true;
+  const existing = await tx<{ state: EffectState; error_code: string | null }[]>`
+    SELECT state, error_code
+    FROM effects
+    WHERE id = ${effectId} AND job_id = ${jobId}::uuid
+  `;
+  return existing[0]?.state === "FAILED" && existing[0]?.error_code === errorCode;
+}
+
+export type A3JournalRecovery =
+  | { status: "none" }
+  | { status: "succeeded" | "failed"; persisted: boolean };
+
+export async function recoverVerifiedA3Effect(
+  job: ClaimedJob,
+  options: { now?: Date; sql?: DatabaseClient } = {},
+): Promise<A3JournalRecovery> {
+  const sql = options.sql ?? getDb();
+  const now = options.now ?? new Date();
+  return sql.begin(async (transaction) => {
+    const tx = transactionClient(transaction);
+    if (!(await currentClaimHeld(tx, job, now))) return { status: "none" };
+    const journals = await tx<A3VerifiedJournalRow[]>`
+      SELECT *
+      FROM a3_execution_journals
+      WHERE effect_id = ${job.effectId}
+        AND job_id = ${job.jobId}::uuid
+        AND stage = 'READBACK_VERIFIED'
+      FOR UPDATE
+    `;
+    const journal = journals[0];
+    if (!journal) return { status: "none" };
+    const payload = deriveA3VerifiedJournalPayload(journal, true);
+    if (!payload.ok) {
+      return {
+        status: "failed",
+        persisted: await persistInvalidRecoveredEffectLocked(
+          tx,
+          job.jobId,
+          job.effectId,
+          payload.errorCode,
+          now,
+        ),
+      };
+    }
+    return {
+      status: "succeeded",
+      persisted: await persistRecoveredVerifiedEffectLocked(
+        tx,
+        job.jobId,
+        job.effectId,
+        payload,
+        now,
+      ),
+    };
+  });
+}
+
 export async function persistFailedEffect(
   job: ClaimedJob,
   errorCode: string,
@@ -681,6 +996,36 @@ async function reconcileExpiredCandidate(
     if (!context) return null;
     if (["SUCCEEDED", "FAILED", "CANCELED"].includes(context.effect_state)) {
       await terminalizeLockedEffect(tx, context, now);
+      return "reconciled";
+    }
+    const journals = await tx<A3VerifiedJournalRow[]>`
+      SELECT *
+      FROM a3_execution_journals
+      WHERE effect_id = ${context.effect_id}
+        AND job_id = ${context.job_id}::uuid
+        AND stage = 'READBACK_VERIFIED'
+      FOR UPDATE
+    `;
+    const verifiedJournal = journals[0];
+    if (verifiedJournal) {
+      const payload = deriveA3VerifiedJournalPayload(verifiedJournal, true);
+      const persisted = payload.ok
+        ? await persistRecoveredVerifiedEffectLocked(
+            tx,
+            context.job_id,
+            context.effect_id,
+            payload,
+            now,
+          )
+        : await persistInvalidRecoveredEffectLocked(
+            tx,
+            context.job_id,
+            context.effect_id,
+            payload.errorCode,
+            now,
+          );
+      if (!persisted) throw new Error("WORKER_A3_RECOVERY_PERSISTENCE_FAILED");
+      await terminalizeLockedEffect(tx, await terminalContext(tx, context.job_id), now);
       return "reconciled";
     }
     if (context.cancel_requested_at) {
