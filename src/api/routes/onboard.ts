@@ -1,15 +1,10 @@
 import { Router } from "express";
-import { ethers } from "ethers";
 import {
   getUserByWallet,
-  createUser,
   updateUser,
   getAllUsers,
   getActiveUsers,
 } from "../../store/user-store";
-import { createProxyWallet } from "../../payments/circle-wallet";
-import { generateLinkCode } from "../../store/link-codes";
-import { mintAgentNFT } from "../../og/inft";
 import type { UserRecord } from "../../types/index";
 
 function sanitizeUser(user: UserRecord) {
@@ -26,89 +21,16 @@ function deriveMaxTrade(riskProfile: string): number {
 export function onboardRoutes(): Router {
   const router = Router();
 
-  // POST /api/onboard — Create new user with wallet verification
-  router.post("/onboard", async (req, res) => {
-    try {
-      const { walletAddress, signature, message } = req.body as {
-        walletAddress?: string;
-        signature?: string;
-        message?: string;
-      };
-
-      if (!walletAddress) {
-        res.status(400).json({ error: "walletAddress is required", code: 400 });
-        return;
-      }
-
-      // Check existing user
-      const existing = await getUserByWallet(walletAddress);
-      if (existing) {
-        const linkCode = await generateLinkCode(existing.id);
-        res.json({
-          userId: existing.id,
-          proxyWalletAddress: existing.proxyWallet.address,
-          telegramLinkCode: linkCode,
-          existing: true,
-        });
-        return;
-      }
-
-      // Verify wallet signature (optional — skip if not provided or on testnet)
-      if (signature && message && signature !== "mock") {
-        try {
-          const recovered = ethers.verifyMessage(message, signature);
-          if (recovered.toLowerCase() !== walletAddress.toLowerCase()) {
-            res.status(401).json({ error: "Signature does not match wallet address", code: 401 });
-            return;
-          }
-        } catch {
-          res.status(401).json({ error: "Invalid signature", code: 401 });
-          return;
-        }
-      }
-
-      // Create Circle proxy wallet and user record
-      // Generate userId FIRST so Circle wallet refId matches the stored user ID
-      const newUserId = crypto.randomUUID();
-      let proxyWallet: { walletId: string; address: string };
-      try {
-        proxyWallet = await createProxyWallet(newUserId);
-      } catch (err) {
-        console.warn("[onboard] Circle wallet creation failed, using placeholder:", err instanceof Error ? err.message : String(err));
-        proxyWallet = { walletId: `local-${newUserId}`, address: `0x${newUserId.replace(/-/g, "").slice(0, 40)}` };
-      }
-
-      const user = await createUser(walletAddress, proxyWallet, newUserId);
-      const linkCode = await generateLinkCode(user.id);
-
-      // Mint iNFT for the agent (non-fatal)
-      let inftTokenId: number | null = null;
-      if (process.env.INFT_CONTRACT_ADDRESS) {
-        try {
-          const { tokenId } = await mintAgentNFT(
-            walletAddress,
-            proxyWallet.address,
-            "balanced",
-          );
-          if (tokenId > 0) {
-            inftTokenId = tokenId;
-            await updateUser(user.id, { inftTokenId });
-          }
-        } catch (err) {
-          console.warn("[onboard] iNFT mint skipped:", err instanceof Error ? err.message : String(err));
-        }
-      }
-
-      res.status(201).json({
-        userId: user.id,
-        proxyWalletAddress: proxyWallet.address,
-        telegramLinkCode: linkCode,
-        inftTokenId,
-        existing: false,
-      });
-    } catch (err) {
-      res.status(500).json({ error: String(err), code: 500 });
-    }
+  // Wallet onboarding is authoritative only through the canonical Next.js
+  // SIWE challenge, verification, session, and DB-only onboarding routes.
+  router.post("/onboard", (_req, res) => {
+    res.status(428).json({
+      error: "Canonical SIWE session required",
+      code: "AUTH_CANONICAL_FLOW_REQUIRED",
+      challengePath: "/api/auth/siwe/challenge",
+      verifyPath: "/api/auth/siwe/verify",
+      onboardPath: "/api/onboard",
+    });
   });
 
   // POST /api/configure — Set risk profile, notification preference, approval mode

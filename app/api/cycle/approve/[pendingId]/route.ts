@@ -1,23 +1,44 @@
 import { NextResponse } from "next/server";
-import { getUserById, decrementCyclesRemaining } from "@/src/store/user-store";
-import { commitCycle, rejectCycle } from "@/src/agents/main-agent";
-import { getPendingCycle, resolvePendingCycle } from "@/src/store/pending-cycles";
+import {
+  authenticateRequest,
+  authErrorResponse,
+  legacyRuntimeDisabledResponse,
+} from "@/src/auth/http";
+import { AuthError } from "@/src/auth/errors";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ pendingId: string }> },
 ) {
   try {
+    const auth = await authenticateRequest(request, { requireUser: true });
+    if (!auth.ok) return auth.response;
     const { pendingId } = await params;
+    let body: { userId?: unknown; modifiedPct?: unknown };
+    try {
+      body = (await request.json()) as { userId?: unknown; modifiedPct?: unknown };
+    } catch {
+      throw new AuthError("AUTH_INVALID_REQUEST", "Malformed JSON body", 400);
+    }
+    if (body.userId !== undefined && body.userId !== auth.auth.principal.userId) {
+      return NextResponse.json({ error: "User claim does not match session", code: "AUTH_FORBIDDEN" }, { status: 403 });
+    }
+    const disabled = legacyRuntimeDisabledResponse();
+    if (disabled) return disabled;
+    const [userStore, mainAgent, pendingStore] = await Promise.all([
+      import("@/src/store/user-store"),
+      import("@/src/agents/main-agent"),
+      import("@/src/store/pending-cycles"),
+    ]);
+    const { getUserById, decrementCyclesRemaining } = userStore;
+    const { commitCycle, rejectCycle } = mainAgent;
+    const { getPendingCycle, resolvePendingCycle } = pendingStore;
     const pending = await getPendingCycle(pendingId);
     if (!pending) {
       return NextResponse.json({ error: "Pending cycle not found" }, { status: 404 });
     }
 
-    // Auth: verify caller owns this pending cycle
-    const body = await request.json().catch(() => ({}));
-    const callerId = (body as { userId?: string }).userId;
-    if (!callerId || callerId !== pending.userId) {
+    if (auth.auth.principal.userId !== pending.userId) {
       return NextResponse.json({ error: "Not authorized to approve this cycle" }, { status: 403 });
     }
 
@@ -27,7 +48,7 @@ export async function POST(
     }
 
     // Validate modifiedPct bounds
-    const modifiedPct = (body as { modifiedPct?: number }).modifiedPct;
+    const modifiedPct = typeof body.modifiedPct === "number" ? body.modifiedPct : undefined;
     if (modifiedPct !== undefined) {
       if (modifiedPct < 0 || modifiedPct > user.agent.maxTradePercent) {
         return NextResponse.json({ error: `modifiedPct must be 0-${user.agent.maxTradePercent}` }, { status: 400 });
@@ -80,11 +101,17 @@ export async function POST(
         timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp,
       });
     } catch (commitErr) {
-      console.error("[api] commitCycle failed after resolve, cleaning up:", commitErr);
-      await rejectCycle(analysis, user, "commit_failed").catch(() => {});
+      const code = commitErr instanceof Error ? commitErr.name : "UNKNOWN";
+      console.error(JSON.stringify({ level: "error", context: "legacy.cycle.approve.commit", code }));
+      try {
+        await rejectCycle(analysis, user, "commit_failed");
+      } catch (cleanupError) {
+        const cleanupCode = cleanupError instanceof Error ? cleanupError.name : "UNKNOWN";
+        console.error(JSON.stringify({ level: "error", context: "legacy.cycle.approve.cleanup", code: cleanupCode }));
+      }
       return NextResponse.json({ error: "Commit failed after approval. Cycle logged as failed." }, { status: 500 });
     }
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return authErrorResponse(err, "legacy.cycle.approve");
   }
 }

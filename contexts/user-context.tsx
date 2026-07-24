@@ -10,8 +10,16 @@ import {
   type ReactNode,
 } from "react";
 import { createPublicClient, http, formatUnits } from "viem";
-import { getUser, onboard, type UserRecord } from "@/lib/api";
-import { useAccount } from "wagmi";
+import {
+  createSiweChallenge,
+  getAuthSession,
+  getUser,
+  onboard,
+  verifySiweChallenge,
+  type OnboardResponse,
+  type UserRecord,
+} from "@/lib/api";
+import { useAccount, useSignMessage } from "wagmi";
 // Pull the chain definition from the neutral lib/ module instead of
 // @/contexts/wagmi-provider. wagmi-provider imports UserProvider from THIS
 // file, so going the other direction creates a TDZ cycle — the module runs
@@ -65,6 +73,7 @@ const UserContext = createContext<UserContextValue | null>(null);
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
   const [user, setUser] = useState<UserRecord | null>(null);
   const [linkCode, setLinkCode] = useState<string | null>(null);
   const [agentBalance, setAgentBalance] = useState<number | null>(null);
@@ -72,6 +81,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const onboardingRef = useRef(false);
   const linkCodeFetchedRef = useRef(false);
+  const authenticatedWalletRef = useRef<string | null>(null);
+  const onboardedWalletRef = useRef<string | null>(null);
 
   const telegramVerified = user?.telegram?.verified ?? false;
   const proxyAddress = user?.proxyWallet?.address ?? null;
@@ -128,11 +139,33 @@ export function UserProvider({ children }: { children: ReactNode }) {
     };
   }, [proxyAddress, refreshAgentBalance]);
 
+  const ensureOnboarded = useCallback(async (forceOnboard = false): Promise<OnboardResponse | null> => {
+    if (!address) return null;
+    const normalizedAddress = address.toLowerCase();
+    if (authenticatedWalletRef.current !== normalizedAddress) {
+      const session = await getAuthSession();
+      if (session?.walletAddress.toLowerCase() !== normalizedAddress) {
+        const challenge = await createSiweChallenge(address);
+        const signature = await signMessageAsync({ message: challenge.message });
+        await verifySiweChallenge({
+          challengeId: challenge.challengeId,
+          message: challenge.message,
+          signature,
+        });
+      }
+      authenticatedWalletRef.current = normalizedAddress;
+    }
+    if (!forceOnboard && onboardedWalletRef.current === normalizedAddress) return null;
+    const result = await onboard();
+    onboardedWalletRef.current = normalizedAddress;
+    return result;
+  }, [address, signMessageAsync]);
+
   const refreshLinkCode = useCallback(async () => {
     if (!address) return;
     try {
-      const result = await onboard(address, "mock", "AlphaDawg sign-in");
-      if (result.telegramLinkCode) {
+      const result = await ensureOnboarded(true);
+      if (result?.telegramLinkCode) {
         setLinkCode(result.telegramLinkCode);
         linkCodeFetchedRef.current = true;
       }
@@ -140,46 +173,40 @@ export function UserProvider({ children }: { children: ReactNode }) {
       console.warn("[user-context] Failed to refresh link code:", err);
       throw err; // Re-throw so modal can show error state
     }
-  }, [address]);
+  }, [address, ensureOnboarded]);
 
   const refetch = useCallback(async () => {
-    if (!address) { setUser(null); return; }
-    const fetched = await getUser(address);
-    if (fetched) {
-      setUser(fetched);
-      // Clear linkCode once telegram is verified
-      if (fetched.telegram?.verified) {
-        setLinkCode(null);
-        linkCodeFetchedRef.current = false;
-      } else if (!linkCodeFetchedRef.current && !onboardingRef.current) {
-        // Returning user without Telegram — generate a link code ONCE
-        linkCodeFetchedRef.current = true;
-        try {
-          const result = await onboard(address, "mock", "AlphaDawg sign-in");
-          if (result.telegramLinkCode) setLinkCode(result.telegramLinkCode);
-        } catch {
-          linkCodeFetchedRef.current = false; // Reset on failure so retry is possible
-        }
-      }
+    if (!address) {
+      setUser(null);
+      authenticatedWalletRef.current = null;
+      onboardedWalletRef.current = null;
       return;
     }
-    // Auto-onboard on first connect (testnet — "mock" signature skips verification)
-    if (!onboardingRef.current) {
-      onboardingRef.current = true;
-      linkCodeFetchedRef.current = true;
-      try {
-        const result = await onboard(address, "mock", "AlphaDawg sign-in");
-        if (result.telegramLinkCode) setLinkCode(result.telegramLinkCode);
-        // Fetch full user record after onboard
-        const fullUser = await getUser(address);
-        if (fullUser) setUser(fullUser);
-      } catch (err) {
-        console.warn("[user-context] Auto-onboard failed:", err);
-        onboardingRef.current = false;
-        linkCodeFetchedRef.current = false;
+    if (onboardingRef.current) return;
+    onboardingRef.current = true;
+    try {
+      const result = await ensureOnboarded();
+      if (result?.telegramLinkCode && !linkCodeFetchedRef.current) {
+        setLinkCode(result.telegramLinkCode);
+        linkCodeFetchedRef.current = true;
       }
+      const fetched = await getUser(address);
+      if (fetched) {
+        setUser(fetched);
+        if (fetched.telegram?.verified) {
+          setLinkCode(null);
+          linkCodeFetchedRef.current = false;
+        }
+      }
+    } catch (err) {
+      console.warn("[user-context] Verified onboarding failed:", err);
+      authenticatedWalletRef.current = null;
+      onboardedWalletRef.current = null;
+      linkCodeFetchedRef.current = false;
+    } finally {
+      onboardingRef.current = false;
     }
-  }, [address]);
+  }, [address, ensureOnboarded]);
 
   useEffect(() => {
     const first = setTimeout(() => void refetch(), 0);

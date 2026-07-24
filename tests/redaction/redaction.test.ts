@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { EnvironmentValidationError, validateEnvironment } from "../../src/config/env";
 import { findSecretFindings } from "../../scripts/scan-secrets";
+import { authErrorResponse } from "../../src/auth/http";
 
 test("secret findings expose location and kind without exposing the value", () => {
   const secret = `gh${"p_"}${"A".repeat(40)}`;
@@ -21,4 +22,21 @@ test("environment errors contain field names but not rejected values", () => {
       return true;
     },
   );
+});
+
+test("structured auth failures never log raw session or signature material", () => {
+  const secret = `0x${"ab".repeat(65)}`;
+  const observed: string[] = [];
+  const original = console.error;
+  console.error = (...values: unknown[]) => {
+    observed.push(values.map(String).join(" "));
+  };
+  try {
+    const response = authErrorResponse(new Error(secret), "redaction.test");
+    assert.equal(response.status, 500);
+  } finally {
+    console.error = original;
+  }
+  assert.doesNotMatch(observed.join("\n"), new RegExp(secret));
+  assert.match(observed.join("\n"), /"code":"INTERNAL_ERROR"/);
 });

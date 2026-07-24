@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { getUserById } from "@/src/store/user-store";
-import { analyzeCycle, runCycle, CycleInProgressError } from "@/src/agents/main-agent";
-import { createPendingCycle, getPendingForUser } from "@/src/store/pending-cycles";
+import {
+  authenticateRequest,
+  authErrorResponse,
+  legacyRuntimeDisabledResponse,
+} from "@/src/auth/http";
+import { AuthError } from "@/src/auth/errors";
 
 export async function POST(
   request: Request,
@@ -9,6 +12,16 @@ export async function POST(
 ) {
   try {
     const { userId } = await params;
+    const auth = await authenticateRequest(request, { requireUser: true, claimedUserId: userId });
+    if (!auth.ok) return auth.response;
+    const disabled = legacyRuntimeDisabledResponse();
+    if (disabled) return disabled;
+    const [{ getUserById }, { analyzeCycle, runCycle }, pendingStore] = await Promise.all([
+      import("@/src/store/user-store"),
+      import("@/src/agents/main-agent"),
+      import("@/src/store/pending-cycles"),
+    ]);
+    const { createPendingCycle, getPendingForUser } = pendingStore;
     const user = await getUserById(userId);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -17,7 +30,12 @@ export async function POST(
     // Accept an optional user-authored goal from the dashboard. Heartbeat and
     // Telegram triggers send nothing and fall back to the default goal string
     // inside analyzeCycle.
-    const body = await request.json().catch(() => ({}));
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      throw new AuthError("AUTH_INVALID_REQUEST", "Malformed JSON body", 400);
+    }
     const goal = typeof (body as { goal?: unknown }).goal === "string"
       ? (body as { goal: string }).goal
       : undefined;
@@ -25,7 +43,7 @@ export async function POST(
     const approvalMode = user.agent.approvalMode ?? "always";
 
     if (approvalMode === "auto") {
-      console.log(`[api] Auto-approve cycle for user ${user.id}`);
+      console.log(JSON.stringify({ level: "info", context: "legacy.cycle.run", mode: "auto" }));
       const result = await runCycle(user, goal);
       return NextResponse.json({
         cycleId: result.cycleId,
@@ -57,7 +75,7 @@ export async function POST(
       );
     }
 
-    console.log(`[api] Analyze cycle for user ${user.id} (approval: ${approvalMode})`);
+    console.log(JSON.stringify({ level: "info", context: "legacy.cycle.run", mode: approvalMode }));
     const analysis = await analyzeCycle(user, goal);
     const timeoutMin = user.agent.approvalTimeoutMin ?? 10;
     const pending = await createPendingCycle(analysis, "ui", timeoutMin);
@@ -75,12 +93,12 @@ export async function POST(
       openclawGatewayStatus: analysis.openclawGatewayStatus ?? "offline",
     });
   } catch (err) {
-    if (err instanceof CycleInProgressError) {
+    if (err instanceof Error && err.name === "CycleInProgressError") {
       return NextResponse.json(
         { error: "A cycle is already in progress for this user. Wait for it to finish before triggering another." },
         { status: 409 },
       );
     }
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return authErrorResponse(err, "legacy.cycle.run");
   }
 }

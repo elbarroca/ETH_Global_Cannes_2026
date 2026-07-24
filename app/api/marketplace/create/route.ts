@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/src/config/prisma";
-import { logAction } from "@/src/store/action-logger";
-import { registerSpecialist } from "@/src/marketplace/registry";
+import {
+  authenticateRequest,
+  authErrorResponse,
+  legacyRuntimeDisabledResponse,
+} from "@/src/auth/http";
 
 export const runtime = "nodejs";
 
 interface CreateRequestBody {
-  name?: string;
-  description?: string;
-  instructions?: string;
-  tools?: string[];
-  emoji?: string;
-  createdBy?: string;
-  attestationHash?: string | null;
+  name?: unknown;
+  description?: unknown;
+  instructions?: unknown;
+  tools?: unknown;
+  emoji?: unknown;
+  createdBy?: unknown;
 }
 
 const USER_CREATED_ENDPOINT = "local://user-created";
@@ -31,49 +32,51 @@ function sanitizeTools(tools: unknown): string[] {
   return cleaned;
 }
 
-export async function POST(req: Request) {
-  let body: CreateRequestBody;
+export async function POST(request: Request): Promise<NextResponse> {
   try {
-    body = (await req.json()) as CreateRequestBody;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+    const auth = await authenticateRequest(request, { requireUser: true });
+    if (!auth.ok) return auth.response;
+    const userId = auth.auth.principal.userId;
+    if (!userId) {
+      return NextResponse.json({ error: "Onboarding required", code: "AUTH_USER_REQUIRED" }, { status: 403 });
+    }
+    const body = (await request.json()) as CreateRequestBody;
+    if (
+      body.createdBy !== undefined &&
+      body.createdBy !== userId &&
+      (typeof body.createdBy !== "string" ||
+        body.createdBy.toLowerCase() !== auth.auth.principal.walletAddress)
+    ) {
+      return NextResponse.json({ error: "Owner claim does not match session", code: "AUTH_FORBIDDEN" }, { status: 403 });
+    }
+    const disabled = legacyRuntimeDisabledResponse();
+    if (disabled) return disabled;
 
-  const name = (body.name ?? "").trim();
-  const description = (body.description ?? "").trim();
-  const instructions = (body.instructions ?? "").trim();
-  const emoji = (body.emoji ?? "").trim() || "🤖";
-  const createdBy = (body.createdBy ?? "").trim() || null;
-  const tools = sanitizeTools(body.tools);
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const description = typeof body.description === "string" ? body.description.trim() : "";
+    const instructions = typeof body.instructions === "string" ? body.instructions.trim() : "";
+    const emoji = typeof body.emoji === "string" ? body.emoji.trim() || "🤖" : "🤖";
+    const tools = sanitizeTools(body.tools);
+    if (name.length < 2 || name.length > 40) {
+      return NextResponse.json({ error: "Name must be 2-40 characters", code: "INVALID_REQUEST" }, { status: 400 });
+    }
+    if (description.length < 10 || description.length > 800) {
+      return NextResponse.json({ error: "Description must be 10-800 characters", code: "INVALID_REQUEST" }, { status: 400 });
+    }
+    if (instructions.length < 20 || instructions.length > 4_000) {
+      return NextResponse.json({ error: "Instructions must be 20-4000 characters", code: "INVALID_REQUEST" }, { status: 400 });
+    }
 
-  if (!name || name.length < 2 || name.length > 40) {
-    return NextResponse.json({ error: "Name must be 2-40 characters" }, { status: 400 });
-  }
-  if (!description || description.length < 10 || description.length > 800) {
-    return NextResponse.json(
-      { error: "Description must be 10-800 characters" },
-      { status: 400 },
-    );
-  }
-  if (!instructions || instructions.length < 20) {
-    return NextResponse.json(
-      { error: "Instructions markdown is required — run Generate first" },
-      { status: 400 },
-    );
-  }
-
-  const prisma = getPrisma();
-
-  // Enforce uniqueness against both built-in and previously deployed community agents.
-  const existing = await prisma.marketplaceAgent.findUnique({ where: { name } });
-  if (existing) {
-    return NextResponse.json(
-      { error: `An agent named "${name}" already exists` },
-      { status: 409 },
-    );
-  }
-
-  try {
+    const [{ getPrisma }, { logAction }, { registerSpecialist }] = await Promise.all([
+      import("@/src/config/prisma"),
+      import("@/src/store/action-logger"),
+      import("@/src/marketplace/registry"),
+    ]);
+    const prisma = getPrisma();
+    const existing = await prisma.marketplaceAgent.findUnique({ where: { name } });
+    if (existing) {
+      return NextResponse.json({ error: "Agent name already exists", code: "CONFLICT" }, { status: 409 });
+    }
     const tagList = [emoji, "community", "user-built"];
     const row = await prisma.marketplaceAgent.create({
       data: {
@@ -90,55 +93,41 @@ export async function POST(req: Request) {
         description,
         instructions,
         tools,
-        createdBy,
+        createdBy: auth.auth.principal.walletAddress,
       },
     });
-
-    // Sync the in-memory registry so `discoverSpecialists()` (used by the
-    // leaderboard enrichment pass) returns this agent immediately. The upsert
-    // touches only endpoint/tags/price/active/wallet — our custom columns
-    // (description/instructions/tools/createdBy) are preserved.
     try {
       await registerSpecialist(name, USER_CREATED_ENDPOINT, tagList, "$0.001");
-    } catch (err) {
-      console.warn("[marketplace/create] Registry sync non-fatal:", err);
+    } catch (error) {
+      const code = error instanceof Error ? error.name : "UNKNOWN";
+      console.warn(JSON.stringify({ level: "warn", context: "legacy.marketplace.create.registry", code }));
     }
-
-    // Audit trail — keep a record that a user deployed an agent. Non-fatal.
-    if (createdBy) {
-      try {
-        await logAction({
-          userId: createdBy,
-          actionType: "AGENT_DEPLOYED",
-          agentName: row.name,
-          payload: {
-            agentId: row.id,
-            tools,
-            attestationHash: body.attestationHash ?? null,
-          },
-        });
-      } catch {
-        /* audit is best-effort */
-      }
+    try {
+      await logAction({
+        userId,
+        actionType: "AGENT_DEPLOYED",
+        agentName: row.name,
+        payload: { agentId: row.id, tools },
+      });
+    } catch (error) {
+      const code = error instanceof Error ? error.name : "UNKNOWN";
+      console.warn(JSON.stringify({ level: "warn", context: "legacy.marketplace.create.audit", code }));
     }
-
-    return NextResponse.json(
-      {
-        id: row.id,
-        name: row.name,
-        emoji,
-        price: row.price,
-        reputation: row.reputation,
-        tools: row.tools,
-        description: row.description,
-        instructions: row.instructions,
-        createdBy: row.createdBy,
-        createdAt: row.createdAt.toISOString(),
-      },
-      { status: 201 },
-    );
-  } catch (err) {
-    console.warn("[marketplace/create] Insert failed:", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({
+      id: row.id,
+      name: row.name,
+      emoji,
+      price: row.price,
+      reputation: row.reputation,
+      tools: row.tools,
+      description: row.description,
+      instructions: row.instructions,
+      createdBy: row.createdBy,
+      createdAt: row.createdAt.toISOString(),
+      legacy: true,
+      authoritative: false,
+    }, { status: 201 });
+  } catch (error) {
+    return authErrorResponse(error, "legacy.marketplace.create");
   }
 }

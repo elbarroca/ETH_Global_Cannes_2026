@@ -1,60 +1,57 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getUserById, updateUser } from "@/src/store/user-store";
-import { burnShares, getTokenInfo } from "@/src/hedera/hts";
-import { agentTransfer } from "@/src/payments/circle-wallet";
+import { type NextRequest, NextResponse } from "next/server";
+import {
+  authenticateRequest,
+  authErrorResponse,
+  legacyRuntimeDisabledResponse,
+} from "@/src/auth/http";
 
-let cachedDecimals: number | null = null;
-async function getDecimals(): Promise<number> {
-  if (cachedDecimals === null) {
-    const info = await getTokenInfo();
-    cachedDecimals = info.decimals;
-  }
-  return cachedDecimals;
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const { userId, amount } = (await req.json()) as { userId?: string; amount?: number };
-
-    if (!userId || amount == null) {
-      return NextResponse.json({ error: "userId and amount are required" }, { status: 400 });
+    const auth = await authenticateRequest(request, { requireUser: true });
+    if (!auth.ok) return auth.response;
+    const userId = auth.auth.principal.userId;
+    if (!userId) {
+      return NextResponse.json({ error: "Onboarding required", code: "AUTH_USER_REQUIRED" }, { status: 403 });
     }
-    if (amount <= 0) {
-      return NextResponse.json({ error: "amount must be positive" }, { status: 400 });
+    const body = (await request.json()) as { userId?: unknown; amount?: unknown };
+    if (body.userId !== undefined && body.userId !== userId) {
+      return NextResponse.json({ error: "User claim does not match session", code: "AUTH_FORBIDDEN" }, { status: 403 });
     }
-
-    const user = await getUserById(userId);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (typeof body.amount !== "number" || !Number.isFinite(body.amount) || body.amount <= 0) {
+      return NextResponse.json({ error: "amount must be positive", code: "INVALID_REQUEST" }, { status: 400 });
     }
-    if (amount > user.fund.depositedUsdc) {
-      return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
+    const disabled = legacyRuntimeDisabledResponse();
+    if (disabled) return disabled;
+
+    const [userStore, hts, circle] = await Promise.all([
+      import("@/src/store/user-store"),
+      import("@/src/hedera/hts"),
+      import("@/src/payments/circle-wallet"),
+    ]);
+    const user = await userStore.getUserById(userId);
+    if (!user) return NextResponse.json({ error: "User not found", code: "NOT_FOUND" }, { status: 404 });
+    if (body.amount > user.fund.depositedUsdc) {
+      return NextResponse.json({ error: "Insufficient balance", code: "INVALID_REQUEST" }, { status: 400 });
     }
-
-    const decimals = await getDecimals();
-    const shareUnits = Math.round(amount * Math.pow(10, decimals));
-    const { newTotalSupply } = await burnShares(shareUnits);
-
-    const fee = amount * 0.01;
-    const netWithdraw = amount - fee;
-    const newDeposit = user.fund.depositedUsdc - amount;
-
-    let txResult: { txId: string; state: string } | null = null;
-    try {
-      txResult = await agentTransfer(user.proxyWallet.walletId, user.walletAddress, netWithdraw.toString());
-    } catch (err) {
-      console.warn("[withdraw] Circle transfer failed (non-fatal):", err instanceof Error ? err.message : String(err));
-    }
-
-    const updated = await updateUser(userId, {
+    const tokenInfo = await hts.getTokenInfo();
+    const shareUnits = Math.round(body.amount * Math.pow(10, tokenInfo.decimals));
+    const { newTotalSupply } = await hts.burnShares(shareUnits);
+    const fee = body.amount * 0.01;
+    const netWithdraw = body.amount - fee;
+    const transfer = await circle.agentTransfer(
+      user.proxyWallet.walletId,
+      user.walletAddress,
+      netWithdraw.toString(),
+    );
+    const newDeposit = user.fund.depositedUsdc - body.amount;
+    const updated = await userStore.updateUser(userId, {
       fund: {
         depositedUsdc: newDeposit,
-        currentNav: Math.max(0, user.fund.currentNav - amount),
-        htsShareBalance: Math.max(0, user.fund.htsShareBalance - amount),
+        currentNav: Math.max(0, user.fund.currentNav - body.amount),
+        htsShareBalance: Math.max(0, user.fund.htsShareBalance - body.amount),
       },
       agent: newDeposit <= 0 ? { active: false } : {},
     });
-
     return NextResponse.json({
       success: true,
       withdrawn: netWithdraw,
@@ -62,10 +59,11 @@ export async function POST(req: NextRequest) {
       remainingUsdc: updated.fund.depositedUsdc,
       agentActive: updated.agent.active,
       htsTotalSupply: newTotalSupply,
-      txStatus: txResult ? "transferred" : "burned_only",
-      circleTxId: txResult?.txId ?? null,
+      txStatus: "transferred",
+      circleTxId: transfer.txId,
+      legacy: true,
     });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch (error) {
+    return authErrorResponse(error, "legacy.withdraw");
   }
 }

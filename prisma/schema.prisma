@@ -308,3 +308,241 @@ model NaryoCorrelation {
 
   @@map("naryo_correlations")
 }
+
+// A2 authenticated commerce kernel. These models are additive and deliberately
+// separate from the inherited Cannes marketplace tables above.
+model AuthChallenge {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message       String    @db.Text
+  messageHash   String    @map("message_hash")
+  walletAddress String    @map("wallet_address")
+  domain        String
+  chainId       Int       @map("chain_id")
+  action        String
+  nonce         String    @unique
+  audience      String
+  uri           String
+  issuedAt      DateTime  @map("issued_at") @db.Timestamptz(6)
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt    DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([walletAddress, expiresAt], map: "idx_auth_challenges_wallet_expiry")
+  @@map("auth_challenges")
+}
+
+model AuthSession {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  challengeId   String    @unique @map("challenge_id") @db.Uuid
+  tokenHash     String    @unique @map("token_hash")
+  walletAddress String    @map("wallet_address")
+  userId        String?   @map("user_id")
+  action        String
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([walletAddress, expiresAt], map: "idx_auth_sessions_wallet_expiry")
+  @@index([userId, expiresAt], map: "idx_auth_sessions_user_expiry")
+  @@map("auth_sessions")
+}
+
+model KernelAgent {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerUserId String         @map("owner_user_id")
+  name        String
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  versions    AgentVersion[]
+
+  @@unique([ownerUserId, name], map: "uniq_kernel_agents_owner_name")
+  @@index([ownerUserId, createdAt], map: "idx_kernel_agents_owner_created")
+  @@map("kernel_agents")
+}
+
+model AgentVersion {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentId        String      @map("agent_id") @db.Uuid
+  version        Int
+  manifest       Json
+  manifestHash   String      @map("manifest_hash")
+  promptHash     String      @map("prompt_hash")
+  configHash     String      @map("config_hash")
+  capabilities   String[]
+  adapterKey     String      @map("adapter_key")
+  endpoint       String?
+  connectorKey   String?     @map("connector_key")
+  ownerWallet    String      @map("owner_wallet")
+  payoutAddress  String?     @map("payout_address")
+  priceAtomic    BigInt      @map("price_atomic")
+  asset          String
+  proofPolicy    String      @map("proof_policy")
+  published      Boolean     @default(false)
+  publishedAt    DateTime?   @map("published_at") @db.Timestamptz(6)
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  agent          KernelAgent @relation(fields: [agentId], references: [id], onDelete: Restrict)
+
+  @@unique([agentId, version], map: "uniq_agent_versions_agent_version")
+  @@index([published, createdAt], map: "idx_agent_versions_published_created")
+  @@map("agent_versions")
+}
+
+model Quote {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  buyerUserId    String   @map("buyer_user_id")
+  agentVersionId String   @map("agent_version_id") @db.Uuid
+  idempotencyKey String   @map("idempotency_key")
+  inputHash      String   @map("input_hash")
+  amountAtomic   BigInt   @map("amount_atomic")
+  asset          String
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([buyerUserId, idempotencyKey], map: "uniq_quotes_buyer_idempotency")
+  @@index([agentVersionId, createdAt], map: "idx_quotes_version_created")
+  @@map("quotes")
+}
+
+model JobIntent {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  buyerUserId    String   @map("buyer_user_id")
+  agentVersionId String   @map("agent_version_id") @db.Uuid
+  idempotencyKey String   @map("idempotency_key")
+  input          Json
+  inputHash      String   @map("input_hash")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([buyerUserId, idempotencyKey], map: "uniq_job_intents_buyer_idempotency")
+  @@index([agentVersionId, createdAt], map: "idx_job_intents_version_created")
+  @@map("job_intents")
+}
+
+model Order {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  buyerUserId    String   @map("buyer_user_id")
+  agentVersionId String   @map("agent_version_id") @db.Uuid
+  intentId       String   @unique @map("intent_id") @db.Uuid
+  quoteId        String   @unique @map("quote_id") @db.Uuid
+  amountAtomic   BigInt   @map("amount_atomic")
+  asset          String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([buyerUserId, createdAt], map: "idx_kernel_orders_buyer_created")
+  @@map("kernel_orders")
+}
+
+model Job {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId            String    @unique @map("order_id") @db.Uuid
+  intentId           String    @unique @map("intent_id") @db.Uuid
+  buyerUserId        String    @map("buyer_user_id")
+  agentVersionId     String    @map("agent_version_id") @db.Uuid
+  state              String    @default("QUEUED")
+  version            Int       @default(0)
+  attempts           Int       @default(0)
+  maxAttempts        Int       @default(3) @map("max_attempts")
+  availableAt        DateTime  @default(now()) @map("available_at") @db.Timestamptz(6)
+  leaseOwner         String?   @map("lease_owner")
+  leaseExpiresAt     DateTime? @map("lease_expires_at") @db.Timestamptz(6)
+  cancelRequestedAt  DateTime? @map("cancel_requested_at") @db.Timestamptz(6)
+  financialOutcome   String?   @map("financial_outcome")
+  lastErrorCode      String?   @map("last_error_code")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([state, availableAt], map: "idx_jobs_state_available")
+  @@index([buyerUserId, createdAt], map: "idx_jobs_buyer_created")
+  @@map("jobs")
+}
+
+model JobEvent {
+  id        BigInt   @id @default(autoincrement())
+  jobId     String   @map("job_id") @db.Uuid
+  version   Int
+  eventType String   @map("event_type")
+  fromState String?  @map("from_state")
+  toState   String   @map("to_state")
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([jobId, version], map: "uniq_job_events_job_version")
+  @@index([jobId, createdAt], map: "idx_job_events_job_created")
+  @@map("job_events")
+}
+
+model Effect {
+  id             String    @id
+  jobId          String    @unique @map("job_id") @db.Uuid
+  intentId       String    @unique @map("intent_id") @db.Uuid
+  idempotencyKey String    @unique @map("idempotency_key")
+  adapterKey     String    @map("adapter_key")
+  requestHash    String    @map("request_hash")
+  state          String    @default("PENDING")
+  attempt        Int       @default(0)
+  resultHash     String?   @map("result_hash")
+  result         Json?
+  errorCode      String?   @map("error_code")
+  terminalAt     DateTime? @map("terminal_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("effects")
+}
+
+model Receipt {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId       String   @unique @map("job_id") @db.Uuid
+  effectId    String   @unique @map("effect_id")
+  verified    Boolean
+  adapterKey  String   @map("adapter_key")
+  proofHash   String   @map("proof_hash")
+  resultHash  String   @map("result_hash")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("receipts")
+}
+
+model Settlement {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId        String   @unique @map("job_id") @db.Uuid
+  receiptId    String   @unique @map("receipt_id") @db.Uuid
+  amountAtomic BigInt   @map("amount_atomic")
+  asset        String
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("settlements")
+}
+
+model Commission {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId           String   @unique @map("job_id") @db.Uuid
+  settlementId    String   @unique @map("settlement_id") @db.Uuid
+  recipientUserId String   @map("recipient_user_id")
+  amountAtomic    BigInt   @map("amount_atomic")
+  asset           String
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("commissions")
+}
+
+model Refund {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId        String   @unique @map("job_id") @db.Uuid
+  amountAtomic BigInt   @map("amount_atomic")
+  asset        String
+  reasonCode   String   @map("reason_code")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("refunds")
+}
+
+model WorkerLease {
+  key         String   @id
+  ownerId     String   @map("owner_id")
+  epoch       BigInt   @default(1)
+  heartbeatAt DateTime @map("heartbeat_at") @db.Timestamptz(6)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("worker_leases")
+}

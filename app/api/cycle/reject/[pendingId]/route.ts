@@ -1,23 +1,42 @@
 import { NextResponse } from "next/server";
-import { getUserById } from "@/src/store/user-store";
-import { rejectCycle } from "@/src/agents/main-agent";
-import { getPendingCycle, resolvePendingCycle } from "@/src/store/pending-cycles";
+import {
+  authenticateRequest,
+  authErrorResponse,
+  legacyRuntimeDisabledResponse,
+} from "@/src/auth/http";
+import { AuthError } from "@/src/auth/errors";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ pendingId: string }> },
 ) {
   try {
+    const auth = await authenticateRequest(request, { requireUser: true });
+    if (!auth.ok) return auth.response;
     const { pendingId } = await params;
+    let body: { userId?: unknown; reason?: unknown };
+    try {
+      body = (await request.json()) as { userId?: unknown; reason?: unknown };
+    } catch {
+      throw new AuthError("AUTH_INVALID_REQUEST", "Malformed JSON body", 400);
+    }
+    if (body.userId !== undefined && body.userId !== auth.auth.principal.userId) {
+      return NextResponse.json({ error: "User claim does not match session", code: "AUTH_FORBIDDEN" }, { status: 403 });
+    }
+    const disabled = legacyRuntimeDisabledResponse();
+    if (disabled) return disabled;
+    const [{ getUserById }, { rejectCycle }, pendingStore] = await Promise.all([
+      import("@/src/store/user-store"),
+      import("@/src/agents/main-agent"),
+      import("@/src/store/pending-cycles"),
+    ]);
+    const { getPendingCycle, resolvePendingCycle } = pendingStore;
     const pending = await getPendingCycle(pendingId);
     if (!pending) {
       return NextResponse.json({ error: "Pending cycle not found" }, { status: 404 });
     }
 
-    // Auth: verify caller owns this pending cycle
-    const body = await request.json().catch(() => ({}));
-    const callerId = (body as { userId?: string }).userId;
-    if (!callerId || callerId !== pending.userId) {
+    if (auth.auth.principal.userId !== pending.userId) {
       return NextResponse.json({ error: "Not authorized to reject this cycle" }, { status: 403 });
     }
 
@@ -26,7 +45,9 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const reason = ((body as { reason?: string }).reason) ?? "user_rejected";
+    const reason = typeof body.reason === "string" && body.reason.trim().length <= 120
+      ? body.reason.trim() || "user_rejected"
+      : "user_rejected";
 
     // Atomically resolve FIRST
     const resolved = await resolvePendingCycle(pendingId, {
@@ -54,6 +75,6 @@ export async function POST(
 
     return NextResponse.json({ status: "rejected", pendingId });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return authErrorResponse(err, "legacy.cycle.reject");
   }
 }

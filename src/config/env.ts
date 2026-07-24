@@ -25,8 +25,19 @@ export interface ValidatedEnvironment {
   databaseUrl?: string;
   directUrl?: string;
   serverPort: number;
+  runtimeMode: "protected" | "legacy";
+  enableKernelWorker: boolean;
+  kernelWorkerConcurrency: number;
+  kernelWorkerLeaseSeconds: number;
   enableBackgroundWorkers: boolean;
   nextStartBot: boolean;
+  siweDomain: string;
+  siweUri: string;
+  siweAudience: string;
+  siweChainId: number;
+  authChallengeTtlSeconds: number;
+  authSessionTtlSeconds: number;
+  authSessionCookie: string;
 }
 
 export class EnvironmentValidationError extends Error {
@@ -152,9 +163,89 @@ export function validateEnvironment(
     false,
     issues,
   );
+  const enableKernelWorker = parseBoolean(
+    "ENABLE_KERNEL_WORKER",
+    source.ENABLE_KERNEL_WORKER,
+    false,
+    issues,
+  );
+  const kernelWorkerConcurrency = parseInteger(
+    "KERNEL_WORKER_CONCURRENCY",
+    source.KERNEL_WORKER_CONCURRENCY,
+    4,
+    1,
+    4,
+    issues,
+  );
+  const kernelWorkerLeaseSeconds = parseInteger(
+    "KERNEL_WORKER_LEASE_SECONDS",
+    source.KERNEL_WORKER_LEASE_SECONDS,
+    30,
+    5,
+    300,
+    issues,
+  );
   const nextStartBot = parseBoolean("NEXT_START_BOT", source.NEXT_START_BOT, false, issues);
   parseBoolean("USE_REMOTE_DEBATE", source.USE_REMOTE_DEBATE, false, issues);
   parseBoolean("USE_HIERARCHICAL_HIRING", source.USE_HIERARCHICAL_HIRING, false, issues);
+
+  const runtimeMode = source.ALPHADAWG_RUNTIME_MODE ?? "protected";
+  if (runtimeMode !== "protected" && runtimeMode !== "legacy") {
+    issues.push("ALPHADAWG_RUNTIME_MODE: expected protected or legacy");
+  }
+  if (runtimeMode !== "legacy" && enableBackgroundWorkers) {
+    issues.push("ENABLE_BACKGROUND_WORKERS: requires ALPHADAWG_RUNTIME_MODE=legacy");
+  }
+
+  const siweDomain = source.SIWE_DOMAIN ?? "localhost:3000";
+  const siweUri = parseUrl(
+    "SIWE_URI",
+    source.SIWE_URI ?? "http://localhost:3000",
+    HTTP_PROTOCOLS,
+    true,
+    issues,
+  );
+  const siweAudience = source.SIWE_AUDIENCE ?? "urn:alphadawg:kernel";
+  if (!/^[A-Za-z0-9:._/-]{3,160}$/.test(siweAudience)) {
+    issues.push("SIWE_AUDIENCE: expected a bounded audience identifier");
+  }
+  if (!/^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/.test(siweDomain)) {
+    issues.push("SIWE_DOMAIN: expected an RFC 3986 authority");
+  }
+  const siweChainId = parseInteger(
+    "SIWE_CHAIN_ID",
+    source.SIWE_CHAIN_ID,
+    5_042_002,
+    1,
+    2_147_483_647,
+    issues,
+  );
+  const authChallengeTtlSeconds = parseInteger(
+    "AUTH_CHALLENGE_TTL_SECONDS",
+    source.AUTH_CHALLENGE_TTL_SECONDS,
+    300,
+    30,
+    900,
+    issues,
+  );
+  const authSessionTtlSeconds = parseInteger(
+    "AUTH_SESSION_TTL_SECONDS",
+    source.AUTH_SESSION_TTL_SECONDS,
+    86_400,
+    300,
+    604_800,
+    issues,
+  );
+  const authSessionCookie = source.AUTH_SESSION_COOKIE ?? "alphadawg_session";
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(authSessionCookie)) {
+    issues.push("AUTH_SESSION_COOKIE: expected 3-64 URL-safe characters");
+  }
+
+  if (nodeEnv === "production") {
+    if (!source.SIWE_DOMAIN) issues.push("SIWE_DOMAIN: required in production");
+    if (!source.SIWE_URI) issues.push("SIWE_URI: required in production");
+    if (!source.SIWE_AUDIENCE) issues.push("SIWE_AUDIENCE: required in production");
+  }
 
   if (issues.length > 0) throw new EnvironmentValidationError(issues);
 
@@ -163,8 +254,19 @@ export function validateEnvironment(
     databaseUrl,
     directUrl,
     serverPort,
+    runtimeMode: runtimeMode as ValidatedEnvironment["runtimeMode"],
+    enableKernelWorker,
+    kernelWorkerConcurrency,
+    kernelWorkerLeaseSeconds,
     enableBackgroundWorkers,
     nextStartBot,
+    siweDomain,
+    siweUri: siweUri as string,
+    siweAudience,
+    siweChainId,
+    authChallengeTtlSeconds,
+    authSessionTtlSeconds,
+    authSessionCookie,
   };
 }
 

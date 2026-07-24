@@ -1,20 +1,9 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-echo "=== AlphaDawg Agent Swarm ==="
-echo "Node $(node -v) | 14 OpenClaw agents | 0G Compute TEE"
-echo "Provider: ${OG_PROVIDER_ADDRESS:-not set}"
+echo '{"level":"info","context":"docker.entrypoint","runtime":"alphadawg"}'
 
-# ── 1. Specialist servers (background) ────────────────────────
-# 10 agents on :4001-4010, each with x402 paywall + 0G sealed inference
-echo "[boot] Starting 10 specialist agents..."
-tsx src/agents/specialist-server.ts &
-SPEC_PID=$!
-
-# Wait a moment for specialists to bind ports
-sleep 2
-
-# ── 2. Backend: Telegram bot + heartbeat + timeout checker ────
-# This is the main process — coordinates the swarm
-echo "[boot] Starting swarm orchestrator (Telegram + heartbeat)..."
+# `src/index.ts` is the only process allowed to start durable workers. Protected
+# mode is the default; legacy capabilities require ALPHADAWG_RUNTIME_MODE=legacy
+# plus ENABLE_BACKGROUND_WORKERS=true and are dynamically imported only then.
 exec tsx src/index.ts

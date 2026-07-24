@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -13,6 +13,8 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PRISMA = resolve(ROOT, "node_modules/.bin/prisma");
 const SCHEMA = resolve(ROOT, "prisma/schema.prisma");
 const BASELINE_MIGRATION = "20260724011500_baseline";
+const A2_MIGRATION = "20260724024500_authenticated_kernel";
+const BASELINE_SQL = resolve(ROOT, "prisma/migrations", BASELINE_MIGRATION, "migration.sql");
 const SENTINEL_ID = "a1-cannes-sentinel";
 const SENTINEL_WALLET = "0xa1cannessentinel";
 const SENTINEL_TIMESTAMP = "2026-07-24T00:00:00.000Z";
@@ -213,14 +215,12 @@ async function dropDatabase(adminUrl: string, database: string): Promise<void> {
 }
 
 async function prepareCannesShape(url: string): Promise<SentinelSnapshot> {
-  run(PRISMA, ["db", "push", "--skip-generate", "--schema", SCHEMA], prismaEnv(url));
   const sql = postgres(url, { max: 1 });
   try {
-    await sql.unsafe(`
-      CREATE SEQUENCE "hot_wallet_index_seq"
-        AS BIGINT INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807
-        START WITH 1 CACHE 1 NO CYCLE OWNED BY NONE
-    `);
+    // Materialize only the inherited Cannes baseline. Using `db push` here
+    // would pre-create current A2 objects and make the forward migration
+    // collide, which is the opposite of an upgrade replay.
+    await sql.unsafe(await readFile(BASELINE_SQL, "utf8"));
     await sql`SELECT setval('hot_wallet_index_seq', 42, true)`;
     await sql`
       INSERT INTO users (
@@ -282,8 +282,16 @@ async function verifyDatabase(
     const relations = await sql<{
       users: string | null;
       sequence: string | null;
+      auth_challenges: string | null;
+      agent_versions: string | null;
+      jobs: string | null;
+      effects: string | null;
+      worker_leases: string | null;
       user_count: string;
       migration_count: string;
+      baseline_count: string;
+      a2_count: string;
+      invariant_trigger_count: string;
       sequence_type: string;
       sequence_start: string;
       sequence_min: string;
@@ -295,12 +303,37 @@ async function verifyDatabase(
       SELECT
         to_regclass('public.users')::text AS users,
         to_regclass('public.hot_wallet_index_seq')::text AS sequence,
+        to_regclass('public.auth_challenges')::text AS auth_challenges,
+        to_regclass('public.agent_versions')::text AS agent_versions,
+        to_regclass('public.jobs')::text AS jobs,
+        to_regclass('public.effects')::text AS effects,
+        to_regclass('public.worker_leases')::text AS worker_leases,
         (SELECT count(*)::text FROM users) AS user_count,
         (
           SELECT count(*)::text
           FROM "_prisma_migrations"
-          WHERE migration_name = ${BASELINE_MIGRATION} AND finished_at IS NOT NULL
+          WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
         ) AS migration_count,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${BASELINE_MIGRATION} AND finished_at IS NOT NULL
+        ) AS baseline_count,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A2_MIGRATION} AND finished_at IS NOT NULL
+        ) AS a2_count,
+        (
+          SELECT count(*)::text FROM pg_trigger
+          WHERE NOT tgisinternal AND tgname IN (
+            'agent_versions_immutable_published',
+            'job_events_append_only',
+            'jobs_legal_transitions',
+            'effects_legal_transitions',
+            'settlements_exclusive_verified',
+            'refunds_exclusive_terminal',
+            'commissions_verified_settlement_only'
+          )
+        ) AS invariant_trigger_count,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
         seq.min_value::text AS sequence_min,
@@ -315,8 +348,16 @@ async function verifyDatabase(
     if (
       result?.users !== "users" ||
       result.sequence !== "hot_wallet_index_seq" ||
+      result.auth_challenges !== "auth_challenges" ||
+      result.agent_versions !== "agent_versions" ||
+      result.jobs !== "jobs" ||
+      result.effects !== "effects" ||
+      result.worker_leases !== "worker_leases" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 1 ||
+      Number(result.migration_count) !== 2 ||
+      Number(result.baseline_count) !== 1 ||
+      Number(result.a2_count) !== 1 ||
+      Number(result.invariant_trigger_count) !== 7 ||
       result.sequence_type !== "bigint" ||
       result.sequence_start !== "1" ||
       result.sequence_min !== "1" ||

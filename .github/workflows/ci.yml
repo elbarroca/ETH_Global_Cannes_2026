@@ -26,6 +26,12 @@ jobs:
       DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/alphadawg_ci
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
       ENABLE_BACKGROUND_WORKERS: "false"
+      ENABLE_KERNEL_WORKER: "false"
+      ALPHADAWG_RUNTIME_MODE: protected
+      SIWE_DOMAIN: localhost:3000
+      SIWE_URI: http://localhost:3000
+      SIWE_AUDIENCE: urn:alphadawg:kernel
+      SIWE_CHAIN_ID: "5042002"
       NEXT_START_BOT: "false"
       # Public, deliberately non-live UUID used only so the client provider can prerender offline.
       NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID: "00000000-0000-4000-8000-000000000000"
@@ -42,9 +48,12 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:auth
+      - run: npm run test:kernel
       - run: npm run test:integration
       - run: npm run test:e2e
       - run: npm run test:resilience
       - run: npm run test:redaction
+      - run: npm run test:boot
       - run: npm run scan:secrets
       - run: npm run build

@@ -11,6 +11,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   for (let attempt = 1; attempt <= FETCH_RETRIES; attempt++) {
     try {
       const res = await fetch(url, {
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json", ...init?.headers },
         ...init,
       });
@@ -232,10 +233,24 @@ export interface EnrichedCycleResponse {
 
 export interface OnboardResponse {
   userId: string;
-  proxyWalletAddress: string;
+  walletAddress: string;
+  proxyWalletAddress: string | null;
   telegramLinkCode: string;
   inftTokenId?: number | null;
   existing: boolean;
+}
+
+export interface SiweChallengeResponse {
+  challengeId: string;
+  message: string;
+  expiresAt: string;
+}
+
+export interface AuthSessionResponse {
+  authenticated: true;
+  walletAddress: string;
+  userId: string | null;
+  expiresAt: string;
 }
 
 export interface PlatformStats {
@@ -245,14 +260,36 @@ export interface PlatformStats {
   totalValueLocked: number;
 }
 
-export async function onboard(
+export async function createSiweChallenge(
   walletAddress: string,
-  signature: string,
-  message: string
-): Promise<OnboardResponse> {
+): Promise<SiweChallengeResponse> {
+  return apiFetch<SiweChallengeResponse>("/api/auth/siwe/challenge", {
+    method: "POST",
+    body: JSON.stringify({ walletAddress, action: "onboard" }),
+  });
+}
+
+export async function verifySiweChallenge(input: {
+  challengeId: string;
+  message: string;
+  signature: `0x${string}`;
+}): Promise<AuthSessionResponse> {
+  return apiFetch<AuthSessionResponse>("/api/auth/siwe/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getAuthSession(): Promise<AuthSessionResponse | null> {
+  return apiFetch<AuthSessionResponse>("/api/auth/session", { cache: "no-store" }).catch(
+    () => null,
+  );
+}
+
+export async function onboard(): Promise<OnboardResponse> {
   return apiFetch<OnboardResponse>("/api/onboard", {
     method: "POST",
-    body: JSON.stringify({ walletAddress, signature, message }),
+    body: JSON.stringify({}),
   });
 }
 

@@ -4,6 +4,91 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator task /root
+task_id: A2-AUTHENTICATED-KERNEL-20260724
+task_instance_id: A2-AUTHENTICATED-KERNEL-20260724:3920D88F
+sprint: A2
+mode: sole_writer
+branch: developer
+start_sha: 31000c2467d3d197b6a733f51f15bdb28c4fe30b
+control_sha: 31000c2467d3d197b6a733f51f15bdb28c4fe30b
+token: 3920D88F-0B33-4764-B65B-864CD77B3BDD
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T02:49:44Z
+expires_at: 2026-07-24T10:00:00Z
+allowed_paths:
+  - package.json
+  - package-lock.json
+  - .env.example
+  - .github/workflows/ci.yml
+  - prisma/schema.prisma
+  - prisma/migrations/**
+  - scripts/test-migrations.ts
+  - scripts/validate-env.ts
+  - src/config/env.ts
+  - src/auth/**
+  - src/kernel/**
+  - src/worker/**
+  - src/index.ts
+  - instrumentation.ts
+  - docker-entrypoint.sh
+  - src/types/index.ts
+  - app/api/auth/siwe/challenge/route.ts
+  - app/api/auth/siwe/verify/route.ts
+  - app/api/auth/session/route.ts
+  - app/api/kernel/agents/route.ts
+  - app/api/kernel/jobs/route.ts
+  - app/api/kernel/jobs/[jobId]/cancel/route.ts
+  - app/api/onboard/route.ts
+  - app/api/configure/route.ts
+  - app/api/marketplace/create/route.ts
+  - app/api/marketplace/hire/route.ts
+  - app/api/cycle/run/[userId]/route.ts
+  - app/api/cycle/analyze/[userId]/route.ts
+  - app/api/cycle/stream/[userId]/route.ts
+  - app/api/cycle/approve/[pendingId]/route.ts
+  - app/api/cycle/reject/[pendingId]/route.ts
+  - app/api/deposit/route.ts
+  - app/api/withdraw/route.ts
+  - app/api/trade/execute/route.ts
+  - contexts/user-context.tsx
+  - lib/api.ts
+  - src/api/routes/onboard.ts
+  - tests/helpers/**
+  - tests/auth/**
+  - tests/kernel/**
+  - tests/integration/**
+  - tests/resilience/**
+  - tests/e2e/**
+  - tests/redaction/**
+  - tests/foundation/env.test.ts
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/evidence/A2-AUTHENTICATED-KERNEL.md
+started_at: 2026-07-24T01:50:56Z
+expected_exit: authenticated fail-closed kernel, singleton worker, deterministic concurrency/recovery, full local gate, and evidence pass on one local SHA
+lock_release: release only token 3920D88F-0B33-4764-B65B-864CD77B3BDD after the atomic A2 commit
+completed_at: 2026-07-24T02:49:44Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - canonical SIWE negative, replay, cookie, hash-only session, and DB-only onboarding tests passed 5/5
+  - immutable schema and seven DB invariant triggers passed empty plus synthetic upgrade replay
+  - twenty concurrent submissions converged to one quote intent order job event and effect identity
+  - singleton four-slot worker heartbeat cancellation bounded attempt and pre/post-terminal restart gates passed
+  - protected legacy routes rejected forged identities before capability imports with zero kernel mutation
+  - cold install Prisma lint typecheck all A1 and A2 tests secret scan boot smoke and 31-page build passed
+  - no sponsor call shared database push deployment user signature transaction form spend mainnet action or claim promotion
+remaining_blocks:
+  - production adapter is A3_NOT_CONFIGURED
+  - independent A2 audit is pending
+  - README.md line 7 inherited target-pool wording remains RELEASE_CLAIM_DRIFT_BLOCKED outside A2 scope
+result: PASS_TO_AUDIT
+status: closed
+```
+
+```yaml
+owner: C0 coordinator task /root
 task_id: A1-DETERMINISTIC-FOUNDATION-REMEDIATION-G1-20260724
 task_instance_id: A1-DETERMINISTIC-FOUNDATION-REMEDIATION-G1-20260724:4140D7A3
 generation: 1

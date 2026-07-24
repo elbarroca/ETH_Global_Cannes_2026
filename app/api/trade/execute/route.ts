@@ -1,98 +1,93 @@
 import { NextResponse } from "next/server";
-import { getUserById } from "@/src/store/user-store";
-import { executeSwap } from "@/src/payments/circle-wallet";
-import { logAction } from "@/src/store/action-logger";
+import {
+  authenticateRequest,
+  authErrorResponse,
+  legacyRuntimeDisabledResponse,
+} from "@/src/auth/http";
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const { userId, action, asset, percentage } = (await request.json()) as {
-      userId: string;
-      action: string;
-      asset: string;
-      percentage: number;
+    const auth = await authenticateRequest(request, { requireUser: true });
+    if (!auth.ok) return auth.response;
+    const userId = auth.auth.principal.userId;
+    if (!userId) {
+      return NextResponse.json({ error: "Onboarding required", code: "AUTH_USER_REQUIRED" }, { status: 403 });
+    }
+    const body = (await request.json()) as {
+      userId?: unknown;
+      action?: unknown;
+      asset?: unknown;
+      percentage?: unknown;
     };
-
-    if (!userId || !action || !asset) {
-      return NextResponse.json(
-        { error: "userId, action, and asset are required" },
-        { status: 400 },
-      );
+    if (body.userId !== undefined && body.userId !== userId) {
+      return NextResponse.json({ error: "User claim does not match session", code: "AUTH_FORBIDDEN" }, { status: 403 });
     }
-
-    if (typeof percentage !== "number" || percentage <= 0 || percentage > 100) {
-      return NextResponse.json(
-        { error: "percentage must be a number between 1 and 100" },
-        { status: 400 },
-      );
+    if (body.action !== "BUY" && body.action !== "SELL") {
+      return NextResponse.json({ error: "action must be BUY or SELL", code: "INVALID_REQUEST" }, { status: 400 });
     }
-
-    if (action !== "BUY" && action !== "SELL") {
-      return NextResponse.json(
-        { error: "action must be BUY or SELL" },
-        { status: 400 },
-      );
+    if (typeof body.asset !== "string" || !/^[A-Z0-9]{2,12}$/.test(body.asset)) {
+      return NextResponse.json({ error: "Invalid asset", code: "INVALID_REQUEST" }, { status: 400 });
     }
-
-    const user = await getUserById(userId);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (typeof body.percentage !== "number" || !Number.isFinite(body.percentage) || body.percentage <= 0 || body.percentage > 100) {
+      return NextResponse.json({ error: "percentage must be between 1 and 100", code: "INVALID_REQUEST" }, { status: 400 });
     }
+    const disabled = legacyRuntimeDisabledResponse();
+    if (disabled) return disabled;
 
+    const [userStore, circle, actionLogger] = await Promise.all([
+      import("@/src/store/user-store"),
+      import("@/src/payments/circle-wallet"),
+      import("@/src/store/action-logger"),
+    ]);
+    const user = await userStore.getUserById(userId);
+    if (!user) return NextResponse.json({ error: "User not found", code: "NOT_FOUND" }, { status: 404 });
     if (!user.proxyWallet?.walletId || !user.proxyWallet?.address) {
-      return NextResponse.json(
-        { error: "No proxy wallet configured" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "No proxy wallet configured", code: "INVALID_REQUEST" }, { status: 400 });
     }
-
-    if (percentage > user.agent.maxTradePercent) {
-      return NextResponse.json(
-        { error: `percentage exceeds max allowed (${user.agent.maxTradePercent}%)` },
-        { status: 400 },
-      );
+    if (body.percentage > user.agent.maxTradePercent) {
+      return NextResponse.json({ error: "percentage exceeds account policy", code: "AUTH_FORBIDDEN" }, { status: 403 });
     }
-
-    const usdcAmount = ((percentage / 100) * user.fund.currentNav).toFixed(2);
-
-    if (action === "BUY") {
-      const result = await executeSwap(
-        user.proxyWallet.walletId,
-        user.proxyWallet.address,
-        asset,
-        usdcAmount,
-      );
-
-      await logAction({
+    if (body.action === "SELL") {
+      return NextResponse.json({ error: "SELL execution not implemented", code: "NOT_IMPLEMENTED" }, { status: 501 });
+    }
+    const usdcAmount = ((body.percentage / 100) * user.fund.currentNav).toFixed(2);
+    const result = await circle.executeSwap(
+      user.proxyWallet.walletId,
+      user.proxyWallet.address,
+      body.asset,
+      usdcAmount,
+    );
+    try {
+      await actionLogger.logAction({
         userId,
         actionType: "TRADE_EXECUTED",
         agentName: "executor",
         status: result.success ? "success" : "failed",
-        payload: { action, asset, percentage, usdcAmount, result },
-      }).catch(() => {});
-
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.reason ?? "Swap failed", details: result },
-          { status: 500 },
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        action,
-        asset,
-        usdcAmount,
-        txId: result.swapTxId,
-        result,
+        payload: {
+          action: body.action,
+          asset: body.asset,
+          percentage: body.percentage,
+          usdcAmount,
+          result,
+        },
       });
+    } catch (error) {
+      const code = error instanceof Error ? error.name : "UNKNOWN";
+      console.warn(JSON.stringify({ level: "warn", context: "legacy.trade.audit", code }));
     }
-
-    // SELL: would need a reverse swap (token → USDC), simplified for hackathon
-    return NextResponse.json(
-      { error: "SELL execution not yet implemented" },
-      { status: 501 },
-    );
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    if (!result.success) {
+      return NextResponse.json({ error: "Swap failed", code: "LEGACY_SWAP_FAILED" }, { status: 500 });
+    }
+    return NextResponse.json({
+      success: true,
+      action: body.action,
+      asset: body.asset,
+      usdcAmount,
+      txId: result.swapTxId,
+      result,
+      legacy: true,
+    });
+  } catch (error) {
+    return authErrorResponse(error, "legacy.trade.execute");
   }
 }

@@ -1,77 +1,62 @@
-import { NextRequest, NextResponse } from "next/server";
-import { ethers } from "ethers";
-import { getUserByWallet, createUser, updateUser } from "@/src/store/user-store";
-import { createProxyWallet } from "@/src/payments/circle-wallet";
-import { generateLinkCode } from "@/src/store/link-codes";
-import { mintAgentNFT } from "@/src/og/inft";
+import { NextResponse } from "next/server";
+import { AuthError } from "@/src/auth/errors";
+import { authErrorResponse, authenticateRequest } from "@/src/auth/http";
+import { onboardVerifiedSession } from "@/src/auth/service";
 
-export async function POST(req: NextRequest) {
+export const runtime = "nodejs";
+
+export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const { walletAddress, signature, message } = (await req.json()) as {
-      walletAddress?: string;
-      signature?: string;
-      message?: string;
-    };
+    const result = await authenticateRequest(request);
+    if (!result.ok) return result.response;
 
-    if (!walletAddress) {
-      return NextResponse.json({ error: "walletAddress is required" }, { status: 400 });
-    }
-
-    // Return existing user
-    const existing = await getUserByWallet(walletAddress);
-    if (existing) {
-      const linkCode = await generateLinkCode(existing.id);
-      return NextResponse.json({
-        userId: existing.id,
-        proxyWalletAddress: existing.proxyWallet.address,
-        telegramLinkCode: linkCode,
-        existing: true,
-      });
-    }
-
-    // Verify signature (skip for testnet "mock")
-    if (signature && message && signature !== "mock") {
+    const text = await request.text();
+    let body: Record<string, unknown> = {};
+    if (text.trim()) {
+      let parsed: unknown;
       try {
-        const recovered = ethers.verifyMessage(message, signature);
-        if (recovered.toLowerCase() !== walletAddress.toLowerCase()) {
-          return NextResponse.json({ error: "Signature does not match wallet address" }, { status: 401 });
-        }
+        parsed = JSON.parse(text) as unknown;
       } catch {
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+        throw new AuthError("AUTH_INVALID_REQUEST", "Malformed JSON body", 400);
       }
-    }
-
-    const newUserId = crypto.randomUUID();
-    let proxyWallet: { walletId: string; address: string };
-    try {
-      proxyWallet = await createProxyWallet(newUserId);
-    } catch (err) {
-      console.warn("[onboard] Circle wallet creation failed, using placeholder:", err instanceof Error ? err.message : String(err));
-      proxyWallet = { walletId: `local-${newUserId}`, address: `0x${newUserId.replace(/-/g, "").slice(0, 40)}` };
-    }
-
-    const user = await createUser(walletAddress, proxyWallet, newUserId);
-    const linkCode = await generateLinkCode(user.id);
-
-    // Mint iNFT agent identity on 0G Chain (non-fatal)
-    let inftTokenId: number | null = null;
-    if (process.env.INFT_CONTRACT_ADDRESS) {
-      try {
-        const { tokenId } = await mintAgentNFT(walletAddress, proxyWallet.address, "balanced");
-        if (tokenId > 0) {
-          inftTokenId = tokenId;
-          await updateUser(user.id, { inftTokenId });
-        }
-      } catch (err) {
-        console.warn("[onboard] iNFT mint skipped:", err instanceof Error ? err.message : String(err));
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new AuthError("AUTH_INVALID_REQUEST", "A JSON object is required", 400);
       }
+      body = parsed as Record<string, unknown>;
+    }
+    const allowedKeys = new Set(["walletAddress", "userId"]);
+    if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
+      throw new AuthError("AUTH_INVALID_REQUEST", "Unexpected onboarding field", 400);
+    }
+    if (
+      body.walletAddress !== undefined &&
+      (typeof body.walletAddress !== "string" ||
+        body.walletAddress.toLowerCase() !== result.auth.principal.walletAddress)
+    ) {
+      throw new AuthError("AUTH_FORBIDDEN", "Wallet claim does not match the session", 403);
+    }
+    if (
+      body.userId !== undefined &&
+      (typeof body.userId !== "string" || body.userId !== result.auth.principal.userId)
+    ) {
+      throw new AuthError("AUTH_FORBIDDEN", "User claim does not match the session", 403);
     }
 
+    const identity = await onboardVerifiedSession(result.auth.principal);
+    const { generateLinkCode } = await import("@/src/store/link-codes");
+    const telegramLinkCode = await generateLinkCode(identity.userId);
     return NextResponse.json(
-      { userId: user.id, proxyWalletAddress: proxyWallet.address, telegramLinkCode: linkCode, inftTokenId, existing: false },
-      { status: 201 },
+      {
+        userId: identity.userId,
+        walletAddress: identity.walletAddress,
+        proxyWalletAddress: null,
+        telegramLinkCode,
+        inftTokenId: null,
+        existing: identity.existing,
+      },
+      { status: identity.existing ? 200 : 201 },
     );
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch (error) {
+    return authErrorResponse(error, "onboard.verified");
   }
 }

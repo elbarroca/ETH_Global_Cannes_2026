@@ -2,6 +2,17 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A2 authenticated commerce kernel
+
+- Added canonical SIWE challenge/verification with explicit domain, chain, wallet, action, nonce, audience, URI, issued-at, and expiry binding; one-time transactional consume; hash-only opaque sessions; HttpOnly/SameSite cookies; and bearer support.
+- Replaced mock/optional onboarding with a browser-signed canonical flow and DB-only identity creation. The inherited Express onboarding endpoint now fails closed and points to the canonical flow with zero Circle/iNFT/placeholder fallback.
+- Added immutable server-owned AgentVersion publishing; atomic-unit Quote/JobIntent/Order/Job records; append-only JobEvent; deterministic one-per-job Effect; verified Receipt; exclusive Settlement/Refund; Commission; and singleton WorkerLease models plus database constraints/triggers.
+- Added one four-slot PostgreSQL-leased worker with heartbeats, optimistic legal transitions, cancellation, bounded attempts, lease expiry, and same-effect restart reconciliation. The production adapter terminates `A3_NOT_CONFIGURED` without sponsor or semantic fallback.
+- Protected the A2-allowlisted inherited mutation routes before legacy capability imports and made protected startup the default across `src/index.ts`, Next instrumentation, and Docker.
+- Extended empty plus synthetic Cannes-shaped migration replay through the A2 migration while preserving the exact A1 sentinel hash and sequence state; added auth, 20-way concurrency, settlement/refund, recovery, protected-boot, and redaction coverage.
+- Recorded the independently identified README top-banner `$27K` wording as `RELEASE_CLAIM_DRIFT_BLOCKED`; it was outside A2 scope and expected winnings remain unproven with floor `$0`.
+- Performed no sponsor call, shared/managed database effect, deployment, push, user signature, network transaction, form, spend, mainnet action, or claim promotion. Offline fixture signatures and disposable loopback PostgreSQL writes only.
+
 ## 2026-07-24 - A1 independent-audit remediation G1
 
 - Recorded the independent `FIX` on A1 commit `c2359f766e61ea0d5b8735992de971101ee962bd` and used the single permitted remediation generation.

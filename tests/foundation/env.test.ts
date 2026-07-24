@@ -12,7 +12,41 @@ test("offline environment validates without sponsor or database secrets", () => 
   const environment = validateEnvironment({ NODE_ENV: "test" });
   assert.equal(environment.databaseUrl, undefined);
   assert.equal(environment.enableBackgroundWorkers, false);
+  assert.equal(environment.enableKernelWorker, false);
+  assert.equal(environment.kernelWorkerConcurrency, 4);
+  assert.equal(environment.runtimeMode, "protected");
+  assert.equal(environment.siweChainId, 5_042_002);
   assert.equal(environment.serverPort, 3001);
+});
+
+test("protected runtime rejects legacy workers and unsafe worker concurrency", () => {
+  assert.throws(
+    () => validateEnvironment({
+      NODE_ENV: "test",
+      ALPHADAWG_RUNTIME_MODE: "protected",
+      ENABLE_BACKGROUND_WORKERS: "true",
+      KERNEL_WORKER_CONCURRENCY: "5",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EnvironmentValidationError);
+      assert.match(error.message, /ENABLE_BACKGROUND_WORKERS/);
+      assert.match(error.message, /KERNEL_WORKER_CONCURRENCY/);
+      return true;
+    },
+  );
+});
+
+test("production requires explicit canonical SIWE authority", () => {
+  assert.throws(
+    () => validateEnvironment({ NODE_ENV: "production" }),
+    (error: unknown) => {
+      assert.ok(error instanceof EnvironmentValidationError);
+      assert.match(error.message, /SIWE_DOMAIN: required in production/);
+      assert.match(error.message, /SIWE_URI: required in production/);
+      assert.match(error.message, /SIWE_AUDIENCE: required in production/);
+      return true;
+    },
+  );
 });
 
 test("environment boundaries reject malformed values without echoing them", () => {

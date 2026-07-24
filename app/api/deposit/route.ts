@@ -1,81 +1,67 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getUserById, updateUser } from "@/src/store/user-store";
-import { mintShares, grantKyc, getTokenInfo } from "@/src/hedera/hts";
-import { getOperatorId } from "@/src/config/hedera";
+import { type NextRequest, NextResponse } from "next/server";
+import {
+  authenticateRequest,
+  authErrorResponse,
+  legacyRuntimeDisabledResponse,
+} from "@/src/auth/http";
 
-let cachedDecimals: number | null = null;
-async function getDecimals(): Promise<number> {
-  if (cachedDecimals === null) {
-    const info = await getTokenInfo();
-    cachedDecimals = info.decimals;
-  }
-  return cachedDecimals;
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const { userId, amount, txHash } = (await req.json()) as { userId?: string; amount?: number; txHash?: string };
-
-    if (!userId || amount == null) {
-      return NextResponse.json({ error: "userId and amount are required" }, { status: 400 });
+    const auth = await authenticateRequest(request, { requireUser: true });
+    if (!auth.ok) return auth.response;
+    const userId = auth.auth.principal.userId;
+    if (!userId) {
+      return NextResponse.json({ error: "Onboarding required", code: "AUTH_USER_REQUIRED" }, { status: 403 });
     }
-    if (amount <= 0) {
-      return NextResponse.json({ error: "amount must be positive" }, { status: 400 });
+    const body = (await request.json()) as {
+      userId?: unknown;
+      amount?: unknown;
+      txHash?: unknown;
+    };
+    if (body.userId !== undefined && body.userId !== userId) {
+      return NextResponse.json({ error: "User claim does not match session", code: "AUTH_FORBIDDEN" }, { status: 403 });
     }
-
-    // Log the on-chain tx hash for audit trail
-    if (txHash) {
-      console.log(`[deposit] User ${userId} deposited $${amount} USDC, txHash: ${txHash}`);
+    if (typeof body.amount !== "number" || !Number.isFinite(body.amount) || body.amount <= 0) {
+      return NextResponse.json({ error: "amount must be positive", code: "INVALID_REQUEST" }, { status: 400 });
     }
-
-    const user = await getUserById(userId);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (body.txHash !== undefined && (typeof body.txHash !== "string" || body.txHash.length > 128)) {
+      return NextResponse.json({ error: "Invalid txHash", code: "INVALID_REQUEST" }, { status: 400 });
     }
+    const disabled = legacyRuntimeDisabledResponse();
+    if (disabled) return disabled;
 
+    const [userStore, hts, hedera] = await Promise.all([
+      import("@/src/store/user-store"),
+      import("@/src/hedera/hts"),
+      import("@/src/config/hedera"),
+    ]);
+    const user = await userStore.getUserById(userId);
+    if (!user) return NextResponse.json({ error: "User not found", code: "NOT_FOUND" }, { status: 404 });
     try {
-      await grantKyc(getOperatorId().toString());
-    } catch (kycErr) {
-      console.warn("[deposit] KYC grant failed:", kycErr instanceof Error ? kycErr.message : String(kycErr));
+      await hts.grantKyc(hedera.getOperatorId().toString());
+    } catch (error) {
+      const code = error instanceof Error ? error.name : "UNKNOWN";
+      console.warn(JSON.stringify({ level: "warn", context: "legacy.deposit.kyc", code }));
     }
-
-    const decimals = await getDecimals();
-    const shareUnits = Math.round(amount * Math.pow(10, decimals));
-    const { newTotalSupply } = await mintShares(shareUnits);
-
-    // NOTE: Deposit does NOT flip `agent.active = true`. Depositing USDC is
-    // NOT consent to hunt. The dashboard's "AUTO-HUNT N cycles" card is the
-    // ONLY surface that enrolls a user in the heartbeat loop (via
-    // /api/configure → cycleCount > 0 → active = true). Manual hunts from the
-    // dashboard Hunt button or Telegram /run still work regardless of
-    // `active`, because they hit /api/cycle/stream or runCycle() directly.
-    const updated = await updateUser(userId, {
+    const tokenInfo = await hts.getTokenInfo();
+    const shareUnits = Math.round(body.amount * Math.pow(10, tokenInfo.decimals));
+    const { newTotalSupply } = await hts.mintShares(shareUnits);
+    const updated = await userStore.updateUser(userId, {
       fund: {
-        depositedUsdc: user.fund.depositedUsdc + amount,
-        currentNav: user.fund.currentNav + amount,
-        htsShareBalance: user.fund.htsShareBalance + amount,
+        depositedUsdc: user.fund.depositedUsdc + body.amount,
+        currentNav: user.fund.currentNav + body.amount,
+        htsShareBalance: user.fund.htsShareBalance + body.amount,
       },
     });
-
-    // Emit DepositRecorded event on Hedera EVM for Naryo (non-fatal)
     if (process.env.NARYO_AUDIT_CONTRACT_ADDRESS) {
       try {
         const { emitDepositEvent } = await import("@/src/naryo/emit-event");
-        await emitDepositEvent(user.walletAddress, amount, updated.fund.currentNav);
-      } catch (err) {
-        console.warn("[deposit] Naryo event emit failed (non-fatal):", err instanceof Error ? err.message : String(err));
+        await emitDepositEvent(user.walletAddress, body.amount, updated.fund.currentNav);
+      } catch (error) {
+        const code = error instanceof Error ? error.name : "UNKNOWN";
+        console.warn(JSON.stringify({ level: "warn", context: "legacy.deposit.naryo", code }));
       }
     }
-
-    // NOTE: Circle Gateway pool bootstrap removed from the deposit path.
-    // Previously, depositing ≥ $0.60 would immediately bridge $0.50 out of
-    // the user's Circle proxy wallet to their BIP-44 hot wallet → Gateway
-    // pool contract, which looked to users like unexplained transfers to a
-    // "random wallet". The bootstrap is still handled lazily at the start
-    // of the first real cycle via `ensureGatewayPoolFunded()` in
-    // src/agents/main-agent.ts:~675 → so deposit is now a pure deposit with
-    // no side effects on the proxy wallet balance.
-
     return NextResponse.json({
       success: true,
       depositedUsdc: updated.fund.depositedUsdc,
@@ -83,8 +69,9 @@ export async function POST(req: NextRequest) {
       currentNav: updated.fund.currentNav,
       agentActive: updated.agent.active,
       htsTotalSupply: newTotalSupply,
+      legacy: true,
     });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch (error) {
+    return authErrorResponse(error, "legacy.deposit");
   }
 }

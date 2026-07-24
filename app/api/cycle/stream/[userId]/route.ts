@@ -27,10 +27,10 @@
  */
 
 import { NextRequest } from "next/server";
-import { getUserById } from "@/src/store/user-store";
-import { getPrisma } from "@/src/config/prisma";
-import { runCycle } from "@/src/agents/main-agent";
-import { enrichCycleRow } from "@/src/store/enrich-cycle";
+import {
+  authenticateRequest,
+  legacyRuntimeDisabledResponse,
+} from "@/src/auth/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,12 +72,30 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   const { userId } = await params;
+  const auth = await authenticateRequest(request, { requireUser: true, claimedUserId: userId });
+  if (!auth.ok) return auth.response;
+  const disabled = legacyRuntimeDisabledResponse();
+  if (disabled) return disabled;
+  const [{ getUserById }, { getPrisma }, { runCycle }, { enrichCycleRow }] = await Promise.all([
+    import("@/src/store/user-store"),
+    import("@/src/config/prisma"),
+    import("@/src/agents/main-agent"),
+    import("@/src/store/enrich-cycle"),
+  ]);
   const user = await getUserById(userId);
   if (!user) {
     return new Response(JSON.stringify({ error: "User not found" }), { status: 404 });
   }
 
-  const body = await request.json().catch(() => ({}));
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Malformed JSON body", code: "AUTH_INVALID_REQUEST" }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    );
+  }
   // Goal resolution priority:
   //   1. Per-hunt override from the request body (e.g. user typed a custom
   //      goal in the dashboard hunt input for this one click).
@@ -103,11 +121,12 @@ export async function POST(
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let disconnected = false;
       const send = (ev: StreamEvent) => {
         try {
           controller.enqueue(encode(ev));
         } catch {
-          // Client disconnected — stop writing.
+          disconnected = true;
         }
       };
 
@@ -157,7 +176,7 @@ export async function POST(
       let tick = 0;
 
       // 3. Poll loop — translate audit rows into SSE events
-      while (!state.done) {
+      while (!state.done && !disconnected) {
         await new Promise((r) => setTimeout(r, 400));
         tick++;
 
@@ -179,7 +198,11 @@ export async function POST(
             },
           },
           orderBy: { createdAt: "asc" },
-        }).catch(() => []);
+        }).catch((error: unknown) => {
+          const code = error instanceof Error ? error.name : "UNKNOWN";
+          console.warn(JSON.stringify({ level: "warn", context: "legacy.cycle.stream.audit", code }));
+          return [];
+        });
 
         for (const a of actions) {
           if (seen.has(a.id)) continue;

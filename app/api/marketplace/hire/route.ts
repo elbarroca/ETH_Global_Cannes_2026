@@ -1,34 +1,42 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getPrisma } from "@/src/config/prisma";
-import { logAction } from "@/src/store/action-logger";
+import { type NextRequest, NextResponse } from "next/server";
+import {
+  authenticateRequest,
+  authErrorResponse,
+  legacyRuntimeDisabledResponse,
+} from "@/src/auth/http";
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const { userId, agentName } = (await req.json()) as {
-      userId?: string;
-      agentName?: string;
-    };
-
-    if (!userId || !agentName) {
-      return NextResponse.json({ error: "userId and agentName are required" }, { status: 400 });
+    const auth = await authenticateRequest(request, { requireUser: true });
+    if (!auth.ok) return auth.response;
+    const userId = auth.auth.principal.userId;
+    if (!userId) {
+      return NextResponse.json({ error: "Onboarding required", code: "AUTH_USER_REQUIRED" }, { status: 403 });
     }
-
+    const body = (await request.json()) as { userId?: unknown; agentName?: unknown };
+    if (body.userId !== undefined && body.userId !== userId) {
+      return NextResponse.json({ error: "User claim does not match session", code: "AUTH_FORBIDDEN" }, { status: 403 });
+    }
+    if (typeof body.agentName !== "string" || body.agentName.trim().length === 0) {
+      return NextResponse.json({ error: "agentName is required", code: "INVALID_REQUEST" }, { status: 400 });
+    }
+    const disabled = legacyRuntimeDisabledResponse();
+    if (disabled) return disabled;
+    const [{ getPrisma }, { logAction }] = await Promise.all([
+      import("@/src/config/prisma"),
+      import("@/src/store/action-logger"),
+    ]);
     const prisma = getPrisma();
-
-    // Find the marketplace agent
-    const agent = await prisma.marketplaceAgent.findUnique({ where: { name: agentName } });
+    const agent = await prisma.marketplaceAgent.findUnique({ where: { name: body.agentName } });
     if (!agent) {
-      return NextResponse.json({ error: `Agent "${agentName}" not found` }, { status: 404 });
+      return NextResponse.json({ error: "Agent not found", code: "NOT_FOUND" }, { status: 404 });
     }
-
-    // Upsert — re-activate if previously fired
     const hired = await prisma.userHiredAgent.upsert({
       where: { userId_agentId: { userId, agentId: agent.id } },
       update: { active: true, hiredAt: new Date() },
       create: { userId, agentId: agent.id },
       include: { agent: true },
     });
-
     try {
       await logAction({
         userId,
@@ -36,8 +44,10 @@ export async function POST(req: NextRequest) {
         agentName: agent.name,
         payload: { agentId: agent.id, price: agent.price },
       });
-    } catch { /* non-fatal */ }
-
+    } catch (error) {
+      const code = error instanceof Error ? error.name : "UNKNOWN";
+      console.warn(JSON.stringify({ level: "warn", context: "legacy.marketplace.hire.audit", code }));
+    }
     return NextResponse.json({
       id: hired.id,
       agentName: agent.name,
@@ -47,7 +57,7 @@ export async function POST(req: NextRequest) {
       price: agent.price,
       reputation: agent.reputation,
     }, { status: 201 });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  } catch (error) {
+    return authErrorResponse(error, "legacy.marketplace.hire");
   }
 }
