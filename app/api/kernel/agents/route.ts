@@ -10,7 +10,11 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const result = await authenticateRequest(request, { requireUser: true });
     if (!result.ok) return result.response;
-    const agents = await listPublishedAgents();
+    const userId = result.auth.principal.userId;
+    if (!userId) {
+      return NextResponse.json({ error: "Onboarding required", code: "AUTH_USER_REQUIRED" }, { status: 403 });
+    }
+    const agents = await listPublishedAgents({ viewerUserId: userId });
     return NextResponse.json({ agents });
   } catch (error) {
     return kernelErrorResponse(error, "kernel.agents.list");

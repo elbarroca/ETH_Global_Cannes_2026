@@ -3,6 +3,11 @@ import type { AgentManifest, KernelJobInput } from "./types";
 
 const ALLOWED_CAPABILITIES = new Set(["market-analysis", "risk-analysis", "research"]);
 const AGENT_PRICE_ATOMIC = 1_000n;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isKernelUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
 
 function objectRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -82,10 +87,7 @@ export function parseJobSubmission(value: unknown): {
 } {
   const body = objectRecord(value);
   rejectUnexpectedKeys(body, ["agentVersionId", "input"]);
-  if (
-    typeof body.agentVersionId !== "string" ||
-    !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(body.agentVersionId)
-  ) {
+  if (!isKernelUuid(body.agentVersionId)) {
     throw new KernelError("KERNEL_INVALID_REQUEST", "agentVersionId must be a UUID", 400);
   }
   const rawInput = objectRecord(body.input);

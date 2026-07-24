@@ -1,5 +1,5 @@
 import { getDb } from "../config/database";
-import { canonicalJson, domainHash } from "./canonical";
+import { canonicalJson, domainHash, type CanonicalValue } from "./canonical";
 import { KernelError } from "./errors";
 import {
   KERNEL_BPS_DENOMINATOR,
@@ -8,6 +8,10 @@ import {
 } from "./policy";
 import type {
   AgentManifest,
+  EvidenceState,
+  KernelJobDetail,
+  KernelJobEvidenceSummary,
+  KernelJobListItem,
   JobSnapshot,
   JobState,
   KernelJobInput,
@@ -22,6 +26,7 @@ interface AgentVersionRow {
   version_id: string;
   version: number;
   name: string;
+  description: string;
   owner_user_id: string;
   owner_wallet: string;
   capabilities: string[];
@@ -31,6 +36,7 @@ interface AgentVersionRow {
   adapter_key: "protected-a3";
   price_atomic: string;
   asset: "USDC_ATOMIC";
+  proof_policy: "verified-receipt-required";
   published_at: Date;
 }
 
@@ -64,19 +70,114 @@ interface JobRow {
   updated_at: Date;
 }
 
-function mapPublishedAgent(row: AgentVersionRow): PublishedAgent {
+interface JobListRow extends JobRow {
+  agent_id: string;
+  agent_name: string;
+  agent_description: string;
+  agent_version: number;
+  owner_wallet: string;
+  capabilities: string[];
+  price_atomic: string;
+  asset: "USDC_ATOMIC";
+  proof_policy: "verified-receipt-required";
+  latest_ens_decision: "ALLOW" | "DENY" | null;
+  a3_stage: string | null;
+  response_hash: string | null;
+  compute_receipt_digest: string | null;
+  expected_root: string | null;
+  expected_digest: string | null;
+  expected_size: number | null;
+  readback_root: string | null;
+  readback_digest: string | null;
+  readback_size: number | null;
+  receipt_verified: boolean | null;
+  receipt_result_hash: string | null;
+  effect_state: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELED";
+  effect_result_hash: string | null;
+  effect_terminal_at: Date | null;
+}
+
+interface JobEventRow {
+  version: number;
+  event_type: string;
+  from_state: JobState | null;
+  to_state: JobState;
+  created_at: Date;
+}
+
+interface EnsDecisionRow {
+  check_id: string;
+  phase: string;
+  operation: string;
+  decision: "ALLOW" | "DENY";
+  error_code: string | null;
+  record_hash: string | null;
+  chain_id: number | null;
+  block_number: string | null;
+  block_timestamp: Date | null;
+  observed_at: Date;
+  fresh_until: Date | null;
+  transaction_hash: string | null;
+}
+
+interface A3EvidenceRow {
+  stage: string;
+  request_hash: string;
+  request_id: string | null;
+  response_hash: string | null;
+  compute_receipt_digest: string | null;
+  storage_receipt_digest: string | null;
+  expected_root: string | null;
+  expected_digest: string | null;
+  expected_size: number | null;
+  readback_root: string | null;
+  readback_digest: string | null;
+  readback_size: number | null;
+  proof_hash: string | null;
+  error_code: string | null;
+  updated_at: Date;
+}
+
+interface EffectEvidenceRow {
+  state: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELED";
+  result_hash: string | null;
+  result: unknown;
+  terminal_at: Date | null;
+}
+
+interface ReceiptFinancialRow {
+  receipt_id: string | null;
+  receipt_verified: boolean | null;
+  adapter_key: string | null;
+  proof_hash: string | null;
+  result_hash: string | null;
+  receipt_created_at: Date | null;
+  settlement_amount_atomic: string | null;
+  settlement_asset: string | null;
+  settlement_created_at: Date | null;
+  refund_amount_atomic: string | null;
+  refund_asset: string | null;
+  refund_reason_code: string | null;
+  refund_created_at: Date | null;
+}
+
+function mapPublishedAgent(row: AgentVersionRow, viewerUserId: string): PublishedAgent {
   return {
     agentId: row.agent_id,
     versionId: row.version_id,
     version: row.version,
     name: row.name,
+    description: row.description,
     capabilities: row.capabilities,
     manifestHash: row.manifest_hash,
     promptHash: row.prompt_hash,
     configHash: row.config_hash,
     adapterKey: row.adapter_key,
+    ownerWallet: row.owner_wallet,
     priceAtomic: row.price_atomic,
     asset: row.asset,
+    proofPolicy: row.proof_policy,
+    ownedByViewer: row.owner_user_id === viewerUserId,
     publishedAt: new Date(row.published_at).toISOString(),
   };
 }
@@ -112,6 +213,135 @@ function mapJob(row: JobRow): JobSnapshot {
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
+}
+
+function missingEvidenceState(state: JobState): EvidenceState {
+  if (state === "QUEUED" || state === "RUNNING") return "pending";
+  return "unavailable";
+}
+
+function mapEvidenceSummary(row: JobListRow): KernelJobEvidenceSummary {
+  const missing = missingEvidenceState(row.state);
+  const a3Failed = row.state === "FAILED" && row.a3_stage === "FAILED";
+  const computeVerified = row.response_hash !== null && row.compute_receipt_digest !== null;
+  const storageVerified =
+    row.a3_stage === "READBACK_VERIFIED" &&
+    row.expected_root !== null &&
+    row.expected_digest !== null &&
+    row.expected_size !== null &&
+    row.readback_root === row.expected_root &&
+    row.readback_digest === row.expected_digest &&
+    row.readback_size === row.expected_size;
+  const receiptBound =
+    row.receipt_verified === true &&
+    row.receipt_result_hash !== null &&
+    row.effect_state === "SUCCEEDED" &&
+    row.effect_result_hash === row.receipt_result_hash &&
+    row.effect_terminal_at !== null;
+  return {
+    owner: "verified",
+    version: "verified",
+    ens: row.latest_ens_decision === "ALLOW"
+      ? "verified"
+      : row.latest_ens_decision === "DENY"
+        ? "failed"
+        : missing,
+    compute: computeVerified ? "verified" : a3Failed ? "failed" : missing,
+    storage: storageVerified
+      ? "verified"
+      : a3Failed && computeVerified
+        ? "failed"
+        : missing,
+    receipt: receiptBound
+      ? "verified"
+      : row.receipt_verified === false
+        || (row.receipt_verified === true && !receiptBound)
+        ? "failed"
+        : missing,
+  };
+}
+
+function mapJobListItem(row: JobListRow): KernelJobListItem {
+  return {
+    ...mapJob(row),
+    agent: {
+      agentId: row.agent_id,
+      versionId: row.agent_version_id,
+      version: row.agent_version,
+      name: row.agent_name,
+      description: row.agent_description,
+      ownerWallet: row.owner_wallet,
+      capabilities: row.capabilities,
+      priceAtomic: row.price_atomic,
+      asset: row.asset,
+      proofPolicy: row.proof_policy,
+    },
+    evidence: mapEvidenceSummary(row),
+  };
+}
+
+function toCanonicalValue(value: unknown): CanonicalValue | null {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (Array.isArray(value)) {
+    const entries: CanonicalValue[] = [];
+    for (const entry of value) {
+      const canonical = toCanonicalValue(entry);
+      if (canonical === null && entry !== null) return null;
+      entries.push(canonical);
+    }
+    return entries;
+  }
+  if (typeof value !== "object") return null;
+  const result: Record<string, CanonicalValue> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    const canonical = toCanonicalValue(entry);
+    if (canonical === null && entry !== null) return null;
+    result[key] = canonical;
+  }
+  return result;
+}
+
+async function loadBuyerJobRows(
+  sql: DatabaseClient,
+  buyerUserId: string,
+  options: { jobId: string | null; limit: number },
+): Promise<JobListRow[]> {
+  return sql<JobListRow[]>`
+    SELECT
+      j.id AS job_id, e.id AS effect_id, j.buyer_user_id, j.agent_version_id,
+      j.state, j.version, j.attempts, j.max_attempts, j.cancel_requested_at,
+      j.last_error_code, j.financial_outcome, j.created_at, j.updated_at,
+      a.id AS agent_id, a.name AS agent_name,
+      COALESCE(v.manifest->>'description', '') AS agent_description,
+      v.version AS agent_version, v.owner_wallet, v.capabilities,
+      v.price_atomic::text, v.asset, v.proof_policy,
+      latest_ens.decision AS latest_ens_decision,
+      journal.stage AS a3_stage, journal.response_hash, journal.compute_receipt_digest,
+      journal.expected_root, journal.expected_digest, journal.expected_size,
+      journal.readback_root, journal.readback_digest, journal.readback_size,
+      receipt.verified AS receipt_verified,
+      receipt.result_hash AS receipt_result_hash,
+      e.state AS effect_state, e.result_hash AS effect_result_hash,
+      e.terminal_at AS effect_terminal_at
+    FROM jobs j
+    JOIN effects e ON e.job_id = j.id
+    JOIN agent_versions v ON v.id = j.agent_version_id
+    JOIN kernel_agents a ON a.id = v.agent_id
+    LEFT JOIN a3_execution_journals journal ON journal.job_id = j.id
+    LEFT JOIN receipts receipt ON receipt.job_id = j.id
+    LEFT JOIN LATERAL (
+      SELECT authority.decision
+      FROM ens_authority_checks authority
+      WHERE authority.job_id = j.id
+      ORDER BY authority.id DESC
+      LIMIT 1
+    ) latest_ens ON true
+    WHERE j.buyer_user_id = ${buyerUserId}
+      AND (${options.jobId}::uuid IS NULL OR j.id = ${options.jobId}::uuid)
+    ORDER BY j.created_at DESC, j.id DESC
+    LIMIT ${options.limit}
+  `;
 }
 
 export async function publishAgent(
@@ -155,13 +385,14 @@ export async function publishAgent(
         )
         RETURNING
           agent_id, id AS version_id, version, ${manifest.name}::text AS name,
+          ${manifest.description}::text AS description,
           ${owner.userId}::text AS owner_user_id, owner_wallet, capabilities,
           manifest_hash, prompt_hash, config_hash, adapter_key, price_atomic::text,
-          asset, published_at
+          asset, proof_policy, published_at
       `;
       const version = versions[0];
       if (!version) throw new Error("KERNEL_AGENT_VERSION_CREATE_FAILED");
-      return mapPublishedAgent(version);
+      return mapPublishedAgent(version, owner.userId);
     });
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "23505") {
@@ -172,20 +403,22 @@ export async function publishAgent(
 }
 
 export async function listPublishedAgents(
-  options: { sql?: DatabaseClient } = {},
+  options: { viewerUserId: string; sql?: DatabaseClient },
 ): Promise<PublishedAgent[]> {
   const sql = options.sql ?? getDb();
   const rows = await sql<AgentVersionRow[]>`
     SELECT
-      a.id AS agent_id, v.id AS version_id, v.version, a.name, a.owner_user_id,
+      a.id AS agent_id, v.id AS version_id, v.version, a.name,
+      COALESCE(v.manifest->>'description', '') AS description, a.owner_user_id,
       v.owner_wallet, v.capabilities, v.manifest_hash, v.prompt_hash,
       v.config_hash, v.adapter_key, v.price_atomic::text, v.asset, v.published_at
+      , v.proof_policy
     FROM agent_versions v
     JOIN kernel_agents a ON a.id = v.agent_id
     WHERE v.published = true
     ORDER BY v.created_at ASC, v.id ASC
   `;
-  return rows.map(mapPublishedAgent);
+  return rows.map((row) => mapPublishedAgent(row, options.viewerUserId));
 }
 
 async function loadSubmission(
@@ -349,20 +582,190 @@ export async function getBuyerJob(
 export async function listBuyerJobs(
   buyerUserId: string,
   options: { sql?: DatabaseClient } = {},
-): Promise<JobSnapshot[]> {
+): Promise<KernelJobListItem[]> {
   const sql = options.sql ?? getDb();
-  const rows = await sql<JobRow[]>`
-    SELECT
-      j.id AS job_id, e.id AS effect_id, j.buyer_user_id, j.agent_version_id,
-      j.state, j.version, j.attempts, j.max_attempts, j.cancel_requested_at,
-      j.last_error_code, j.financial_outcome, j.created_at, j.updated_at
-    FROM jobs j
-    JOIN effects e ON e.job_id = j.id
-    WHERE j.buyer_user_id = ${buyerUserId}
-    ORDER BY j.created_at DESC, j.id DESC
-    LIMIT 100
-  `;
-  return rows.map(mapJob);
+  const rows = await loadBuyerJobRows(sql, buyerUserId, { jobId: null, limit: 100 });
+  return rows.map(mapJobListItem);
+}
+
+export async function getBuyerJobDetail(
+  buyerUserId: string,
+  jobId: string,
+  options: { sql?: DatabaseClient } = {},
+): Promise<KernelJobDetail | null> {
+  const sql = options.sql ?? getDb();
+  const baseRows = await loadBuyerJobRows(sql, buyerUserId, { jobId, limit: 1 });
+  const baseRow = baseRows[0];
+  if (!baseRow) return null;
+
+  const [events, ensChecks, journals, effects, financialRows] = await Promise.all([
+    sql<JobEventRow[]>`
+      SELECT version, event_type, from_state, to_state, created_at
+      FROM job_events
+      WHERE job_id = ${jobId}::uuid
+      ORDER BY version ASC
+      LIMIT 100
+    `,
+    sql<EnsDecisionRow[]>`
+      SELECT
+        id::text AS check_id, phase, operation, decision, error_code, record_hash,
+        chain_id, block_number::text, block_timestamp, observed_at, fresh_until,
+        transaction_hash
+      FROM ens_authority_checks
+      WHERE job_id = ${jobId}::uuid
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    sql<A3EvidenceRow[]>`
+      SELECT
+        stage, request_hash, request_id, response_hash, compute_receipt_digest,
+        storage_receipt_digest, expected_root, expected_digest, expected_size,
+        readback_root, readback_digest, readback_size, proof_hash, error_code,
+        updated_at
+      FROM a3_execution_journals
+      WHERE job_id = ${jobId}::uuid
+      LIMIT 1
+    `,
+    sql<EffectEvidenceRow[]>`
+      SELECT state, result_hash, result, terminal_at
+      FROM effects
+      WHERE job_id = ${jobId}::uuid
+      LIMIT 1
+    `,
+    sql<ReceiptFinancialRow[]>`
+      SELECT
+        receipt.id AS receipt_id, receipt.verified AS receipt_verified,
+        receipt.adapter_key, receipt.proof_hash, receipt.result_hash,
+        receipt.created_at AS receipt_created_at,
+        settlement.amount_atomic::text AS settlement_amount_atomic,
+        settlement.asset AS settlement_asset,
+        settlement.created_at AS settlement_created_at,
+        refund.amount_atomic::text AS refund_amount_atomic,
+        refund.asset AS refund_asset, refund.reason_code AS refund_reason_code,
+        refund.created_at AS refund_created_at
+      FROM jobs job
+      LEFT JOIN receipts receipt ON receipt.job_id = job.id
+      LEFT JOIN settlements settlement ON settlement.job_id = job.id
+      LEFT JOIN refunds refund ON refund.job_id = job.id
+      WHERE job.id = ${jobId}::uuid
+      LIMIT 1
+    `,
+  ]);
+
+  const base = mapJobListItem(baseRow);
+  const ens = ensChecks[0] ?? null;
+  const journal = journals[0] ?? null;
+  const effect = effects[0] ?? null;
+  const financial = financialRows[0] ?? null;
+  const receiptRecord = financial?.receipt_id && financial.receipt_created_at &&
+    financial.adapter_key && financial.proof_hash && financial.result_hash
+    ? {
+        receiptId: financial.receipt_id,
+        verified: financial.receipt_verified === true,
+        adapterKey: financial.adapter_key,
+        proofHash: financial.proof_hash,
+        resultHash: financial.result_hash,
+        createdAt: financial.receipt_created_at.toISOString(),
+      }
+    : null;
+  const receiptBound =
+    receiptRecord?.verified === true &&
+    effect?.state === "SUCCEEDED" &&
+    effect.result_hash === receiptRecord.resultHash &&
+    effect.terminal_at !== null;
+  const receipt = receiptBound ? receiptRecord : null;
+  const receiptBindingError = receiptRecord?.verified === true && !receiptBound;
+  const storage = journal?.expected_root && journal.expected_digest &&
+    journal.expected_size !== null
+    ? {
+        expectedRoot: journal.expected_root,
+        expectedDigest: journal.expected_digest,
+        expectedSize: journal.expected_size,
+        storageReceiptDigest: journal.storage_receipt_digest,
+        readbackRoot: journal.readback_root,
+        readbackDigest: journal.readback_digest,
+        readbackSize: journal.readback_size,
+        verified:
+          journal.stage === "READBACK_VERIFIED" &&
+          journal.readback_root === journal.expected_root &&
+          journal.readback_digest === journal.expected_digest &&
+          journal.readback_size === journal.expected_size,
+      }
+    : null;
+
+  return {
+    ...base,
+    evidence: receiptBindingError
+      ? { ...base.evidence, receipt: "failed" }
+      : base.evidence,
+    evidenceDetail: {
+      timeline: events.map((event) => ({
+        version: event.version,
+        eventType: event.event_type,
+        fromState: event.from_state,
+        toState: event.to_state,
+        createdAt: event.created_at.toISOString(),
+      })),
+      latestEnsDecision: ens
+        ? {
+            checkId: ens.check_id,
+            phase: ens.phase,
+            operation: ens.operation,
+            decision: ens.decision,
+            errorCode: ens.error_code,
+            recordHash: ens.record_hash,
+            chainId: ens.chain_id,
+            blockNumber: ens.block_number,
+            blockTimestamp: ens.block_timestamp?.toISOString() ?? null,
+            observedAt: ens.observed_at.toISOString(),
+            freshUntil: ens.fresh_until?.toISOString() ?? null,
+            transactionHash: ens.transaction_hash,
+          }
+        : null,
+      execution: journal
+        ? {
+            stage: journal.stage,
+            requestHash: journal.request_hash,
+            requestId: journal.request_id,
+            responseHash: journal.response_hash,
+            computeReceiptDigest: journal.compute_receipt_digest,
+            proofHash: journal.proof_hash,
+            updatedAt: journal.updated_at.toISOString(),
+          }
+        : null,
+      storage,
+      receipt,
+      delivery: receipt && effect?.result_hash && effect.terminal_at
+        ? {
+            resultHash: effect.result_hash,
+            result: toCanonicalValue(effect.result),
+            terminalAt: effect.terminal_at.toISOString(),
+          }
+        : null,
+      financial: {
+        settlement: receipt && financial?.settlement_amount_atomic &&
+          financial.settlement_asset && financial.settlement_created_at
+          ? {
+              amountAtomic: financial.settlement_amount_atomic,
+              asset: financial.settlement_asset,
+              createdAt: financial.settlement_created_at.toISOString(),
+            }
+          : null,
+        refund: financial?.refund_amount_atomic && financial.refund_asset &&
+          financial.refund_reason_code && financial.refund_created_at
+          ? {
+              amountAtomic: financial.refund_amount_atomic,
+              asset: financial.refund_asset,
+              reasonCode: financial.refund_reason_code,
+              createdAt: financial.refund_created_at.toISOString(),
+            }
+          : null,
+      },
+      errorCode: receiptBindingError
+        ? "RECEIPT_EFFECT_HASH_MISMATCH"
+        : base.lastErrorCode ?? journal?.error_code ?? ens?.error_code ?? null,
+    },
+  };
 }
 
 export async function cancelBuyerJob(

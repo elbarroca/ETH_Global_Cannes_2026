@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/src/auth/http";
 import { kernelErrorResponse } from "@/src/kernel/http";
+import { isKernelUuid } from "@/src/kernel/policy";
 import { cancelBuyerJob } from "@/src/kernel/service";
 
 export const runtime = "nodejs";
@@ -17,7 +18,7 @@ export async function POST(
       return NextResponse.json({ error: "Onboarding required", code: "AUTH_USER_REQUIRED" }, { status: 403 });
     }
     const { jobId } = await params;
-    if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(jobId)) {
+    if (!isKernelUuid(jobId)) {
       return NextResponse.json(
         { error: "jobId must be a UUID", code: "KERNEL_INVALID_REQUEST" },
         { status: 400 },

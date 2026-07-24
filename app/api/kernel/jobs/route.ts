@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/src/auth/http";
 import { kernelErrorResponse } from "@/src/kernel/http";
-import { parseIdempotencyKey, parseJobSubmission } from "@/src/kernel/policy";
-import { getBuyerJob, listBuyerJobs, submitJob } from "@/src/kernel/service";
+import { isKernelUuid, parseIdempotencyKey, parseJobSubmission } from "@/src/kernel/policy";
+import { getBuyerJobDetail, listBuyerJobs, submitJob } from "@/src/kernel/service";
 
 export const runtime = "nodejs";
 
@@ -16,13 +16,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
     const jobId = new URL(request.url).searchParams.get("jobId");
     if (jobId) {
-      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(jobId)) {
+      if (!isKernelUuid(jobId)) {
         return NextResponse.json(
           { error: "jobId must be a UUID", code: "KERNEL_INVALID_REQUEST" },
           { status: 400 },
         );
       }
-      const job = await getBuyerJob(userId, jobId);
+      const job = await getBuyerJobDetail(userId, jobId);
       if (!job) {
         return NextResponse.json(
           { error: "Job not found", code: "KERNEL_NOT_FOUND" },
