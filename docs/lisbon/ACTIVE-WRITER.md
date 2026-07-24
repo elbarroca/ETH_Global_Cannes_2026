@@ -24,7 +24,21 @@ allowed_paths:
 started_at: 2026-07-24T20:56:40Z
 expected_exit: preserve the three user changes as separate verified local commits, close this record, and release only the matching lock
 external_effect_authority: local files, checks, and atomic commits only; no push deployment form transaction spend or public claim
-status: active
+completed_at: 2026-07-24T20:57:49Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - lint passed with zero errors and 23 inherited warnings
+  - strict typecheck passed
+  - foundation tests passed 9 of 9
+  - production build passed all 31 pages
+  - tracked secret scan and diff check passed
+  - UI mount guard, Telegram poller entry command, and env guidance were committed separately
+remaining_blocks:
+  - no push deployment form transaction spend or public claim was attempted
+audit_verdict: PASS_LOCAL_MICRO_COMMITS
+result: PASS_A7_MICRO_COMMIT_PACKET
+lock_release: release only matching token A7-MICRO-COMMITS-2445DA17-EFC8-48CB-94C9-6E62092F6AC2 after the closing commit and clean status
+status: closed
 ```
 
 ```yaml
