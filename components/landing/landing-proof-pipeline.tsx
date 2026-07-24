@@ -23,7 +23,7 @@ const STEPS: {
   {
     key: "og",
     title: "0G",
-    sub: "Sealed inference + storage",
+    sub: "Compute + storage evidence",
     accent: "border-violet-500/40 bg-violet-500/5 text-violet-300",
   },
   {

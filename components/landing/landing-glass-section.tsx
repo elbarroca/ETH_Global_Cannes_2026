@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { landingPrimaryClass } from "@/components/landing/landing-cta";
 
-const TRACK_BADGES = ["0G Compute & Storage", "Hedera HCS / HTS", "Arc x402", "OpenClaw agents", "Naryo feed"] as const;
+const TRACK_BADGES = ["Immutable versions", "Idempotent jobs", "ENS authority", "0G evidence", "Canonical receipts"] as const;
 
 export function LandingGlassSection() {
   return (
@@ -16,9 +16,9 @@ export function LandingGlassSection() {
           <span className="text-void-500 font-normal">not black box</span>
         </h2>
         <p className="mt-6 text-base md:text-lg text-void-400 max-w-2xl mx-auto leading-relaxed">
-          AlphaDawg is an <span className="text-void-300">agent hiring economy</span>: autonomous specialists,
-          nanopayment settlement on Arc, and audit trails on Hedera and 0G you can verify in one click — built for
-          hackathon tracks that reward <span className="text-void-300">real integrations</span>, not slideware.
+          The A5 path separates configured infrastructure from verified evidence. Publication is
+          immutable; execution claims appear only from the authenticated buyer&apos;s job record and
+          its canonical receipt.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-2">
           {TRACK_BADGES.map((b) => (

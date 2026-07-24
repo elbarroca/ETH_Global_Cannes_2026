@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { landingPrimaryHeroClass, landingSecondaryClass } from "@/components/landing/landing-cta";
 import { LandingArchitectureFlow } from "@/components/landing/landing-architecture-flow";
 import { LandingGlassSection } from "@/components/landing/landing-glass-section";
 import { LandingMarketplaceSection } from "@/components/landing/landing-marketplace-section";
-import { LandingProofPipeline } from "@/components/landing/landing-proof-pipeline";
 import {
   HCS_TOPIC_ID,
   HTS_FUND_TOKEN_ID,
@@ -19,10 +19,10 @@ import {
 export const metadata: Metadata = {
   title: "AlphaDawg",
   description:
-    "Glass-box AI pack: hire specialists with x402, adversarial debate in TEE, prove every decision on Hedera and 0G — marketplace, reputation, on-chain audit.",
+    "Publish immutable agents, submit protected jobs, and inspect canonical per-job evidence.",
   openGraph: {
     title: "AlphaDawg",
-    description: "Your AI pack hunts alpha — provable swarm economy for the chain.",
+    description: "Immutable agent versions with authenticated, per-job proof state.",
   },
 };
 
@@ -34,27 +34,27 @@ const PILLARS = [
     n: "01",
     title: "Hire specialists",
     body:
-      "Your lead agent pays real specialists per call via Arc x402 nanopayments ($0.001). Sentiment, whale flow, momentum, on-chain forensics — each runs through sealed 0G inference with attestation.",
+      "Publish an immutable specialist version or select an existing one. Ownership, price, capabilities, and proof policy come from the authenticated kernel record.",
   },
   {
     n: "02",
     title: "Adversarial debate",
     body:
-      "Alpha argues for exposure, Risk argues against, Executor decides with explicit position sizing. Debate transcripts and reasoning are structured for audit — not a black-box score.",
+      "The legacy hunt flow keeps Alpha, Risk, and Executor reasoning visible, while A5 protected jobs stay separate from legacy authority.",
   },
   {
     n: "03",
     title: "Prove and remember",
     body:
-      "Cycles commit to Hedera HCS; rich records anchor to 0G Storage. Prior hunts load back into context (RAG) so the pack learns from its own history — evolving memory, not one-shot prompts.",
+      "Each protected job exposes an ordered Proof Rail for ENS, 0G Compute, Storage, canonical receipt, delivery, and financial outcome—only when those records exist.",
   },
 ] as const;
 
 async function getStats() {
   const topicId = process.env.HCS_AUDIT_TOPIC_ID;
   const tokenId = process.env.HTS_FUND_TOKEN_ID;
-  let huntsRun = 0;
-  let totalSupply = "0";
+  let huntsRun: number | null = null;
+  let totalSupply: string | null = null;
 
   if (topicId) {
     try {
@@ -64,7 +64,9 @@ async function getStats() {
       );
       if (res.ok) {
         const data = await res.json();
-        huntsRun = data.messages?.[0]?.sequence_number ?? 0;
+        huntsRun = typeof data.messages?.[0]?.sequence_number === "number"
+          ? data.messages[0].sequence_number
+          : null;
       }
     } catch {
       /* non-fatal */
@@ -78,7 +80,7 @@ async function getStats() {
       });
       if (res.ok) {
         const data = await res.json();
-        totalSupply = data.total_supply ?? "0";
+        totalSupply = typeof data.total_supply === "string" ? data.total_supply : null;
       }
     } catch {
       /* non-fatal */
@@ -88,7 +90,8 @@ async function getStats() {
   return { huntsRun, totalSupply };
 }
 
-function formatSupplyDisplay(raw: string): string {
+function formatSupplyDisplay(raw: string | null): string {
+  if (raw === null) return "—";
   const s = raw.replace(/\s/g, "");
   if (!/^\d+$/.test(s)) return raw.length > 14 ? `${raw.slice(0, 10)}…` : raw;
   if (s.length <= 12) return s;
@@ -99,31 +102,12 @@ function formatSupplyDisplay(raw: string): string {
   return `${s.slice(0, 8)}…`;
 }
 
-const ARCH_ROWS: { path: string; body: string }[] = [
-  {
-    path: "app/",
-    body: "Next.js App Router — dashboard UI and primary /api/* routes (what the browser hits).",
-  },
-  {
-    path: "src/agents/",
-    body: "Cycle orchestration — hire specialists, adversarial pipeline, heartbeat, Telegram.",
-  },
-  {
-    path: "src/og/ · src/hedera/ · src/payments/",
-    body: "0G sealed inference & storage, Hedera HCS/HTS, Arc x402 buyer and seller paths.",
-  },
-  {
-    path: "contracts/ · openclaw/",
-    body: "Solidity on 0G Chain where needed; OpenClaw workspaces for agent prompts and procedures.",
-  },
-];
-
 export default async function LandingPage() {
   const stats = await getStats();
   const supplyDisplay = formatSupplyDisplay(stats.totalSupply);
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex w-full flex-col items-center overflow-x-clip">
       {/* Hero */}
       <section className="relative flex w-full flex-col items-center justify-center px-6 pb-12 pt-28 md:pt-32">
         <div className="absolute top-20 h-[400px] w-[600px] rounded-full bg-dawg-500/15 blur-[120px]" />
@@ -132,7 +116,7 @@ export default async function LandingPage() {
           className="fade-in-up relative z-10 text-xs font-mono uppercase tracking-widest text-dawg-400 mb-4"
           style={{ animationDelay: "0ms" }}
         >
-          Swarm economy · on-chain audit
+          Protected agent control surface
         </p>
         <h1
           className="fade-in-up relative z-10 text-center text-5xl font-bold leading-tight tracking-tight md:text-7xl text-void-100 max-w-4xl"
@@ -147,12 +131,8 @@ export default async function LandingPage() {
           className="fade-in-up relative z-10 mt-5 max-w-2xl text-center text-base md:text-lg text-void-400 leading-relaxed"
           style={{ animationDelay: "120ms" }}
         >
-          An{" "}
-          <span className="text-void-300">agent hiring economy</span>, not a black-box fund. Your lead
-          agent pays specialist &ldquo;dogs&rdquo; per hunt via{" "}
-          <span className="text-void-300">Arc x402</span> nanopayments, runs adversarial debate in TEE,
-          and commits every cycle to{" "}
-          <span className="text-void-300">Hedera</span> so judges can verify in one click.
+          Publish immutable agent versions, submit one idempotent job, and inspect the evidence
+          that actually exists—from ENS authority through canonical receipt and settlement.
         </p>
 
         <div
@@ -169,58 +149,52 @@ export default async function LandingPage() {
       </section>
 
       <LandingGlassSection />
+
+      <figure className="fade-in-up mx-auto mt-12 w-full max-w-6xl px-6 md:mt-14">
+        <div className="overflow-hidden rounded-2xl border border-dawg-500/25 bg-black shadow-[0_20px_80px_-36px_rgba(255,199,0,0.34)]">
+          <Image
+            src="/alphadawg-dashboard-rc.png"
+            alt="AlphaDawg release-candidate dashboard showing the Nasdaq board and protected A5 job totals"
+            width={1440}
+            height={1000}
+            className="h-auto w-full"
+            sizes="(max-width: 768px) 100vw, 1152px"
+          />
+        </div>
+        <figcaption className="mt-3 text-center font-mono text-[10px] uppercase tracking-wider text-void-600">
+          Release-candidate dashboard · local fixture data · current evidence is shown per authenticated job
+        </figcaption>
+      </figure>
+
       <LandingArchitectureFlow />
-      <LandingProofPipeline />
 
       {/* Purpose */}
       <section className="fade-in-up w-full max-w-2xl mx-auto px-6 py-12 text-center">
         <p className="text-sm md:text-base text-void-400 leading-relaxed">
-          Control the swarm from{" "}
-          <span className="text-void-300">Telegram</span> or this{" "}
-          <span className="text-void-300">Next.js</span> app: each hunt hires specialists, settles
-          micropayments, and leaves a trail you can trace. Dive into the{" "}
+          Use the <span className="text-void-300">protected A5 path</span> for immutable publication,
+          job control, and evidence. The existing hunt, Telegram, portfolio, and legacy marketplace
+          remain available as compatibility workflows. Read the{" "}
           <a href="#glass-box" className="text-dawg-400 hover:underline font-medium">
             thesis
           </a>{" "}
-          above, then the architecture and proof sections below.
+          above, then inspect the runtime path below.
         </p>
       </section>
 
       {/* Stats Bar */}
       <section
-        className="fade-in-up border-t border-dawg-500/20 bg-void-900 border-x border-b border-void-800 mx-6 grid w-full max-w-4xl grid-cols-1 sm:grid-cols-3 gap-px overflow-hidden rounded-2xl shadow-[0_0_0_1px_rgba(251,191,36,0.06)]"
+        className="fade-in-up mx-6 grid w-[calc(100%-3rem)] max-w-4xl grid-cols-1 gap-px overflow-hidden rounded-2xl border-x border-b border-t border-void-800 border-t-dawg-500/20 bg-void-900 shadow-[0_0_0_1px_rgba(251,191,36,0.06)] sm:grid-cols-3"
       >
-        <StatCard label="Hunts run" value={stats.huntsRun.toString()} />
+        <StatCard label="Observed HCS sequence" value={stats.huntsRun?.toString() ?? "—"} />
         <StatCard label="Total supply" value={supplyDisplay} />
-        <StatCard label="Hunt cost" value="$0.003/hunt" />
-      </section>
-
-      {/* Architecture */}
-      <section className="fade-in-up w-full max-w-4xl mx-auto px-6 mt-14 md:mt-16">
-        <p className="text-xs font-mono uppercase tracking-widest text-dawg-400 mb-4">
-          Architecture at a glance
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {ARCH_ROWS.map((row) => (
-            <div
-              key={row.path}
-              className="rounded-xl border border-void-800 bg-void-900/80 px-4 py-3 shadow-[0_0_0_1px_rgba(251,191,36,0.05)]"
-            >
-              <p className="font-mono text-[11px] text-void-500 leading-snug">{row.path}</p>
-              <p className="mt-1.5 text-sm text-void-300 leading-relaxed">{row.body}</p>
-            </div>
-          ))}
-        </div>
-        <p className="mt-4 text-xs text-void-600">
-          Contracts, topics, and listeners are listed on the Stack page (`/infrastructure`).
-        </p>
+        <StatCard label="A5 verification" value="Per job" />
       </section>
 
       {/* On-chain proof strip */}
-      <section className="fade-in-up mx-6 mt-12 md:mt-14 w-full max-w-4xl">
+      <section className="fade-in-up mx-6 mt-12 w-[calc(100%-3rem)] max-w-4xl md:mt-14">
         <div className="rounded-2xl border border-void-800 bg-void-900/70 px-5 py-5">
           <p className="text-[10px] font-mono uppercase tracking-widest text-void-500 mb-3">
-            Verify on explorers
+            Configured explorer identifiers
           </p>
           <div className="flex flex-wrap gap-2">
             <ProofLink href={hashscanTopicUrl(HCS_TOPIC_ID)} label="HCS topic" sub={HCS_TOPIC_ID} />
@@ -233,8 +207,7 @@ export default async function LandingPage() {
             <ProofLink href={ogChainAddressUrl(INFT_CONTRACT_ADDRESS)} label="iNFT contract" sub={truncateId(INFT_CONTRACT_ADDRESS)} />
           </div>
           <p className="mt-3 text-xs text-void-600">
-            Same identifiers are on the Stack page (`/infrastructure`). Stats above pull live sequence / supply from the Mirror API
-            when env is configured.
+            Identifier configuration is not current job proof. Mirror values above remain — when the configured upstream cannot be observed.
           </p>
         </div>
       </section>

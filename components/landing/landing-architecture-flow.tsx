@@ -32,7 +32,7 @@ const NODES: { key: string; title: string; sub: string; accent: string }[] = [
   {
     key: "spec",
     title: "Specialists",
-    sub: "0G sealed TEE",
+    sub: "Protected A3 target",
     accent: "border-violet-500/40 bg-violet-500/5 text-violet-200",
   },
   {
@@ -76,9 +76,8 @@ export function LandingArchitectureFlow() {
           How a hunt flows
         </h2>
         <p className="mt-2 text-sm text-void-500 max-w-2xl mx-auto leading-relaxed">
-          Mirrors <span className="font-mono text-void-400">runCycle()</span> in{" "}
-          <span className="font-mono text-void-400">src/agents/main-agent.ts</span> — from user intent to
-          optional on-chain swap.
+          The existing hunt pipeline remains available for compatibility. Protected A5 jobs use the
+          separate authenticated Proof Rail shown on the dashboard and verifier.
         </p>
       </div>
 
