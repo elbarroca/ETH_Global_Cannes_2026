@@ -3,17 +3,14 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardBody, CodeBlock } from "@/components/ui/card";
-import { Badge, SealedBadge, ZeroGBadge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { DawgSpinner } from "@/components/dawg-spinner";
+import { KernelJobDetail } from "@/components/kernel-job-detail";
 import { useUser } from "@/contexts/user-context";
 import { getCycleDetail, getLatestCycle } from "@/lib/api";
 import type { CycleDetail, AgentActionRecord } from "@/lib/types";
 import {
-  INFT_CONTRACT_ADDRESS,
   HCS_TOPIC_ID,
-  ogChainAddressUrl,
-  inftTokenUrl,
-  hashscanTopicUrl,
   hashscanMessageUrl,
 } from "@/lib/links";
 
@@ -54,8 +51,33 @@ const AGENT_META: Record<AgentKey, { emoji: string; type: "Specialist" | "Advers
 
 const AGENT_KEYS: AgentKey[] = ["SentimentBot", "WhaleEye", "MomentumX", "MemecoinHunter", "TwitterAlpha", "DeFiYield", "NewsScanner", "OnChainForensics", "OptionsFlow", "MacroCorrelator", "Alpha", "Risk", "Executor"];
 
-const PROVIDER_ADDRESS = process.env.NEXT_PUBLIC_OG_PROVIDER_ADDRESS ?? "0x9f2b...4a1c";
-const INFT_CONTRACT = INFT_CONTRACT_ADDRESS;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const ACTION_TYPE_BY_AGENT: Record<AgentKey, string> = {
+  SentimentBot: "SPECIALIST_HIRED",
+  WhaleEye: "SPECIALIST_HIRED",
+  MomentumX: "SPECIALIST_HIRED",
+  MemecoinHunter: "SPECIALIST_HIRED",
+  TwitterAlpha: "SPECIALIST_HIRED",
+  DeFiYield: "SPECIALIST_HIRED",
+  NewsScanner: "SPECIALIST_HIRED",
+  OnChainForensics: "SPECIALIST_HIRED",
+  OptionsFlow: "SPECIALIST_HIRED",
+  MacroCorrelator: "SPECIALIST_HIRED",
+  Alpha: "DEBATE_ALPHA",
+  Risk: "DEBATE_RISK",
+  Executor: "DEBATE_EXECUTOR",
+};
+
+function getActionForAgent(
+  key: AgentKey,
+  actions: AgentActionRecord[],
+): AgentActionRecord | undefined {
+  const specialistName = SPECIALIST_MARKETPLACE_NAMES[key];
+  return actions.find((action) =>
+    action.actionType === ACTION_TYPE_BY_AGENT[key] &&
+    (!specialistName || action.agentName === specialistName));
+}
 
 function getAttestationForAgent(
   key: AgentKey,
@@ -64,33 +86,7 @@ function getAttestationForAgent(
 ): string {
   if (!cycle) return "—";
 
-  // Try to find the action log for this agent
-  const actionTypeMap: Record<AgentKey, string> = {
-    SentimentBot: "SPECIALIST_HIRED",
-    WhaleEye: "SPECIALIST_HIRED",
-    MomentumX: "SPECIALIST_HIRED",
-    MemecoinHunter: "SPECIALIST_HIRED",
-    TwitterAlpha: "SPECIALIST_HIRED",
-    DeFiYield: "SPECIALIST_HIRED",
-    NewsScanner: "SPECIALIST_HIRED",
-    OnChainForensics: "SPECIALIST_HIRED",
-    OptionsFlow: "SPECIALIST_HIRED",
-    MacroCorrelator: "SPECIALIST_HIRED",
-    Alpha: "DEBATE_ALPHA",
-    Risk: "DEBATE_RISK",
-    Executor: "DEBATE_EXECUTOR",
-  };
-
-  // For specialists, also match by agent name
-  const nameMap: Record<string, string> = {
-    SentimentBot: "sentiment", WhaleEye: "whale", MomentumX: "momentum",
-    MemecoinHunter: "memecoin-hunter", TwitterAlpha: "twitter-alpha", DeFiYield: "defi-yield",
-    NewsScanner: "news-scanner", OnChainForensics: "onchain-forensics", OptionsFlow: "options-flow",
-    MacroCorrelator: "macro-correlator",
-  };
-  const action = key in nameMap
-    ? actions.find((a) => a.actionType === actionTypeMap[key] && a.agentName === nameMap[key])
-    : actions.find((a) => a.actionType === actionTypeMap[key]);
+  const action = getActionForAgent(key, actions);
   if (action?.attestationHash) return action.attestationHash;
 
   // Fall back to cycle record attestations (only for adversarial agents — specialists are in JSON)
@@ -105,10 +101,12 @@ function getAttestationForAgent(
     case "OnChainForensics":
     case "OptionsFlow":
     case "MacroCorrelator": {
-      const specs = Array.isArray(cycle.specialists) ? cycle.specialists as Array<{ name?: string; attestation?: string }> : [];
-      const specName = nameMap[key];
+      const specs = Array.isArray(cycle.specialists)
+        ? cycle.specialists as Array<{ name?: string; attestation?: string; attestationHash?: string }>
+        : [];
+      const specName = SPECIALIST_MARKETPLACE_NAMES[key];
       const spec = specs.find((s) => s.name === specName);
-      return spec?.attestation ?? "—";
+      return spec?.attestationHash ?? spec?.attestation ?? "—";
     }
     case "Alpha": return cycle.alphaAttestation ?? "—";
     case "Risk": return cycle.riskAttestation ?? "—";
@@ -118,23 +116,7 @@ function getAttestationForAgent(
 }
 
 function getTeeVerified(key: AgentKey, actions: AgentActionRecord[]): boolean {
-  const actionTypeMap: Record<AgentKey, string> = {
-    SentimentBot: "SPECIALIST_HIRED",
-    WhaleEye: "SPECIALIST_HIRED",
-    MomentumX: "SPECIALIST_HIRED",
-    MemecoinHunter: "SPECIALIST_HIRED",
-    TwitterAlpha: "SPECIALIST_HIRED",
-    DeFiYield: "SPECIALIST_HIRED",
-    NewsScanner: "SPECIALIST_HIRED",
-    OnChainForensics: "SPECIALIST_HIRED",
-    OptionsFlow: "SPECIALIST_HIRED",
-    MacroCorrelator: "SPECIALIST_HIRED",
-    Alpha: "DEBATE_ALPHA",
-    Risk: "DEBATE_RISK",
-    Executor: "DEBATE_EXECUTOR",
-  };
-  const action = actions.find((a) => a.actionType === actionTypeMap[key]);
-  return action?.teeVerified ?? false;
+  return getActionForAgent(key, actions)?.teeVerified === true;
 }
 
 export default function VerifyPage() {
@@ -152,6 +134,19 @@ export default function VerifyPage() {
 }
 
 function VerifyContent() {
+  const searchParams = useSearchParams();
+  const jobId = searchParams.get("jobId");
+  if (jobId && UUID_PATTERN.test(jobId)) {
+    return (
+      <main className="mx-auto max-w-7xl space-y-4 px-5 py-5">
+        <KernelJobDetail jobId={jobId} mode="verify" />
+      </main>
+    );
+  }
+  return <LegacyCycleVerifyContent />;
+}
+
+function LegacyCycleVerifyContent() {
   const [selected, setSelected] = useState<AgentKey>("SentimentBot");
   const { userId, user } = useUser();
   const searchParams = useSearchParams();
@@ -224,8 +219,10 @@ function VerifyContent() {
   }, [userId, paramOrCached, requestKey]);
 
   const agent = AGENT_META[selected];
+  const selectedAction = getActionForAgent(selected, actions);
   const attestation = getAttestationForAgent(selected, cycle, actions);
   const teeVerified = getTeeVerified(selected, actions);
+  const hasVerifiedTeeEvidence = teeVerified && attestation !== "—";
 
   if (loading) {
     return (
@@ -238,7 +235,7 @@ function VerifyContent() {
   if (!cycle) {
     return (
       <main className="max-w-7xl mx-auto px-5 py-5 space-y-4">
-        <h1 className="text-lg font-bold text-void-100">0G Verification</h1>
+        <h1 className="text-lg font-bold text-void-100">Legacy cycle evidence</h1>
         <Card>
           <CardBody className="text-center py-12 space-y-3">
             <p className="text-void-400 text-sm">No cycle data found.</p>
@@ -257,13 +254,13 @@ function VerifyContent() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-lg font-bold text-void-100">
-            0G verification — hunt #{cycle.cycleNumber}
+            Legacy cycle evidence — hunt #{cycle.cycleNumber}
           </h1>
           <p className="text-sm text-void-500 mt-0.5">
-            Every inference sealed inside TEE hardware on 0G Compute
+            Select an action to inspect only the evidence recorded for that action.
           </p>
         </div>
-        <ZeroGBadge label="6 sealed inference calls" />
+        <Badge variant="gray">Recorded cycle</Badge>
       </div>
 
       {/* Agent selector */}
@@ -272,6 +269,7 @@ function VerifyContent() {
           <button
             key={key}
             onClick={() => setSelected(key)}
+            aria-pressed={selected === key}
             className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
               selected === key
                 ? "bg-blood-900/30 border-2 border-blood-600 text-void-200"
@@ -289,109 +287,104 @@ function VerifyContent() {
       <Card>
         <CardBody className="space-y-4">
           {/* Card header */}
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
               <span className="text-3xl">{agent.emoji}</span>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-void-200">{selected}</span>
                   <Badge variant="gray">{agent.type}</Badge>
-                  {teeVerified && <Badge variant="green">TEE Verified</Badge>}
+                  {hasVerifiedTeeEvidence
+                    ? <Badge variant="green">TEE evidence verified</Badge>
+                    : <Badge variant="gray">TEE evidence unavailable</Badge>}
                 </div>
                 <p className="text-xs text-void-500 mt-0.5">{agent.skill}</p>
               </div>
             </div>
-            <SealedBadge />
           </div>
 
           {/* Two-column layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Left: Agent details */}
             <div className="space-y-3">
-              <DetailBlock label="0G Compute Provider">
-                <span className="font-mono text-sm text-void-200">{PROVIDER_ADDRESS}</span>
+              <DetailBlock label="Action type">
+                <span className="font-mono text-sm text-void-200">
+                  {selectedAction?.actionType ?? "—"}
+                </span>
               </DetailBlock>
-              <DetailBlock label="Model">
-                <span className="font-mono text-sm text-void-200">glm-5-chat</span>
+              <DetailBlock label="Action status">
+                <span className="font-mono text-sm text-void-200">
+                  {selectedAction?.status ?? "—"}
+                </span>
               </DetailBlock>
-              <DetailBlock label="iNFT Identity">
-                {agent.type === "Specialist" ? (
-                  <span className="font-mono text-sm text-gold-400">
-                    ERC-7857 on 0G Chain
-                  </span>
-                ) : (
-                  <span className="text-sm text-void-500">Platform infra</span>
-                )}
+              <DetailBlock label="Recorded agent name">
+                <span className="font-mono text-sm text-void-200">
+                  {selectedAction?.agentName ?? "—"}
+                </span>
               </DetailBlock>
-              <DetailBlock label="Execution Environment">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-void-200">Intel TDX + NVIDIA H100 TEE</span>
-                  <Badge variant="green">Hardware isolated</Badge>
-                </div>
+              <DetailBlock label="Recorded payment">
+                <span className="font-mono text-sm text-void-200">
+                  {selectedAction?.paymentAmount && selectedAction.paymentNetwork
+                    ? `${selectedAction.paymentAmount} · ${selectedAction.paymentNetwork}`
+                    : "—"}
+                </span>
+              </DetailBlock>
+              <DetailBlock label="Recorded duration">
+                <span className="font-mono text-sm text-void-200">
+                  {selectedAction?.durationMs != null ? `${selectedAction.durationMs} ms` : "—"}
+                </span>
               </DetailBlock>
               <DetailBlock label="Decision">
                 <span className="text-sm text-void-200">
-                  {cycle.decision ?? "HOLD"} {cycle.decisionPct ?? 0}% {cycle.asset ?? "ETH"}
+                  {cycle.decision ?? "—"}
+                  {cycle.decisionPct != null ? ` ${cycle.decisionPct}%` : ""}
+                  {cycle.asset ? ` ${cycle.asset}` : ""}
                 </span>
               </DetailBlock>
             </div>
 
-            {/* Right: TEE Attestation */}
+            {/* Right: recorded action evidence */}
             <div>
               <CodeBlock className="space-y-2">
                 <div>
                   <div className="text-[11px] uppercase tracking-wider text-void-600 mb-1">
                     Attestation hash
                   </div>
-                  <div className="text-gold-400 break-all">
-                    {attestation}
+                  <div className={`break-all ${hasVerifiedTeeEvidence ? "text-emerald-300" : "text-void-500"}`}>
+                    {attestation === "—" ? "No attestation hash recorded" : attestation}
                   </div>
                 </div>
                 <hr className="border-void-800" />
                 <div className="space-y-1 text-void-500">
-                  <div>Signature: Ed25519</div>
-                  <div>Key generated inside TEE</div>
-                  <div>Private key never leaves enclave</div>
                   <div>
-                    Timestamp:{" "}
+                    Recorded at:{" "}
                     <span className="text-void-200">
-                      {new Date(cycle.createdAt).toLocaleString()}
+                      {selectedAction?.createdAt ?? cycle.createdAt}
                     </span>
                   </div>
                   <div>
-                    TEE verified:{" "}
-                    <span className={teeVerified ? "text-green-400" : "text-gold-400"}>
-                      {teeVerified ? "Yes" : "Pending"}
+                    TEE evidence:{" "}
+                    <span className={hasVerifiedTeeEvidence ? "text-green-400" : "text-void-400"}>
+                      {hasVerifiedTeeEvidence ? "Verified on selected action" : "Not verified on selected action"}
                     </span>
                   </div>
-                </div>
-                <hr className="border-void-800" />
-                <div className="flex flex-col gap-1">
-                  {cycle.hashscanUrl && (
-                    <a
-                      href={cycle.hashscanUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-teal-400 hover:text-void-300 transition-colors"
-                    >
-                      Verify on Hashscan →
-                    </a>
+                  {selectedAction?.paymentTxHash && (
+                    <div className="break-all">Payment transaction: {selectedAction.paymentTxHash}</div>
                   )}
+                </div>
+                {cycle.hashscanUrl && (
+                  <>
+                    <hr className="border-void-800" />
                   <a
-                    href={
-                      user?.inftTokenId != null
-                        ? inftTokenUrl(user.inftTokenId)
-                        : ogChainAddressUrl(INFT_CONTRACT)
-                    }
+                    href={cycle.hashscanUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-gold-400 hover:text-void-300 transition-colors"
+                    className="text-teal-400 hover:text-void-300 transition-colors"
                   >
-                    {user?.inftTokenId != null
-                      ? `View iNFT #${user.inftTokenId} on 0G Chainscan →`
-                      : "View VaultMindAgent contract on 0G Chainscan →"}
+                    Open recorded Hashscan URL →
                   </a>
-                </div>
+                  </>
+                )}
               </CodeBlock>
             </div>
           </div>
@@ -399,22 +392,16 @@ function VerifyContent() {
           {/* Explanation block */}
           <div className="bg-void-850 border border-void-800 rounded-xl p-4">
             <p className="text-xs text-void-400 leading-relaxed">
-              This attestation cryptographically proves that{" "}
-              <strong className="text-void-300">{selected}</strong>
-              {"'"}s analysis was executed inside a hardware-isolated TEE on 0G Compute. The
-              model (
-              <span className="font-mono text-gold-400">glm-5-chat</span>
-              ) ran on input data that nobody — not the server operator, not AlphaDawg,
-              not anyone — could see or modify during processing. The output was signed by
-              a key generated inside the enclave. If anyone had tampered with the input,
-              the model, or the output, the attestation hash would not match.
+              {hasVerifiedTeeEvidence
+                ? `${selected}'s selected action record includes both teeVerified=true and an attestation hash. This legacy view reports those stored fields without inferring provider, hardware, signature scheme, or runtime guarantees.`
+                : `${selected}'s selected action does not include complete verified TEE evidence. Runtime guarantees remain unavailable.`}
             </p>
           </div>
 
           {/* Verify-as-rating action — records a verified-kind rating on HCS
               + Supabase. Only rendered for marketplace specialists; returns
               null for Alpha/Risk/Executor (platform infra). */}
-          {AGENT_META[selected].type === "Specialist" && (
+          {AGENT_META[selected].type === "Specialist" && hasVerifiedTeeEvidence && (
             <div className="bg-void-950 border border-emerald-900/40 rounded-xl p-4 space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
@@ -436,34 +423,27 @@ function VerifyContent() {
       <Card>
         <CardBody className="space-y-3">
           <h3 className="text-sm font-semibold text-void-200">
-            0G Storage — decentralized cycle record
+            Recorded cycle fields
           </h3>
           <div className="space-y-2">
-            <DetailBlock label="Storage Root Hash">
+            <DetailBlock label="Recorded storage hash">
               {cycle.storageHash ? (
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(cycle.storageHash ?? "").catch(() => {});
-                    }}
-                    className="font-mono text-sm text-gold-400 hover:text-gold-300 break-all text-left transition-colors"
-                    title="Click to copy. 0G Storage roots are retrievable only via the 0G indexer API — no public browser explorer exists."
-                  >
-                    {cycle.storageHash} <span className="text-[10px] text-void-500">📋 copy</span>
-                  </button>
-                  <p className="text-[10px] text-void-600">
-                    Retrievable via 0G indexer · no public browser explorer
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(cycle.storageHash ?? "").catch(() => {})}
+                  className="break-all text-left font-mono text-sm text-gold-400 hover:text-gold-300"
+                  title="Copy the recorded storage hash"
+                >
+                  {cycle.storageHash} <span className="text-[10px] text-void-500">copy</span>
+                </button>
               ) : (
-                <span className="text-xs text-void-600">Not stored (0G Storage was unavailable)</span>
+                <span className="text-xs text-void-600">No storage hash recorded.</span>
               )}
             </DetailBlock>
-            <DetailBlock label="HCS Sequence">
+            <DetailBlock label="Recorded HCS sequence">
               {cycle.hcsSeqNum ? (
                 <a
-                  href={hashscanMessageUrl(HCS_TOPIC_ID, cycle.hcsSeqNum)}
+                  href={cycle.hashscanUrl ?? hashscanMessageUrl(HCS_TOPIC_ID, cycle.hcsSeqNum)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-mono text-sm text-teal-300 hover:text-teal-200 underline decoration-dotted"
@@ -474,19 +454,9 @@ function VerifyContent() {
                 <span className="font-mono text-sm text-void-600">—</span>
               )}
             </DetailBlock>
-            <DetailBlock label="HCS Audit Topic">
-              <a
-                href={hashscanTopicUrl(HCS_TOPIC_ID)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-xs text-teal-300 hover:text-teal-200 underline decoration-dotted"
-              >
-                {HCS_TOPIC_ID} ↗
-              </a>
-            </DetailBlock>
-            <DetailBlock label="Total Cost">
+            <DetailBlock label="Recorded total cost">
               <span className="text-sm text-void-200">
-                ${(cycle.totalCostUsd ?? 0.003).toFixed(3)} USDC (3 specialist hires)
+                {cycle.totalCostUsd != null ? `$${cycle.totalCostUsd.toFixed(3)} USDC` : "—"}
               </span>
             </DetailBlock>
           </div>

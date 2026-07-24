@@ -35,6 +35,7 @@ import {
 import { SwarmStatusBar } from "@/components/swarm-status-bar";
 import { SwarmActivityTicker } from "@/components/swarm-activity-ticker";
 import { InProgressHuntBanner } from "@/components/in-progress-hunt-banner";
+import { KernelJobsPanel } from "@/components/kernel-jobs-panel";
 // DebateTheater removed — debate data is shown inside ExpandableHuntCard
 
 function formatFeedSyncedAge(ms: number): string {
@@ -340,7 +341,7 @@ export default function DashboardPage() {
       price: 0.001,
       attestation: s.attestationHash.slice(0, 10) + "..." + s.attestationHash.slice(-4),
       model: "glm-5-chat",
-      provider: "0G Compute",
+      provider: "Provider not verified",
       inftId: "",
     })),
     adversarial: {
@@ -443,6 +444,8 @@ export default function DashboardPage() {
         agentBalanceFetchedAt={agentBalanceFetchedAt}
       />
 
+      <KernelJobsPanel />
+
       {/* Cycle header — shows the current/last hunt status. The user's saved
           goal (user.agent.goal) drives every cycle; they edit it inline in
           the "Hunt Goal" card below. The italic quote next to the header
@@ -486,10 +489,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Build Your Specialist — dashboard entry point for the "Create Your
-          Own Agent" flow. Replaces the free-text Hunt input. The same modal
-          is also launched from the Marketplace header's "Deploy your agent"
-          button, so both surfaces share one component. */}
+      {/* Shared immutable agent publication entry point. */}
       <Card>
         <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -497,7 +497,7 @@ export default function DashboardPage() {
               Build Your Specialist
             </span>
             <span className="text-xs text-void-400 truncate">
-              Describe the edge · 0G crafts the persona · deploy to the pack marketplace.
+              Define instructions · review the immutable version · publish to the protected registry.
             </span>
           </div>
           <button
@@ -776,7 +776,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <p className="text-[11px] text-neutral-700 mt-1.5 leading-snug max-w-2xl font-medium">
-                  Live indexer stream — proof that the AlphaDawg listener sees real activity across chains.
+                  Observed indexer events when the configured listener or fallback returns records.
                 </p>
               </div>
               <NaryoFeed variant="light" />
@@ -828,7 +828,9 @@ export default function DashboardPage() {
                   <p className={`text-lg font-bold font-mono ${(agentBalance ?? 0) > 0 ? "text-gold-400" : "text-void-600"}`}>
                     {agentBalance != null ? `$${agentBalance.toFixed(4)}` : "—"}
                   </p>
-                  <p className="text-[10px] text-void-600">USDC on Arc · live</p>
+                  <p className="text-[10px] text-void-600">
+                    {agentBalance != null ? "Arc RPC · observed" : "Arc balance unavailable"}
+                  </p>
                 </div>
                 <button
                   onClick={() => router.push("/deposit")}
@@ -866,9 +868,9 @@ export default function DashboardPage() {
                     path: {cycle.specialistPath.replace(/_/g, " ")}
                   </Badge>
                 )}
-                <Badge variant="gray">0G Sealed</Badge>
-                <Badge variant="gray">Hedera HCS</Badge>
-                <Badge variant="gray">Arc Nano</Badge>
+                <Badge variant="gray">Configured · 0G</Badge>
+                <Badge variant="gray">Configured · Hedera</Badge>
+                <Badge variant="gray">Configured · Arc</Badge>
               </div>
             </div>
           </div>
@@ -904,7 +906,7 @@ export default function DashboardPage() {
           <div className="sticky top-4 space-y-2">
             <SwarmActivityTicker />
             <p className="text-[10px] text-void-600 leading-snug px-0.5">
-              Sidebar: live network activity. Main column: your hunts (only updates when a hunt finishes).
+              Sidebar: observed network activity. Main column: your hunts after completion.
             </p>
           </div>
         </aside>
@@ -912,7 +914,6 @@ export default function DashboardPage() {
     </main>
     {showCreateAgent && (
       <CreateAgentModal
-        createdBy={user?.proxyWallet?.address ?? userId ?? null}
         onClose={() => setShowCreateAgent(false)}
       />
     )}
@@ -1276,7 +1277,7 @@ function EmptyHuntsState() {
           Your pack is idle. Set an <span className="text-gold-400">AUTO-HUNT</span> cycle count
           above to schedule hunts, or send <code className="px-1 py-0.5 bg-void-800 text-void-300 rounded text-[10px]">/run</code>
           to your Telegram bot to trigger a one-shot hunt. Every hunt — regardless of source —
-          will appear live in this feed.
+          will appear in this feed.
         </p>
       </CardBody>
     </Card>

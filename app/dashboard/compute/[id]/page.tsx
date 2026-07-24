@@ -12,6 +12,7 @@ import { AgentGridCard } from "@/components/agent-grid-card";
 import { ComputeLog } from "@/components/compute-log";
 import { ExecuteTradeModal } from "@/components/execute-trade-modal";
 import { DebateTheater } from "@/components/debate-theater";
+import { KernelJobDetail } from "@/components/kernel-job-detail";
 import {
   HCS_TOPIC_ID,
   INFT_CONTRACT_ADDRESS,
@@ -27,6 +28,8 @@ const ACTION_COLORS: Record<string, { text: string; bg: string; border: string }
   HOLD: { text: "text-gold-400", bg: "bg-gold-400/5", border: "border-gold-400/20" },
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function truncHash(hash: string | null): string {
   if (!hash || hash.length < 14) return hash ?? "—";
   return `${hash.slice(0, 10)}...${hash.slice(-4)}`;
@@ -36,7 +39,8 @@ export default function ComputePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { userId, user } = useUser();
-  const requestKey = userId && params.id ? `${userId}:${params.id}` : null;
+  const isKernelJobId = UUID_PATTERN.test(params.id);
+  const requestKey = userId && params.id && !isKernelJobId ? `${userId}:${params.id}` : null;
   const [loaded, setLoaded] = useState<{
     key: string;
     data: ComputeDetailResponse | null;
@@ -46,7 +50,7 @@ export default function ComputePage() {
   const [fullPriorCidIdx, setFullPriorCidIdx] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!userId || !params.id || !requestKey) return;
+    if (isKernelJobId || !userId || !params.id || !requestKey) return;
     let cancelled = false;
     getCycleDetail(userId, Number(params.id))
       .catch(() => null)
@@ -56,10 +60,18 @@ export default function ComputePage() {
     return () => {
       cancelled = true;
     };
-  }, [userId, params.id, requestKey]);
+  }, [isKernelJobId, userId, params.id, requestKey]);
 
   const loading = requestKey === null || loaded?.key !== requestKey;
   const data = loaded?.key === requestKey ? loaded.data : null;
+
+  if (isKernelJobId) {
+    return (
+      <main className="mx-auto max-w-7xl space-y-4 px-5 py-5">
+        <KernelJobDetail jobId={params.id} />
+      </main>
+    );
+  }
 
   if (loading) {
     return (
