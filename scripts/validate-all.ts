@@ -148,7 +148,7 @@ async function testLinkCodes(): Promise<void> {
   try {
     const { generateLinkCode, redeemLinkCode } = await import("../src/store/link-codes.js");
 
-    // Link codes now use Supabase — need a real user ID to test
+    // Link codes use PostgreSQL — need a real user ID to test
     // Just verify the functions are async and importable
     ok("generateLinkCode()", "async function imported (DB-backed)");
     ok("redeemLinkCode()", "async function imported (DB-backed)");

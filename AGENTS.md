@@ -4,6 +4,14 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+## Database and AI tooling
+
+- Neon Postgres is the canonical managed database.
+- `DATABASE_URL` uses the Neon pooled (`-pooler`) endpoint; `DIRECT_URL` uses the matching direct endpoint for Prisma migrations.
+- Load `.env.local` for CLI migrations: `node --env-file=.env.local ./node_modules/prisma/build/index.js migrate deploy`.
+- Use `npx neonctl@latest` and the `neon` MCP server at `https://mcp.neon.tech/mcp`.
+- Never commit database URLs, passwords, Neon API keys, or OAuth credentials. Managed migrations require explicit project-owner authorization.
+
 # AlphaDawg — Agent Registry
 
 > 7 specialist Claude Code agents + 2 slash commands. Each agent owns a domain, knows the verified SDK patterns, and can be delegated to autonomously.

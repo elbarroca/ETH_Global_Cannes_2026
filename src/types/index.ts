@@ -328,7 +328,7 @@ export type SwarmEventRecord =
   | {
       // User feedback on a specialist — the on-chain point-in-time proof of
       // an ELO mutation. Produced by POST /api/marketplace/rate after the
-      // corresponding `agent_ratings` row lands in Supabase. Small enough
+      // corresponding `agent_ratings` row lands in PostgreSQL. Small enough
       // (~130 bytes) to never need the cot[] truncation path in logSwarmEvent.
       ev: "rating";
       c: number; // cycle number the rating is scoped to

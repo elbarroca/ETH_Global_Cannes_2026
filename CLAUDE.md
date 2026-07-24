@@ -18,7 +18,7 @@ npm run migrate                       # Deploy committed Prisma migrations
 npx prisma db push                    # Alternative: sync schema via Prisma
 npm run validate                      # 45-test validation suite
 npm run prisma:generate               # Generate Prisma typed client
-npm run prisma:push                   # Sync Prisma schema to Supabase
+npm run prisma:push                   # Development-only schema sync
 npm run prisma:studio                 # Visual DB browser
 ```
 
@@ -32,7 +32,7 @@ Core product = **agent hiring economy**: autonomous agents discover, pay, and de
 ## STACK
 - **Runtime:** Node.js >= 22 · TypeScript strict · ES modules (`"type": "module"`) · npm
 - **Frontend:** Next.js 16.2 (App Router, Turbopack, React 19) · Tailwind CSS v4
-- **Database:** Supabase PostgreSQL · `postgres` ^3.4.8 (user store) · `@prisma/client` ^6.19 (marketplace, actions)
+- **Database:** Neon PostgreSQL · `postgres` ^3.4.8 (user store) · `@prisma/client` ^6.19 (marketplace, actions)
 - **Wallets:** `@circle-fin/developer-controlled-wallets` (MPC custody) · BIP-44 HD via ethers (hot wallet)
 - **Hedera:** `@hashgraph/sdk` ^2.69.0
 - **0G Compute:** `@0glabs/0g-serving-broker` · `@types/crypto-js@4.2.2` · `crypto-js@4.2.0`
@@ -82,10 +82,10 @@ alphadawg/
 │   │   ├── og-storage.ts             ← 0G Flow contract + indexer URL
 │   │   ├── arc.ts                     ← getUserPaymentFetch(index) — per-user x402
 │   │   ├── wallets.ts                 ← BIP-44 HD derivation from AGENT_MNEMONIC
-│   │   ├── database.ts               ← postgres.js singleton (Supabase)
+│   │   ├── database.ts               ← postgres.js singleton (Neon)
 │   │   └── prisma.ts                  ← Prisma client singleton
 │   ├── store/
-│   │   ├── user-store.ts              ← Supabase CRUD with atomic JSONB merge
+│   │   ├── user-store.ts              ← PostgreSQL CRUD with atomic JSONB merge
 │   │   ├── action-logger.ts           ← logAction(), logCycleRecord() via Prisma
 │   │   ├── crypto.ts                  ← AES-256-CBC encrypt/decrypt
 │   │   ├── proxy-wallet.ts            ← Wallet helpers (Circle MPC is primary path)
@@ -202,7 +202,7 @@ alphadawg/
 - kebab-case files. camelCase functions/vars. PascalCase types/components.
 - `JSON.parse()` from 0G inference ALWAYS in try/catch (7B model malforms JSON).
 - No over-engineering. No factories. No DI. No wrapper abstractions around SDKs.
-- All store functions are async (Supabase). Always `await` store calls.
+- All store functions are async (PostgreSQL). Always `await` store calls.
 
 ## .env VARIABLES
 ```env
@@ -226,9 +226,9 @@ INFT_CONTRACT_ADDRESS=0x73e3...      # ERC-7857 on 0G Chain (optional — skips 
 AGENT_MNEMONIC="word1 word2 ... word12"  # BIP-44 HD seed for hot wallets
 SERVER_ENCRYPTION_KEY=...             # 32-byte hex for AES-256-CBC
 
-# Supabase
-DATABASE_URL=postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true
-DIRECT_URL=postgresql://...pooler.supabase.com:5432/postgres
+# Neon Postgres
+DATABASE_URL=postgresql://...-pooler....neon.tech/neondb?sslmode=require
+DIRECT_URL=postgresql://.......neon.tech/neondb?sslmode=require
 
 # Circle MPC (console.circle.com)
 CIRCLE_API_KEY=TEST_API_KEY:...
@@ -242,7 +242,7 @@ USDC_BASE_SEPOLIA_ADDRESS=0x036C...   # USDC on Base Sepolia (has default)
 
 # Telegram (@BotFather)
 TELEGRAM_BOT_TOKEN=123456:ABC-...    # Optional — bot disabled if missing
-# NOTE: No TELEGRAM_CHAT_ID — chat IDs are per-user in Supabase
+# NOTE: No TELEGRAM_CHAT_ID — chat IDs are per-user in PostgreSQL
 
 # Market Data (optional — uses public endpoints if missing)
 COINGECKO_API_URL=https://api.coingecko.com/api/v3
@@ -310,7 +310,7 @@ Each domain has a dedicated rules file in `.claude/rules/` that auto-loads when 
 | 0G JSON parse fails | 7B model malformed | try/catch JSON.parse, retry or fallback |
 | OpenClaw heartbeat too slow | Default 30 min | Set `heartbeat.every: "5m"` in openclaw.json |
 | Circle wallet creation fails | Missing API key | Set CIRCLE_API_KEY + CIRCLE_ENTITY_SECRET |
-| `DIRECT_URL not set` | Missing Supabase config | Set DIRECT_URL in .env (port 5432, not 6543) |
+| `DIRECT_URL not set` | Missing Neon config | Set DIRECT_URL to the matching non-pooled Neon endpoint |
 | Prisma Client not initialized | Missing generate | Run `npm run prisma:generate` |
 | iNFT mint skipped | Missing contract addr | Set INFT_CONTRACT_ADDRESS in .env (non-fatal) |
 | 0G Storage upload fails | Indexer down | Check OG_STORAGE_INDEXER URL, retry later |
@@ -334,7 +334,7 @@ Each domain has a dedicated rules file in `.claude/rules/` that auto-loads when 
 | 12 | Circle MPC wallets | DONE | — |
 | 13 | Marketplace + reputation | DONE | — |
 | 14 | Real market data feeds | DONE | — |
-| 15 | Supabase migration | DONE | — |
+| 15 | PostgreSQL migration | DONE | — |
 | 16 | Naryo listener | NOT STARTED | Naryo $3.5K |
 
 ## TESTING FLOW
@@ -360,6 +360,6 @@ npm run build                         # Verify production build
 ## INVARIANTS — DECIDED. DO NOT REVISIT.
 Payment: x402 on Arc · Inference: 0G Sealed · Audit: Hedera HCS · Token: HTS
 Agents: OpenClaw · Memory: 0G Storage · Frontend: Next.js 16.2 · Style: Tailwind v4
-Database: Supabase PostgreSQL · Wallets: Circle MPC (proxy) + BIP-44 HD (hot)
+Database: Neon PostgreSQL · Wallets: Circle MPC (proxy) + BIP-44 HD (hot)
 iNFT: ERC-7857 on 0G Chain (NOT Hedera) · Contracts: Hardhat 2 + Solidity 0.8.24 (0G Chain only — Hedera uses native SDK, zero Solidity)
 Dashboard API: Next.js API routes (`app/api/*`) — Express `:3001` is backend services only (Telegram, heartbeat), NEVER the dashboard API

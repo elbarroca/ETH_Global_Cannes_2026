@@ -15,7 +15,7 @@ import {
 } from "@/lib/links";
 
 // Mapping from the AGENT_KEYS selector names (SentimentBot, WhaleEye, …) to
-// the canonical `marketplace_agents.name` values stored in Supabase. Only
+// the canonical `marketplace_agents.name` values stored in Neon. Only
 // specialists are in the marketplace — adversarial agents (Alpha/Risk/Executor)
 // are platform infra, so the VerifyRatingButton renders null for them.
 const SPECIALIST_MARKETPLACE_NAMES: Partial<Record<string, string>> = {
@@ -399,7 +399,7 @@ function LegacyCycleVerifyContent() {
           </div>
 
           {/* Verify-as-rating action — records a verified-kind rating on HCS
-              + Supabase. Only rendered for marketplace specialists; returns
+              + Neon. Only rendered for marketplace specialists; returns
               null for Alpha/Risk/Executor (platform infra). */}
           {AGENT_META[selected].type === "Specialist" && hasVerifiedTeeEvidence && (
             <div className="bg-void-950 border border-emerald-900/40 rounded-xl p-4 space-y-2">

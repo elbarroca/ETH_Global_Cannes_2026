@@ -8,7 +8,7 @@
  *   1. Environment variables required for the flow
  *   2. User creation with proxy wallet + defaults
  *   3. Telegram link code generation + redemption
- *   4. Chat ID binding to user record in Supabase
+ *   4. Chat ID binding to user record in Neon Postgres
  *   5. Approval preferences (approvalMode, approvalTimeoutMin)
  *   6. analyzeCycle() produces AnalysisResult without touching HCS
  *   7. PendingCycle CRUD (create, get, resolve)

@@ -1,6 +1,6 @@
 /**
  * VaultMind — Audit Trail E2E Validation
- * Tests: HCS on-chain logging → Mirror Node read-back → Supabase persistence → cross-check
+ * Tests: HCS on-chain logging → Mirror Node read-back → Neon persistence → cross-check
  *
  * Requires: OPERATOR_ID, OPERATOR_KEY, HCS_AUDIT_TOPIC_ID, DATABASE_URL, DIRECT_URL
  * Usage: ./node_modules/.bin/tsx scripts/validate-audit-trail.ts
@@ -222,16 +222,16 @@ async function testMirrorNodeReadback(topicId: string, expectedRecord: AuditCycl
   ok("On-chain audit", "HCS record matches what was submitted \u2014 immutable proof");
 }
 
-// ─── Test 3: Save to Supabase (Prisma) ─────────���───────────
+// ─── Test 3: Save to Neon (Prisma) ─────────────────────────
 
-async function testSupabasePersist(
+async function testNeonPersist(
   userId: string,
   cycleNumber: number,
   hcsSeqNum: number,
   hashscanUrl: string,
   record: AuditCycleRecord,
 ): Promise<{ cycleDbId: string; actionIds: string[] }> {
-  console.log("\n\u2550\u2550\u2550 TEST 3: Persist to Supabase via Prisma \u2550\u2550\u2550");
+  console.log("\n\u2550\u2550\u2550 TEST 3: Persist to Neon via Prisma \u2550\u2550\u2550");
 
   const { logAction, logCycleRecord } = await import("../src/store/action-logger.js");
 
@@ -340,9 +340,9 @@ async function testSupabasePersist(
   return { cycleDbId, actionIds };
 }
 
-// ─── Test 4: Read back from Supabase and validate ───────────
+// ─── Test 4: Read back from Neon and validate ───────────────
 
-async function testSupabaseReadback(
+async function testNeonReadback(
   userId: string,
   cycleDbId: string,
   actionIds: string[],
@@ -350,7 +350,7 @@ async function testSupabaseReadback(
   hcsSeqNum: number,
   expectedRecord: AuditCycleRecord,
 ): Promise<void> {
-  console.log("\n\u2550\u2550\u2550 TEST 4: Supabase Read-back + Validation \u2550\u2550\u2550");
+  console.log("\n\u2550\u2550\u2550 TEST 4: Neon Read-back + Validation \u2550\u2550\u2550");
 
   const { getUserCycles, getUserActions } = await import("../src/store/action-logger.js");
 
@@ -451,14 +451,14 @@ async function testSupabaseReadback(
   }
 }
 
-// ─── Test 5: Cross-check HCS ↔ Supabase ────────────────────
+// ─── Test 5: Cross-check HCS ↔ Neon ────────────────────────
 
 async function testCrossCheck(
   userId: string,
   cycleNumber: number,
   hcsSeqNum: number,
 ): Promise<void> {
-  console.log("\n\u2550\u2550\u2550 TEST 5: Cross-Check HCS \u2194 Supabase \u2550\u2550\u2550");
+  console.log("\n\u2550\u2550\u2550 TEST 5: Cross-Check HCS \u2194 Neon \u2550\u2550\u2550");
 
   const topicId = process.env.HCS_AUDIT_TOPIC_ID!;
   const { getHistory } = await import("../src/hedera/hcs.js");
@@ -469,7 +469,7 @@ async function testCrossCheck(
   const hcsRecords = await getHistory(topicId, 10);
   const hcsRecord = hcsRecords.find((r) => r.c === cycleNumber && r.u === userId);
 
-  // Get from Supabase
+  // Get from Neon
   const dbCycles = await getUserCycles(userId, 5);
   const dbCycle = dbCycles.find((c) => c.cycleNumber === cycleNumber);
 
@@ -478,7 +478,7 @@ async function testCrossCheck(
     return;
   }
   if (!dbCycle) {
-    fail("DB record", "not found in Supabase");
+    fail("DB record", "not found in Neon");
     return;
   }
 
@@ -527,7 +527,7 @@ async function testCrossCheck(
     ok("HCS seq number", `DB stores seq=${hcsSeqNum} \u2014 links to on-chain proof`);
   }
 
-  ok("AUDIT INTEGRITY", "On-chain HCS record matches Supabase DB record \u2014 tamper-proof");
+  ok("AUDIT INTEGRITY", "On-chain HCS record matches Neon DB record \u2014 tamper-proof");
 }
 
 // ─── Test 6: User state update ──────────────────────────────
@@ -571,7 +571,7 @@ async function testUserStateUpdate(userId: string, cycleNumber: number): Promise
 async function main(): Promise<void> {
   console.log("\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
   console.log("\u2551   VAULTMIND \u2014 AUDIT TRAIL E2E VALIDATION            \u2551");
-  console.log("\u2551   HCS On-Chain \u2192 Mirror Node \u2192 Supabase \u2192 Cross-Check  \u2551");
+  console.log("\u2551   HCS On-Chain \u2192 Mirror Node \u2192 Neon \u2192 Cross-Check      \u2551");
   console.log("\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D");
 
   // Preflight
@@ -584,7 +584,7 @@ async function main(): Promise<void> {
 
   const totalStart = Date.now();
 
-  // Setup: get/create test user in Supabase
+  // Setup: get/create test user in Neon
   console.log("\n\u2500\u2500\u2500 SETUP: Test User \u2500\u2500\u2500");
   const user = await getOrCreateTestUser();
   ok("Test user ready", `id=${user.id.slice(0, 8)}..., wallet=${user.walletAddress}`);
@@ -595,15 +595,15 @@ async function main(): Promise<void> {
   // Test 2: Read back from Mirror Node
   await testMirrorNodeReadback(process.env.HCS_AUDIT_TOPIC_ID!, record);
 
-  // Test 3: Save to Supabase
-  const { cycleDbId, actionIds } = await testSupabasePersist(
+  // Test 3: Save to Neon
+  const { cycleDbId, actionIds } = await testNeonPersist(
     user.id, cycleNumber, seqNum, hashscanUrl, record,
   );
 
-  // Test 4: Read back from Supabase
-  await testSupabaseReadback(user.id, cycleDbId, actionIds, cycleNumber, seqNum, record);
+  // Test 4: Read back from Neon
+  await testNeonReadback(user.id, cycleDbId, actionIds, cycleNumber, seqNum, record);
 
-  // Test 5: Cross-check HCS ↔ Supabase
+  // Test 5: Cross-check HCS ↔ Neon
   await testCrossCheck(user.id, cycleNumber, seqNum);
 
   // Test 6: User state update
@@ -615,14 +615,14 @@ async function main(): Promise<void> {
   console.log("\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
   console.log(`\u2551   RESULTS: \u2705 ${passed} passed \u00B7 \u274C ${failed} failed \u00B7 \u23ED\uFE0F  ${skipped} skipped`);
   console.log(`\u2551   Total time: ${totalElapsed}s`);
-  console.log("\u2551   Flow: CompactRecord \u2192 HCS \u2192 Mirror Node \u2192 Supabase \u2192 Cross-Check");
+  console.log("\u2551   Flow: CompactRecord \u2192 HCS \u2192 Mirror Node \u2192 Neon \u2192 Cross-Check");
   console.log("\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D");
 
   if (failed > 0) {
     console.log("\nSome tests failed. Check output above.");
     process.exit(1);
   } else {
-    console.log("\nAudit trail fully validated! HCS on-chain records match Supabase DB.");
+    console.log("\nAudit trail fully validated! HCS on-chain records match Neon DB.");
     process.exit(0);
   }
 }

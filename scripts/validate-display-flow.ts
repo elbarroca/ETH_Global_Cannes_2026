@@ -1,7 +1,7 @@
 /**
  * End-to-end validation of the "Surface the Agent Hiring Economy in the UI" refactor.
  *
- * Runs a REAL cycle against the live Fly.io swarm + 0G + HCS + Supabase,
+ * Runs a REAL cycle against the live Fly.io swarm + 0G + HCS + Neon,
  * then asserts every new field lands correctly:
  *   1. Swarm reachability (13 Fly.io /healthz + /analyze 200)
  *   2. DB schema — cycles.goal/payments + pending_cycles.goal/rich_record

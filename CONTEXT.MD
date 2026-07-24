@@ -1,7 +1,7 @@
 # VAULTMIND — UNIFIED ENGINEERING BIBLE (V2)
 
 > **ETHGlobal Cannes 2026 · April 3-5 · 7 bounties · $17,250 max payout**
-> Single source of truth. Reflects actual codebase after Sprint 4 (Supabase + Circle). Every SDK pattern verified.
+> Single source of truth. Reflects the current Neon Postgres + Circle codebase. Every SDK pattern verified.
 
 ---
 
@@ -15,7 +15,7 @@
 6. [Tech Stack — Exact Versions](#6-tech-stack)
 7. [Repo Structure (Current V2)](#7-repo-structure)
 8. [Environment Variables](#8-env)
-9. [Database Layer — Supabase + Prisma](#9-database)
+9. [Database Layer — Neon + Prisma](#9-database)
 10. [Dual Wallet Architecture](#10-wallets)
 11. [Hedera SDK Reference](#11-hedera)
 12. [0G Compute SDK Reference](#12-og-compute)
@@ -51,7 +51,7 @@ You deposit USDC. A personal AI agent hires specialist sub-agents from an open m
 - Every interaction economically incentivized via real micropayments
 - Every inference cryptographically verified via TEE attestation
 - Every decision immutably logged with one-click proof verification
-- **Persistent state via Supabase** — all user data, cycles, actions, marketplace agents stored in PostgreSQL via Prisma
+- **Persistent state via Neon** — all user data, cycles, actions, marketplace agents stored in PostgreSQL via Prisma
 
 ### What VaultMind IS NOT
 - Not a hedge fund
@@ -120,7 +120,7 @@ The **agent hiring economy**. Not "AI does trading." The product is the mechanis
 
 STATE MANAGEMENT:
 ┌──────────────────────────────────────────────────────────┐
-│  SUPABASE (PostgreSQL via Prisma)                        │
+│  NEON (PostgreSQL via Prisma)                            │
 │  Users · Cycles · AgentActions · MarketplaceAgents       │
 │  Persistent across restarts. Relational queries.         │
 └──────────────────────────────────────────────────────────┘
@@ -188,7 +188,7 @@ STEP 5: STORE MEMORY [0G Storage]
     │  Save cycle results to 0G Storage
     │
     ▼
-STEP 6: SAVE TO DATABASE [Supabase via Prisma]
+STEP 6: SAVE TO DATABASE [Neon via Prisma]
     │  Full cycle record + all agent actions
     │
     ▼
@@ -310,7 +310,7 @@ Judges want: Naryo multichain event listener. ≥1 DLT.
 | Modules | ES modules | `"type": "module"` | Required by Hedera SDK |
 | Frontend | Next.js | 16.2 | App Router, Turbopack, React 19, Server Components |
 | Styling | Tailwind CSS | v4 | Utility-first, no custom CSS |
-| Database | Supabase (PostgreSQL) | — | Persistent state |
+| Database | Neon (PostgreSQL) | — | Persistent state |
 | ORM | Prisma | latest | Typed queries, migrations |
 | Hedera | `@hashgraph/sdk` | ^2.69.0 | Also `@hiero-ledger/sdk` compatible |
 | 0G Compute | `@0glabs/0g-serving-broker` | latest | + `@types/crypto-js@4.2.2` + `crypto-js@4.2.0` |
@@ -389,7 +389,7 @@ vaultmind/
 │   ├── api/
 │   │   ├── server.ts              ← Express on :3001
 │   │   └── routes/
-│   │       ├── onboard.ts         ← Circle wallet + iNFT mint + Supabase
+│   │       ├── onboard.ts         ← Circle wallet + iNFT mint + Neon
 │   │       ├── cycle.ts           ← GET history, POST run
 │   │       ├── fund.ts            ← Deposit (mint HTS) + Withdraw (burn + Circle transfer)
 │   │       └── actions.ts         ← Agent action history (Prisma)
@@ -472,10 +472,10 @@ AGENT_MASTER_SEED="word1 word2 word3 ... word12"   # Derives all HD hot wallets 
 SERVER_ENCRYPTION_KEY=...                            # AES for proxy wallet key encryption
 
 # ═══════════════════════════════════════════════════
-# SUPABASE
+# NEON POSTGRES
 # ═══════════════════════════════════════════════════
-DATABASE_URL=postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true
-DIRECT_URL=postgresql://...pooler.supabase.com:5432/postgres
+DATABASE_URL=postgresql://...-pooler....neon.tech/neondb?sslmode=require
+DIRECT_URL=postgresql://.......neon.tech/neondb?sslmode=require
 
 # ═══════════════════════════════════════════════════
 # CIRCLE MPC
@@ -488,7 +488,7 @@ CIRCLE_WALLET_SET_ID=...
 # TELEGRAM (@BotFather)
 # ═══════════════════════════════════════════════════
 TELEGRAM_BOT_TOKEN=123456:ABC-...
-# ⚠️ NO TELEGRAM_CHAT_ID — chat IDs are dynamic per user, stored in Supabase
+# ⚠️ NO TELEGRAM_CHAT_ID — chat IDs are dynamic per user, stored in PostgreSQL
 
 # ═══════════════════════════════════════════════════
 # OPENCLAW
@@ -502,12 +502,12 @@ OPENCLAW_WORKSPACE=~/.openclaw/agents
 # ❌ AGENT_EVM_PRIVATE_KEY    → derived per user from AGENT_MASTER_SEED
 # ❌ AGENT_MNEMONIC           → renamed to AGENT_MASTER_SEED
 # ❌ SPECIALIST_WALLET_ADDRESS → per specialist from marketplace_agents table
-# ❌ TELEGRAM_CHAT_ID         → per user from users table in Supabase
+# ❌ TELEGRAM_CHAT_ID         → per user from users table in PostgreSQL
 ```
 
 ---
 
-## 9. DATABASE LAYER — SUPABASE + PRISMA
+## 9. DATABASE LAYER — NEON + PRISMA
 
 ### Prisma Schema (Key Models)
 
@@ -581,7 +581,7 @@ model MarketplaceAgent {
 ### Commands
 ```bash
 npx prisma generate       # Generate typed client
-npx prisma db push        # Sync schema to Supabase
+node --env-file=.env.local ./node_modules/prisma/build/index.js migrate deploy
 npx prisma studio         # Visual DB browser
 ```
 
@@ -598,7 +598,7 @@ USER DEPOSITS USDC
 ┌──────────────────────────────────┐
 │  CIRCLE CUSTODY WALLET           │  Circle holds keys (HSM)
 │  Created: onboard API call       │  Purpose: deposit/withdraw USDC
-│  Stored: Supabase (walletId +    │  Signing: Circle SDK server-side
+│  Stored: Neon (walletId +        │  Signing: Circle SDK server-side
 │          address)                 │  Never exposes private key
 └──────────────┬───────────────────┘
                │ agentTransfer() tops up ~$0.05
@@ -607,7 +607,7 @@ USER DEPOSITS USDC
 │  HD HOT WALLET                   │  YOU hold key (derived from master seed)
 │  Derived: AGENT_MASTER_SEED +    │  Purpose: sign x402 micropayments
 │           user.hotWalletIndex    │  Signing: viem privateKeyToAccount()
-│  Stored: address in Supabase     │  Small balance only
+│  Stored: address in Neon         │  Small balance only
 └──────────────┬───────────────────┘
                │ x402 payment ($0.001 each)
                ▼
@@ -1131,8 +1131,8 @@ Main Agent passes reputation scores alongside specialist data to Alpha/Risk/Exec
 ### Onboarding Flow (3 Steps in Dashboard)
 
 ```
-STEP 1: CONNECT WALLET → Dashboard captures address → Create user in Supabase
-STEP 2: CONNECT TELEGRAM → Deep link t.me/VaultMindBot?start={wallet} → Bot captures chat ID → Update Supabase
+STEP 1: CONNECT WALLET → Dashboard captures address → Create user in Neon
+STEP 2: CONNECT TELEGRAM → Deep link t.me/VaultMindBot?start={wallet} → Bot captures chat ID → Update Neon
 STEP 3: DEPOSIT USDC → Circle creates custody wallet → HD hot wallet derived → HTS shares minted → Cycle starts
 ```
 
@@ -1274,7 +1274,7 @@ Always logs proof. Reports honestly even when positions lose money.
 | 3 | x402 nanopayments (hire specialists) | Arc | $6K |
 | 4 | HCS cycle logging | Hedera AI, No Solidity | $9K |
 | 5 | HTS fund token + custom fees | Tokenization, No Solidity | $5.5K |
-| 5.5 | Supabase + Prisma + dynamic onboarding | Multi-user, persistence | All |
+| 5.5 | Neon + Prisma + dynamic onboarding | Multi-user, persistence | All |
 | 5.6 | Dual wallet architecture (Circle + HD) | Per-user signing | Arc, Hedera |
 | 5.7 | Telegram deep-link binding | Multi-user Telegram | All |
 | 6 | Dashboard 3-column debate view | All (MVP required) | — |
@@ -1296,7 +1296,7 @@ Always logs proof. Reports honestly even when positions lose money.
 
 | # | System | Test | Expected |
 |---|--------|------|----------|
-| 1 | Supabase | `npx prisma db push` | Tables created |
+| 1 | Neon | `node --env-file=.env.local ./node_modules/prisma/build/index.js migrate deploy` | Migrations applied |
 | 2 | Hedera | Account at portal.hedera.com | HBAR balance > 0 |
 | 3 | Hedera | `TopicCreateTransaction` | Topic ID `0.0.XXXXX` |
 | 4 | Hedera | `TopicMessageSubmitTransaction` freeze+sign | No error |
@@ -1373,7 +1373,7 @@ npm run dev               # :3000
 | Agent memory | 0G Storage | Decentralized, Merkle-verified, persistent |
 | Agent identity | ERC-7857 iNFT on 0G Chain | Tradeable, composable, ownable agents |
 | Frontend | Next.js 16.2 + Tailwind v4 | Turbopack, React 19, Server Components |
-| User state | Supabase + Prisma | Persistence across restarts, relational queries |
+| User state | Neon + Prisma | Persistence across restarts, relational queries |
 | Proxy wallets | Circle (custody) + HD (signing) | MPC security for custody; HD for x402 signing |
 | Specialist data | Real APIs + 0G inference | Judges need real data, not mocks |
 | Specialist wallets | Per-specialist generated | Dynamic marketplace, each has own payTo |
@@ -1427,4 +1427,4 @@ npm run dev               # :3000
 
 ---
 
-*Last updated: April 4, 2026 — ETHGlobal Cannes Day 2 · V2 Unified (Supabase + Circle + Real Data)*
+*Last updated: July 24, 2026 — Lisbon continuity · Neon Postgres + Circle*

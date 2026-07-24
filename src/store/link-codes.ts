@@ -14,7 +14,7 @@ function generateCode(): string {
 }
 
 /**
- * Generate a link code for a user and persist it in Supabase.
+ * Generate a link code for a user and persist it in Neon Postgres.
  * Both Next.js and Express processes can read from the same DB.
  */
 export async function generateLinkCode(userId: string): Promise<string> {

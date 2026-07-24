@@ -1,10 +1,8 @@
 import postgres from "postgres";
 import { isLoopbackDatabaseUrl, requireDatabaseUrl, withoutPrismaPoolParameters } from "./env";
 
-// Vercel serverless functions must hit the Supabase PgBouncer pooler (:6543),
-// not the direct connection (:5432). Direct connections get exhausted fast under
-// fan-out invocations. DIRECT_URL is reserved for Prisma migrations only.
-// prepare:false is required by PgBouncer transaction mode.
+// Vercel serverless functions use Neon's pooled endpoint. DIRECT_URL is reserved
+// for Prisma migrations. prepare:false keeps runtime queries pooler-compatible.
 
 let sql: ReturnType<typeof postgres> | null = null;
 

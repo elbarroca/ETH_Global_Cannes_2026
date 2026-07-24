@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       // number back to the UI, which renders an "↗ HCS" verification link.
       // Typical Hedera testnet round-trip is ~1–2s. If it fails (network
       // flake, topic misconfigured) we still return 200 with hcsSeqNum=null
-      // — the Supabase write is the source of truth for the displayed ELO.
+      // — the PostgreSQL write is the source of truth for the displayed ELO.
       let hcsSeqNum: number | null = null;
       const topicId = process.env.HCS_AUDIT_TOPIC_ID ?? null;
       if (topicId) {

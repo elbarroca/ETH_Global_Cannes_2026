@@ -94,7 +94,7 @@ async function main(): Promise<void> {
 
     try {
       // Idempotency: if the on-chain contract already has this wallet bound,
-      // don't mint a duplicate — just sync the tokenId into Supabase.
+      // don't mint a duplicate — just sync the tokenId into Neon.
       const existingTokenId = await getAgentByWallet(spec.walletAddress);
       if (existingTokenId > 0) {
         await prisma.marketplaceAgent.update({

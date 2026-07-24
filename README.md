@@ -349,7 +349,7 @@ npm run naryo:logs        # Tail listener output
 | Runtime | Node.js ≥ 22, TypeScript strict, ES modules |
 | Frontend | Next.js 16.2 (App Router + Turbopack), React 19, Tailwind v4 (CSS-first `@theme`) |
 | Wallet connect | Dynamic Labs SDK · wagmi · RainbowKit |
-| Database | Supabase PostgreSQL · `postgres.js` ^3.4 (user store) · Prisma ^6.19 (marketplace + actions) |
+| Database | Neon PostgreSQL · `postgres.js` ^3.4 (user store) · Prisma ^6.19 (marketplace + actions) |
 | Hedera | `@hashgraph/sdk` ^2.69 |
 | 0G Compute | `@0glabs/0g-serving-broker` 0.7.4 |
 | 0G Storage | `@0gfoundation/0g-ts-sdk` ^1.2.1 *(note: `@0gfoundation`, NOT `@0glabs`)* |
@@ -401,7 +401,7 @@ alphadawg/
 │   │   └── data/             Real market data fetchers (CoinGecko, FNG, whale, momentum)
 │   ├── telegram/bot.ts       7 commands + link-code binding
 │   ├── naryo/                Event emitters + cross-chain correlation handler
-│   ├── store/                Supabase CRUD + AES-256-CBC crypto + link codes
+│   ├── store/                PostgreSQL CRUD + AES-256-CBC crypto + link codes
 │   └── api/                  Express :3001 backend services
 ├── app/                      Next.js 16.2 App Router frontend
 │   ├── page.tsx              Landing (server component, real HCS + HTS stats)
@@ -442,7 +442,7 @@ cp .env.example .env
 #   Hedera:   OPERATOR_ID, OPERATOR_KEY
 #   0G:       OG_PRIVATE_KEY (must start with 0x), OG_RPC_URL, OG_PROVIDER_ADDRESS
 #   Circle:   CIRCLE_API_KEY, CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_SET_ID
-#   Supabase: DATABASE_URL (pgbouncer port 6543), DIRECT_URL (port 5432)
+#   Neon:     DATABASE_URL (pooled endpoint), DIRECT_URL (direct endpoint)
 #   Wallets:  AGENT_MNEMONIC (BIP-39), SERVER_ENCRYPTION_KEY (32-byte hex)
 #   Telegram: TELEGRAM_BOT_TOKEN
 #   Frontend: NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID, NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID

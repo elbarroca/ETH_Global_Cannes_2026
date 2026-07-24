@@ -3,6 +3,66 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Codex under project-owner direction
+task_id: NEON-DATABASE-MIGRATION-20260724
+task_instance_id: NEON-DATABASE-MIGRATION-20260724:8BDDD6D5
+generation: 1
+sprint: database_infrastructure
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: 5c63cc753338047944c5d5c174b30f17c53478fd
+control_sha: 5c63cc753338047944c5d5c174b30f17c53478fd
+token: NEON-MIGRATION-8BDDD6D5-E4C6-4975-A0C1-920B156254F3
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T20:24:09Z
+expires_at: 2026-07-24T22:03:54Z
+allowed_paths:
+  - .env.local
+  - .env.example
+  - .mcp.json
+  - skills-lock.json
+  - .agents/skills/neon/**
+  - .agents/skills/neon-postgres/**
+  - AGENTS.md
+  - CLAUDE.md
+  - README.md
+  - CONTEXT.MD
+  - src/config/database.ts
+  - src/store/link-codes.ts
+  - src/types/index.ts
+  - app/verify/page.tsx
+  - app/api/marketplace/rate/route.ts
+  - scripts/validate-all.ts
+  - scripts/validate-audit-trail.ts
+  - scripts/validate-approval-flow.ts
+  - scripts/validate-display-flow.ts
+  - scripts/mint-specialist-infts.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-24T20:03:54Z
+expected_exit: Neon pooled runtime and direct migration connectivity, migrated Prisma schema, official Neon MCP configuration, current operational guidance, and green repository checks
+external_effect_authority: project-owner supplied Neon database URL and explicitly authorized Neon setup, managed migration, CLI and MCP configuration; no push deployment release transaction form spend or public claim
+completed_at: 2026-07-24T20:24:09Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - pooled and direct Neon connections pass after control-plane role password rotation; credentials remain only in ignored .env.local
+  - Prisma deployed 20260724011500_baseline, 20260724024500_authenticated_kernel, 20260724041000_strict_0g, and 20260724130000_ens_authority; migrate status reports up to date
+  - real SIWE challenge route returned 201 against Neon and the verification row was removed
+  - neonctl 2.36.0 is authenticated; Codex and Claude Neon MCP use OAuth with no tracked or Codex-configured API-key header
+  - official neon and neon-postgres project skills are locked; transient .neon initializer state was removed
+  - environment validation lint typecheck foundation tests auth tests production build secret scan diff check and credential-prefix scan pass
+variance_reconciliation:
+  - neonctl init added skills-lock.json and both project skill directories before they appeared in the initial allowlist
+  - coordinator explicitly admitted those exact paths; the active mirror was amended before commit and no other path was added
+remaining_blocks:
+  - inaccessible Supabase source data was not migrated; Neon starts from the committed Prisma schema
+  - no push deployment release or public claim was attempted
+audit_verdict: PASS_LOCAL_NEON_MIGRATION
+result: PASS_NEON_MIGRATION_LOCAL_ONLY
+lock_release: release only matching token NEON-MIGRATION-8BDDD6D5-E4C6-4975-A0C1-920B156254F3 after one atomic local commit and clean status
+status: closed
+```
+
+```yaml
 owner: A5 audit remediation sole writer /root/a5_remediation_writer
 task_id: A5-AUDIT-REMEDIATION-G1-20260724
 task_instance_id: A5-AUDIT-REMEDIATION-G1-20260724:636B8EDB
