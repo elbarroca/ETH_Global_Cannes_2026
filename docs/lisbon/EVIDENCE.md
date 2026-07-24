@@ -31,6 +31,8 @@ status: PASS | FAIL | BLOCKED
 | `A0-BASELINE-001` | Baseline | `PASS` | `BASELINE.md` and Git object/hash checks. |
 | `A0-AUTH-001` | Local start | `PASS_LOCAL_ONLY` | Thread authorization; external effects remain denied. |
 | `A0-LOCAL-BUILD-ADMISSION-005` | A0_LOCAL | `PASS` | Git provenance, local project-owner authority, and atomic writer serialization admit A1 and authorize later A2/offline A3 after their sequential prerequisites pass. Independent states are `LOCAL_BUILD_AUTHORIZED`, `RELEASE_BLOCKED`, and `LIVE_EFFECT_BLOCKED`. Exact packet: `evidence/A0-LOCAL-BUILD-ADMISSION.md`. |
+| `A0-LOCAL-ADMISSION-AUDIT-006` | Independent audit | `FIX` | Audit of `36783c69f249387943f6f4b89286e2b27660337e` found that `prompts/C0-COORDINATOR.md` still blocked A1 on release-only gaps and that the first evidence packet overstated its stale-language check. |
+| `A0-LOCAL-ADMISSION-REMEDIATION-007` | A0 remediation G1 | `PASS_TO_AUDIT` | The stale C0 gate now uses the exact A0_LOCAL split; the first check is corrected to `FAIL`, and all active non-archive Lisbon controls/prompts pass the contradiction scan. Exact repair evidence is appended to `evidence/A0-LOCAL-BUILD-ADMISSION.md`. |
 | `A0-PROMPT-001` | Historical prompt pack | `PASS_SUPERSEDED` | The former all-in-one contract and 12 split prompts passed their original checks; `A0-PROMPT-LEAN-002` replaces this architecture. |
 | `A0-PROMPT-LEAN-002` | Lean prompt pack | `PASS` | `GOALS.md` is the canonical contract, `SPRINTS.md` defines A0-A7, and `prompts/` contains only C0 plus reusable executor/auditor templates. Nine-file Markdown links/fences, sprint/header coverage, deleted-prompt reference checks, `git diff --check`, added-line secret patterns, and physical/mirrored lock-token equality passed. Independent read-only audit findings were reconciled. |
 | `A0-LOCK-001` | Writer serialization | `PASS` | Atomic common-dir lease exists; physical and mirrored tokens match. |
@@ -53,7 +55,7 @@ HTTP `200`, a database flag, UI badge, inherited receipt, or mock is not termina
 
 ## A0 verification scope
 
-This gate changes documentation and control state only. It ran Markdown structure/link checks, exact status-vocabulary checks, no-stale-A1-block checks, common-dir lock/token equality, branch/baseline/remote verification, changed-line secret-pattern scanning, and authored-control `git diff --check`. The intentionally byte-preserved `docs/lisbon/archive/research-vault/**` corpus is verified by exact path, size, and SHA-256 manifest and is excluded from whitespace normalization/checks. Application lint, typecheck, tests, build, migrations, and live sponsor smokes remain `NOT_RUN` for A1 and later code sprints.
+This gate changes documentation and control state only. The first commit ran Markdown structure/link, exact status-vocabulary, common-dir lock/token, branch/baseline/remote, changed-line secret-pattern, and authored-control `git diff --check` checks. Its stale-A1 check was too narrow and missed `prompts/C0-COORDINATOR.md`; independent audit returned `FIX`. Remediation G1 checks every active non-archive Lisbon control/prompt for the contradiction. The intentionally byte-preserved `docs/lisbon/archive/research-vault/**` corpus remains excluded from authored-control checks. Application lint, typecheck, tests, build, migrations, and live sponsor smokes remain `NOT_RUN` for A1 and later code sprints.
 
 ## Downstream boundary
 

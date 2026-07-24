@@ -51,9 +51,28 @@ All work before H0 remains disclosed prior/pre-window work. This control correct
 | `git diff --check` | 0 | No output. |
 | Markdown fence and local-link check over all ten changed documents | 0 | 10 files, 3 local links, no missing target. |
 | Required state vocabulary in `BASELINE.md`, `GOALS.md`, `CLAIM-MATRIX.md`, and `EVIDENCE.md` | 0 | All three exact independent states present. |
-| Stale A1-block vocabulary assertion | 0 | No active-control statement says release-only gaps block A1. |
+| First-pass stale A1-block vocabulary assertion | 1 (`FAIL`) | Scope was too narrow and missed the contradictory active C0 prompt at line 48; independent audit required remediation. |
 | Changed-line high-confidence secret-pattern scan | 0 | No match. |
 
 Changed paths are exactly the ten paths authorized by the dispatch. The exit SHA is the commit containing this packet and is returned to C0 because a commit cannot embed its own SHA. Application lint, typecheck, tests, build, migrations, and sponsor smokes are outside this docs-only A0 correction and remain for their assigned sprints.
 
 External effects attempted: none.
+
+## Independent audit and remediation G1
+
+- Audit target: `36783c69f249387943f6f4b89286e2b27660337e`
+- Audit verdict: `FIX`
+- Finding: `docs/lisbon/prompts/C0-COORDINATOR.md:48` still made rights, eligibility, access, and static compatibility A1 blockers, contradicting `A0_LOCAL`.
+- Repair: replace only that gate with the exact local-build/release/live-effect split and make this packet's first-pass result truthful.
+- Remediation start/control SHA: `36783c69f249387943f6f4b89286e2b27660337e`
+- Remediation exit SHA: derive from the commit containing this section and return it to C0.
+
+| Remediation check | Exit | Observed |
+|---|---:|---|
+| Contradictory A1-block scan across active non-archive Lisbon controls/prompts | 0 | No stale contradiction. |
+| Markdown fence/local-link check for all five changed documents | 0 | No malformed structure or missing local target. |
+| Exact five-path allowlist assertion | 0 | `PASS` |
+| `git diff --check` | 0 | No output. |
+| Changed-line high-confidence secret-pattern scan | 0 | No match. |
+
+Claim promotion: none. External effects attempted: none.

@@ -4,6 +4,42 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator task /root
+task_id: A0-LOCAL-ADMISSION-REMEDIATION-G1-20260724
+task_instance_id: A0-LOCAL-ADMISSION-REMEDIATION-G1-20260724:C0986048
+generation: 1
+sprint: A0_remediation
+mode: sole_writer
+branch: developer
+start_sha: 36783c69f249387943f6f4b89286e2b27660337e
+control_sha: 36783c69f249387943f6f4b89286e2b27660337e
+token: C0986048-D378-45CE-B13F-1A44A7B15A13
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T00:03:01Z
+expires_at: 2026-07-24T01:15:00Z
+allowed_paths:
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/evidence/A0-LOCAL-BUILD-ADMISSION.md
+  - docs/lisbon/prompts/C0-COORDINATOR.md
+started_at: 2026-07-24T00:00:40Z
+expected_exit: remove the audited stale C0 A1 block and correct the A0 evidence claim
+lock_release: release only token C0986048-D378-45CE-B13F-1A44A7B15A13 after the atomic commit
+completed_at: 2026-07-24T00:03:01Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - independent audit FIX on 36783c69f249387943f6f4b89286e2b27660337e is recorded exactly
+  - the active C0 prompt now uses the A0_LOCAL release and live-effect split
+  - the first stale-language check is corrected to FAIL
+  - all active non-archive Lisbon controls and prompts pass the contradiction scan
+  - exact five-path, Markdown/link, diff, and changed-line secret checks pass
+  - no product change, external effect, or claim promotion occurred
+audit_verdict: pending_pinned_exit_reaudit
+status: complete
+```
+
+```yaml
+owner: C0 coordinator task /root
 task_id: A0-LOCAL-ADMISSION-20260724T0045WEST
 task_instance_id: A0-LOCAL-ADMISSION-20260724T0045WEST:EC59B765
 sprint: A0

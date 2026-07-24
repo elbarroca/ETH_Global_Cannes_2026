@@ -45,7 +45,7 @@ WRITER SAFETY
 GATES
 - Follow the Definition of Done and evidence ladder in docs/lisbon/GOALS.md.
 - Required missing scripts, skipped required checks, mocks presented as live behavior, stale rules, moving SHAs, or incomplete evidence are blockers.
-- H0 does not block local Continuity work, but pre-H0 commits are disclosed prior work and never Lisbon-window evidence. A0 blocks product writers until rights, eligibility, required access, and static compatibility pass.
+- `A0_LOCAL` passes only on Git provenance, local project-owner authority, and writer serialization. It opens safe local A1 and authorizes later A2/offline A3 after their prerequisites pass. H0 plus rights, license, team, owners, eligibility, access, caps, static-compatibility, and live-P0 gaps do not block that local work; they remain `RELEASE_BLOCKED`, claim-blocking, or `LIVE_EFFECT_BLOCKED`. Pre-H0 commits remain disclosed prior/pre-window work and never Lisbon-window evidence.
 - A3 cannot code around failed 0G verification or proof readback.
 - A6 is optional and is CUT unless every entry gate passes with six hours reserved.
 - A7 runs the complete fresh-clone, functionality, UI, security, deployment, documentation, eligibility, demo, and bounty audit on one frozen SHA.

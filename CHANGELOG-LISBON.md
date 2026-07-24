@@ -2,6 +2,12 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A0 local-admission audit remediation
+
+- Recorded the independent `FIX` on A0_LOCAL commit `36783c69f249387943f6f4b89286e2b27660337e`: the active C0 prompt still blocked A1 on release-only gaps, and the evidence packet overstated the first stale-language check.
+- Replaced only the stale C0 gate with the exact `A0_LOCAL` split and corrected the first check to `FAIL` before recording the narrowed remediation result.
+- Kept pre-H0 disclosure plus every release, claim, and live-effect block intact; performed no product change, external effect, or claim promotion.
+
 ## 2026-07-24 - A0 local build admission
 
 - Admitted `A0_LOCAL` at start SHA `2dd242d4ae217fd6cd370e598d3ffca3250ab1f7` after verifying `developer`, baseline ancestry, clean start state, worktrees, `origin/main`, absent `origin/developer`, and an atomically acquired mirrored writer lease.
