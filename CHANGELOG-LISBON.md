@@ -2,6 +2,17 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A5 whole-product UI and protected control surface
+
+- Preserved the dark Nasdaq shell, existing route URLs, and navigation labels while adding keyboard-safe mobile navigation, global focus/active/disabled/reduced-motion rules, and responsive layouts with no horizontal overflow from 390 through 1,440 CSS pixels.
+- Replaced the legacy create claim with authenticated immutable `Define → Review → Publish`, explicit generation provenance, additive published-agent ownership/proof-policy fields, and a receipt view that reports owner, version, price, hashes, and publication time without implying runtime execution.
+- Added idempotent protected-job submission, two-second visible-only active polling, cancellation, replay-safe UI, exact job totals, UUID compute/verify routing, buyer-scoped redacted detail, and the ordered Owner → Version → ENS → 0G Compute → Storage → Receipt Proof Rail.
+- Bound delivery and settlement presentation to a verified receipt whose result hash matches one terminal successful effect. Missing evidence is unavailable rather than failed; mismatched receipt/effect hashes fail closed and expose no receipt, delivery, or settlement payload.
+- Corrected Portfolio, History, Deposit, Infrastructure, Verify, Compute, landing, chat, and legacy marketplace copy so configuration, snapshots, outages, token absence, and provider/runtime evidence are not promoted into unsupported status claims. Added one production-rendered release-candidate dashboard image labeled as local fixture data.
+- Added Playwright `1.61.1`, Chromium-only production build/start coverage for five widths, effective 200% zoom, keyboard dialog focus/Escape/restoration, reduced motion, long identifiers, publish, job failure/refund, verified delivery, replay, cancellation, and the 390px overflow invariant.
+- Passed the complete local gate: lint with zero errors and 23 inherited warnings; typecheck; foundation, auth, kernel, Go, integration, A3, A4, A5, e2e, resilience, redaction, boot, build, Playwright, whitespace, and secret checks. Independent final review found and then passed the receipt/effect binding and strict UUID remediations.
+- Performed no live ENS/0G call, managed migration, shared database effect, wallet signature, transaction, funding, spend, form, upload, push, deployment, public identifier, release claim, or track promotion. A5 is local-only; live/release gates remain blocked.
+
 ## 2026-07-24 - A4 independent-audit remediation G1
 
 - Bounded every shared ENS resolver invocation to a typed `ENS_AUTHORITY_TIMEOUT`, including normal and recovered `PRE_DELIVERY`; a resolver that never settles now terminalizes and refunds instead of being kept alive by worker heartbeats.

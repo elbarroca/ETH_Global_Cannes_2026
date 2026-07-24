@@ -3,6 +3,61 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: A5 UI and control-surface sole writer /root
+task_id: A5-UI-CONTROL-SURFACE-20260724
+task_instance_id: A5-UI-CONTROL-SURFACE-20260724:DEF3962A
+generation: 1
+sprint: A5
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: 1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9
+control_sha: 1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9
+token: DEF3962A-C6CE-4ADB-836E-8096FAAD7F72
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T18:21:20Z
+expires_at: 2026-07-24T22:45:38Z
+allowed_paths:
+  - src/kernel/**
+  - app/**
+  - components/**
+  - lib/**
+  - hooks/**
+  - tests/a5/**
+  - tests/playwright/**
+  - package.json
+  - package-lock.json
+  - playwright.config.ts
+  - public/** only if required for the release-candidate screenshot
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+started_at: 2026-07-24T14:45:38Z
+expected_exit: evidence-backed whole-product UI with authenticated immutable publish and idempotent job control, responsive Proof Rail, truthful legacy surfaces, and local Chromium verification
+external_effect_authority: local files tests loopback services disposable PostgreSQL generated build output exact package install one atomic local commit and no push deployment managed migration sponsor call transaction form upload spend or public claim
+admission_evidence:
+  - A4 remediation is pinned at 1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9 with a clean worktree and released physical lock
+  - independent pinned-SHA A4 re-audit passed Go 1.23.10 verifier integration 26 of 26 and both migration lanes
+  - approved design contract preserves the existing dark Nasdaq identity and routes while removing unsupported live sealed minted and deployed claims
+completed_at: 2026-07-24T18:21:20Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - immutable Define Review Publish creator flow and authenticated buyer-scoped idempotent job control use the protected kernel without database migration
+  - ordered Proof Rail dashboard UUID compute detail and jobId verifier expose bounded ENS A3 Storage receipt delivery and financial evidence only
+  - verified delivery and settlement require one terminal successful effect whose result hash exactly matches the verified receipt and mismatch regression fails closed
+  - remaining route copy semantics accessibility mobile navigation reduced motion 200 percent reflow and five-width overflow checks pass
+  - foundation auth kernel Go integration A3 A4 A5 e2e resilience redaction boot build Chromium diff and secret gates pass
+  - independent final review and remediation re-review returned PASS with no remaining actionable finding
+remaining_blocks:
+  - PASS_LIVE is NOT_RUN and LIVE_EFFECT_BLOCKED with no live ENS 0G sponsor or public identifier evidence
+  - managed migration deployment push forms transaction signature funding upload spend release and claim promotion remain blocked
+  - inherited dependency advisories and release claim drift remain separate unresolved release concerns
+audit_verdict: PASS
+result: PASS_UI_CONTROL_SURFACE_LOCAL_ONLY
+lock_release: release only matching token DEF3962A-C6CE-4ADB-836E-8096FAAD7F72 after required gates one atomic local commit clean status and mirrored closure
+status: closed
+```
+
+```yaml
 owner: A4 remediation sole writer /root/a4_remediation_writer
 task_id: A4-ENS-AUTHORITY-REMEDIATION-G1-20260724
 task_instance_id: A4-ENS-AUTHORITY-REMEDIATION-G1-20260724:47C57F33
