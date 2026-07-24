@@ -43,7 +43,7 @@
     "migrate": "prisma migrate deploy",
     "setup:circle": "npx tsx scripts/setup-circle.ts",
     "specialists": "tsx src/agents/specialist-server.ts",
-    "bot": "tsx src/telegram/bot.ts",
+    "bot": "node --env-file=.env.local --import tsx --eval \"import('./src/telegram/bot.ts').then(({ startBot }) => startBot())\"",
     "cycle": "tsx src/index.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
