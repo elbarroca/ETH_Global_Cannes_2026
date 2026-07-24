@@ -1,0 +1,31 @@
+AlphaDawg Lisbon project migration
+
+Source retained: .claude/** (migration provenance only)
+Active instructions: AGENTS.md
+Codex agent defaults: inherited; no project config required
+
+Codex custom agents:
+- .codex/agents/og-integrator.toml
+- .codex/agents/hedera-integrator.toml
+- .codex/agents/payments-integrator.toml
+- .codex/agents/frontend-builder.toml
+- .codex/agents/openclaw-builder.toml
+- .codex/agents/kernel-integrator.toml
+- .codex/agents/cycle-wirer.toml
+- .codex/agents/ens-integrator.toml
+- .codex/agents/bounty-auditor.toml
+
+Codex skills converted from source commands:
+- .agents/skills/source-command-build-specialist/SKILL.md
+- .agents/skills/source-command-test-cycle/SKILL.md
+
+Manual migration reconciliation:
+- Removed source model pins instead of carrying unsupported Claude model names.
+- Replaced stale VaultMind/Cannes paths, versions, APIs, bounties, and live-success instructions.
+- Added explicit Kernel and ENS owners.
+- Narrowed every mutation domain and made the Bounty Auditor read-only.
+- Rewrote command placeholders as normal Codex skill inputs.
+- Preserved existing Circle and Neon Codex skills unchanged.
+
+Validation: target validator passed all nine agent TOML files, both converted
+skills, existing skills, and AGENTS.md. Codex enables subagents by default.

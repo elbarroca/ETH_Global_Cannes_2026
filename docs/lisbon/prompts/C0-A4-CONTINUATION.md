@@ -147,7 +147,10 @@ For each sprint:
 
 R0 - AGENT AND PROMPT READINESS
 
-- Audit `AGENTS.md`, every `.claude/agents/*.md`, both slash commands, and the C0/executor/auditor chain.
+- Audit `AGENTS.md`, every `.codex/agents/*.toml`, both converted
+  `.agents/skills/source-command-*/SKILL.md` workflows, and the
+  C0/executor/auditor chain. `.claude/**` is migration provenance only and
+  cannot dispatch work.
 - Require exactly one owner for authentication/kernel, ENS, 0G, UI/E2E, optional payments, cycle wiring, and final bounty audit. Add or narrow one ENS specialist owner for `src/ens/**` and related migrations/tests; do not leave ENS implicit inside a broad role.
 - Verify every declared path exists, every dependency/API version matches `package.json` plus installed types, and every command exists.
 - Remove or correct stale Cannes-only bounty rules, `VaultMind` identity, obsolete `src/dashboard/**` paths, stale 0G SDK versions/signatures, and any instruction that could revive a legacy success path.

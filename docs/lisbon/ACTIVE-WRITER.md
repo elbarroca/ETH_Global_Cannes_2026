@@ -3,6 +3,66 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: R0-AGENT-READY-20260724
+task_instance_id: R0-AGENT-READY-20260724:7F0FC69E
+generation: 1
+sprint: R0
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: 7134e1ec0227250c0f9927259ed64d5e0267081d
+control_sha: 7134e1ec0227250c0f9927259ed64d5e0267081d
+token: R0-AGENT-READY-7F0FC69E-BF5A-41AE-90C9-28A44DA8E4EE
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T22:06:10Z
+expires_at: 2026-07-25T00:36:37Z
+allowed_paths:
+  - AGENTS.md
+  - .codex/config.toml
+  - .codex/agents/**
+  - .codex/migrate-to-codex-report.txt
+  - .agents/skills/source-command-build-specialist/**
+  - .agents/skills/source-command-test-cycle/**
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md only if observed facts require reconciliation
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/SPRINTS.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/R0-AGENT-READINESS.md
+  - docs/lisbon/prompts/C0-COORDINATOR.md
+  - docs/lisbon/prompts/C0-A4-CONTINUATION.md
+  - docs/lisbon/prompts/SPRINT-EXECUTOR.md
+  - docs/lisbon/prompts/SPRINT-AUDIT.md
+  - docs/lisbon/prompts/README.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-24T21:36:37Z
+deadline: 2026-07-25T00:36:37Z
+expected_exit: every registered specialist and reusable prompt is current, path/version/command checks pass, one ENS owner exists, mutating scopes do not overlap, and an immutable local commit is ready for independent audit
+acceptance_items:
+  - exactly one owner for authentication/kernel, ENS, 0G, UI/E2E, optional payments, cycle wiring, and final bounty audit
+  - no VaultMind, Cannes-only bounty, obsolete src/dashboard, stale installed API/version, nonexistent path, or legacy-success instruction
+  - read-only dry dispatch matrix records domains, paths, dependencies, commands, conflicts, and verdicts
+  - official Lisbon and ENS criteria are refreshed without promoting live claims
+external_effect_authority: safe local files, checks, loopback processes, generated output, and one atomic commit only; no push, deploy, managed migration, webhook registration, sponsor call, signature, transaction, form, spend, or public claim
+scope_reconciliation:
+  - owner corrected the target from Claude Code to Codex after the initial R0 draft
+  - mistaken uncommitted .claude edits were restored byte-for-byte from HEAD
+  - Codex-native project agents use .codex/agents/*.toml and converted commands use .agents/skills/*/SKILL.md
+completed_at: 2026-07-24T22:06:10Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - seven Claude source agents map to nine valid Codex agents, including explicit Kernel and ENS owners
+  - Codex target validation, source preservation, stale-instruction, path, command, schema, inventory, and installed-version checks passed
+  - lint passed with zero errors and 23 inherited warnings; typecheck and foundation tests passed 9 of 9
+  - secret scan, production build, and diff check passed
+result: PASS_TO_AUDIT_LOCAL_ONLY
+lock_release: release only matching token R0-AGENT-READY-7F0FC69E-BF5A-41AE-90C9-28A44DA8E4EE after the containing commit
+status: closed
+```
+
+```yaml
 owner: Codex under project-owner direction
 task_id: TELEGRAM-AGENT-UI-GOAL-20260724
 task_instance_id: TELEGRAM-AGENT-UI-GOAL-20260724:0EC63C69

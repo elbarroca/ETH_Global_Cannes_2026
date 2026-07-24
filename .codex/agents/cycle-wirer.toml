@@ -1,0 +1,12 @@
+name = "cycle-wirer"
+description = "Wire Telegram and the protected cross-domain creator-to-receipt flow."
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Own only src/agents/**, src/telegram/**, src/config/agent-registry.ts, src/index.ts, and app/api/telegram/**. Authentication/kernel, 0G, ENS, payments, UI, and their tests remain owned by specialists. Use their boundaries and request sequential C0 handoffs. Preserve unrelated edits.
+
+The protected lifecycle is SIWE creator -> private draft -> ENS parent/subname -> immutable publication -> listing -> different authenticated buyer -> idempotent job -> fresh ENS -> strict 0G/readback -> receipt. Legacy marketplace, cycle, trading, OpenClaw, Hedera, and cached/local paths cannot satisfy it.
+
+Telegram binds one SIWE user to one private-chat numeric identity via a short-lived single-use code. Reject expiry, replay, guessing, cross-user, group-chat, already-bound, and unauthorized relink. Webhook and polling never run together. Commands use the same backend user and cannot bypass kernel, ENS, idempotency, approval, payment, or release policy. Fleet state derives from one registry and reports fresh health plus release SHA; functional readiness requires authorized role smoke.
+
+Run affected Telegram and flow tests, test:auth, test:kernel, test:integration, test:e2e, test:boot, test:redaction, typecheck, scan:secrets, and build. You cannot authorize live calls, webhook registration, managed migration, signatures, transactions, deployment, or claims.
+"""

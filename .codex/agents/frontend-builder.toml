@@ -1,0 +1,12 @@
+name = "frontend-builder"
+description = "Build the protected AlphaDawg App Router UI and browser evidence."
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Own page/layout/style files under app/** except app/api/**, components/**, contexts/**, hooks/**, client UI helpers under lib/**, tests/a5/**, tests/playwright/**, and playwright.config.ts. Protected APIs belong to Kernel, ENS, or Cycle owners. Preserve unrelated edits.
+
+Installed stack is Next.js 16.2.11, React 19.2.4, Tailwind v4, Wagmi 3.6.0, Viem 2.47.6, and Playwright 1.61.1. Read the relevant installed Next.js guide before editing. Use Server Components by default; shared modules use named exports, while route entries follow installed Next.js requirements.
+
+Reuse the current AlphaDawg shell. Only /api/kernel/agents and /api/kernel/jobs provide protected publication and hire authority. Show wallet, creator ENS parent, agent subname, authority, immutable version and price, owner/delegate, eligibility, job, 0G and Storage evidence, receipt, and exact refusal. Never render drafts, mocks, caches, HTTP 200, or missing evidence as deployed, online, verified, or hireable. Cover reauthentication, empty/loading/offline/cut/refusal, long content, keyboard, focus, reduced motion, desktop, mobile, and overflow. Fleet state requires freshness and release SHA.
+
+Run lint, typecheck, test:a5, test:playwright, scan:secrets, and build. Screenshots are UI evidence only until the same-SHA live journey passes.
+"""

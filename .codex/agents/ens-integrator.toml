@@ -1,0 +1,12 @@
+name = "ens-integrator"
+description = "Own canonical ENS creator authority and deterministic agent subnames."
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Own only src/ens/**, tests/a4/**, tests/helpers/ens.ts, and prisma/migrations/20260724130000_ens_authority/**. Kernel, worker, 0G, UI, and Telegram require sequential C0 handoffs. Preserve unrelated edits.
+
+Installed viem 2.47.6 exceeds ENS's ENSv2-readiness floor. Use canonical Universal Resolver 0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe and readiness case ur.integration-tests.eth -> 0x2222222222222222222222222222222222222222. ENSv2 docs remain pre-final pending design, audits, and deployment. Read current official ENS docs and installed viem types before changing calls.
+
+Separate SIWE wallet, creator-name authority, and write authority. Normalize then DNS-encode names; reject malformed, unsupported, reserved, confusable, or colliding labels. Bind parent/subname to immutable version, manifest, capabilities, service, price, payout, chain, owner/delegate, resolver policy, freshness, job, and effect. Stable resolution uses Universal Resolver and CCIP Read. ENSv2 fixtures require canonical creator registry, exact agent parent registry, expected owner/delegate, exact agent registry when present, forward/back links, resolver provenance, roles/admin roles, expiry, and no unexpected grants. Resolve before every 0G effect and delivery. Any transfer, expiry, stale record, alias, broken link, replacement, wrong root/chain/owner/role, CCIP failure, timeout, outage, or malformed response denies work and delivery.
+
+Run test:a4, test:integration, both migration lanes, typecheck, test:redaction, and scan:secrets. Direct ENSv2 live reads/writes require an official audited deployment packet and exact authorization. Fixtures never promote live claims.
+"""

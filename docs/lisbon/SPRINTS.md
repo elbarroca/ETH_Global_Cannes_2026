@@ -82,7 +82,10 @@ Objective: make the registered specialists safe to dispatch against the current 
 
 Deliver:
 
-- Audit `AGENTS.md`, `.claude/agents/**`, `.claude/commands/**`, and the active coordinator/executor/auditor prompt chain.
+- Audit `AGENTS.md`, `.codex/agents/**`, the converted
+  `.agents/skills/source-command-*/**` workflows, and the active
+  coordinator/executor/auditor prompt chain. `.claude/**` is migration
+  provenance only and cannot dispatch work.
 - Give authentication/kernel, ENS, 0G, product UI/E2E, optional payments, cycle wiring, and final bounty audit exactly one owner each. ENS must explicitly own `src/ens/**` and its migrations/tests.
 - Reconcile every declared path, package/API version, command, product name, event/bounty rule, and allowed effect against the current checkout. Remove stale Cannes-only, `VaultMind`, missing-path, and outdated-SDK guidance.
 - Dry-dispatch each specialist read-only and record its domain, paths, commands, dependencies, conflicts, and verdict.

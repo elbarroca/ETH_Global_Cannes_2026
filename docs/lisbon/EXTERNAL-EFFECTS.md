@@ -6,7 +6,21 @@ Control state: `LIVE_EFFECT_BLOCKED`.
 
 This state is independent from `LOCAL_BUILD_AUTHORIZED`: local files, tests, loopback processes, disposable local databases, and atomic commits on the exact authorized branch are allowed when they cannot affect a shared or external system. It also preserves `RELEASE_BLOCKED`; local success grants no push, deployment, submission, or claim authority.
 
-Last reconciled: `2026-07-24T13:10:56Z`. A4 used only local files, deterministic resolver fixtures, the preserved local Go toolchain, generated build output, and disposable loopback PostgreSQL. No live ENS/0G read or write, shared database, or other external effect was attempted. The project owner previously authorized one documentation/control commit on new branch `Eth_global_lisbon_` and one push of that exact containing commit; that one-time push is already consumed by the observed remote control SHA and does not authorize this A4 commit or any descendant push. No PR, merge, deployment, live sponsor call, managed migration, signature, transaction, form, funding, upload, spend, or claim promotion is authorized.
+Last reconciled: `2026-07-24T21:56:41Z`. R0 used local files,
+read-only official documentation, the Codex migration validator, and static
+repository checks only. No live ENS/0G read or write, shared database, or other
+external effect was attempted. The project owner previously authorized one
+documentation/control commit on new branch `Eth_global_lisbon_` and one push
+of that exact containing commit; that one-time push is consumed by the observed
+remote control SHA and authorizes no descendant push.
+
+`ACTIVE-WRITER.md` records a historical Neon provisioning/migration effect in
+commit `7287d85f76bff6d8c59d2def35a416a0c80a4944`, but this ledger contains no
+matching pre-effect authorization row. It is therefore
+`OBSERVED_UNRECONCILED`, cannot be repeated or used as release proof, and
+remains owner-reconciliation work. No current PR, merge, deployment, live
+sponsor call, managed migration, webhook registration, signature, transaction,
+form, funding, upload, spend, or claim promotion is authorized.
 
 Autonomous goals cannot change a row from `NOT_AUTHORIZED` to `AUTHORIZED` on their own. The coordinator may mirror a separate authenticated project-owner instruction only when it binds the exact effect, release SHA, provider/network, cap/scope, and timestamp. Signing/broadcast approval must also bind effect ID, asset, recipient, spender/target, atomic amount cap, deadline, nonce, and policy version; consume it once and reconcile ambiguous outcomes without replacement.
 
@@ -27,6 +41,7 @@ Autonomous goals cannot change a row from `NOT_AUTHORIZED` to `AUTHORIZED` on th
 | Uniswap feedback-form submission | `NOT_AUTHORIZED` |  | Exact form and FEEDBACK.md SHA |  |  |
 | Sui/Walrus/Seal effects | `NOT_AUTHORIZED` |  | Network/object/request/gas cap |  |  |
 | Database provisioning/migration | `NOT_AUTHORIZED` |  | Exact project/database/schema |  |  |
+| Historical Neon provisioning/migration at `7287d85` | `OBSERVED_UNRECONCILED; NOT_AUTHORIZED_CURRENTLY` |  | Four committed Prisma migrations recorded as applied; no repeat authority | 2026-07-24 | `ACTIVE-WRITER.md` record; no matching exact authorization row in this ledger |
 | Vercel deployment | `NOT_AUTHORIZED` |  | Exact project/environment/SHA |  |  |
 | Railway deployment | `NOT_AUTHORIZED` |  | Exact project/service/environment/SHA |  |  |
 | Mainnet value | `PROHIBITED` | Project owner | Zero | Permanent current contract |  |

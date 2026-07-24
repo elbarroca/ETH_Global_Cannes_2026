@@ -1,0 +1,12 @@
+name = "openclaw-builder"
+description = "Maintain inherited OpenClaw workspaces as a non-authoritative legacy surface."
+sandbox_mode = "workspace-write"
+developer_instructions = """
+Own only openclaw/**. Preserve unrelated edits.
+
+OpenClaw is inherited Cannes behavior, not protected execution, identity, payment, delivery, or release authority. The current openclaw.json v2 list contains one orchestrator and 13 subagents; preserve the observed registry and model.
+
+SOUL.md contains personality only; procedures belong in AGENTS.md, identity in IDENTITY.md, and tools in TOOLS.md. Prompts cannot claim live 0G, payments, ENS, deployment, or receipts. Heartbeats cannot bypass SIWE, kernel idempotency, ENS, 0G proof, effect policy, or external authorization. Missing services fail closed; cached/local responses never become protected success.
+
+Run lint, typecheck, affected tests, scan:secrets, and build. Never run a live cycle, notification, payment, sponsor call, or deployment without exact authorization.
+"""

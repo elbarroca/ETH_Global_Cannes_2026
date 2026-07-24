@@ -65,7 +65,9 @@ The archive is provenance only. It cannot direct current work.
 
 `R0_AGENT_READY` must pass before another A4-A7 writer is dispatched:
 
-- Inventory `AGENTS.md`, every `.claude/agents/*.md`, both slash commands, this contract, `SPRINTS.md`, and the active coordinator/executor/auditor prompts.
+- Inventory `AGENTS.md`, every `.codex/agents/*.toml`, both converted
+  `.agents/skills/source-command-*/SKILL.md` workflows, this contract,
+  `SPRINTS.md`, and the active coordinator/executor/auditor prompts.
 - Require exactly one owner for each protected domain: authentication/kernel, ENS, 0G, product UI/E2E, optional payments, cycle wiring, and final bounty audit. Add or narrow one specialist instead of leaving ENS unowned or duplicating writers.
 - Verify every declared path exists, every package/API version matches `package.json` and installed types, and every command exists. Remove stale Cannes-only bounty criteria, `VaultMind` identity, obsolete `src/dashboard/**` paths, and stale SDK signatures before trusting an agent.
 - The ENS owner must cover `src/ens/**`, ENS migrations/tests, Universal Resolver readiness, ENSv2 hierarchy/permission checks, and the creator-subname lifecycle. The Cycle Wirer owns only the cross-domain protected flow. The Frontend Builder owns root `app/**` and `components/**`. The Bounty Auditor must use current Lisbon controls and official requirements.

@@ -2,6 +2,22 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - R0 Codex agent and prompt readiness
+
+- Migrated all seven legacy specialist definitions into validated
+  `.codex/agents/*.toml` files, added explicit Kernel and ENS owners, and
+  narrowed every mutation domain. The Bounty Auditor is read-only.
+- Converted both legacy command workflows into Codex skills under
+  `.agents/skills/`; `.claude/**` remains unchanged inactive provenance.
+- Reconciled installed packages, actual paths, package commands, current
+  Lisbon rules, ENSv2 pre-final status, Universal Resolver guidance, and the
+  active C0/executor/auditor chain.
+- Ran the Codex migration scan/plan/doctor/dry-run/write/manual-repair loop,
+  target validation, stale-instruction/path/command scans, source-preservation
+  check, and diff hygiene. The containing commit returns `PASS_TO_AUDIT`.
+- Performed no push, deployment, managed migration, webhook registration,
+  sponsor call, signature, transaction, form, funding, upload, spend, or claim.
+
 ## 2026-07-24 - A5 independent-audit remediation G1
 
 - Classified the A5 dependency findings instead of applying blind majors. Removed the production-reachable Dynamic/RainbowKit/WalletConnect tree and unused direct `uuid` declarations; applied bounded package upgrades and transitive overrides; and reduced the production audit to 0 critical, 0 high, 4 moderate, and 13 low advisories. The remaining production findings require incompatible 0G, Hedera, or Telegram majors; the six full-audit highs are confined to lint, Hardhat, Solidity coverage, and their test/compiler dependencies.

@@ -1,6 +1,7 @@
-# C0 - Autonomous AlphaDawg Lisbon Coordinator
+# C0 - Original AlphaDawg Lisbon Coordinator
 
-Paste this `/goal` once. Do not launch the executor or auditor manually.
+Provenance only. Current A4-A7 work launches
+`docs/lisbon/prompts/C0-A4-CONTINUATION.md`; do not paste this older wrapper.
 
 ```text
 /goal
@@ -19,11 +20,11 @@ READ FIRST
 9. only the context files needed by the selected sprint
 
 BOOT
-- Resolve the repository with `git rev-parse --show-toplevel`; require branch `developer` and verify baseline `bfa7bd37c573e2e49525d965f7f937210e170d72` ancestry.
+- Resolve the repository with `git rev-parse --show-toplevel`; require the branch bound by the active launch contract and verify baseline `bfa7bd37c573e2e49525d965f7f937210e170d72` ancestry. The current continuation branch is `Eth_global_lisbon_`; `developer` is preserved A0-A3 provenance only.
 - Inspect HEAD, status, all worktrees, remotes, runtime/lockfile, common-dir writer lease, ACTIVE-WRITER mirror, current controls, and existing evidence.
 - Stop mutation on unexpected changes, an unknown/expired writer, branch mismatch, or ambiguous external effect. Preserve evidence; never reset, stash, clean, rebase, overwrite, or steal a lock.
 - Treat recorded states as evidence to reconcile, not truth to repeat. Recheck time-sensitive official rules from primary sources before A0 and A7.
-- Select the earliest sprint in docs/lisbon/SPRINTS.md that is neither independently passed nor evidence-backed CUT.
+- Select the earliest sprint in docs/lisbon/SPRINTS.md that is neither independently passed nor evidence-backed CUT. Current continuation must pass `R0_AGENT_READY` before A4-A7 dispatch.
 
 EXECUTION
 - Maintain one concise task row per active sprint: sprint, role, mode, start/target SHA, scope, state, deadline, evidence, blocker, next action.
