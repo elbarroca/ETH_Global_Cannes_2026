@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/circlefin/skills",
+  "commit": "c7d269a2025e26410e0e23fb5a73c769dc07d088",
+  "installedAt": "2026-07-24",
+  "normalization": "trailing whitespace and final blank lines only",
+  "scope": "project"
+}

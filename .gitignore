@@ -56,3 +56,9 @@ circle-recovery*
 .claude/skills/
 .qwen/
 .windsurf/
+
+# Project-pinned Circle skills are part of this repository.
+!.agents/
+.agents/*
+!.agents/skills/
+!.agents/skills/**

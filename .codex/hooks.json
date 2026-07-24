@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".codex/hooks/circle-skills-context.sh SessionStart",
+            "timeout": 5,
+            "statusMessage": "Circle skills: validating project setup"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".codex/hooks/circle-skills-context.sh UserPromptSubmit",
+            "timeout": 5,
+            "statusMessage": "Circle skills: routing wallet and testnet work"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".codex/hooks/circle-skills-context.sh SubagentStart",
+            "timeout": 5,
+            "statusMessage": "Circle skills: briefing project agent"
+          }
+        ]
+      }
+    ]
+  }
+}
