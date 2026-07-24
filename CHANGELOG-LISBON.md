@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - Post-A3 continuation prompt and branch publication control
+
+- Recorded the final independent `PASS_A3_REMEDIATION` verdict on exact SHA `9a4f41f8c679469dc230cba584bce84fcc3c65e5`; A3 is now `PASS_FIXTURE; PASS_INTEGRATION; PASS_REAUDIT; LOCAL_ONLY`, while live remains `NOT_RUN; LIVE_EFFECT_BLOCKED`.
+- Added one self-contained A4-to-release `/goal` with completed A0-A3 state, remaining setup, A4-A7 contracts, writer/auditor serialization, external-effect gates, stop rules, and exact checkpoint fields.
+- Made the continuation prompt the current launch entry while preserving the original C0 prompt as provenance.
+- Updated the control center and canonical authority row so safe local A4-A7 work is confined to `Eth_global_lisbon_`; external/live effects remain denied.
+- Mirrored one-time authorization for the documentation/control commit and exact same-name push to `origin/Eth_global_lisbon_`; no PR, merge, deployment, sponsor call, managed migration, signature, transaction, form, funding, upload, spend, or claim promotion is authorized.
+- Changed documentation and control records only; product code, package manifests/lock, schema, migrations, CI, and runtime behavior remain unchanged.
+
 ## 2026-07-24 - A3 independent-audit remediation G1
 
 - Removed the conditional production live A3 runtime entirely. Retired enable/funding/spend settings are rejected, the example environment no longer advertises them, and the default adapter returns terminal `A3_LIVE_BLOCKED` before any broker, signer-status, billing-header, funding, Storage, verifier, upload, or network construction/import.

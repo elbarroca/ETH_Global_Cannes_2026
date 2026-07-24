@@ -1,6 +1,6 @@
 # AlphaDawg Lisbon Execution Contract
 
-This file defines what must be true. [`SPRINTS.md`](SPRINTS.md) defines the work. [`prompts/C0-COORDINATOR.md`](prompts/C0-COORDINATOR.md) is the only prompt the operator launches.
+This file defines what must be true. [`SPRINTS.md`](SPRINTS.md) defines the work. [`prompts/C0-A4-CONTINUATION.md`](prompts/C0-A4-CONTINUATION.md) is the current post-A3 launch prompt.
 
 ## Target outcome
 
@@ -12,12 +12,13 @@ Uniswap is optional. It may run only after the protected path is frozen, repeata
 
 ## Authority and scope
 
-- `LOCAL_BUILD_AUTHORIZED`: A0_LOCAL admits safe local A1 and, after their sequential prerequisites pass, A2 and offline A3 work plus atomic commits on `developer`.
+- `LOCAL_BUILD_AUTHORIZED`: A0_LOCAL admitted safe local A1-A3 work on `developer`; the current owner instruction separately authorizes safe local A4-A7 continuation and atomic commits on `Eth_global_lisbon_`.
 - `RELEASE_BLOCKED`: rights/license, team/owner, access/cap, event-window, same-SHA, submission, and promotion evidence remain release/claim gates.
 - `LIVE_EFFECT_BLOCKED`: only an exact `AUTHORIZED` row may open its named sponsor/API call, managed database effect, deployment, signature, transaction, form, or spend; mainnet value remains prohibited.
 - Project: AlphaDawg only.
 - Immutable prior baseline: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
-- Implementation branch: `developer`.
+- Validated A0-A3 implementation branch: `developer`.
+- Current continuation branch: `Eth_global_lisbon_`.
 - Current authority and state come from `BASELINE.md`, `EXTERNAL-EFFECTS.md`, `TRACK-MATRIX.md`, `CLAIM-MATRIX.md`, and `EVIDENCE.md`; never from a timestamp embedded in a prompt.
 - Previous Cannes code is reusable input, not Lisbon eligibility or release evidence.
 - Local files, tests, loopback processes, disposable local databases, and commits are the only pre-authorized effects. Push, deploy, provision, migrate a managed database, call sponsor/paid APIs, sign, transact, submit forms, spend, or publish claims only when `EXTERNAL-EFFECTS.md` contains exact current authorization.
@@ -103,4 +104,6 @@ If a required command does not exist, the sprint is not green. A1 must create re
 
 ## Launch
 
-Paste only [`prompts/C0-COORDINATOR.md`](prompts/C0-COORDINATOR.md) into one persistent Codex task. C0 reads the sprint ledger and instantiates the reusable executor and auditor prompts itself.
+For the accepted post-A3 frontier, paste only [`prompts/C0-A4-CONTINUATION.md`](prompts/C0-A4-CONTINUATION.md) into one persistent Codex task. It starts from independently accepted A3 engineering SHA `9a4f41f8c679469dc230cba584bce84fcc3c65e5` on continuation branch `Eth_global_lisbon_` and instantiates the reusable executor and auditor prompts itself.
+
+[`prompts/C0-COORDINATOR.md`](prompts/C0-COORDINATOR.md) remains the original A0-A7 launch prompt for provenance, not the current continuation entrypoint.

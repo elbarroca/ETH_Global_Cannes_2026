@@ -4,6 +4,54 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator task /root
+task_id: A3-TO-A4-CONTINUATION-PROMPT-PUBLISH-20260724
+task_instance_id: A3-TO-A4-CONTINUATION-PROMPT-PUBLISH-20260724:12016122
+sprint: continuation_control
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: 9a4f41f8c679469dc230cba584bce84fcc3c65e5
+control_sha: 9a4f41f8c679469dc230cba584bce84fcc3c65e5
+token: 12016122-6DDA-4CD7-A372-B2A42C2302A8
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T12:19:21Z
+expires_at: 2026-07-24T14:18:30Z
+allowed_paths:
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/README.md
+  - docs/lisbon/evidence/A3-STRICT-0G.md
+  - docs/lisbon/prompts/C0-A4-CONTINUATION.md
+  - docs/lisbon/prompts/README.md
+started_at: 2026-07-24T12:18:30Z
+expected_exit: one reviewed docs-only continuation commit on Eth_global_lisbon_ plus the exact authorized same-name push
+control_deviation: the same coordinator drafted the allowlisted unstaged docs diff before formal lease acquisition; no other writer or physical lock existed, and the complete diff was adopted and revalidated under this token before staging
+external_effect_authority: one exact push of the containing commit to origin/Eth_global_lisbon_; no PR merge tag release deployment live call signature transaction form funding upload spend or claim promotion
+completed_at: 2026-07-24T12:19:21Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - current launch controls point to the self-contained A4 continuation goal on Eth_global_lisbon_
+  - exact A0 A1 A2 and A3 accepted SHAs results setup gaps A4-A7 gates stop rules and output fields are recorded
+  - final A3 remediation audit PASS is reconciled across evidence claims writer ledger and the evidence packet
+  - canonical authority permits safe local A4-A7 work on Eth_global_lisbon_ while every live release and shared-system effect remains blocked
+  - independent docs review passed after authority launch SHA and one-time-consumption findings were repaired
+  - Markdown links fences git diff lint typecheck foundation tests and staged secret scan passed
+  - product code package lock schema migrations CI and runtime behavior were unchanged
+remaining_blocks:
+  - PASS_LIVE is NOT_RUN and LIVE_EFFECT_BLOCKED
+  - A4 A5 A6 and A7 are not implemented or validated
+  - README rights event-window dependency deployment PR merge forms submission and release gates remain blocked
+audit_verdict: PASS_DOCS_CONTROL_REVIEW
+result: PASS_TO_AUTHORIZED_PUSH
+lock_release: release only matching token 12016122-6DDA-4CD7-A372-B2A42C2302A8 after the atomic documentation commit
+status: closed
+```
+
+```yaml
+owner: C0 coordinator task /root
 task_id: A3-STRICT-0G-REMEDIATION-G1-20260724
 task_instance_id: A3-STRICT-0G-REMEDIATION-G1-20260724:E83BB3D9
 generation: 1
@@ -36,7 +84,7 @@ started_at: 2026-07-24T05:10:51Z
 expected_exit: unconditionally block production live A3, recover durable readback with zero adapter calls at max attempts, cooperatively terminate and clean bounded verifier subprocesses, enforce canonical deadlines, and pass end-to-end failure regressions
 lock_release: release only token E83BB3D9-81C2-4FFF-9DE3-C64CD847F3EC after one atomic remediation commit or a recorded BLOCKED closeout
 completed_at: 2026-07-24T05:47:13Z
-exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+exit_sha: 9a4f41f8c679469dc230cba584bce84fcc3c65e5
 acceptance_evidence:
   - production live A3 is unconditionally unavailable and former enable funding and spend settings are rejected
   - default adapter with every former live flag permissive made zero network calls and terminalized A3_LIVE_BLOCKED without a journal or success artifact
@@ -46,12 +94,12 @@ acceptance_evidence:
   - Go applies RLIMIT_FSIZE before official non-FullTrusted proof download and handles SIGXFSZ through its context
   - twelve focused A3 tests three pinned-Go tests and build combined integration seventeen of seventeen both migration lanes and the full cold gate passed
   - package lock schema migrations and CI remained unchanged and no external effect occurred
+  - independent immutable-SHA re-audit accepted all five remediation roots and repeated the full gate on exact exit SHA 9a4f41f8c679469dc230cba584bce84fcc3c65e5
 remaining_blocks:
-  - independent pinned remediation exit SHA re-audit is pending
   - PASS_LIVE is NOT_RUN and LIVE_EFFECT_BLOCKED because production live A3 is intentionally unavailable
   - release claim rights event-window dependency README deployment and A7 gates remain blocked
-audit_verdict: pending_pinned_exit_reaudit
-result: PASS_TO_REAUDIT
+audit_verdict: PASS_A3_REMEDIATION
+result: PASS_FIXTURE_PASS_INTEGRATION_PASS_REAUDIT
 status: closed
 ```
 
@@ -95,7 +143,7 @@ started_at: 2026-07-24T03:48:15Z
 expected_exit: strict offline 0G fixture and disposable-PostgreSQL A3 integration with durable claim-fenced recovery, live paths blocked, full gate, and one atomic commit
 lock_release: release only token 3EFB753E-44AB-4FC5-AC06-DF67929282E8 after the atomic A3 commit or a recorded BLOCKED closeout
 completed_at: 2026-07-24T04:47:29Z
-exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+exit_sha: 879072a728f0bec7a4b7a541594a7920cd815d69
 acceptance_evidence:
   - strict Compute binds the exact canonical creator buyer version manifest input provider model nonce deadline policy intent job and effect request before single-use headers
   - exactly one signature object is schema-checked verified by the installed verifier and UTF-8 byte-matched to accepted assistant content
@@ -105,11 +153,11 @@ acceptance_evidence:
   - fourteen terminal mutation cases created zero receipt settlement commission rating trade second effect or fake proof
   - package-lock remained byte-identical and no sponsor provider indexer RPC shared database deployment push signature transaction form spend or claim promotion occurred
 remaining_blocks:
-  - independent pinned exit SHA audit is pending
+  - immutable-SHA audit returned FIX_REQUIRED and opened the single A3 remediation generation
   - PASS_LIVE is NOT_RUN and LIVE_EFFECT_BLOCKED without exact authority public identifiers and proof-enabled live readback
   - release claim rights event-window dependency README deployment and A7 gates remain blocked
-audit_verdict: pending_pinned_exit_audit
-result: PASS_FIXTURE_PASS_INTEGRATION_PASS_TO_AUDIT
+audit_verdict: FIX_REQUIRED
+result: PASS_FIXTURE_PASS_INTEGRATION_AUDIT_FIX
 status: closed
 ```
 
@@ -152,7 +200,7 @@ started_at: 2026-07-24T03:01:17Z
 expected_exit: fence every worker mutation by current claim authority, close auth-action and cookie parsing gaps, pass full cold gate, and return one atomic remediation commit
 lock_release: release only token E170CD9A-E7F3-4F1D-AA9A-CCA93C32437C after the atomic A2 remediation commit
 completed_at: 2026-07-24T03:32:59Z
-exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+exit_sha: dd336b840edb4de97fc382298c5a0c0c658f6f9f
 acceptance_evidence:
   - stale A heartbeat success failure retry and finalization were rejected after B reclaimed the exact job with zero observed mutation to B claim state
   - B alone terminalized one effect receipt settlement and commission after reclaim
@@ -164,10 +212,10 @@ acceptance_evidence:
   - no schema migration package lockfile README sponsor shared database deployment push signature transaction form spend mainnet action or claim promotion change occurred
 remaining_blocks:
   - production adapter remains A3_NOT_CONFIGURED
-  - pinned remediation exit re-audit is pending
+  - independent re-audit accepted exact exit SHA dd336b840edb4de97fc382298c5a0c0c658f6f9f
   - README.md line 7 remains RELEASE_CLAIM_DRIFT_BLOCKED outside remediation scope
-audit_verdict: pending_pinned_exit_reaudit
-result: PASS_TO_REAUDIT
+audit_verdict: PASS_A2_REMEDIATION
+result: PASS_REAUDIT
 status: closed
 ```
 
@@ -239,7 +287,7 @@ started_at: 2026-07-24T01:50:56Z
 expected_exit: authenticated fail-closed kernel, singleton worker, deterministic concurrency/recovery, full local gate, and evidence pass on one local SHA
 lock_release: release only token 3920D88F-0B33-4764-B65B-864CD77B3BDD after the atomic A2 commit
 completed_at: 2026-07-24T02:49:44Z
-exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+exit_sha: 2f623a25fbbf4d226657a439a3ed3bbf47cfc7a7
 acceptance_evidence:
   - canonical SIWE negative, replay, cookie, hash-only session, and DB-only onboarding tests passed 5/5
   - immutable schema and seven DB invariant triggers passed empty plus synthetic upgrade replay
@@ -250,9 +298,10 @@ acceptance_evidence:
   - no sponsor call shared database push deployment user signature transaction form spend mainnet action or claim promotion
 remaining_blocks:
   - production adapter is A3_NOT_CONFIGURED
-  - independent A2 audit is pending
+  - independent A2 audit returned FIX_REQUIRED and opened the single A2 remediation generation
   - README.md line 7 inherited target-pool wording remains RELEASE_CLAIM_DRIFT_BLOCKED outside A2 scope
-result: PASS_TO_AUDIT
+audit_verdict: FIX_REQUIRED
+result: AUDIT_FIX
 status: closed
 ```
 
@@ -283,7 +332,7 @@ started_at: 2026-07-24T01:21:21Z
 expected_exit: close the four A1 audit findings at root cause and pass the complete local gate
 lock_release: release only token 4140D7A3-E309-4470-BFE7-613944557C52 after the atomic remediation commit
 completed_at: 2026-07-24T01:38:37Z
-exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+exit_sha: 31000c2467d3d197b6a733f51f15bdb28c4fe30b
 acceptance_evidence:
   - README makes committed migrations canonical and labels prisma push noncanonical development-only
   - deterministic synthetic sentinel identity and full-row SHA-256 match exactly before and after baseline resolution
@@ -292,7 +341,8 @@ acceptance_evidence:
   - full cold and auxiliary A1 gates pass with zero lint errors and no effectful validate command
   - exact eight-path, Markdown, YAML, diff, lockfile, lease, and secret checks pass
   - no sponsor call, shared database effect, push, deployment, signature, transaction, form, spend, mainnet action, or claim promotion occurred
-audit_verdict: pending_pinned_exit_reaudit
+audit_verdict: FIX_RELEASE_CLAIM_DRIFT
+result: ENGINEERING_PASS_RELEASE_CLAIM_DRIFT
 status: complete
 ```
 
@@ -399,7 +449,7 @@ started_at: 2026-07-24T00:00:40Z
 expected_exit: remove the audited stale C0 A1 block and correct the A0 evidence claim
 lock_release: release only token C0986048-D378-45CE-B13F-1A44A7B15A13 after the atomic commit
 completed_at: 2026-07-24T00:03:01Z
-exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+exit_sha: 8c07b80a515405947b5994c6540f9038e7f5058f
 acceptance_evidence:
   - independent audit FIX on 36783c69f249387943f6f4b89286e2b27660337e is recorded exactly
   - the active C0 prompt now uses the A0_LOCAL release and live-effect split
@@ -407,7 +457,8 @@ acceptance_evidence:
   - all active non-archive Lisbon controls and prompts pass the contradiction scan
   - exact five-path, Markdown/link, diff, and changed-line secret checks pass
   - no product change, external effect, or claim promotion occurred
-audit_verdict: pending_pinned_exit_reaudit
+audit_verdict: PASS_A0_LOCAL
+result: PASS_REAUDIT
 status: complete
 ```
 

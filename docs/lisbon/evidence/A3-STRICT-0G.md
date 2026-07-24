@@ -5,8 +5,8 @@
 - Start/control SHA: `879072a728f0bec7a4b7a541594a7920cd815d69`
 - Branch: `developer`
 - Observed through: `2026-07-24T05:47:13Z`
-- Exit SHA: derive from the commit containing this packet
-- Result: `PASS_FIXTURE; PASS_INTEGRATION; PASS_TO_REAUDIT; LOCAL_ONLY`
+- Exit SHA: `9a4f41f8c679469dc230cba584bce84fcc3c65e5`
+- Result: `PASS_FIXTURE; PASS_INTEGRATION; PASS_REAUDIT; LOCAL_ONLY`
 - Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
 
 ## Result and boundary
@@ -15,7 +15,7 @@ A3 remediation G1 retains the strict local fixture integration while removing pr
 
 This is offline fixture and integration evidence only. No 0G provider, indexer, RPC, storage node, sponsor service, shared database, wallet, transaction, deployment, user signature, spend, push, form, or public identifier was contacted or created. `PASS_LIVE` remains blocked. This packet does not claim release, production readiness, bounty qualification, or Lisbon-window work classification.
 
-The writer started clean on exact SHA `879072a728f0bec7a4b7a541594a7920cd815d69`, branch `developer`, atomically acquired common-Git-dir token `E83BB3D9-81C2-4FFF-9DE3-C64CD847F3EC`, and mirrored it before implementation. The package lock remains byte-identical with SHA-256 `b4a1aed30a52a74d1b4396da9f1d6535a5e475da1b40a99a6c744aae1a8c6b33`. The independent audit of `879072a728f0bec7a4b7a541594a7920cd815d69` returned `FIX_REQUIRED`; this is the single permitted remediation generation and requires pinned-exit-SHA re-audit.
+The writer started clean on exact SHA `879072a728f0bec7a4b7a541594a7920cd815d69`, branch `developer`, atomically acquired common-Git-dir token `E83BB3D9-81C2-4FFF-9DE3-C64CD847F3EC`, and mirrored it before implementation. The package lock remains byte-identical with SHA-256 `b4a1aed30a52a74d1b4396da9f1d6535a5e475da1b40a99a6c744aae1a8c6b33`. The independent audit of `879072a728f0bec7a4b7a541594a7920cd815d69` returned `FIX_REQUIRED`; the single permitted remediation produced `9a4f41f8c679469dc230cba584bce84fcc3c65e5`, which the final independent re-audit accepted with no blocking finding.
 
 ## Strict Compute boundary
 
@@ -131,7 +131,13 @@ Toolchain: Node `v22.22.3`, npm `10.9.8`, Prisma/Client `6.19.3`, TypeScript `5.
 | `npm run build` | 0 | Next.js `16.2.2` compiled, typechecked, and generated 31/31 static pages with a deliberately non-live public Dynamic UUID. |
 | `git diff --check` and exact allowlist scan | 0 | No whitespace defect, package-lock change, generated artifact, or out-of-scope path. |
 
-The atomic commit and physical lease release are verified immediately after the containing commit. Independent pinned-SHA audit remains pending and is not preclaimed here.
+The atomic commit and physical lease release were verified at exact SHA `9a4f41f8c679469dc230cba584bce84fcc3c65e5`.
+
+## Independent remediation re-audit
+
+The final read-only audit returned `PASS_A3_REMEDIATION` on exact SHA `9a4f41f8c679469dc230cba584bce84fcc3c65e5` with parent `879072a728f0bec7a4b7a541594a7920cd815d69`, eighteen allowlisted remediation paths, clean `developer`, and no physical writer lock.
+
+It independently closed all five original findings: production live authority is absent; immutable `READBACK_VERIFIED` recovery precedes adapter construction and attempt exhaustion; Node and Go termination/cleanup/file bounds are enforced; the canonical deadline reaches Compute, signature retrieval, Storage, and the verifier; and subprocess failures are proven through worker persistence and deterministic refund. It repeated the pinned Go build/tests, Prisma, environment, lint/typecheck, foundation/auth/kernel/A3/integration/migrations/e2e/resilience/redaction/boot/secret/shell/build gates without a blocker.
 
 ## Remaining blocks
 

@@ -4,9 +4,9 @@ Missing or incomplete rows are denied. Never record secret values.
 
 Control state: `LIVE_EFFECT_BLOCKED`.
 
-This state is independent from `LOCAL_BUILD_AUTHORIZED`: local files, tests, loopback processes, disposable local databases, and atomic commits on `developer` are allowed when they cannot affect a shared or external system. It also preserves `RELEASE_BLOCKED`; local success grants no push, deployment, submission, or claim authority.
+This state is independent from `LOCAL_BUILD_AUTHORIZED`: local files, tests, loopback processes, disposable local databases, and atomic commits on the exact authorized branch are allowed when they cannot affect a shared or external system. It also preserves `RELEASE_BLOCKED`; local success grants no push, deployment, submission, or claim authority.
 
-Last reconciled: `2026-07-23T23:48:00Z`. No live sponsor call, write, signature, transaction, form, push, deployment, provisioning, managed migration, or spend occurred during this A0 local-admission correction.
+Last reconciled: `2026-07-24T11:55:02Z`. The project owner authorized one documentation/control commit on new branch `Eth_global_lisbon_` and one push of the exact containing commit to the same remote branch. This does not authorize a PR, merge, deployment, live sponsor call, managed migration, signature, transaction, form, funding, upload, spend, or claim promotion.
 
 Autonomous goals cannot change a row from `NOT_AUTHORIZED` to `AUTHORIZED` on their own. The coordinator may mirror a separate authenticated project-owner instruction only when it binds the exact effect, release SHA, provider/network, cap/scope, and timestamp. Signing/broadcast approval must also bind effect ID, asset, recipient, spender/target, atomic amount cap, deadline, nonce, and policy version; consume it once and reconcile ambiguous outcomes without replacement.
 
@@ -14,6 +14,9 @@ Autonomous goals cannot change a row from `NOT_AUTHORIZED` to `AUTHORIZED` on th
 |---|---|---|---|---|---|
 | Local files and commits on `developer` | `AUTHORIZED` | Project owner | AlphaDawg Lisbon worktree only | 2026-07-23 18:06 WEST | Thread authorization archived in `BASELINE.md`. |
 | Disposable local files, tests, loopback processes, and databases | `AUTHORIZED` | Project owner | Local-only; no shared/external endpoint, account, or system effect | 2026-07-24 00:45 WEST | Current controlling local-build instruction and `BASELINE.md`. |
+| Local A4-A7 work on `Eth_global_lisbon_` | `AUTHORIZED` | Project owner | Safe local files, tests, loopback services, disposable databases, and atomic commits only; no shared/external effect | 2026-07-24 12:55 WEST | Current authenticated instruction to create the continuation goal and publish all work on this branch. |
+| Documentation/control commit on `Eth_global_lisbon_` | `AUTHORIZED_ONCE` | Project owner | Exact continuation prompt, final A3 audit reconciliation, changelog, and this authorization in the containing commit only | 2026-07-24 12:55 WEST | Current authenticated project-owner instruction. |
+| Push `Eth_global_lisbon_` | `AUTHORIZED_ONCE` | Project owner | Push the exact containing commit to `origin/Eth_global_lisbon_`; no force, PR, merge, tag, release, or deployment | 2026-07-24 12:55 WEST | Current authenticated project-owner instruction. |
 | Push `developer` | `NOT_AUTHORIZED` |  | Exact remote/commits |  |  |
 | `0g_probe` | `NOT_AUTHORIZED` |  | Provider/network/request and spend cap |  |  |
 | `0g_live_smoke` | `NOT_AUTHORIZED` |  | Provider/network/request and spend cap |  |  |
@@ -29,3 +32,5 @@ Autonomous goals cannot change a row from `NOT_AUTHORIZED` to `AUTHORIZED` on th
 | Mainnet value | `PROHIBITED` | Project owner | Zero | Permanent current contract |  |
 
 An authorized probe does not authorize product integration, deployment, or track promotion.
+
+`AUTHORIZED_ONCE` is self-consuming when the named remote/effect observably equals the exact containing commit. Any descendant commit, repeat push with new objects, PR, merge, tag, release, or other effect requires a new authorization row.
