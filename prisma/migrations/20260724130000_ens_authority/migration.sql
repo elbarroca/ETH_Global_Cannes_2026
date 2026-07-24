@@ -80,6 +80,7 @@ CREATE TABLE "ens_authority_checks" (
     "worker_epoch" BIGINT NOT NULL,
     "claim_version" INTEGER NOT NULL,
     "claim_expires_at" TIMESTAMPTZ(6) NOT NULL,
+    "disposable_test_clock" BOOLEAN NOT NULL DEFAULT FALSE,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ens_authority_checks_pkey" PRIMARY KEY ("id"),
@@ -100,10 +101,19 @@ CREATE TABLE "ens_authority_checks" (
             AND "chain_id" IS NOT NULL AND "block_number" IS NOT NULL
             AND "block_timestamp" IS NOT NULL AND "fresh_until" IS NOT NULL)
         OR ("decision" = 'DENY' AND "error_code" ~ '^ENS_AUTHORITY_[A-Z0-9_]{2,48}$'
-            AND "record_bytes" IS NULL AND "record_hash" IS NULL)
+            AND (
+                ("record_bytes" IS NULL AND "record_hash" IS NULL
+                    AND "chain_id" IS NULL AND "block_number" IS NULL
+                    AND "block_timestamp" IS NULL AND "fresh_until" IS NULL
+                    AND "transaction_hash" IS NULL)
+                OR ("record_bytes" IS NOT NULL AND "record_hash" ~ '^[0-9a-f]{64}$'
+                    AND "chain_id" IS NOT NULL AND "block_number" IS NOT NULL
+                    AND "block_timestamp" IS NOT NULL AND "fresh_until" IS NOT NULL)
+            ))
     ),
     CONSTRAINT "ens_checks_observation_check" CHECK (
         "worker_epoch" > 0 AND "claim_version" > 0
+        AND ("record_bytes" IS NULL OR octet_length("record_bytes") BETWEEN 1 AND 131072)
         AND ("transaction_hash" IS NULL OR "transaction_hash" ~ '^0x[0-9a-f]{64}$')
     )
 );
@@ -157,9 +167,22 @@ CREATE OR REPLACE FUNCTION enforce_ens_authority_check()
 RETURNS TRIGGER AS $$
 DECLARE
     binding ens_authority_bindings%ROWTYPE;
+    authority_now TIMESTAMPTZ;
+    role_is_superuser BOOLEAN;
 BEGIN
     IF TG_OP <> 'INSERT' THEN
         RAISE EXCEPTION 'ENS authority checks are append-only';
+    END IF;
+    IF NEW.disposable_test_clock THEN
+        SELECT rolsuper INTO role_is_superuser FROM pg_roles WHERE rolname = current_user;
+        IF NOT COALESCE(role_is_superuser, FALSE) THEN
+            RAISE EXCEPTION 'disposable ENS authority test clock requires database superuser';
+        END IF;
+        authority_now := NEW.observed_at;
+    ELSE
+        authority_now := clock_timestamp();
+        NEW.observed_at := authority_now;
+        NEW.created_at := authority_now;
     END IF;
     SELECT * INTO binding FROM ens_authority_bindings
     WHERE effect_id = NEW.effect_id FOR UPDATE;
@@ -176,18 +199,18 @@ BEGIN
           AND j.agent_version_id = NEW.agent_version_id
           AND j.state = 'RUNNING' AND j.version = NEW.claim_version
           AND j.lease_owner = NEW.lease_owner
-          AND j.lease_expires_at > NEW.observed_at
+          AND j.lease_expires_at > authority_now
           AND j.lease_expires_at = NEW.claim_expires_at
           AND w.owner_id = NEW.lease_owner AND w.epoch = NEW.worker_epoch
-          AND w.expires_at > NEW.observed_at
+          AND w.expires_at > authority_now
     ) THEN
         RAISE EXCEPTION 'ENS authority check has no current worker claim';
     END IF;
     IF NEW.decision = 'ALLOW' AND (
         NEW.chain_id <> binding.chain_id
-        OR NEW.block_timestamp > NEW.observed_at
-        OR NEW.observed_at - NEW.block_timestamp > make_interval(secs => binding.max_age_seconds)
-        OR NEW.fresh_until <= NEW.observed_at
+        OR NEW.block_timestamp > authority_now
+        OR authority_now - NEW.block_timestamp > make_interval(secs => binding.max_age_seconds)
+        OR NEW.fresh_until <= authority_now
         OR NEW.fresh_until - NEW.block_timestamp > make_interval(secs => binding.max_age_seconds)
     ) THEN
         RAISE EXCEPTION 'ENS authority ALLOW is not fresh or exact';
@@ -202,9 +225,27 @@ FOR EACH ROW EXECUTE FUNCTION enforce_ens_authority_check();
 
 CREATE OR REPLACE FUNCTION enforce_receipt_authority()
 RETURNS TRIGGER AS $$
+DECLARE
+    authority_now TIMESTAMPTZ;
+    disposable_clock BOOLEAN;
+    role_is_superuser BOOLEAN;
 BEGIN
     IF TG_OP <> 'INSERT' THEN
         RAISE EXCEPTION 'receipts are immutable';
+    END IF;
+    SELECT disposable_test_clock INTO disposable_clock
+    FROM ens_authority_checks WHERE id = NEW.authority_check_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'receipt requires a fresh exact PRE_DELIVERY ENS authority ALLOW';
+    END IF;
+    IF disposable_clock THEN
+        SELECT rolsuper INTO role_is_superuser FROM pg_roles WHERE rolname = current_user;
+        IF NOT COALESCE(role_is_superuser, FALSE) THEN
+            RAISE EXCEPTION 'disposable ENS authority test clock requires database superuser';
+        END IF;
+        authority_now := NEW.created_at;
+    ELSE
+        authority_now := clock_timestamp();
     END IF;
     IF NOT EXISTS (
         SELECT 1
@@ -221,13 +262,15 @@ BEGIN
           AND c.agent_version_id = j.agent_version_id
           AND c.binding_hash = b.binding_hash
           AND b.job_id = NEW.job_id AND b.agent_version_id = j.agent_version_id
-          AND c.observed_at <= NEW.created_at AND c.fresh_until >= NEW.created_at
-          AND NEW.created_at - c.observed_at <= make_interval(secs => b.max_age_seconds)
+          AND NEW.created_at >= c.created_at
+          AND NEW.created_at <= authority_now + interval '1 second'
+          AND c.observed_at <= authority_now AND c.fresh_until >= authority_now
+          AND authority_now - c.observed_at <= make_interval(secs => b.max_age_seconds)
           AND j.state = 'RUNNING' AND j.version = c.claim_version
-          AND j.lease_owner = c.lease_owner AND j.lease_expires_at > NEW.created_at
+          AND j.lease_owner = c.lease_owner AND j.lease_expires_at > authority_now
           AND j.lease_expires_at >= c.claim_expires_at
           AND w.owner_id = c.lease_owner AND w.epoch = c.worker_epoch
-          AND w.expires_at > NEW.created_at
+          AND w.expires_at > authority_now
           AND NEW.verified AND NEW.adapter_key = 'protected-a3'
     ) THEN
         RAISE EXCEPTION 'receipt requires a fresh exact PRE_DELIVERY ENS authority ALLOW';

@@ -8,6 +8,9 @@ const ADDRESS = /^0x[0-9a-f]{40}$/;
 const HASH = /^[0-9a-f]{64}$/;
 const NODE = /^0x[0-9a-f]{64}$/;
 const TX_HASH = /^0x[0-9a-f]{64}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const DEFAULT_RESOLUTION_TIMEOUT_MS = 5_000;
+const MAX_RECORD_BYTES = 131_072;
 
 export type EnsAuthorityOperation =
   | "COMPUTE_SERVICE"
@@ -66,6 +69,8 @@ export interface EnsAuthorityRuntime {
   agentResolver: string;
   maxAgeSeconds: number;
   policyVersion: string;
+  disposableTestClock?: boolean;
+  resolutionTimeoutMs?: number;
 }
 
 export interface EnsAuthorityCheckResult {
@@ -94,6 +99,11 @@ interface ValidatedResolution {
   transactionHash: string | null;
 }
 
+interface ParsedResolution extends ValidatedResolution {
+  authorityRecord: Record<string, unknown>;
+  observation: Record<string, unknown>;
+}
+
 export class EnsAuthorityResolverError extends Error {
   readonly code: "ENS_AUTHORITY_RESOLVER_OUTAGE" | "ENS_AUTHORITY_TIMEOUT";
 
@@ -120,6 +130,46 @@ function transactionClient(transaction: unknown): DatabaseClient {
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function clock(supplied?: Date | (() => Date), fixed = false): () => Date {
+  if (typeof supplied === "function") return supplied;
+  if (!supplied) return () => new Date();
+  if (fixed) return () => new Date(supplied.getTime());
+  const startedAt = Date.now();
+  return () => new Date(supplied.getTime() + Date.now() - startedAt);
+}
+
+async function resolveWithTimeout(
+  resolver: EnsAuthorityResolver,
+  request: EnsAuthorityResolutionRequest,
+  signal: AbortSignal,
+  timeoutMs: number,
+): Promise<unknown> {
+  if (signal.aborted) throw signal.reason ?? new Error("ENS_AUTHORITY_ABORTED");
+  const controller = new AbortController();
+  const abort = (): void => controller.abort(signal.reason ?? new Error("ENS_AUTHORITY_ABORTED"));
+  signal.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(() => {
+    controller.abort(new EnsAuthorityResolverError("ENS_AUTHORITY_TIMEOUT"));
+  }, timeoutMs);
+  try {
+    return await Promise.race([
+      resolver.resolve(request, controller.signal),
+      new Promise<never>((_resolve, reject) => {
+        if (controller.signal.aborted) {
+          reject(controller.signal.reason ?? new Error("ENS_AUTHORITY_ABORTED"));
+          return;
+        }
+        controller.signal.addEventListener("abort", () => {
+          reject(controller.signal.reason ?? new Error("ENS_AUTHORITY_ABORTED"));
+        }, { once: true });
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", abort);
+  }
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -185,6 +235,13 @@ function validateRuntime(runtime: EnsAuthorityRuntime): Omit<EnsAuthorityRuntime
   if (!/^[a-z][a-z0-9-]{2,63}$/.test(runtime.policyVersion)) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
   }
+  const resolutionTimeoutMs = runtime.resolutionTimeoutMs ?? DEFAULT_RESOLUTION_TIMEOUT_MS;
+  if (!Number.isSafeInteger(resolutionTimeoutMs) || resolutionTimeoutMs < 10 || resolutionTimeoutMs > 60_000) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
+  }
+  if (runtime.disposableTestClock !== undefined && typeof runtime.disposableTestClock !== "boolean") {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
+  }
   return {
     creatorName,
     agentName,
@@ -194,6 +251,8 @@ function validateRuntime(runtime: EnsAuthorityRuntime): Omit<EnsAuthorityRuntime
     agentResolver: address(runtime.agentResolver),
     maxAgeSeconds: runtime.maxAgeSeconds,
     policyVersion: runtime.policyVersion,
+    disposableTestClock: runtime.disposableTestClock ?? false,
+    resolutionTimeoutMs,
   };
 }
 
@@ -351,7 +410,30 @@ function validateParty(
   }
 }
 
-function validateResolution(value: unknown, binding: EnsAuthorityBinding, now: Date): ValidatedResolution {
+function parseObservedParty(value: unknown): void {
+  const party = record(value);
+  if (!party || !exactKeys(party, ["delegate", "name", "node", "owner", "registry", "resolver"])) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
+  }
+  if (typeof party.name !== "string" || party.name.length > 255) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
+  }
+  try {
+    if (normalize(party.name) !== party.name) throw new Error("non-canonical name");
+  } catch {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
+  }
+  if (typeof party.node !== "string" || !NODE.test(party.node)) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
+  }
+  for (const key of ["delegate", "owner", "registry", "resolver"] as const) {
+    if (typeof party[key] !== "string" || !ADDRESS.test(party[key].toLowerCase())) {
+      throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
+    }
+  }
+}
+
+function parseResolution(value: unknown): ParsedResolution {
   const response = record(value);
   if (!response || !exactKeys(response, ["observation", "record", "schemaVersion"]) || response.schemaVersion !== 1) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
@@ -382,6 +464,61 @@ function validateResolution(value: unknown, binding: EnsAuthorityBinding, now: D
   ) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
   }
+  parseObservedParty(authorityRecord.creator);
+  parseObservedParty(authorityRecord.agent);
+  if (
+    typeof authorityRecord.agentVersionId !== "string" || !UUID.test(authorityRecord.agentVersionId) ||
+    !Number.isSafeInteger(authorityRecord.agentVersion) || (authorityRecord.agentVersion as number) < 1 ||
+    typeof authorityRecord.manifestHash !== "string" || !HASH.test(authorityRecord.manifestHash) ||
+    !Array.isArray(authorityRecord.capabilities) || authorityRecord.capabilities.length < 1 ||
+    authorityRecord.capabilities.length > 32 || authorityRecord.capabilities.some(
+      (capability) => typeof capability !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(capability),
+    ) ||
+    typeof authorityRecord.service !== "string" || authorityRecord.service.length < 1 ||
+    Buffer.byteLength(authorityRecord.service, "utf8") > 2_048 ||
+    !Number.isSafeInteger(authorityRecord.chainId) || (authorityRecord.chainId as number) < 1 ||
+    typeof authorityRecord.payout !== "string" || !ADDRESS.test(authorityRecord.payout.toLowerCase()) ||
+    typeof authorityRecord.policyVersion !== "string" ||
+    !/^[a-z][a-z0-9-]{2,63}$/.test(authorityRecord.policyVersion) ||
+    typeof authorityRecord.jobId !== "string" || !UUID.test(authorityRecord.jobId) ||
+    typeof authorityRecord.effectId !== "string" || !HASH.test(authorityRecord.effectId)
+  ) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
+  }
+  if (
+    !Number.isSafeInteger(observation.chainId) || (observation.chainId as number) < 1 ||
+    typeof observation.blockNumber !== "string" || !/^[1-9][0-9]{0,19}$/.test(observation.blockNumber) ||
+    observation.transactionHash !== null && (
+      typeof observation.transactionHash !== "string" || !TX_HASH.test(observation.transactionHash)
+    )
+  ) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
+  }
+  const blockTimestamp = parseDate(observation.blockTimestamp);
+  const freshUntil = parseDate(authorityRecord.freshUntil);
+  const recordBytes = canonicalJson(canonicalValue(authorityRecord));
+  if (Buffer.byteLength(recordBytes, "utf8") > MAX_RECORD_BYTES) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
+  }
+  return {
+    authorityRecord,
+    observation,
+    recordBytes,
+    recordHash: sha256(recordBytes),
+    chainId: observation.chainId as number,
+    blockNumber: observation.blockNumber,
+    blockTimestamp,
+    freshUntil,
+    transactionHash: observation.transactionHash as string | null,
+  };
+}
+
+function validateResolution(
+  parsed: ParsedResolution,
+  binding: EnsAuthorityBinding,
+  now: Date,
+): ValidatedResolution {
+  const { authorityRecord, observation } = parsed;
   validateParty(authorityRecord.creator, {
     name: binding.creatorName,
     node: binding.creatorNode,
@@ -418,35 +555,16 @@ function validateResolution(value: unknown, binding: EnsAuthorityBinding, now: D
   if (authorityRecord.chainId !== binding.chainId || observation.chainId !== binding.chainId) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_CHAIN_MISMATCH");
   }
-  if (typeof observation.blockNumber !== "string" || !/^[1-9][0-9]{0,19}$/.test(observation.blockNumber)) {
-    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
-  }
-  if (observation.transactionHash !== null && (
-    typeof observation.transactionHash !== "string" || !TX_HASH.test(observation.transactionHash)
-  )) {
-    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
-  }
-  const blockTimestamp = parseDate(observation.blockTimestamp);
-  const freshUntil = parseDate(authorityRecord.freshUntil);
   const maxAgeMs = binding.maxAgeSeconds * 1_000;
   if (
-    blockTimestamp > now ||
-    now.getTime() - blockTimestamp.getTime() > maxAgeMs ||
-    freshUntil <= now ||
-    freshUntil.getTime() - blockTimestamp.getTime() > maxAgeMs
+    parsed.blockTimestamp > now ||
+    now.getTime() - parsed.blockTimestamp.getTime() > maxAgeMs ||
+    parsed.freshUntil <= now ||
+    parsed.freshUntil.getTime() - parsed.blockTimestamp.getTime() > maxAgeMs
   ) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_STALE");
   }
-  const recordBytes = canonicalJson(canonicalValue(authorityRecord));
-  return {
-    recordBytes,
-    recordHash: sha256(recordBytes),
-    chainId: binding.chainId,
-    blockNumber: observation.blockNumber,
-    blockTimestamp,
-    freshUntil,
-    transactionHash: observation.transactionHash as string | null,
-  };
+  return parsed;
 }
 
 async function persistCheck(
@@ -458,6 +576,7 @@ async function persistCheck(
   now: Date,
   resolution: ValidatedResolution | null,
   errorCode: string | null,
+  disposableTestClock: boolean,
 ): Promise<string> {
   return sql.begin(async (transaction) => {
     const tx = transactionClient(transaction);
@@ -475,7 +594,8 @@ async function persistCheck(
         effect_id, job_id, agent_version_id, binding_hash, phase, operation,
         decision, error_code, record_bytes, record_hash, chain_id, block_number,
         block_timestamp, observed_at, fresh_until, transaction_hash,
-        lease_owner, worker_epoch, claim_version, claim_expires_at, created_at
+        lease_owner, worker_epoch, claim_version, claim_expires_at,
+        disposable_test_clock, created_at
       ) VALUES (
         ${job.effectId}, ${job.jobId}::uuid, ${job.agentVersionId}::uuid, ${bindingHash},
         ${phase}, ${operation}, ${errorCode ? "DENY" : "ALLOW"}, ${errorCode},
@@ -483,7 +603,7 @@ async function persistCheck(
         ${resolution?.chainId ?? null}, ${resolution?.blockNumber ?? null}::numeric,
         ${resolution?.blockTimestamp ?? null}, ${now}, ${resolution?.freshUntil ?? null},
         ${resolution?.transactionHash ?? null}, ${job.leaseOwner}, ${job.workerEpoch}::bigint,
-        ${job.claimVersion}, ${claimExpiresAt}, ${now}
+        ${job.claimVersion}, ${claimExpiresAt}, ${disposableTestClock}, ${now}
       ) RETURNING id::text
     `;
     const id = rows[0]?.id;
@@ -497,14 +617,17 @@ export async function checkFreshEnsAuthority(
   runtime: EnsAuthorityRuntime,
   phase: EnsAuthorityPhase,
   operation: EnsAuthorityOperation,
-  options: { now?: Date; sql: DatabaseClient; signal: AbortSignal },
+  options: { now?: Date | (() => Date); sql: DatabaseClient; signal: AbortSignal },
 ): Promise<EnsAuthorityCheckResult> {
-  const now = options.now ?? new Date();
+  const currentTime = clock(options.now, runtime.disposableTestClock === true);
+  const preparedAt = currentTime();
   let prepared: { binding: EnsAuthorityBinding; bindingHash: string };
+  let policy: Omit<EnsAuthorityRuntime, "resolver">;
   try {
+    policy = validateRuntime(runtime);
     prepared = await options.sql.begin(async (transaction) => {
       const tx = transactionClient(transaction);
-      const ensured = await ensureBinding(tx, job, runtime, now);
+      const ensured = await ensureBinding(tx, job, runtime, preparedAt);
       return { binding: ensured.binding, bindingHash: ensured.bindingHash };
     }) as { binding: EnsAuthorityBinding; bindingHash: string };
   } catch (error) {
@@ -516,11 +639,21 @@ export async function checkFreshEnsAuthority(
 
   let resolution: ValidatedResolution | null = null;
   let errorCode: string | null = null;
+  let observedAt = preparedAt;
   try {
-    const raw = await runtime.resolver.resolve({ binding: prepared.binding, operation, phase }, options.signal);
+    const raw = await resolveWithTimeout(
+      runtime.resolver,
+      { binding: prepared.binding, operation, phase },
+      options.signal,
+      policy.resolutionTimeoutMs ?? DEFAULT_RESOLUTION_TIMEOUT_MS,
+    );
+    observedAt = currentTime();
     if (options.signal.aborted) throw options.signal.reason ?? new Error("ENS_AUTHORITY_ABORTED");
-    resolution = validateResolution(raw, prepared.binding, now);
+    const parsed = parseResolution(raw);
+    resolution = parsed;
+    validateResolution(parsed, prepared.binding, observedAt);
   } catch (error) {
+    observedAt = currentTime();
     if (options.signal.aborted) throw options.signal.reason ?? error;
     errorCode = error instanceof EnsAuthorityValidationError || error instanceof EnsAuthorityResolverError
       ? error.code
@@ -532,9 +665,10 @@ export async function checkFreshEnsAuthority(
     prepared.bindingHash,
     phase,
     operation,
-    now,
+    observedAt,
     resolution,
     errorCode,
+    policy.disposableTestClock === true,
   );
   return { allowed: errorCode === null, checkId, errorCode };
 }

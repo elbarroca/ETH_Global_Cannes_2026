@@ -648,6 +648,7 @@ model EnsAuthorityCheck {
   workerEpoch      BigInt    @map("worker_epoch")
   claimVersion     Int       @map("claim_version")
   claimExpiresAt   DateTime  @map("claim_expires_at") @db.Timestamptz(6)
+  disposableTestClock Boolean @default(false) @map("disposable_test_clock")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([effectId, phase, id], map: "idx_ens_checks_effect_phase")

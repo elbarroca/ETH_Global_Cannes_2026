@@ -3,6 +3,58 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: A4 remediation sole writer /root/a4_remediation_writer
+task_id: A4-ENS-AUTHORITY-REMEDIATION-G1-20260724
+task_instance_id: A4-ENS-AUTHORITY-REMEDIATION-G1-20260724:47C57F33
+generation: 1
+sprint: A4_remediation
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: c2390609388afc82ae455efc6c36dd55e909cca4
+control_sha: ac939141af51b46342b218a977f85027017c4c85
+token: A4-ENS-AUTHORITY-REMEDIATION-G1-20260724-47C57F33-9576-4647-87CA-733A03FEF6B9
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T14:33:34Z
+expires_at: 2026-07-24T20:00:00Z
+allowed_paths:
+  - src/ens/authority.ts
+  - src/worker/runner.ts
+  - prisma/schema.prisma only if required
+  - prisma/migrations/20260724130000_ens_authority/migration.sql
+  - tests/a4/**
+  - tests/helpers/ens.ts
+  - scripts/test-migrations.ts only if required
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md only if observed facts require it
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+started_at: 2026-07-24T14:02:18Z
+expected_exit: bounded ENS resolution, transaction-time freshness and claim fences, authoritative receipt time, and canonical semantic DENY evidence with focused regressions
+external_effect_authority: safe local files tests loopback services disposable PostgreSQL generated build output and one atomic local commit only
+completed_at: 2026-07-24T14:33:34Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - every ENS resolver path has one shared typed finite timeout including normal and recovered PRE_DELIVERY
+  - post-resolution application time and production database clock_timestamp fence record freshness job claim and worker lease
+  - Receipt authority uses current database time and rejects caller backdating through NEW.created_at
+  - bounded canonical record bytes hash and available observation metadata persist for semantic DENY while malformed unserializable and oversized inputs retain no raw evidence
+  - disposable deterministic clock is database-superuser-only and a normal-role activation attempt is rejected
+  - focused A4 nine of nine A3 twelve of twelve combined integration twenty-six of twenty-six and both four-migration lanes pass
+  - cold install Prisma environment lint typecheck foundation auth kernel Go e2e resilience redaction boot secret shell and fully awaited 31-page build plus production start smoke pass
+remaining_blocks:
+  - independent pinned-SHA A4 remediation re-audit is required before A5
+  - PASS_LIVE is NOT_RUN and LIVE_EFFECT_BLOCKED with no live ENS or 0G public identifier
+  - release claim rights event-window dependency README deployment push forms and submission gates remain blocked
+audit_verdict: PASS_TO_AUDIT
+result: PASS_TO_AUDIT
+lock_release: release only matching token A4-ENS-AUTHORITY-REMEDIATION-G1-20260724-47C57F33-9576-4647-87CA-733A03FEF6B9 after green checks one atomic commit clean status and mirrored closure
+status: closed
+```
+
+```yaml
 owner: A4 sole writer /root/a4_writer
 task_id: A4-ENS-AUTHORITY-20260724
 task_instance_id: A4-ENS-AUTHORITY-20260724:EAFF8890

@@ -116,14 +116,23 @@ function fixture(
   options: {
     hooks?: StrictA3Hooks;
     mutator?: EnsFixtureMutator;
-    now?: Date;
+    now?: Date | (() => Date);
+    beforeResolve?: (request: Parameters<FixtureEnsAuthorityResolver["resolve"]>[0], call: number) => Promise<void>;
+    disposableTestClock?: boolean;
+    resolutionTimeoutMs?: number;
   } = {},
 ): A4Fixture {
   const now = options.now ?? NOW;
   const compute = new FixtureCompute();
   const storage = new FixtureStorage();
   const verifier = { calls: 0 };
-  const ens = createEnsAuthorityFixture({ now, mutator: options.mutator });
+  const ens = createEnsAuthorityFixture({
+    now,
+    mutator: options.mutator,
+    beforeResolve: options.beforeResolve,
+    disposableTestClock: options.disposableTestClock,
+    resolutionTimeoutMs: options.resolutionTimeoutMs,
+  });
   const adapter = new StrictA3Adapter({
     authority: ens.runtime,
     hooks: options.hooks,
@@ -286,6 +295,160 @@ test("stable ENS authority gates the full A3 path twice and twenty duplicates se
   }
 });
 
+test("never-settling normal and recovered PRE_DELIVERY resolution timeout and refund", async () => {
+  const database = await startDisposableDatabase("a4-timeout");
+  try {
+    const version = await setup(database);
+    const neverDelivery = async (request: Parameters<FixtureEnsAuthorityResolver["resolve"]>[0]): Promise<void> => {
+      if (request.phase === "PRE_DELIVERY") await new Promise<never>(() => undefined);
+    };
+    const authority = createEnsAuthorityFixture({
+      now: () => new Date(),
+      beforeResolve: neverDelivery,
+      disposableTestClock: false,
+      resolutionTimeoutMs: 25,
+    });
+    const normal = await submit(database, version, "a4-timeout-normal", new Date());
+    const adapter: KernelAdapter = {
+      key: "protected-a3",
+      execute: async () => ({
+        ok: true,
+        proofHash: "1".repeat(64),
+        result: { status: "verified" },
+        verified: true,
+      }),
+    };
+    const started = Date.now();
+    await runWorkerOnce({
+      ownerId: "a4-timeout-normal-worker",
+      concurrency: 1,
+      leaseSeconds: 5,
+      adapter,
+      authority: authority.runtime,
+      sql: database.sql,
+    });
+    assert.ok(Date.now() - started < 1_000);
+    assert.deepEqual(await snapshot(database, normal.jobId), {
+      authority_allows: 0,
+      authority_denies: 1,
+      authority_checks: 1,
+      bindings: 1,
+      commissions: 0,
+      effect_state: "FAILED",
+      effects: 1,
+      job_state: "FAILED",
+      receipts: 0,
+      refunds: 1,
+      settlements: 0,
+    });
+
+    const recovered = await submit(database, version, "a4-timeout-recovered", new Date());
+    const run = fixture(database, {
+      now: () => new Date(),
+      hooks: { afterReadbackVerified: async () => { throw new A3SimulatedCrashError(); } },
+      beforeResolve: neverDelivery,
+      disposableTestClock: false,
+      resolutionTimeoutMs: 25,
+    });
+    await runWorkerOnce({
+      ownerId: "a4-timeout-normal-worker",
+      concurrency: 1,
+      leaseSeconds: 5,
+      adapter: run.adapter,
+      sql: database.sql,
+    });
+    const recoveredState = await snapshot(database, recovered.jobId);
+    assert.equal(recoveredState.job_state, "FAILED");
+    assert.equal(recoveredState.receipts, 0);
+    assert.equal(recoveredState.refunds, 1);
+    const errors = await database.sql<{ error_code: string }[]>`
+      SELECT error_code FROM effects WHERE job_id IN (${normal.jobId}::uuid, ${recovered.jobId}::uuid)
+      ORDER BY job_id
+    `;
+    assert.deepEqual(errors.map(({ error_code }) => error_code), [
+      "ENS_AUTHORITY_TIMEOUT",
+      "ENS_AUTHORITY_TIMEOUT",
+    ]);
+  } finally {
+    await database.close();
+  }
+});
+
+test("post-resolution time rejects expired records and claims while preserving semantic DENY evidence", async () => {
+  const database = await startDisposableDatabase("a4-post-time");
+  try {
+    const version = await setup(database);
+    const recordJob = await submit(database, version, "a4-record-expiry");
+    const claimJob = await submit(database, version, "a4-claim-expiry");
+    assert.equal((await acquireWorkerLease("a4-post-time-worker", 30, { now: NOW, sql: database.sql })).acquired, true);
+    const claims = await claimJobs("a4-post-time-worker", 2, 30, { now: NOW, sql: database.sql });
+    const recordClaim = claims.find(({ jobId }) => jobId === recordJob.jobId);
+    const expiredClaim = claims.find(({ jobId }) => jobId === claimJob.jobId);
+    if (!recordClaim || !expiredClaim) throw new Error("A4_TEST_POST_TIME_CLAIMS_MISSING");
+
+    let recordTime = NOW;
+    const staleRecord = createEnsAuthorityFixture({
+      now: () => recordTime,
+      disposableTestClock: true,
+      beforeResolve: async () => { recordTime = new Date(NOW.getTime() + 100); },
+      mutator: (response) => change(
+        response,
+        "record",
+        "freshUntil",
+        new Date(NOW.getTime() + 50).toISOString(),
+      ),
+    });
+    const denied = await checkFreshEnsAuthority(
+      recordClaim,
+      staleRecord.runtime,
+      "PRE_DELIVERY",
+      "ACCEPT_DELIVERY",
+      { now: () => recordTime, signal: new AbortController().signal, sql: database.sql },
+    );
+    assert.deepEqual(denied, {
+      allowed: false,
+      checkId: denied.checkId,
+      errorCode: "ENS_AUTHORITY_STALE",
+    });
+    const evidence = await database.sql<{
+      block_number: string | null;
+      block_timestamp: Date | null;
+      fresh_until: Date | null;
+      record_bytes: string | null;
+      record_hash: string | null;
+    }[]>`
+      SELECT block_number::text, block_timestamp, fresh_until, record_bytes, record_hash
+      FROM ens_authority_checks WHERE id = ${denied.checkId}::bigint
+    `;
+    assert.ok(evidence[0]?.record_bytes?.includes(recordJob.effectId));
+    assert.match(evidence[0]?.record_hash ?? "", /^[0-9a-f]{64}$/);
+    assert.ok(evidence[0]?.block_number);
+    assert.ok(evidence[0]?.block_timestamp);
+    assert.ok(evidence[0]?.fresh_until);
+
+    let claimTime = NOW;
+    const staleClaim = createEnsAuthorityFixture({
+      now: () => claimTime,
+      disposableTestClock: true,
+      beforeResolve: async () => { claimTime = new Date(NOW.getTime() + 31_000); },
+    });
+    await assert.rejects(checkFreshEnsAuthority(
+      expiredClaim,
+      staleClaim.runtime,
+      "PRE_DELIVERY",
+      "ACCEPT_DELIVERY",
+      { now: () => claimTime, signal: new AbortController().signal, sql: database.sql },
+    ), /ENS_AUTHORITY_CLAIM_LOST/);
+    const allows = await database.sql<{ count: number }[]>`
+      SELECT count(*)::int FROM ens_authority_checks
+      WHERE job_id IN (${recordJob.jobId}::uuid, ${claimJob.jobId}::uuid) AND decision = 'ALLOW'
+    `;
+    assert.equal(allows[0]?.count, 0);
+  } finally {
+    await database.close();
+  }
+});
+
 test("malformed, stale, forged, mismatched, replayed, outage, and timeout authority refuse before A3", async () => {
   const database = await startDisposableDatabase("a4-refusal");
   try {
@@ -306,6 +469,8 @@ test("malformed, stale, forged, mismatched, replayed, outage, and timeout author
       { name: "stale", mutate: (r) => change(r, "record", "freshUntil", new Date(NOW.getTime() - 1).toISOString()) },
       { name: "missing", mutate: (r) => { const copy = structuredClone(r); delete object(copy.record).manifestHash; return copy; } },
       { name: "malformed", mutate: () => [] },
+      { name: "oversized", mutate: (r) => change(r, "record", "service", "x".repeat(131_073)) },
+      { name: "unserializable", mutate: (r) => change(r, "record", "service", 1n) },
       { name: "replay", mutate: (r) => change(r, "record", "effectId", "0".repeat(64)) },
       { name: "outage", mutate: () => { throw new EnsAuthorityResolverError("ENS_AUTHORITY_RESOLVER_OUTAGE"); } },
       { name: "timeout", mutate: () => { throw new EnsAuthorityResolverError("ENS_AUTHORITY_TIMEOUT"); } },
@@ -335,6 +500,12 @@ test("malformed, stale, forged, mismatched, replayed, outage, and timeout author
       assert.equal(state.refunds, 1, item.name);
       assert.equal(state.authority_denies, 1, item.name);
     }
+    const leakedMalformed = await database.sql<{ count: number }[]>`
+      SELECT count(*)::int FROM ens_authority_checks
+      WHERE error_code = 'ENS_AUTHORITY_MALFORMED'
+        AND (record_bytes IS NOT NULL OR record_hash IS NOT NULL)
+    `;
+    assert.equal(leakedMalformed[0]?.count, 0);
   } finally {
     await database.close();
   }
@@ -615,12 +786,14 @@ test("receipt bypass and authority mutation are rejected by database triggers", 
         effect_id, job_id, agent_version_id, binding_hash, phase, operation,
         decision, error_code, record_bytes, record_hash, chain_id, block_number,
         block_timestamp, observed_at, fresh_until, transaction_hash,
-        lease_owner, worker_epoch, claim_version, claim_expires_at, created_at
+        lease_owner, worker_epoch, claim_version, claim_expires_at,
+        disposable_test_clock, created_at
       ) SELECT
         effect_id, job_id, agent_version_id, binding_hash, 'PRE_DELIVERY', 'COMPUTE_REQUEST',
         decision, error_code, record_bytes, record_hash, chain_id, block_number,
         block_timestamp, observed_at, fresh_until, transaction_hash,
-        lease_owner, worker_epoch, claim_version, claim_expires_at, created_at
+        lease_owner, worker_epoch, claim_version, claim_expires_at,
+        disposable_test_clock, created_at
       FROM ens_authority_checks WHERE id = ${bypassCheck.checkId}::bigint
     `, /ens_checks_phase_check/);
     await assert.rejects(database.sql`
@@ -632,6 +805,63 @@ test("receipt bypass and authority mutation are rejected by database triggers", 
       )
     `, /receipt requires a fresh exact PRE_DELIVERY ENS authority ALLOW/);
     assert.equal(canonicalJson(await snapshot(database, submitted.jobId)).includes("SUCCEEDED"), true);
+  } finally {
+    await database.close();
+  }
+});
+
+test("database time rejects receipt backdating and normal roles cannot enable the disposable clock", async () => {
+  const database = await startDisposableDatabase("a4-db-clock");
+  try {
+    const version = await setup(database);
+    const submitted = await submit(database, version, "a4-db-clock", new Date());
+    assert.equal((await acquireWorkerLease("a4-db-clock-worker", 30, { sql: database.sql })).acquired, true);
+    const claim = (await claimJobs("a4-db-clock-worker", 1, 30, { sql: database.sql }))[0];
+    if (!claim) throw new Error("A4_TEST_DB_CLOCK_CLAIM_MISSING");
+    const ens = createEnsAuthorityFixture({
+      now: () => new Date(),
+      disposableTestClock: false,
+    });
+    const authority = await checkFreshEnsAuthority(
+      claim,
+      ens.runtime,
+      "PRE_DELIVERY",
+      "ACCEPT_DELIVERY",
+      { signal: new AbortController().signal, sql: database.sql },
+    );
+    if (!authority.checkId) throw new Error("A4_TEST_DB_CLOCK_CHECK_MISSING");
+    await assert.rejects(database.sql`
+      INSERT INTO receipts (
+        job_id, effect_id, authority_check_id, verified, adapter_key,
+        proof_hash, result_hash, created_at
+      ) VALUES (
+        ${submitted.jobId}::uuid, ${submitted.effectId}, ${authority.checkId}::bigint,
+        true, 'protected-a3', ${"1".repeat(64)}, ${"2".repeat(64)},
+        ${new Date(Date.now() - 60_000)}
+      )
+    `, /receipt requires a fresh exact PRE_DELIVERY ENS authority ALLOW/);
+
+    const role = `a4_app_${process.pid}`;
+    if (!/^[a-z][a-z0-9_]+$/.test(role)) throw new Error("A4_TEST_ROLE_INVALID");
+    await database.sql.unsafe(`CREATE ROLE "${role}" NOLOGIN`);
+    await database.sql.unsafe(`GRANT INSERT ON ens_authority_checks TO "${role}"`);
+    await database.sql.unsafe(`GRANT USAGE ON SEQUENCE ens_authority_checks_id_seq TO "${role}"`);
+    await assert.rejects(database.sql.begin(async (transaction) => {
+      await transaction.unsafe(`SET LOCAL ROLE "${role}"`);
+      await transaction.unsafe(`
+        INSERT INTO ens_authority_checks (
+          effect_id, job_id, agent_version_id, binding_hash, phase, operation,
+          decision, error_code, observed_at, lease_owner, worker_epoch,
+          claim_version, claim_expires_at, disposable_test_clock, created_at
+        ) VALUES (
+          '${"0".repeat(64)}', '00000000-0000-0000-0000-000000000000'::uuid,
+          '00000000-0000-0000-0000-000000000000'::uuid, '${"0".repeat(64)}',
+          'PRE_DELIVERY', 'ACCEPT_DELIVERY', 'DENY', 'ENS_AUTHORITY_TIMEOUT',
+          CURRENT_TIMESTAMP, 'untrusted', 1, 1, CURRENT_TIMESTAMP + interval '1 minute',
+          true, CURRENT_TIMESTAMP
+        )
+      `);
+    }), /disposable ENS authority test clock requires database superuser/);
   } finally {
     await database.close();
   }

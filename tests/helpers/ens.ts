@@ -16,16 +16,19 @@ export type EnsFixtureMutator = (
 
 export class FixtureEnsAuthorityResolver implements EnsAuthorityResolver {
   readonly calls: EnsAuthorityResolutionRequest[] = [];
-  private readonly now: Date;
+  private readonly clock: () => Date;
   private mutator: EnsFixtureMutator | null;
   private beforeResolve: ((request: EnsAuthorityResolutionRequest, call: number) => Promise<void>) | null;
 
   constructor(options: {
-    now: Date;
+    now: Date | (() => Date);
     mutator?: EnsFixtureMutator;
     beforeResolve?: (request: EnsAuthorityResolutionRequest, call: number) => Promise<void>;
   }) {
-    this.now = options.now;
+    const suppliedNow = options.now;
+    this.clock = suppliedNow instanceof Date
+      ? () => new Date(suppliedNow.getTime())
+      : suppliedNow;
     this.mutator = options.mutator ?? null;
     this.beforeResolve = options.beforeResolve ?? null;
   }
@@ -45,11 +48,12 @@ export class FixtureEnsAuthorityResolver implements EnsAuthorityResolver {
     const call = this.calls.push(request);
     await this.beforeResolve?.(request, call);
     const { binding } = request;
+    const now = this.clock();
     const response: Record<string, unknown> = {
       schemaVersion: 1,
       observation: {
         blockNumber: String(12_345 + call),
-        blockTimestamp: this.now.toISOString(),
+        blockTimestamp: now.toISOString(),
         chainId: binding.chainId,
         transactionHash: RECORD_TX,
       },
@@ -81,7 +85,7 @@ export class FixtureEnsAuthorityResolver implements EnsAuthorityResolver {
         policyVersion: binding.policyVersion,
         jobId: binding.jobId,
         effectId: binding.effectId,
-        freshUntil: new Date(this.now.getTime() + binding.maxAgeSeconds * 500).toISOString(),
+        freshUntil: new Date(now.getTime() + binding.maxAgeSeconds * 500).toISOString(),
       },
     };
     return this.mutator ? this.mutator(response, request, call) : response;
@@ -89,9 +93,11 @@ export class FixtureEnsAuthorityResolver implements EnsAuthorityResolver {
 }
 
 export function createEnsAuthorityFixture(options: {
-  now: Date;
+  now: Date | (() => Date);
   mutator?: EnsFixtureMutator;
   beforeResolve?: (request: EnsAuthorityResolutionRequest, call: number) => Promise<void>;
+  disposableTestClock?: boolean;
+  resolutionTimeoutMs?: number;
 }): { resolver: FixtureEnsAuthorityResolver; runtime: EnsAuthorityRuntime } {
   const resolver = new FixtureEnsAuthorityResolver(options);
   return {
@@ -106,6 +112,8 @@ export function createEnsAuthorityFixture(options: {
       agentResolver: RESOLVER,
       maxAgeSeconds: 300,
       policyVersion: "ens-authority-v1",
+      disposableTestClock: options.disposableTestClock ?? options.now instanceof Date,
+      resolutionTimeoutMs: options.resolutionTimeoutMs,
     },
   };
 }

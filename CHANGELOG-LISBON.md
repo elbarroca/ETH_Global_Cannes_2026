@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A4 independent-audit remediation G1
+
+- Bounded every shared ENS resolver invocation to a typed `ENS_AUTHORITY_TIMEOUT`, including normal and recovered `PRE_DELIVERY`; a resolver that never settles now terminalizes and refunds instead of being kept alive by worker heartbeats.
+- Moved validation and persistence to a post-resolution clock. The database now overwrites production authority observation time with `clock_timestamp()` and independently fences the current claim, worker lease, record age, and freshness at insertion.
+- Removed Receipt authorization dependence on caller-supplied `NEW.created_at`: the trigger uses current database time for claim/freshness and rejects receipts backdated before their exact authority check.
+- Preserved bounded canonical record bytes/hash plus available block/time/freshness metadata for structurally valid semantic `DENY`; malformed, unserializable, and oversized inputs retain no raw evidence. The deterministic fixture clock is persisted explicitly and accepted only from a database superuser, which a focused normal-role regression proves cannot activate it.
+- Passed 9/9 focused A4 tests, A3 12/12, combined integration 26/26 plus both four-migration lanes, and the complete cold local gate. The fully awaited 31-page build produced the required server artifacts, omitted `export-detail.json`, and passed a production loopback start smoke.
+- Performed no live ENS/0G read or write, sponsor/API call, shared or managed database effect, deployment, push, signature, transaction, form, funding, upload, spend, public identifier, or claim promotion. Remediation returns `PASS_TO_AUDIT`; A5 and every live/release claim remain blocked pending independent pinned-SHA re-audit.
+
 ## 2026-07-24 - A4 stable ENS authority boundary
 
 - Pinned the already locked `viem` runtime to exact `2.47.6` and added one stable Registry/Public Resolver/Universal Resolver read path. No ENSjs, ethers integration, direct ENSv2 contract path, dependency addition, or live call was introduced.
