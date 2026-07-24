@@ -60,9 +60,9 @@ function formatNumber(value: number): string {
  * character uses the `.nasdaq-led*` classes declared in `globals.css`.
  *
  * Layout:
- *   • Top strip  — LIVE dot + fund identifiers + wall-clock
+ *   • Top strip  — environment + fund identifiers + wall-clock
  *   • Headline   — oversized NAV digits + 24h change
- *   • Metric row — 4 tiles (hunts / pack spend / 0G sealed / win rate)
+ *   • Metric row — 4 tiles with observed or explicitly unavailable values
  *   • Crawl      — horizontal scrolling chain/proof-chain marquee
  */
 export function NasdaqHeader({
@@ -84,6 +84,7 @@ export function NasdaqHeader({
         minute: "2-digit",
         second: "2-digit",
         hour12: false,
+        timeZone: "UTC",
       });
     const first = setTimeout(() => setClock(format()), 0);
     const id = setInterval(() => setClock(format()), 1000);
@@ -96,22 +97,18 @@ export function NasdaqHeader({
   // agentBalance is piped in from UserContext so every UI surface reads the
   // same Arc RPC poll. null means either "not onboarded yet" or "first read
   // still in flight" — the UI renders "$—" in both cases.
-  const depositedIsLive = agentBalance != null;
+  const hasObservedArcBalance = agentBalance != null;
 
-  // Headline NAV must match the agent proxy wallet (DEPOSITED / CUSTODY). DB
-  // `fund.nav` can lag deposits or manual top-ups; prefer live Arc USDC.
-  const headlineNav =
-    agentBalance != null ? agentBalance : fund != null ? fund.nav : null;
+  // The headline is an observed Arc RPC balance. A stored NAV snapshot is not
+  // substituted when the observation is unavailable.
+  const headlineNav = agentBalance;
   const navLabel =
-    headlineNav != null ? formatCurrency(headlineNav) : "$------";
-  const change = fund?.navChange24h ?? 0;
-  const hasChange = fund?.navChange24h != null && !Number.isNaN(change);
-  const changePositive = change >= 0;
+    headlineNav != null ? formatCurrency(headlineNav) : "$—";
 
   return (
     <section
       className="nasdaq-led nasdaq-scanlines relative overflow-hidden rounded-2xl border-2 border-dawg-500/60 shadow-[0_0_0_1px_rgba(0,0,0,0.9),0_10px_50px_-10px_rgba(255,199,0,0.35)]"
-      aria-label="AlphaDawg Nasdaq LED ticker"
+      aria-label="AlphaDawg Nasdaq LED status board"
     >
       {/* Bright yellow tower accent bar (top edge) */}
       <div className="h-[3px] w-full bg-gradient-to-r from-transparent via-dawg-500 to-transparent" />
@@ -124,11 +121,8 @@ export function NasdaqHeader({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-dawg-500/20 px-5 py-2 text-xs uppercase">
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#39FF7A] opacity-60" />
-                <span className="nasdaq-led-green relative inline-flex h-2.5 w-2.5 rounded-full bg-[#39FF7A]" />
-              </span>
-              <span className="nasdaq-led-green text-[18px] leading-none">LIVE</span>
+              <span className="h-2.5 w-2.5 rounded-full bg-void-500" aria-hidden="true" />
+              <span className="nasdaq-led-dim text-[18px] leading-none">TESTNET VIEW</span>
             </span>
             <LedSeparator />
             <span className="text-[18px] leading-none">
@@ -138,7 +132,7 @@ export function NasdaqHeader({
             </span>
             <LedSeparator />
             <span className="nasdaq-led-dim hidden text-[16px] leading-none md:inline">
-              0G SEALED TEE · HEDERA HCS · ARC USDC · X402
+              PROTECTED JOB EVIDENCE · HEDERA · ARC
             </span>
           </div>
 
@@ -149,6 +143,7 @@ export function NasdaqHeader({
                   year: "numeric",
                   month: "short",
                   day: "2-digit",
+                  timeZone: "UTC",
                 })
                 .toUpperCase()}
             </span>
@@ -166,30 +161,16 @@ export function NasdaqHeader({
           {/* Headline NAV */}
           <div>
             <div className="nasdaq-led-dim text-[18px] uppercase leading-none tracking-[0.22em]">
-              FUND NAV · USD
+              OBSERVED ARC BALANCE · USD
             </div>
             <div className="mt-2 flex items-baseline gap-4">
               <span className="nasdaq-led-bright text-[72px] leading-[0.85] tabular-nums md:text-[104px]">
                 {navLabel}
               </span>
               <div className="flex flex-col items-start gap-0.5">
-                <span
-                  className={`inline-flex items-center gap-1 text-[28px] leading-none tabular-nums ${
-                    hasChange
-                      ? changePositive
-                        ? "nasdaq-led-green"
-                        : "nasdaq-led-red"
-                      : "nasdaq-led-dim"
-                  }`}
-                >
-                  <span aria-hidden="true">
-                    {hasChange ? (changePositive ? "▲" : "▼") : "—"}
-                  </span>
-                  <span>
-                    {hasChange
-                      ? `${changePositive ? "+" : ""}${change.toFixed(2)}%`
-                      : "0.00%"}
-                  </span>
+                <span className="nasdaq-led-dim inline-flex items-center gap-1 text-[28px] leading-none tabular-nums">
+                  <span aria-hidden="true">—</span>
+                  <span>—</span>
                 </span>
                 <span className="nasdaq-led-dim text-[14px] uppercase leading-none tracking-wider">
                   24H CHANGE
@@ -197,10 +178,10 @@ export function NasdaqHeader({
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[16px] uppercase leading-none">
-              <span className="nasdaq-led-dim">DEPOSITED</span>
+              <span className="nasdaq-led-dim">ARC BALANCE</span>
               <span
                 className={`tabular-nums ${
-                  depositedIsLive ? "nasdaq-led-green" : ""
+                  hasObservedArcBalance ? "nasdaq-led-green" : ""
                 }`}
                 title={
                   agentBalanceFetchedAt
@@ -211,13 +192,10 @@ export function NasdaqHeader({
                 {agentBalance != null ? formatCurrency(agentBalance, 4) : "$—"}
               </span>
               <LedSeparator />
-              {depositedIsLive ? (
+              {hasObservedArcBalance ? (
                 <span className="nasdaq-led-green inline-flex items-center gap-1">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#39FF7A] opacity-60" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[#39FF7A]" />
-                  </span>
-                  LIVE · ARC ONCHAIN
+                  <span className="h-2 w-2 rounded-full bg-[#39FF7A]" aria-hidden="true" />
+                  ARC RPC · OBSERVED
                 </span>
               ) : (
                 <span className="nasdaq-led-dim">
@@ -232,20 +210,20 @@ export function NasdaqHeader({
             <LedTile
               label="HUNTS"
               value={fund ? formatNumber(fund.totalCycles) : "—"}
-              sub="ALL SEALED"
+              sub="RECORDED CYCLES"
               tone="bright"
             />
             <LedTile
-              label="PACK SPEND"
-              value={fund ? formatCurrency(fund.totalSpend, 3) : "—"}
-              sub={fund ? `${fund.totalPayments} X402 CALLS` : "0 CALLS"}
-              tone="bright"
+              label="SPEND"
+              value="—"
+              sub="NO CANONICAL TOTAL"
+              tone="dim"
             />
             <LedTile
-              label="0G SEALED"
-              value={fund ? formatNumber(fund.totalInferences) : "—"}
-              sub={fund && fund.totalCycles > 0 ? "6 PER HUNT · TEE ✓" : "TEE VERIFIED"}
-              tone="green"
+              label="INFERENCES"
+              value="—"
+              sub="PER-JOB EVIDENCE"
+              tone="dim"
             />
             <LedTile
               label="WIN RATE"
@@ -259,8 +237,8 @@ export function NasdaqHeader({
         {/* ── Row 3: Scrolling crawl (Bloomberg-style marquee) ───────────── */}
         <div className="relative overflow-hidden border-t border-dawg-500/20 bg-black py-2.5">
           <div className="nasdaq-ticker-track whitespace-nowrap text-[20px] uppercase leading-none">
-            <TickerStream fund={fund} headlineNav={headlineNav} liveDeposited={agentBalance} />
-            <TickerStream fund={fund} headlineNav={headlineNav} liveDeposited={agentBalance} aria-hidden />
+            <TickerStream fund={fund} headlineNav={headlineNav} observedArcBalance={agentBalance} />
+            <TickerStream fund={fund} headlineNav={headlineNav} observedArcBalance={agentBalance} aria-hidden />
           </div>
           {/* Black fade edges so the loop point is invisible */}
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-black to-transparent" />
@@ -323,15 +301,14 @@ function LedSeparator() {
 function TickerStream({
   fund,
   headlineNav,
-  liveDeposited,
+  observedArcBalance,
   ...props
 }: {
   fund: NasdaqHeaderFund | null;
   /** Same figure as the hero FUND NAV (live Arc when available). */
   headlineNav: number | null;
-  /** Live Circle MPC proxy balance — shown as CUSTODY so the crawl matches
-      the DEPOSITED hero line when the wallet balance endpoint is reachable. */
-  liveDeposited: number | null;
+  /** Arc RPC balance observation shown only when the read succeeded. */
+  observedArcBalance: number | null;
 } & React.HTMLAttributes<HTMLDivElement>) {
   const items: Array<{ label: string; value: string; tone: "up" | "neutral" | "bright" }> = [
     {
@@ -339,18 +316,17 @@ function TickerStream({
       value: headlineNav != null ? formatCurrency(headlineNav) : "$—",
       tone: "bright",
     },
-    { label: "24H Δ", value: "0.00%", tone: "neutral" },
+    { label: "24H Δ", value: "—", tone: "neutral" },
     {
-      label: "CUSTODY",
-      value: liveDeposited != null ? formatCurrency(liveDeposited, 4) : "$—",
-      tone: liveDeposited != null ? "up" : "neutral",
+      label: "ARC OBSERVED",
+      value: observedArcBalance != null ? formatCurrency(observedArcBalance, 4) : "$—",
+      tone: observedArcBalance != null ? "up" : "neutral",
     },
-    { label: "HUNTS", value: fund ? formatNumber(fund.totalCycles) : "—", tone: "up" },
-    { label: "X402 PAID", value: fund ? formatCurrency(fund.totalSpend, 3) : "—", tone: "up" },
-    { label: "TEE ATTESTATIONS", value: fund ? formatNumber(fund.totalInferences) : "—", tone: "bright" },
-    { label: "SEALED", value: "100%", tone: "up" },
-    { label: "SWARM ONLINE", value: "13/13", tone: "up" },
-    { label: "CHAIN", value: "0G · HEDERA · ARC", tone: "neutral" },
+    { label: "HUNTS", value: fund ? formatNumber(fund.totalCycles) : "—", tone: "bright" },
+    { label: "SPEND", value: "—", tone: "neutral" },
+    { label: "INFERENCES", value: "—", tone: "neutral" },
+    { label: "PROOF", value: "PER JOB", tone: "neutral" },
+    { label: "NETWORKS", value: "0G · HEDERA · ARC", tone: "neutral" },
   ];
 
   return (

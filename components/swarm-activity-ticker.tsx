@@ -47,7 +47,7 @@ const ACTION_STYLES: Record<string, ActionStyle> = {
   TRADE_EXECUTED:   { label: "SWAP",     tone: "dawg" },
   SWAP_FAILED:      { label: "SWAP✗",    tone: "red" },
   CYCLE_STARTED:    { label: "START",    tone: "void" },
-  CYCLE_COMPLETED:  { label: "SEALED",   tone: "dawg" },
+  CYCLE_COMPLETED:  { label: "RECORDED", tone: "dawg" },
   // Terminal "hunt done" marker — fires exactly once per hunt at the very end
   // of commitCycle, so it's the canonical "your hunt is finished" signal for
   // the user. Rendered with the loudest tone in the palette.
@@ -190,10 +190,10 @@ function describe(row: SwarmActivityRow): string {
     case "HCS_LOGGED": {
       const seq = typeof p.seqNum === "number" ? p.seqNum : null;
       if (seq != null && decision && asset) {
-        return `Sealed ${decision}${pct != null ? ` ${pct}%` : ""} ${asset} to Hedera HCS seq #${seq}`;
+        return `Recorded ${decision}${pct != null ? ` ${pct}%` : ""} ${asset} on Hedera HCS seq #${seq}`;
       }
-      if (seq != null) return `Decision sealed to Hedera HCS seq #${seq}`;
-      return "Decision sealed to Hedera HCS topic";
+      if (seq != null) return `Decision recorded on Hedera HCS seq #${seq}`;
+      return "Decision HCS action recorded without a sequence";
     }
     case "STORAGE_UPLOADED": {
       const rh = storageHash ?? (typeof p.rootHash === "string" ? p.rootHash : null);
@@ -253,7 +253,7 @@ function describe(row: SwarmActivityRow): string {
       if (st === "narrative_ready") {
         const headline = typeof p.headline === "string" ? p.headline : null;
         return headline
-          ? `Narrative sealed: ${headline.length > 100 ? `${headline.slice(0, 100)}…` : headline}`
+          ? `Narrative recorded: ${headline.length > 100 ? `${headline.slice(0, 100)}…` : headline}`
           : "Cycle narrative ready for 0G + HCS commit";
       }
       if (st === "override_applied") {
@@ -279,10 +279,10 @@ function describe(row: SwarmActivityRow): string {
       const dur = typeof p.durationMs === "number" ? p.durationMs : null;
       const durStr = dur != null && dur > 0 ? ` in ${(dur / 1000).toFixed(1)}s` : "";
       if (decision && asset && pct != null && cycleNum != null) {
-        return `HUNT #${cycleNum} SEALED: ${decision} ${pct}% ${asset}${durStr}${headline ? ` — ${headline.slice(0, 80)}${headline.length > 80 ? "…" : ""}` : ""}`;
+        return `HUNT #${cycleNum} RECORDED: ${decision} ${pct}% ${asset}${durStr}${headline ? ` — ${headline.slice(0, 80)}${headline.length > 80 ? "…" : ""}` : ""}`;
       }
-      if (cycleNum != null) return `HUNT #${cycleNum} SEALED${durStr}`;
-      return "Hunt sealed to the audit trail";
+      if (cycleNum != null) return `HUNT #${cycleNum} RECORDED${durStr}`;
+      return "Hunt completion recorded";
     }
     case "CYCLE_REJECTED": {
       if (cycleNum != null) return `Hunt #${cycleNum} rejected by the user`;

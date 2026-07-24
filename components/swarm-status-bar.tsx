@@ -71,7 +71,7 @@ export function SwarmStatusBar() {
   }, [health]);
 
   return (
-    <div className="sticky top-0 z-40 bg-black/90 backdrop-blur-sm border-b border-dawg-500/20 px-4 py-3">
+    <div className="sticky top-14 z-40 bg-black/90 backdrop-blur-sm border-b border-dawg-500/20 px-4 py-3">
       <div className="max-w-screen-2xl mx-auto flex items-center gap-4 flex-wrap">
         {/* Left: 13 agent health pills */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -141,7 +141,7 @@ export function SwarmStatusBar() {
             These numbers are PLATFORM-WIDE (all users, last 24h), NOT personal
             activity. A fresh wallet will see non-zero values here even with
             zero personal hunts — the NETWORK label makes that explicit. */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="ml-auto flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
           <span
             className="font-pixel text-[12px] leading-none uppercase tracking-[0.14em] text-[#FFCC00]/50 pr-1 border-r border-dawg-500/20 mr-1"
             title="Platform-wide activity across all users in the last 24 hours"
@@ -179,12 +179,7 @@ export function SwarmStatusBar() {
   );
 }
 
-/**
- * One-click verification menu. Shows the 4 live smart contracts / chain-level
- * assets backing AlphaDawg with direct explorer links. This is the canonical
- * "everything is real and verifiable" surface for judges — no searching, no
- * copy-paste, just click and inspect on chain.
- */
+/** Explorer links for configured contract and chain-level identifiers. */
 function LiveContractsMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -241,11 +236,11 @@ function LiveContractsMenu() {
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-void-300">
-                Live on-chain assets
+                Configured explorer assets
               </span>
             </div>
             <p className="text-[10px] text-void-600 mt-0.5">
-              Every click opens the canonical block explorer
+              Links are configuration aids, not current job proof
             </p>
           </div>
           <ul className="divide-y divide-void-800/60">
@@ -266,7 +261,7 @@ function LiveContractsMenu() {
                     </span>
                   </div>
                   <p className="text-[10px] text-void-500 mt-0.5 leading-snug">
-                    {contract.description}
+                    Configured identifier; inspect the explorer for current chain state.
                   </p>
                   <div className="flex items-center justify-between gap-2 mt-1">
                     <span className="text-[9px] font-mono text-void-600 truncate">

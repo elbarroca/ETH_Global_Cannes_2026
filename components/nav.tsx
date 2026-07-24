@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { WalletConnectButton } from "./wallet-connect";
-import { LiveBadge } from "./ui/badge";
 import { DawgLogo } from "./dawg-logo";
 import { useUser } from "@/contexts/user-context";
 import { arcAddressUrl, inftTokenUrl } from "@/lib/links";
@@ -112,6 +111,7 @@ function InftPill({ tokenId }: { tokenId: number }) {
 
 export function Nav() {
   const pathname = usePathname();
+  const [mobileMenu, setMobileMenu] = useState({ open: false, pathname });
   const { user, walletAddress, agentBalance } = useUser();
   const mounted = useSyncExternalStore(
     subscribeToHydration,
@@ -121,28 +121,41 @@ export function Nav() {
 
   const proxyAddress = user?.proxyWallet?.address ?? null;
   const inftTokenId = user?.inftTokenId ?? null;
+  const mobileOpen = mobileMenu.open && mobileMenu.pathname === pathname;
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setMobileMenu({ open: false, pathname });
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [mobileOpen, pathname]);
 
   return (
-    <header className="sticky top-0 z-50 bg-void-900 border-b border-void-800">
+    <header className="sticky top-0 z-50 border-b border-void-800 bg-void-900">
       <div className="max-w-7xl mx-auto px-5 h-14 flex items-center gap-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0 group">
+        <Link href="/" onClick={() => setMobileMenu({ open: false, pathname })} className="flex min-h-11 items-center gap-2 shrink-0 group">
           <DawgLogo animated className="w-8 h-8" />
-          <span className="font-bold text-void-100 text-base tracking-tight">
+          <span className="hidden font-bold text-void-100 text-base tracking-tight sm:inline">
             AlphaDawg
           </span>
-          <LiveBadge />
+          <span className="rounded-md border border-void-700 bg-black px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-void-400">
+            Testnet
+          </span>
         </Link>
 
-        {/* Nav tabs */}
-        <nav className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto py-1">
+        {/* Desktop nav tabs */}
+        <nav aria-label="Primary" className="hidden items-center gap-0.5 flex-1 min-w-0 py-1 md:flex">
           {TABS.map((tab) => {
             const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                aria-current={active ? "page" : undefined}
+                className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm transition-colors ${
                   active
                     ? "bg-void-800 text-void-100 font-medium"
                     : "text-void-500 hover:text-void-300"
@@ -155,7 +168,7 @@ export function Nav() {
         </nav>
 
         {/* Right section — wallet identity */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           {inftTokenId !== null && <InftPill tokenId={inftTokenId} />}
 
           {/* Agent wallet — always relevant when user is onboarded */}
@@ -166,10 +179,46 @@ export function Nav() {
           {/* User (EOA) wallet — connected external wallet */}
           {mounted && walletAddress && <UserWalletPill address={walletAddress} />}
 
+          <button
+            type="button"
+            onClick={() => setMobileMenu({ open: !mobileOpen, pathname })}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-primary-nav"
+            aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+            className="grid h-11 w-11 place-items-center rounded-xl border border-void-700 text-lg text-void-300 hover:bg-void-800 md:hidden"
+          >
+            {mobileOpen ? "×" : "☰"}
+          </button>
+
           {/* Dynamic widget — handles connect / disconnect / switch */}
           <WalletConnectButton />
         </div>
       </div>
+
+      {mobileOpen && (
+        <nav id="mobile-primary-nav" aria-label="Mobile primary" className="border-t border-void-800 bg-void-900 px-4 py-3 md:hidden">
+          <div className="grid grid-cols-2 gap-2">
+            {TABS.map((tab) => {
+              const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => setMobileMenu({ open: false, pathname })}
+                  className={`inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-void-800 text-void-100"
+                      : "border border-void-800 text-void-400 hover:bg-void-800 hover:text-void-200"
+                  }`}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </header>
   );
 }
