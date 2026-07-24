@@ -26,10 +26,12 @@ import {
   reconcileExpiredJobs,
 } from "../../src/worker/store";
 import { sha256 } from "../../src/auth/service";
+import { checkFreshEnsAuthority } from "../../src/ens/authority";
 import {
   configureDatabaseEnvironment,
   startDisposableDatabase,
 } from "../helpers/postgres";
+import { createEnsAuthorityFixture } from "../helpers/ens";
 
 const BUYER_ID = "a2-buyer";
 const OTHER_ID = "a2-other";
@@ -116,6 +118,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
       agentInput.manifest,
       { now: BASE_TIME, sql: database.sql },
     );
+    const ens = createEnsAuthorityFixture({ now: BASE_TIME });
 
     await t.test("published versions are immutable and transitions are DB-enforced", async () => {
       await assert.rejects(database.sql`
@@ -259,6 +262,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
         concurrency: 1,
         leaseSeconds: 30,
         adapter,
+        authority: ens.runtime,
         sql: database.sql,
         now,
       });
@@ -268,6 +272,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
         concurrency: 1,
         leaseSeconds: 30,
         adapter,
+        authority: ens.runtime,
         sql: database.sql,
         now: new Date(now.getTime() + 1_000),
       });
@@ -295,6 +300,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
         concurrency: 1,
         leaseSeconds: 30,
         adapter: initialAdapter,
+        authority: ens.runtime,
         sql: database.sql,
         now,
         afterTerminalEffectPersisted: async () => {
@@ -313,6 +319,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
         concurrency: 1,
         leaseSeconds: 30,
         adapter: restartAdapter,
+        authority: ens.runtime,
         sql: database.sql,
         now: new Date(now.getTime() + 31_000),
       });
@@ -338,11 +345,20 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
       const job = claimed[0];
       assert.equal(job?.jobId, submitted.jobId);
       if (!job) throw new Error("TEST_JOB_NOT_CLAIMED");
+      const authority = await checkFreshEnsAuthority(
+        job,
+        ens.runtime,
+        "PRE_DELIVERY",
+        "ACCEPT_DELIVERY",
+        { now, signal: new AbortController().signal, sql: database.sql },
+      );
+      assert.equal(authority.allowed, true);
+      if (!authority.checkId) throw new Error("TEST_AUTHORITY_CHECK_MISSING");
       await persistSuccessfulEffect(
         job,
         { status: "delivered" },
         domainHash("test-proof", job.effectId),
-        { now, sql: database.sql },
+        { authorityCheckId: authority.checkId, now, sql: database.sql },
       );
       const order = await database.sql<{ amount_atomic: string; asset: string }[]>`
         SELECT o.amount_atomic::text, o.asset

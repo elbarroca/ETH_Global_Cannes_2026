@@ -17,6 +17,11 @@ import {
   type StorageVerificationRequest,
   type StorageVerificationResult,
 } from "./storage-verifier";
+import {
+  checkFreshEnsAuthority,
+  type EnsAuthorityOperation,
+  type EnsAuthorityRuntime,
+} from "../ens/authority";
 
 const POLICY_VERSION = "strict-0g-v1";
 const REQUEST_DEADLINE_MS = 5 * 60 * 1_000;
@@ -117,6 +122,7 @@ export interface StrictA3AdapterOptions {
   };
   hooks?: StrictA3Hooks;
   environment?: Record<string, string | undefined>;
+  authority?: EnsAuthorityRuntime;
 }
 
 interface A3JournalRow {
@@ -546,6 +552,7 @@ export class StrictA3Adapter implements KernelAdapter {
   private readonly clock: () => Date;
   private readonly deadlineMs: number;
   private readonly hooks: StrictA3Hooks;
+  readonly authorityRuntime: EnsAuthorityRuntime | null;
   private readonly runtime: null | {
     provider: string;
     model: string;
@@ -569,6 +576,7 @@ export class StrictA3Adapter implements KernelAdapter {
       throw new Error("A3_INVALID_DEADLINE_POLICY");
     }
     this.hooks = options.hooks ?? {};
+    this.authorityRuntime = options.authority ?? null;
     if (options.fixture) {
       this.runtime = options.fixture;
       return;
@@ -593,6 +601,24 @@ export class StrictA3Adapter implements KernelAdapter {
 
   private async assertCurrentClaim(job: ClaimedJob): Promise<void> {
     await this.withCurrentClaim(job, async () => undefined);
+  }
+
+  private async assertFreshAuthority(
+    job: ClaimedJob,
+    operation: EnsAuthorityOperation,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (!this.authorityRuntime) throw new A3TerminalError("ENS_AUTHORITY_NOT_CONFIGURED");
+    const decision = await checkFreshEnsAuthority(
+      job,
+      this.authorityRuntime,
+      "PRE_EXECUTION",
+      operation,
+      { now: this.clock(), signal, sql: this.sql },
+    );
+    if (!decision.allowed) {
+      throw new A3TerminalError(decision.errorCode ?? "ENS_AUTHORITY_DENIED");
+    }
   }
 
   private async lineage(tx: DatabaseClient, request: AdapterExecutionRequest): Promise<LineageRow> {
@@ -1001,6 +1027,7 @@ export class StrictA3Adapter implements KernelAdapter {
         await this.hooks.afterPrepared?.();
         checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
+        await this.assertFreshAuthority(job, "COMPUTE_SERVICE", activeDeadline.signal);
         const preparedJournal = journal;
         const service = validateService(
           await awaitWithSignal(
@@ -1019,6 +1046,7 @@ export class StrictA3Adapter implements KernelAdapter {
         journal = await this.markRequestSent(job, journal);
 
         await this.assertCurrentClaim(job);
+        await this.assertFreshAuthority(job, "COMPUTE_HEADERS", activeDeadline.signal);
         const sentJournal = journal;
         const headers = await awaitWithSignal(
           () => runtime.compute.getRequestHeaders(
@@ -1030,6 +1058,7 @@ export class StrictA3Adapter implements KernelAdapter {
         );
         checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
+        await this.assertFreshAuthority(job, "COMPUTE_REQUEST", activeDeadline.signal);
         const response = validateComputeResponse(
           await awaitWithSignal(
             () => runtime.compute.sendRequest(
@@ -1045,6 +1074,7 @@ export class StrictA3Adapter implements KernelAdapter {
         );
         checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
+        await this.assertFreshAuthority(job, "COMPUTE_SIGNATURE", activeDeadline.signal);
         const signature = validateSignature(await awaitWithSignal(
           () => runtime.compute.fetchSignature(
             service,
@@ -1094,6 +1124,7 @@ export class StrictA3Adapter implements KernelAdapter {
         }
         const contentBytes = Buffer.from(journal.response_content, "utf8");
         const contentDigest = sha256Hex(contentBytes);
+        await this.assertFreshAuthority(job, "STORAGE_WRITE", activeDeadline.signal);
         journal = await this.markStorageRequested(job, journal);
         await this.assertCurrentClaim(job);
         const storageJournal = journal;
@@ -1145,6 +1176,7 @@ export class StrictA3Adapter implements KernelAdapter {
           root: journal.expected_root,
         };
         await this.assertCurrentClaim(job);
+        await this.assertFreshAuthority(job, "STORAGE_READBACK", activeDeadline.signal);
         this.validateVerifierResult(
           await awaitWithSignal(
             () => runtime.verifier(verifierRequest, activeDeadline.signal),

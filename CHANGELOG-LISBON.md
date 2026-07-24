@@ -2,6 +2,16 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A4 stable ENS authority boundary
+
+- Pinned the already locked `viem` runtime to exact `2.47.6` and added one stable Registry/Public Resolver/Universal Resolver read path. No ENSjs, ethers integration, direct ENSv2 contract path, dependency addition, or live call was introduced.
+- Added one immutable canonical ENS binding per effect and append-only fresh authority checks binding normalized creator/agent names and nodes to version, manifest, capability, service, payout, chain, owner/delegate, registry/resolver, freshness, policy, job, effect, and the current worker claim.
+- Made fresh authority load-bearing immediately before every remaining strict A3 Compute/Storage operation and again before delivery. `RESPONSE_VERIFIED`, `STORAGE_COMMITTED`, `READBACK_VERIFIED`, and expired-lease recovery skip completed or ambiguous adapter work while re-resolving only the authority needed for the remaining operation.
+- Added a database receipt authority foreign key and trigger: no receipt can be inserted without the latest fresh exact `PRE_DELIVERY` `ALLOW` for the same effect/job/version/binding/current claim. Authority bindings are immutable and checks are append-only.
+- Passed the six focused A4 tests, including 20 duplicate submissions, the full mismatch/refusal matrix, transfer during execution, both resume stages, unchanged/transferred readback recovery with zero adapter replay, both authority-phase lease takeovers, bounds/immutability, and direct receipt bypass refusal.
+- Passed combined integration 23/23 plus both four-migration lanes and the complete local cold gate. No live ENS/0G read or write, sponsor call, shared database effect, deployment, push, signature, transaction, form, funding, upload, spend, public identifier, or claim promotion occurred.
+- Kept `research_only_not_promotable`, `LIVE_EFFECT_BLOCKED`, `PASS_LIVE: NOT_RUN`, accepted A0-A3 state, and direct ENSv2 `CUT` unchanged. A4 returns `PASS_TO_AUDIT`, not release or track qualification.
+
 ## 2026-07-24 - Post-A3 continuation prompt and branch publication control
 
 - Recorded the final independent `PASS_A3_REMEDIATION` verdict on exact SHA `9a4f41f8c679469dc230cba584bce84fcc3c65e5`; A3 is now `PASS_FIXTURE; PASS_INTEGRATION; PASS_REAUDIT; LOCAL_ONLY`, while live remains `NOT_RUN; LIVE_EFFECT_BLOCKED`.

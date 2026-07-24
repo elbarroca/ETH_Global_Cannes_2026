@@ -15,6 +15,7 @@ const SCHEMA = resolve(ROOT, "prisma/schema.prisma");
 const BASELINE_MIGRATION = "20260724011500_baseline";
 const A2_MIGRATION = "20260724024500_authenticated_kernel";
 const A3_MIGRATION = "20260724041000_strict_0g";
+const A4_MIGRATION = "20260724130000_ens_authority";
 const BASELINE_SQL = resolve(ROOT, "prisma/migrations", BASELINE_MIGRATION, "migration.sql");
 const SENTINEL_ID = "a1-cannes-sentinel";
 const SENTINEL_WALLET = "0xa1cannessentinel";
@@ -289,12 +290,17 @@ async function verifyDatabase(
       effects: string | null;
       worker_leases: string | null;
       a3_execution_journals: string | null;
+      ens_authority_bindings: string | null;
+      ens_authority_checks: string | null;
       user_count: string;
       migration_count: string;
       baseline_count: string;
       a2_count: string;
       a3_count: string;
+      a4_count: string;
       invariant_trigger_count: string;
+      a4_constraint_count: string;
+      receipt_authority_nullable: string;
       sequence_type: string;
       sequence_start: string;
       sequence_min: string;
@@ -312,6 +318,8 @@ async function verifyDatabase(
         to_regclass('public.effects')::text AS effects,
         to_regclass('public.worker_leases')::text AS worker_leases,
         to_regclass('public.a3_execution_journals')::text AS a3_execution_journals,
+        to_regclass('public.ens_authority_bindings')::text AS ens_authority_bindings,
+        to_regclass('public.ens_authority_checks')::text AS ens_authority_checks,
         (SELECT count(*)::text FROM users) AS user_count,
         (
           SELECT count(*)::text
@@ -331,6 +339,10 @@ async function verifyDatabase(
           WHERE migration_name = ${A3_MIGRATION} AND finished_at IS NOT NULL
         ) AS a3_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A4_MIGRATION} AND finished_at IS NOT NULL
+        ) AS a4_count,
+        (
           SELECT count(*)::text FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN (
             'agent_versions_immutable_published',
@@ -340,9 +352,28 @@ async function verifyDatabase(
             'settlements_exclusive_verified',
             'refunds_exclusive_terminal',
             'commissions_verified_settlement_only',
-            'a3_journals_legal_transitions'
+            'a3_journals_legal_transitions',
+            'ens_authority_bindings_immutable',
+            'ens_authority_checks_append_only',
+            'receipts_require_ens_authority'
           )
         ) AS invariant_trigger_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'ens_bindings_effect_fk', 'ens_bindings_job_fk', 'ens_bindings_version_fk',
+            'ens_checks_binding_fk', 'ens_checks_job_fk', 'ens_checks_version_fk',
+            'receipts_authority_check_fk', 'ens_bindings_hash_check',
+            'ens_bindings_address_check', 'ens_bindings_bounds_check',
+            'ens_checks_binding_hash_check', 'ens_checks_phase_check',
+            'ens_checks_decision_check', 'ens_checks_observation_check'
+          )
+        ) AS a4_constraint_count,
+        (
+          SELECT is_nullable FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'receipts'
+            AND column_name = 'authority_check_id'
+        ) AS receipt_authority_nullable,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
         seq.min_value::text AS sequence_min,
@@ -363,12 +394,17 @@ async function verifyDatabase(
       result.effects !== "effects" ||
       result.worker_leases !== "worker_leases" ||
       result.a3_execution_journals !== "a3_execution_journals" ||
+      result.ens_authority_bindings !== "ens_authority_bindings" ||
+      result.ens_authority_checks !== "ens_authority_checks" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 3 ||
+      Number(result.migration_count) !== 4 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
-      Number(result.invariant_trigger_count) !== 8 ||
+      Number(result.a4_count) !== 1 ||
+      Number(result.invariant_trigger_count) !== 11 ||
+      Number(result.a4_constraint_count) !== 14 ||
+      result.receipt_authority_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||
       result.sequence_start !== "1" ||
       result.sequence_min !== "1" ||

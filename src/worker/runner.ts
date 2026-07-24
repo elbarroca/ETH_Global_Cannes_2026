@@ -7,6 +7,7 @@ import {
   finalizePersistedEffect,
   heartbeatClaimedJobs,
   heartbeatWorkerLease,
+  inspectVerifiedA3Effect,
   MAX_WORKER_CONCURRENCY,
   persistFailedEffect,
   persistSuccessfulEffect,
@@ -16,6 +17,11 @@ import {
   type ClaimedJob,
 } from "./store";
 import type { DatabaseClient } from "../kernel/service";
+import { getDb } from "../config/database";
+import {
+  checkFreshEnsAuthority,
+  type EnsAuthorityRuntime,
+} from "../ens/authority";
 
 export interface WorkerRunOptions {
   ownerId: string;
@@ -24,15 +30,62 @@ export interface WorkerRunOptions {
   adapter?: KernelAdapter;
   sql?: DatabaseClient;
   now?: Date;
+  authority?: EnsAuthorityRuntime;
   afterTerminalEffectPersisted?: (job: ClaimedJob) => Promise<void>;
+}
+
+function adapterAuthority(adapter: KernelAdapter): EnsAuthorityRuntime | null {
+  if (!("authorityRuntime" in adapter)) return null;
+  const value = (adapter as KernelAdapter & { authorityRuntime?: unknown }).authorityRuntime;
+  return value && typeof value === "object" ? value as EnsAuthorityRuntime : null;
+}
+
+async function deliveryAuthority(
+  job: ClaimedJob,
+  options: WorkerRunOptions,
+  signal: AbortSignal,
+): Promise<{ allowed: boolean; checkId: string | null; errorCode: string | null }> {
+  if (!options.authority) {
+    return { allowed: false, checkId: null, errorCode: "ENS_AUTHORITY_NOT_CONFIGURED" };
+  }
+  return checkFreshEnsAuthority(
+    job,
+    options.authority,
+    "PRE_DELIVERY",
+    "ACCEPT_DELIVERY",
+    { now: options.now, signal, sql: options.sql ?? getDb() },
+  );
 }
 
 async function finalizeRecoveredJournal(
   job: ClaimedJob,
   options: WorkerRunOptions,
   leaseLost: () => boolean,
+  signal: AbortSignal,
 ): Promise<boolean> {
-  const recovery = await recoverVerifiedA3Effect(job, { now: options.now, sql: options.sql });
+  const inspection = await inspectVerifiedA3Effect(job, { now: options.now, sql: options.sql });
+  if (inspection.status === "none") return false;
+  let authorityCheckId: string | null = null;
+  if (inspection.status === "verified") {
+    const decision = await deliveryAuthority(job, options, signal);
+    if (!decision.allowed || !decision.checkId) {
+      const persisted = await persistFailedEffect(
+        job,
+        decision.errorCode ?? "ENS_AUTHORITY_DENIED",
+        { now: options.now, sql: options.sql },
+      );
+      if (!persisted || leaseLost()) return true;
+      await options.afterTerminalEffectPersisted?.(job);
+      if (!leaseLost()) await finalizePersistedEffect(job, { now: options.now, sql: options.sql });
+      return true;
+    }
+    authorityCheckId = decision.checkId;
+  }
+  const recovery = await recoverVerifiedA3Effect(job, {
+    authorityCheckId,
+    now: options.now,
+    sql: options.sql,
+  });
   if (recovery.status === "none") return false;
   if (!recovery.persisted || leaseLost()) return true;
   await options.afterTerminalEffectPersisted?.(job);
@@ -49,8 +102,14 @@ async function processClaimedJob(
   signal: AbortSignal,
 ): Promise<void> {
   if (leaseLost()) return;
-  if (await finalizeRecoveredJournal(job, options, leaseLost)) return;
-  const adapter = options.adapter ?? new StrictA3Adapter({ sql: options.sql, now: options.now });
+  const adapter = options.adapter ?? new StrictA3Adapter({
+    authority: options.authority,
+    sql: options.sql,
+    now: options.now,
+  });
+  const authority = options.authority ?? adapterAuthority(adapter) ?? undefined;
+  const runtimeOptions = authority ? { ...options, authority } : options;
+  if (await finalizeRecoveredJournal(job, runtimeOptions, leaseLost, signal)) return;
   if (adapter.key !== job.adapterKey) throw new Error("WORKER_ADAPTER_POLICY_MISMATCH");
   let result;
   try {
@@ -72,7 +131,7 @@ async function processClaimedJob(
     });
   } catch {
     if (leaseLost()) return;
-    if (await finalizeRecoveredJournal(job, options, leaseLost)) return;
+    if (await finalizeRecoveredJournal(job, runtimeOptions, leaseLost, signal)) return;
     await requeueAfterTransientFailure(job, { now: options.now, sql: options.sql });
     return;
   }
@@ -90,11 +149,21 @@ async function processClaimedJob(
         sql: options.sql,
       });
     } else {
-      persisted = await persistSuccessfulEffect(job, result.result, result.proofHash, {
-        now: options.now,
-        sql: options.sql,
-        requireA3Readback: adapter.requiresVerifiedJournal === true,
-      });
+      const decision = await deliveryAuthority(job, runtimeOptions, signal);
+      if (!decision.allowed || !decision.checkId) {
+        persisted = await persistFailedEffect(
+          job,
+          decision.errorCode ?? "ENS_AUTHORITY_DENIED",
+          { now: options.now, sql: options.sql },
+        );
+      } else {
+        persisted = await persistSuccessfulEffect(job, result.result, result.proofHash, {
+          authorityCheckId: decision.checkId,
+          now: options.now,
+          sql: options.sql,
+          requireA3Readback: adapter.requiresVerifiedJournal === true,
+        });
+      }
     }
   } else if (result.retryable) {
     await requeueAfterTransientFailure(job, { now: options.now, sql: options.sql });

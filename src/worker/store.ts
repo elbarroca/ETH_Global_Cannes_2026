@@ -486,7 +486,13 @@ export async function claimJobs(
       SELECT id FROM jobs
       WHERE state = 'QUEUED'
         AND available_at <= ${now}
-        AND attempts < max_attempts
+        AND (
+          attempts < max_attempts
+          OR EXISTS (
+            SELECT 1 FROM a3_execution_journals journal
+            WHERE journal.job_id = jobs.id AND journal.stage = 'READBACK_VERIFIED'
+          )
+        )
         AND cancel_requested_at IS NULL
       ORDER BY created_at ASC, id ASC
       FOR UPDATE SKIP LOCKED
@@ -496,7 +502,11 @@ export async function claimJobs(
     for (const candidate of candidates) {
       const jobs = await tx<{ id: string; version: number; attempts: number }[]>`
         UPDATE jobs
-        SET state = 'RUNNING', version = version + 1, attempts = attempts + 1,
+        SET state = 'RUNNING', version = version + 1,
+            attempts = CASE WHEN EXISTS (
+              SELECT 1 FROM a3_execution_journals journal
+              WHERE journal.job_id = jobs.id AND journal.stage = 'READBACK_VERIFIED'
+            ) THEN attempts ELSE attempts + 1 END,
             lease_owner = ${ownerId}, lease_expires_at = ${expiresAt}, updated_at = ${now}
         WHERE id = ${candidate.id}::uuid AND state = 'QUEUED'
         RETURNING id, version, attempts
@@ -560,7 +570,12 @@ export async function persistSuccessfulEffect(
   job: ClaimedJob,
   result: CanonicalValue,
   proofHash: string,
-  options: { now?: Date; sql?: DatabaseClient; requireA3Readback?: boolean } = {},
+  options: {
+    authorityCheckId?: string;
+    now?: Date;
+    sql?: DatabaseClient;
+    requireA3Readback?: boolean;
+  } = {},
 ): Promise<boolean> {
   if (!/^[0-9a-f]{64}$/.test(proofHash)) throw new Error("WORKER_INVALID_PROOF_HASH");
   const sql = options.sql ?? getDb();
@@ -569,6 +584,10 @@ export async function persistSuccessfulEffect(
   return sql.begin(async (transaction) => {
     const tx = transactionClient(transaction);
     if (!(await currentClaimHeld(tx, job, now))) return false;
+    if (!options.authorityCheckId || !/^[1-9][0-9]*$/.test(options.authorityCheckId)) {
+      throw new Error("WORKER_ENS_AUTHORITY_REQUIRED");
+    }
+    const authorityCheckId = options.authorityCheckId;
     if (options.requireA3Readback) {
       const journals = await tx<{ effect_id: string }[]>`
         SELECT effect_id
@@ -612,9 +631,11 @@ export async function persistSuccessfulEffect(
     }
     const receipts = await tx<{ id: string }[]>`
       INSERT INTO receipts (
-        job_id, effect_id, verified, adapter_key, proof_hash, result_hash, created_at
+        job_id, effect_id, authority_check_id, verified, adapter_key,
+        proof_hash, result_hash, created_at
       ) VALUES (
-        ${job.jobId}::uuid, ${job.effectId}, true, ${job.adapterKey},
+        ${job.jobId}::uuid, ${job.effectId}, ${authorityCheckId}::bigint,
+        true, ${job.adapterKey},
         ${proofHash}, ${resultHash}, ${now}
       )
       ON CONFLICT (job_id) DO NOTHING
@@ -630,6 +651,7 @@ async function persistRecoveredVerifiedEffectLocked(
   jobId: string,
   effectId: string,
   payload: { result: CanonicalValue; proofHash: string },
+  authorityCheckId: string,
   now: Date,
 ): Promise<boolean> {
   const resultHash = domainHash("effect-result", payload.result);
@@ -643,9 +665,10 @@ async function persistRecoveredVerifiedEffectLocked(
   if (effects.length === 1) {
     const receipts = await tx<{ id: string }[]>`
       INSERT INTO receipts (
-        job_id, effect_id, verified, adapter_key, proof_hash, result_hash, created_at
+        job_id, effect_id, authority_check_id, verified, adapter_key,
+        proof_hash, result_hash, created_at
       ) VALUES (
-        ${jobId}::uuid, ${effectId}, true, 'protected-a3',
+        ${jobId}::uuid, ${effectId}, ${authorityCheckId}::bigint, true, 'protected-a3',
         ${payload.proofHash}, ${resultHash}, ${now}
       )
       ON CONFLICT (job_id) DO NOTHING
@@ -698,9 +721,38 @@ export type A3JournalRecovery =
   | { status: "none" }
   | { status: "succeeded" | "failed"; persisted: boolean };
 
-export async function recoverVerifiedA3Effect(
+export type A3JournalInspection =
+  | { status: "none" }
+  | { status: "verified" }
+  | { status: "invalid"; errorCode: string };
+
+export async function inspectVerifiedA3Effect(
   job: ClaimedJob,
   options: { now?: Date; sql?: DatabaseClient } = {},
+): Promise<A3JournalInspection> {
+  const sql = options.sql ?? getDb();
+  const now = options.now ?? new Date();
+  return sql.begin(async (transaction) => {
+    const tx = transactionClient(transaction);
+    if (!(await currentClaimHeld(tx, job, now))) return { status: "none" };
+    const journals = await tx<A3VerifiedJournalRow[]>`
+      SELECT * FROM a3_execution_journals
+      WHERE effect_id = ${job.effectId} AND job_id = ${job.jobId}::uuid
+        AND stage = 'READBACK_VERIFIED'
+      FOR UPDATE
+    `;
+    const journal = journals[0];
+    if (!journal) return { status: "none" };
+    const payload = deriveA3VerifiedJournalPayload(journal, true);
+    return payload.ok
+      ? { status: "verified" }
+      : { status: "invalid", errorCode: payload.errorCode };
+  }) as Promise<A3JournalInspection>;
+}
+
+export async function recoverVerifiedA3Effect(
+  job: ClaimedJob,
+  options: { authorityCheckId?: string | null; now?: Date; sql?: DatabaseClient } = {},
 ): Promise<A3JournalRecovery> {
   const sql = options.sql ?? getDb();
   const now = options.now ?? new Date();
@@ -730,6 +782,9 @@ export async function recoverVerifiedA3Effect(
         ),
       };
     }
+    if (!options.authorityCheckId || !/^[1-9][0-9]*$/.test(options.authorityCheckId)) {
+      throw new Error("WORKER_ENS_AUTHORITY_REQUIRED");
+    }
     return {
       status: "succeeded",
       persisted: await persistRecoveredVerifiedEffectLocked(
@@ -737,6 +792,7 @@ export async function recoverVerifiedA3Effect(
         job.jobId,
         job.effectId,
         payload,
+        options.authorityCheckId,
         now,
       ),
     };
@@ -1008,25 +1064,24 @@ async function reconcileExpiredCandidate(
     `;
     const verifiedJournal = journals[0];
     if (verifiedJournal) {
-      const payload = deriveA3VerifiedJournalPayload(verifiedJournal, true);
-      const persisted = payload.ok
-        ? await persistRecoveredVerifiedEffectLocked(
-            tx,
-            context.job_id,
-            context.effect_id,
-            payload,
-            now,
-          )
-        : await persistInvalidRecoveredEffectLocked(
-            tx,
-            context.job_id,
-            context.effect_id,
-            payload.errorCode,
-            now,
-          );
-      if (!persisted) throw new Error("WORKER_A3_RECOVERY_PERSISTENCE_FAILED");
-      await terminalizeLockedEffect(tx, await terminalContext(tx, context.job_id), now);
-      return "reconciled";
+      const changed = await tx<{ version: number }[]>`
+        UPDATE jobs
+        SET state = 'QUEUED', version = version + 1, lease_owner = NULL,
+            lease_expires_at = NULL, available_at = ${now}, updated_at = ${now}
+        WHERE id = ${candidate.job_id}::uuid AND state = 'RUNNING'
+          AND version = ${candidate.version} AND lease_expires_at <= ${now}
+        RETURNING version
+      `;
+      const requeued = changed[0];
+      if (!requeued) return null;
+      await tx`
+        INSERT INTO job_events (job_id, version, event_type, from_state, to_state, payload, created_at)
+        VALUES (
+          ${candidate.job_id}::uuid, ${requeued.version}, 'A3_READBACK_RECOVERY_PENDING',
+          'RUNNING', 'QUEUED', ${tx.json({})}, ${now}
+        )
+      `;
+      return "requeued";
     }
     if (context.cancel_requested_at) {
       const effects = await tx<{ id: string }[]>`

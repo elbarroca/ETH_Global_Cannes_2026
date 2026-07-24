@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { domainHash } from "../../src/kernel/canonical";
+import { checkFreshEnsAuthority } from "../../src/ens/authority";
 import { parseAgentInput } from "../../src/kernel/policy";
 import {
   cancelBuyerJob,
@@ -30,6 +31,7 @@ import {
   startDisposableDatabase,
   type DisposableDatabase,
 } from "../helpers/postgres";
+import { createEnsAuthorityFixture } from "../helpers/ens";
 
 const BUYER_ID = "fencing-buyer";
 const CREATOR_ID = "fencing-creator";
@@ -62,6 +64,7 @@ test("reclaimed jobs reject every stale worker mutation and preserve one effect"
   configureDatabaseEnvironment(database.url);
   try {
     const agentVersionId = await createAgent(database);
+    const ens = createEnsAuthorityFixture({ now: BASE_TIME });
     const submitted = await submitJob(BUYER_ID, {
       agentVersionId,
       idempotencyKey: "stale-claim-rejection",
@@ -150,11 +153,20 @@ test("reclaimed jobs reject every stale worker mutation and preserve one effect"
     assert.deepEqual(await snapshot(), beforeLateA);
 
     const completionTime = new Date(takeoverTime.getTime() + 2_000);
+    const authority = await checkFreshEnsAuthority(
+      claimB,
+      ens.runtime,
+      "PRE_DELIVERY",
+      "ACCEPT_DELIVERY",
+      { now: completionTime, signal: new AbortController().signal, sql: database.sql },
+    );
+    assert.equal(authority.allowed, true);
+    if (!authority.checkId) throw new Error("TEST_AUTHORITY_CHECK_MISSING");
     assert.equal(await persistSuccessfulEffect(
       claimB,
       { worker: "b", status: "delivered" },
       domainHash("test-proof", "worker-b-success"),
-      { now: completionTime, sql: database.sql },
+      { authorityCheckId: authority.checkId, now: completionTime, sql: database.sql },
     ), true);
     assert.equal(await finalizePersistedEffect(claimB, {
       now: completionTime,

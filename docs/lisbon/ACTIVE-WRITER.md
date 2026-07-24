@@ -3,6 +3,65 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: A4 sole writer /root/a4_writer
+task_id: A4-ENS-AUTHORITY-20260724
+task_instance_id: A4-ENS-AUTHORITY-20260724:EAFF8890
+sprint: A4
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: 16622acb26f3decf13a2bb83d002a05f50f301d6
+control_sha: 9a4f41f8c679469dc230cba584bce84fcc3c65e5
+token: EAFF8890-40DA-4507-8634-BD1D5386CC27
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T13:14:16Z
+expires_at: 2026-07-24T16:30:00Z
+allowed_paths:
+  - src/ens/authority.ts
+  - src/ens/viem-resolver.ts
+  - src/og/strict-a3.ts
+  - src/worker/runner.ts
+  - src/worker/store.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260724*_ens_authority/migration.sql
+  - tests/a4/**
+  - tests/helpers/ens.ts
+  - tests/a3/strict-a3.test.ts
+  - tests/kernel/kernel.test.ts
+  - tests/integration/worker-fencing.test.ts
+  - scripts/test-migrations.ts
+  - package.json
+  - package-lock.json
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+started_at: 2026-07-24T12:33:27Z
+expected_exit: stable ENS authority boundary integrated into strict A3 execution and pre-delivery receipt acceptance with local fixture and migration evidence
+external_effect_authority: local files tests loopback services disposable PostgreSQL generated build output and one atomic local commit only
+completed_at: 2026-07-24T13:14:16Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - exact viem 2.47.6 stable Registry Public Resolver and Universal Resolver boundary with direct ENSv2 cut
+  - immutable canonical effect bindings and append-only fresh claim-fenced PRE_EXECUTION and PRE_DELIVERY checks
+  - receipt database trigger requires the latest fresh exact authority ALLOW for the same current claim and binding
+  - twenty duplicates one A3 execution transfer restart resume refusal bypass bounds and both authority-phase lease takeovers pass
+  - focused A4 six of six A3 twelve of twelve combined integration twenty-three of twenty-three and both four-migration lanes pass
+  - cold install Prisma environment lint typecheck foundation auth kernel Go e2e resilience redaction boot secret shell and 31-page build pass
+  - exact changed-path allowlist staged diff whitespace placeholder and high-confidence secret reviews pass
+remaining_blocks:
+  - independent pinned-SHA A4 audit is required before A5
+  - PASS_LIVE is NOT_RUN and LIVE_EFFECT_BLOCKED with no live ENS or 0G public identifier
+  - release claim rights event-window dependency README deployment push forms and submission gates remain blocked
+audit_verdict: PENDING_INDEPENDENT_A4_AUDIT
+result: PASS_TO_AUDIT
+lock_release: release only matching token EAFF8890-40DA-4507-8634-BD1D5386CC27 after atomic commit and mirrored closure
+status: closed
+```
+
+```yaml
 owner: C0 coordinator task /root
 task_id: A3-TO-A4-CONTINUATION-PROMPT-PUBLISH-20260724
 task_instance_id: A3-TO-A4-CONTINUATION-PROMPT-PUBLISH-20260724:12016122

@@ -16,8 +16,9 @@
     "test": "tsx --test tests/foundation/*.test.ts tests/kernel/state.test.ts",
     "test:auth": "tsx --test tests/auth/*.test.ts",
     "test:kernel": "tsx --test tests/kernel/*.test.ts",
-    "test:integration": "tsx --test tests/integration/*.test.ts tests/a3/*.test.ts && tsx scripts/test-migrations.ts",
+    "test:integration": "tsx --test tests/integration/*.test.ts tests/a3/*.test.ts tests/a4/*.test.ts && tsx scripts/test-migrations.ts",
     "test:a3": "tsx --test tests/a3/*.test.ts",
+    "test:a4": "tsx --test tests/a4/*.test.ts",
     "test:go": "cd tools/0g-storage-verifier && go test ./... && go build -o /tmp/alphadawg-0g-storage-verifier ./cmd/verify",
     "test:e2e": "tsx --test tests/e2e/*.test.ts",
     "test:resilience": "tsx --test tests/resilience/*.test.ts",
@@ -84,7 +85,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "uuid": "*",
-    "viem": "*",
+    "viem": "2.47.6",
     "wagmi": "^3.6.0"
   },
   "devDependencies": {

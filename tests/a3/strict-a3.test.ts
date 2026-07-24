@@ -39,6 +39,7 @@ import {
   startDisposableDatabase,
   type DisposableDatabase,
 } from "../helpers/postgres";
+import { createEnsAuthorityFixture } from "../helpers/ens";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const GO_TOOL = resolve(ROOT, "tools/0g-storage-verifier");
@@ -347,6 +348,7 @@ function fixtureAdapter(
 ): {
   adapter: StrictA3Adapter;
   compute: FixtureCompute;
+  ens: ReturnType<typeof createEnsAuthorityFixture>;
   storage: FixtureStorage;
   verifier: { calls: number };
 } {
@@ -354,8 +356,10 @@ function fixtureAdapter(
   const compute = new FixtureCompute(content, options.computeFailure, options.onResolve);
   const storage = new FixtureStorage(options.wrongRoot, options.storageCrash);
   const verifier = { calls: 0 };
+  const ens = createEnsAuthorityFixture({ now: options.now ?? BASE_TIME });
   return {
     compute,
+    ens,
     storage,
     verifier,
     adapter: new StrictA3Adapter({
@@ -363,6 +367,7 @@ function fixtureAdapter(
       now: options.now ?? BASE_TIME,
       hooks: options.hooks,
       deadlineMs: options.deadlineMs,
+      authority: ens.runtime,
       fixture: {
         provider: PROVIDER,
         model: MODEL,
@@ -712,7 +717,7 @@ test("canonical deadline aborts stalled Compute request and signature retrieval"
       const submitted = await submit(database, agentVersionId, `a3-deadline-${item.name}`, now);
       const fixture = fixtureAdapter(database, {
         computeFailure: item.failure,
-        deadlineMs: 30,
+        deadlineMs: 250,
         now,
       });
       const startedAt = Date.now();
@@ -854,6 +859,7 @@ test("READBACK_VERIFIED recovers in-process and finalizes without a second adapt
       concurrency: 1,
       leaseSeconds: 30,
       adapter,
+      authority: fixture.ens.runtime,
       sql: database.sql,
       now: BASE_TIME,
     });
@@ -936,9 +942,10 @@ test("expired attempt=max READBACK_VERIFIED finalizes before exhaustion with zer
       concurrency: 1,
       leaseSeconds: 30,
       adapter: recoveryAdapter,
+      authority: fixture.ens.runtime,
       sql: database.sql,
       now: recoveryTime,
-    }), { leaseAcquired: true, claimed: 0 });
+    }), { leaseAcquired: true, claimed: 1 });
     assert.equal(recoveryAdapterCalls, 0);
     assert.deepEqual([
       fixture.compute.calls.send,

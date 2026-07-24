@@ -489,14 +489,15 @@ model Effect {
 }
 
 model Receipt {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  jobId       String   @unique @map("job_id") @db.Uuid
-  effectId    String   @unique @map("effect_id")
-  verified    Boolean
-  adapterKey  String   @map("adapter_key")
-  proofHash   String   @map("proof_hash")
-  resultHash  String   @map("result_hash")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId            String   @unique @map("job_id") @db.Uuid
+  effectId         String   @unique @map("effect_id")
+  authorityCheckId BigInt   @unique @map("authority_check_id")
+  verified         Boolean
+  adapterKey       String   @map("adapter_key")
+  proofHash        String   @map("proof_hash")
+  resultHash       String   @map("result_hash")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@map("receipts")
 }
@@ -593,4 +594,63 @@ model A3ExecutionJournal {
 
   @@index([jobId, stage], map: "idx_a3_journals_job_stage")
   @@map("a3_execution_journals")
+}
+
+model EnsAuthorityBinding {
+  effectId          String   @id @map("effect_id")
+  jobId             String   @unique @map("job_id") @db.Uuid
+  agentVersionId    String   @map("agent_version_id") @db.Uuid
+  bindingBytes      String   @map("binding_bytes") @db.Text
+  bindingHash       String   @map("binding_hash")
+  creatorName       String   @map("creator_name")
+  creatorNode       String   @map("creator_node")
+  agentName         String   @map("agent_name")
+  agentNode         String   @map("agent_node")
+  chainId           Int      @map("chain_id")
+  registry          String
+  creatorResolver   String   @map("creator_resolver")
+  agentResolver     String   @map("agent_resolver")
+  creatorOwner      String   @map("creator_owner")
+  creatorDelegate   String   @map("creator_delegate")
+  agentOwner        String   @map("agent_owner")
+  agentDelegate     String   @map("agent_delegate")
+  manifestHash      String   @map("manifest_hash")
+  capabilities      String[]
+  service           String   @db.Text
+  payout            String
+  maxAgeSeconds     Int      @map("max_age_seconds")
+  policyVersion     String   @map("policy_version")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([agentVersionId, createdAt], map: "idx_ens_bindings_version_created")
+  @@map("ens_authority_bindings")
+}
+
+model EnsAuthorityCheck {
+  id               BigInt    @id @default(autoincrement())
+  effectId         String    @map("effect_id")
+  jobId            String    @map("job_id") @db.Uuid
+  agentVersionId   String    @map("agent_version_id") @db.Uuid
+  bindingHash      String    @map("binding_hash")
+  phase            String
+  operation        String
+  decision         String
+  errorCode        String?   @map("error_code")
+  recordBytes      String?   @map("record_bytes") @db.Text
+  recordHash       String?   @map("record_hash")
+  chainId          Int?      @map("chain_id")
+  blockNumber      Decimal?  @map("block_number") @db.Decimal(20, 0)
+  blockTimestamp   DateTime? @map("block_timestamp") @db.Timestamptz(6)
+  observedAt       DateTime  @map("observed_at") @db.Timestamptz(6)
+  freshUntil       DateTime? @map("fresh_until") @db.Timestamptz(6)
+  transactionHash  String?   @map("transaction_hash")
+  leaseOwner       String    @map("lease_owner")
+  workerEpoch      BigInt    @map("worker_epoch")
+  claimVersion     Int       @map("claim_version")
+  claimExpiresAt   DateTime  @map("claim_expires_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([effectId, phase, id], map: "idx_ens_checks_effect_phase")
+  @@index([jobId, decision, createdAt], map: "idx_ens_checks_job_decision")
+  @@map("ens_authority_checks")
 }
