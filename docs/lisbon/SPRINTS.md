@@ -10,8 +10,9 @@ These are acceptance cards, not standalone prompts. C0 runs them in order using 
 | `A1` deterministic foundation | 3-4 h | Writer | A0_LOCAL | Clean install, real verification scripts, CI, schema, lint, typecheck, tests, and build pass. |
 | `A2` authenticated kernel and runtime | 5-7 h | Writer | A1 | Immutable hiring flow and one restart-safe worker reject forgery and duplication. |
 | `A3` strict 0G | 3-5 h | Writer | A2 + 0G static gate | Verified inference and proof-enabled Storage readback are mandatory for delivery. |
-| `A4` ENS authority | 2-4 h | Writer | A3 + ENS static gate | Fresh creator/agent records gate 0G before and after execution. |
-| `A5` product UI and E2E | 3-5 h | Writer | A4 | The protected path and its failures are usable, accessible, and automatically tested. |
+| `R0` agent and prompt readiness | 45-90 min | Control writer + read-only audit | Current controls | Every specialist has current paths/APIs, one non-overlapping domain, and complete A4-A7 acceptance coverage. |
+| `A4` ENS authority | 2-4 h | Writer | A3 + R0 + ENS static gate | Canonical creator authority and deterministic agent subnames gate publication, 0G, and delivery. |
+| `A5` product UI and E2E | 3-5 h | Writer | Accepted A4 | One protected creator -> publish -> different-buyer hire -> receipt path is usable, accessible, and automatically tested. |
 | `A6` optional Uniswap | max 4 h | Writer or CUT | Frozen A5 core + admission + 6 h reserve | Exact admitted contribution passes removal and live gates, or is cut untouched. |
 | `A7` release and submission | Remaining >=4 h | Writer | Required gates pass; A6 pass/cut | One SHA passes clean-clone release, two demos, deployment, evidence, and final audit. |
 
@@ -75,20 +76,37 @@ Deliver:
 
 Verify: local fixtures and integration first; missing/invalid/tampered proof, one-byte tamper, malformed response, timeout, outage, duplicate retry, and kill/restart produce no false success or replacement effect. `PASS_LIVE` requires separate exact authorization and public identifiers.
 
-## A4 - ENS authority
+## R0 - agent and A4-A7 prompt readiness
 
-Objective: make stable ENS creator and agent records an authorization boundary for A3.
-
-Entry: A3 passes and the chosen stable ENS path has current static proof. Direct ENSv2 stays optional until its official deployment packet and authorized live write/readback exist.
+Objective: make the registered specialists safe to dispatch against the current Lisbon protected path.
 
 Deliver:
 
-- Bind creator and agent subnames to immutable version, manifest, capability, service, chain, owner/delegate, resolver, and freshness.
-- Resolve immediately before 0G and again before accepting delivery.
-- Persist name/node, ownership, resolver, record hash, chain, block, transaction/time, and policy decision.
-- Transfer, mutation, stale record, wrong chain/version/resolver, missing record, or outage causes zero new 0G calls and zero accepted delivery.
+- Audit `AGENTS.md`, `.claude/agents/**`, `.claude/commands/**`, and the active coordinator/executor/auditor prompt chain.
+- Give authentication/kernel, ENS, 0G, product UI/E2E, optional payments, cycle wiring, and final bounty audit exactly one owner each. ENS must explicitly own `src/ens/**` and its migrations/tests.
+- Reconcile every declared path, package/API version, command, product name, event/bounty rule, and allowed effect against the current checkout. Remove stale Cannes-only, `VaultMind`, missing-path, and outdated-SDK guidance.
+- Dry-dispatch each specialist read-only and record its domain, paths, commands, dependencies, conflicts, and verdict.
 
-Verify: authorized write/read when allowed, forged writer, parent/agent transfer before and during execution, stale/mismatched data, outage, and restart.
+Gate: `R0_AGENT_READY` only when no required domain is unowned, no mutating scopes overlap, and every prompt is executable from the current checkout without inventing APIs or authority.
+
+## A4 - ENS authority
+
+Objective: bind an authenticated creator wallet and immutable agent version to a canonical creator name and deterministic agent subname, then make that authority an authorization boundary for publication and A3.
+
+Entry: A3 and `R0_AGENT_READY` pass. The stable Universal Resolver path and ENSv2 hierarchy/interfaces have current static proof. Direct ENSv2 live writes remain blocked until an official audited deployment packet and exact authorized write/readback exist.
+
+Deliver:
+
+- Treat SIWE wallet authentication, creator-name ownership, and ENS write authority as separate gates; reverse resolution is not authority.
+- Normalize and DNS-encode the creator name and deterministic agent label. Bind the resulting full subname to immutable version, manifest, capability, service, price, payout, chain, owner/delegate, resolver policy, and freshness.
+- Use the canonical Universal Resolver with CCIP Read. Prove readiness with the official `ur.integration-tests.eth` expected address.
+- Under ENSv2 fixtures/interfaces, require a canonical creator registry, require the agent parent registry to equal it, verify `findOwner(agentName)`, and verify an exact agent registry when one exists. Reject aliases, broken parent backlinks, wrong roots, and unexpected inherited resolvers.
+- Verify contract-wide/name roles and admin roles. Unexpected external grants, parent expiry/transfer, or subregistry replacement/removal deny authority.
+- Resolve immediately before 0G and again before accepting delivery.
+- Persist normalized/DNS names, root/Universal Resolver, canonical creator registry, agent parent/exact registry, ownership/roles, winning resolver and suffix, record hash, chain, block, transaction/time, freshness, and policy decision.
+- Transfer, mutation, stale record, wrong chain/version/root/registry/resolver, missing record, CCIP failure, or outage causes zero new 0G calls and zero accepted delivery.
+
+Verify: fixture first; authorized live write/read only when allowed. Cover forged writer, reverse-name spoofing, normalization/collision errors, registry aliasing, broken backlinks, external role grants, inherited-resolver mismatch, parent/agent transfer before and during execution, parent expiry/subregistry removal, stale data, CCIP failure, outage, duplicate/replay, and restart. Twenty duplicates still converge to one effect.
 
 ## A5 - product UI, functionality, and E2E
 
@@ -96,10 +114,13 @@ Objective: expose the protected path clearly without a broad redesign.
 
 Deliver:
 
-- Reuse the existing dashboard and components. Show hire input, immutable version/price, job state, ENS authority, 0G verification, Storage proof, canonical receipt, and explicit failure/refusal states.
+- Reuse the existing dashboard and components. Implement one stateful journey: private draft -> ENS name binding -> authorized readback -> immutable publication -> protected marketplace listing -> different authenticated buyer hire -> job -> verified receipt.
+- Derive creator/buyer identity server-side. A draft is not hireable; publish only the exact immutable version/name binding; changes create a new version. Define “deploy agent” as activating the application version/runtime, never as unproven contract or sponsor deployment.
+- Use only `/api/kernel/agents` and `/api/kernel/jobs` as protected authority. Legacy marketplace create/hire routes remain disabled or visibly non-authoritative.
+- Show connected wallet, creator name, agent subname, canonical state, owner/delegate, immutable version/price, publication/hire eligibility, job state, ENS authority, 0G verification, Storage proof, canonical receipt, and explicit failure/refusal states.
 - Keep model output advisory. The UI cannot create authority, rewrite terminal state, or show success from mocks, cached flags, or missing evidence.
 - Add functional API/integration tests for the complete path and refusal cases.
-- Add one automated browser path covering hire -> progress -> verified delivery -> receipt, plus forgery/refusal and replay no-op. Use existing browser tooling; add the minimum direct test dependency only if no supported runner exists.
+- Add one automated browser path with creator wallet A publishing an agent subname and buyer wallet B hiring its exact version through progress -> verified delivery -> receipt; cover self/cross-user refusal, forgery, stale authority, version substitution, duplicate hire, and replay no-op.
 - Check desktop and mobile layouts, keyboard flow, labels, focus, loading, empty, error, offline, and long-content states. Capture same-SHA screenshots only after automation passes.
 
 Gate: build/start, functional tests, automated critical-path UI tests, accessibility baseline, and two local reset/replays pass without manual data repair.
@@ -128,9 +149,10 @@ Deliver:
 - Freeze one SHA; run the complete release contract in `docs/lisbon/GOALS.md` from a fresh checkout.
 - Deploy web/API, PostgreSQL migration, and long-running worker from the same SHA only under exact current authorization. Expose non-secret release and evidence versions.
 - Run authorized live 0G and ENS smokes; run Uniswap only if A6 passed.
+- Prove the same creator parent, agent subname, immutable version, marketplace listing, external-buyer job, receipt, and release SHA across UI, API, worker, database, evidence, deployment, and video.
 - Run failure-first and success-plus-replay demos twice from resettable state within four minutes.
 - Complete current sponsor requirements, README/setup, prior-work disclosure, changelog, AI disclosure, public identifiers, demo script/video, and submission evidence.
-- Run the registered Bounty Auditor on the frozen SHA. No critical/high finding may remain.
+- Re-run `R0_AGENT_READY`, then run the current Lisbon Bounty Auditor on the frozen SHA. No critical/high finding may remain.
 
 Gate: `RELEASE_VALIDATED` only when code, deployment, UI, receipts, evidence, video, and track claims all bind the same SHA. Otherwise return the exact `BLOCKED`, `NARROW`, or `CUT` state.
 

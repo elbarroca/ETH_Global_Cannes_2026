@@ -4,6 +4,48 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Codex under project-owner direction
+task_id: ENSV2-GOAL-AND-A4-A7-PROMPT-20260724
+task_instance_id: ENSV2-GOAL-AND-A4-A7-PROMPT-20260724:B97B4AD3
+generation: 1
+sprint: A4_A7_control_reconciliation
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: 954d64de58557a3441500f7525e191cdd72ce293
+control_sha: 954d64de58557a3441500f7525e191cdd72ce293
+token: ENSV2-GOAL-B97B4AD3-602C-4A36-AE80-E811580004C6
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T21:13:26Z
+expires_at: 2026-07-24T22:13:26Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/SPRINTS.md
+  - docs/lisbon/prompts/C0-A4-CONTINUATION.md
+  - docs/lisbon/prompts/README.md
+started_at: 2026-07-24T21:13:26Z
+expected_exit: reconcile agent readiness ENSv2 canonical authority and the creator-to-marketplace-to-hire path in the A4-A7 control contract
+external_effect_authority: local files checks and one atomic commit only; no push deployment managed migration sponsor call signature transaction form spend or public claim
+completed_at: 2026-07-24T21:18:45Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - audited all seven registered specialists and found the canonical R0 blockers: ENS has no explicit owner, bounty criteria are Cannes-only, frontend paths and product identity are stale, and the 0G SDK version is stale
+  - GOALS and SPRINTS now require agent readiness before A4-A7 and order the remaining work as R0 then A4 then A5 then A6 pass-or-cut then A7
+  - ENSv2 contract requires SIWE-separated name authority, canonical creator registry, agent parent and owner checks, role and resolver provenance, and pre/post 0G resolution
+  - protected product journey is creator draft to ENS binding to immutable publication to external buyer hire to verified receipt through kernel authority only
+  - local Markdown links structure prompt fences contradiction scan diff check and tracked secret scan pass
+  - lint passed with zero errors and 23 inherited warnings; strict typecheck passed; foundation tests passed 9 of 9
+remaining_blocks:
+  - this control update does not pass R0 or repair the specialist files; C0 must do that before another A4-A7 writer
+  - A4 and A5 exact-SHA audits and the new ENSv2 and creator-to-hire implementation remain to execute
+  - no push deployment managed migration sponsor call ENS write signature transaction form spend or public claim was attempted
+audit_verdict: PASS_CONTROL_UPDATE_LOCAL_ONLY
+result: PASS_ENSV2_A4_A7_GOAL_RECONCILIATION
+lock_release: release only matching token ENSV2-GOAL-B97B4AD3-602C-4A36-AE80-E811580004C6 after one atomic commit and clean status
+status: closed
+```
+
+```yaml
+owner: Codex under project-owner direction
 task_id: A7-MICRO-COMMITS-20260724
 task_instance_id: A7-MICRO-COMMITS-20260724:2445DA17
 generation: 1
