@@ -33,7 +33,10 @@ test("Circle hook validates skills and ignores unrelated prompts", () => {
   ) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
   assert.equal(output.hookSpecificOutput.hookEventName, "UserPromptSubmit");
   assert.match(output.hookSpecificOutput.additionalContext, /All 17 project Circle skills validated/);
-  assert.match(output.hookSpecificOutput.additionalContext, /Local Circle\/UI E2E is not ready/);
+  assert.match(
+    output.hookSpecificOutput.additionalContext,
+    /Local Circle\/UI E2E is not ready|Required local Circle and database variables are configured/,
+  );
   assert.match(output.hookSpecificOutput.additionalContext, /proxyWallet\.address/);
   assert.match(output.hookSpecificOutput.additionalContext, /BLOCKED_NO_UI_AGENT_WALLET/);
   assert.match(output.hookSpecificOutput.additionalContext, /Sepolia assets stay on Sepolia/);
