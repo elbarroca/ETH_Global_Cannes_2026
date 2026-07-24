@@ -18,8 +18,6 @@ interface DawgLoaderProps {
   className?: string;
 }
 
-type Phase = "spinning" | "blasting" | "done";
-
 const DEFAULT_MESSAGES = [
   "Setting up agents…",
   "Retrieving wallet…",
@@ -45,39 +43,32 @@ export function DawgLoader({
   messageIntervalMs = 2000,
   className = "",
 }: DawgLoaderProps) {
-  const [phase, setPhase] = useState<Phase>(isLoading ? "spinning" : "blasting");
+  const [done, setDone] = useState(false);
   const [messageIndex, setMessageIndex] = useState(0);
-
-  // Trigger blast when parent flips isLoading off.
-  useEffect(() => {
-    if (!isLoading && phase === "spinning") {
-      setPhase("blasting");
-    }
-  }, [isLoading, phase]);
 
   // Cycle messages while spinning.
   useEffect(() => {
-    if (phase !== "spinning") return;
+    if (!isLoading) return;
     const id = setInterval(() => {
       setMessageIndex((i) => (i + 1) % messages.length);
     }, messageIntervalMs);
     return () => clearInterval(id);
-  }, [phase, messages.length, messageIntervalMs]);
+  }, [isLoading, messages.length, messageIntervalMs]);
 
   // Cleanup handler: fires when the blast coin animation ends.
   const handleBlastEnd = () => {
-    if (phase !== "blasting") return;
-    setPhase("done");
+    if (isLoading || done) return;
+    setDone(true);
     onComplete?.();
   };
 
-  if (phase === "done") return null;
+  if (done) return null;
 
   const containerClass = fullScreen
     ? `fixed inset-0 z-50 flex items-center justify-center bg-void-950/95 backdrop-blur-sm ${className}`.trim()
     : `flex items-center justify-center py-8 ${className}`.trim();
 
-  const isBlasting = phase === "blasting";
+  const isBlasting = !isLoading;
   const currentMessage = messages[messageIndex] ?? "";
 
   return (

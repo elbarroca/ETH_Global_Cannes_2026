@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  deterministic-foundation:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_DB: alphadawg_ci
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/alphadawg_ci
+      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/alphadawg_ci
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      ENABLE_BACKGROUND_WORKERS: "false"
+      NEXT_START_BOT: "false"
+      # Public, deliberately non-live UUID used only so the client provider can prerender offline.
+      NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID: "00000000-0000-4000-8000-000000000000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 22
+      - run: npm ci --legacy-peer-deps
+      - run: npx prisma validate
+      - run: npx prisma generate
+      - run: npm run validate:env -- --require-database
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm run test:e2e
+      - run: npm run test:resilience
+      - run: npm run test:redaction
+      - run: npm run scan:secrets
+      - run: npm run build

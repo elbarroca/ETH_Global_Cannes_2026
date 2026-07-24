@@ -4,6 +4,85 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator task /root
+task_id: A1-DETERMINISTIC-FOUNDATION-20260724T0107WEST
+task_instance_id: A1-DETERMINISTIC-FOUNDATION-20260724T0107WEST:1E701677
+sprint: A1
+mode: sole_writer
+branch: developer
+start_sha: 8c07b80a515405947b5994c6540f9038e7f5058f
+control_sha: 8c07b80a515405947b5994c6540f9038e7f5058f
+token: 1E701677-CC4A-45FD-95BC-2FC936C75878
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T01:01:00Z
+expires_at: 2026-07-24T04:15:00Z
+allowed_paths:
+  - package.json
+  - package-lock.json
+  - .github/workflows/ci.yml
+  - .env.example
+  - .gitignore
+  - eslint.config.mjs
+  - hardhat.config.cjs
+  - README.md
+  - CLAUDE.md
+  - prisma/schema.prisma
+  - prisma/migrations/**
+  - scripts/clean-generated.ts
+  - scripts/scan-secrets.ts
+  - scripts/test-migrations.ts
+  - scripts/validate-env.ts
+  - src/config/env.ts
+  - src/config/database.ts
+  - src/config/prisma.ts
+  - tests/foundation/**
+  - tests/integration/**
+  - tests/e2e/**
+  - tests/resilience/**
+  - tests/redaction/**
+  - app/api/marketplace/earnings/route.ts
+  - app/api/swarm/metrics/route.ts
+  - app/dashboard/compute/[id]/page.tsx
+  - app/dashboard/page.tsx
+  - app/verify/page.tsx
+  - components/auth-guard.tsx
+  - components/dawg-loader.tsx
+  - components/expandable-hunt-card.tsx
+  - components/hunt/hunt-narrative-flow.tsx
+  - components/hunt/hunt-pipeline-arrows.tsx
+  - components/nav.tsx
+  - contexts/user-context.tsx
+  - scripts/validate-audit-trail.ts
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/evidence/A1-DETERMINISTIC-FOUNDATION.md
+scope_amendments:
+  - authorized_at_utc: 2026-07-24T00:40:10Z
+    path: app/api/swarm/metrics/route.ts
+    reason: cold build proved database access during route prerender
+  - authorized_at_utc: 2026-07-24T00:41:12Z
+    path: app/api/marketplace/earnings/route.ts
+    reason: next cold build proved the same database prerender failure
+started_at: 2026-07-24T00:08:51Z
+expected_exit: deterministic npm, environment, migration, CI, lint, test, build, and evidence gates pass on one local SHA
+lock_release: release only token 1E701677-CC4A-45FD-95BC-2FC936C75878 after the atomic commit
+completed_at: 2026-07-24T01:01:00Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - committed npm lock is unchanged and the cold npm ci install passes
+  - Prisma validate and generate pass with non-connecting loopback placeholders
+  - empty and explicitly synthetic Cannes-shaped disposable migration replays pass
+  - lint has zero errors; typecheck, unit, integration, e2e, resilience, redaction, environment, and build gates pass
+  - CI covers the same deterministic foundation with workers disabled and a deliberately non-live public Dynamic UUID
+  - both route scope amendments were build-proven and C0-authorized before editing
+  - no sponsor call, shared database effect, push, deployment, signature, transaction, form, spend, mainnet action, or claim promotion occurred
+audit_verdict: pending_pinned_exit_audit
+status: complete
+```
+
+```yaml
+owner: C0 coordinator task /root
 task_id: A0-LOCAL-ADMISSION-REMEDIATION-G1-20260724
 task_instance_id: A0-LOCAL-ADMISSION-REMEDIATION-G1-20260724:C0986048
 generation: 1

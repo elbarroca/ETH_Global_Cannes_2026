@@ -4,6 +4,7 @@
 |---|---|---|
 | Clean Cannes baseline | `CONFIRMED` | Commit/tree/lock hashes and clean event worktree. |
 | Local Continuity implementation authority | `LOCAL_BUILD_AUTHORIZED` | A0_LOCAL Git provenance, project-owner local authority, and writer serialization. |
+| Deterministic local engineering foundation | `PASS_LOCAL_ONLY` | A1 exact cold gate and synthetic migration replay in [`evidence/A1-DETERMINISTIC-FOUNDATION.md`](evidence/A1-DETERMINISTIC-FOUNDATION.md). Live Cannes migration compatibility, dependency audit remediation, release, sponsor connectivity, and production readiness remain unproven. |
 | Release and claim authority | `RELEASE_BLOCKED` | Rights/license/team/owners, required access/caps, event-window classification, same-SHA release evidence, and independent release audit; H0 remains the boundary for Lisbon-new evidence. |
 | Sponsor and shared-system effects | `LIVE_EFFECT_BLOCKED` | Exact current effect-specific authorization, provider/network/scope/cap, and resulting public identifiers. |
 | Open-source/license authority | `PENDING` | Contributor authorization and root license. |

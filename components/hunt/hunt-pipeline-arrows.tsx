@@ -186,13 +186,15 @@ export function HuntPipelineArrows({
   //   When no anchors exist at all (stale legacy rows), fall back to
   //   cycle.timestamp - 60s as the start so the diagram still renders a
   //   monotonically-increasing sequence of times.
-  const cycleEndMs = (() => {
-    const t = new Date(cycle.timestamp).getTime();
-    return Number.isFinite(t) ? t : Date.now();
-  })();
   const realMsValues = nodes
     .map((n) => n.realMs)
     .filter((v): v is number => v != null && Number.isFinite(v));
+  const parsedCycleEndMs = new Date(cycle.timestamp).getTime();
+  const cycleEndMs = Number.isFinite(parsedCycleEndMs)
+    ? parsedCycleEndMs
+    : realMsValues.length > 0
+      ? Math.max(...realMsValues)
+      : 0;
   const anchorStart = realMsValues.length > 0 ? Math.min(...realMsValues) : cycleEndMs - 60_000;
   const anchorEnd = realMsValues.length > 0 ? Math.max(...realMsValues, cycleEndMs) : cycleEndMs;
   const totalSpan = Math.max(anchorEnd - anchorStart, (nodes.length - 1) * 1000); // at least 1s/node

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { WalletConnectButton } from "./wallet-connect";
 import { LiveBadge } from "./ui/badge";
 import { DawgLogo } from "./dawg-logo";
@@ -17,6 +17,10 @@ const TABS = [
   { href: "/deposit", label: "Deposit" },
   { href: "/verify", label: "Verify" },
 ];
+
+const subscribeToHydration = () => () => undefined;
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 function shorten(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -109,11 +113,11 @@ function InftPill({ tokenId }: { tokenId: number }) {
 export function Nav() {
   const pathname = usePathname();
   const { user, walletAddress, agentBalance } = useUser();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    subscribeToHydration,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
 
   const proxyAddress = user?.proxyWallet?.address ?? null;
   const inftTokenId = user?.inftTokenId ?? null;

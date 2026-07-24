@@ -72,11 +72,19 @@ function useTokenStream(
   const [idx, setIdx] = useState(0);
   const doneRef = useRef(false);
   const onDoneRef = useRef(onDone);
-  onDoneRef.current = onDone;
+  const [previousInput, setPreviousInput] = useState({ fullText, active });
+
+  if (previousInput.fullText !== fullText || previousInput.active !== active) {
+    setPreviousInput({ fullText, active });
+    setIdx(0);
+  }
+
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
 
   useEffect(() => {
     doneRef.current = false;
-    setIdx(0);
   }, [fullText, active]);
 
   useEffect(() => {
@@ -389,12 +397,14 @@ export function HuntNarrativeFlow({
   const [idx, setIdx] = useState(0);
   const [debateSub, setDebateSub] = useState<0 | 1>(0);
   const [verdictDone, setVerdictDone] = useState(false);
+  const [previousPhases, setPreviousPhases] = useState(phases);
 
-  useEffect(() => {
+  if (previousPhases !== phases) {
+    setPreviousPhases(phases);
     setIdx(0);
     setDebateSub(0);
     setVerdictDone(false);
-  }, [cycle.id, phases]);
+  }
 
   const phase = phases[idx];
   const streamActive = !(loadingActions && actions.length === 0);

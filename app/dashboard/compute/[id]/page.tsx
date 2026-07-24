@@ -36,19 +36,30 @@ export default function ComputePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { userId, user } = useUser();
-  const [data, setData] = useState<ComputeDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const requestKey = userId && params.id ? `${userId}:${params.id}` : null;
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    data: ComputeDetailResponse | null;
+  } | null>(null);
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [showFullStorageRoot, setShowFullStorageRoot] = useState(false);
   const [fullPriorCidIdx, setFullPriorCidIdx] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!userId || !params.id) return;
-    setLoading(true);
+    if (!userId || !params.id || !requestKey) return;
+    let cancelled = false;
     getCycleDetail(userId, Number(params.id))
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [userId, params.id]);
+      .catch(() => null)
+      .then((data) => {
+        if (!cancelled) setLoaded({ key: requestKey, data });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, params.id, requestKey]);
+
+  const loading = requestKey === null || loaded?.key !== requestKey;
+  const data = loaded?.key === requestKey ? loaded.data : null;
 
   if (loading) {
     return (

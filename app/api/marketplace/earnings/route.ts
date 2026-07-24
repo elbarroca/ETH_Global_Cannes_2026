@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/src/config/prisma";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 // Per-specialist earnings aggregate.
 //

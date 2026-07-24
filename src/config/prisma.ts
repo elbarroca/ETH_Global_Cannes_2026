@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { requireDatabaseUrl, withPrismaPoolParameters } from "./env";
 
 // Vercel serverless requires a very small connection footprint per lambda —
 // each cold invocation gets its own Prisma instance. connection_limit=1 +
@@ -13,7 +14,7 @@ export function getPrisma(): PrismaClient {
       log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
       datasources: {
         db: {
-          url: `${process.env.DATABASE_URL ?? ""}&connection_limit=1&pool_timeout=20&pgbouncer=true`,
+          url: withPrismaPoolParameters(requireDatabaseUrl()),
         },
       },
     });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useUser } from "@/contexts/user-context";
 import { DawgLoader } from "./dawg-loader";
 
@@ -10,22 +10,24 @@ const AUTH_MESSAGES = [
   "Unlocking dashboard…",
 ];
 
+const subscribeToHydration = () => () => undefined;
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isConnected, user } = useUser();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    subscribeToHydration,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
   const [hasShownLoader, setHasShownLoader] = useState(false);
   const [blastDone, setBlastDone] = useState(false);
-
-  // Wait for client hydration before rendering conditional UI —
-  // prevents SSR mismatch with Dynamic Labs' injected elements.
-  useEffect(() => setMounted(true), []);
 
   const stillLoading = mounted && isConnected && !user;
 
   // Latch: once we've ever shown the loader, keep it mounted through the blast.
-  useEffect(() => {
-    if (stillLoading) setHasShownLoader(true);
-  }, [stillLoading]);
+  if (stillLoading && !hasShownLoader) setHasShownLoader(true);
 
   if (!mounted) return <>{children}</>;
 

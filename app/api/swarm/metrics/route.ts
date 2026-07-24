@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/src/config/prisma";
 
-export const revalidate = 15;
+export const dynamic = "force-dynamic";
 
 // Aggregate counters for the SwarmStatusBar metric chips.
 //

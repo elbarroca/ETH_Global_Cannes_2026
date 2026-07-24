@@ -14,7 +14,7 @@ npm run setup:topic                   # HCS audit topic → saves TOPIC_ID to .e
 npm run setup:token                   # HTS fund token → saves TOKEN_ID to .env
 npm run setup:og                      # Fund 0G broker (10 0G deposit)
 npm run setup:circle                  # Circle entity secret + wallet set
-npm run migrate                       # Supabase DDL — script may need recreation
+npm run migrate                       # Deploy committed Prisma migrations
 npx prisma db push                    # Alternative: sync schema via Prisma
 npm run validate                      # 45-test validation suite
 npm run prisma:generate               # Generate Prisma typed client
@@ -315,7 +315,7 @@ Each domain has a dedicated rules file in `.claude/rules/` that auto-loads when 
 | iNFT mint skipped | Missing contract addr | Set INFT_CONTRACT_ADDRESS in .env (non-fatal) |
 | 0G Storage upload fails | Indexer down | Check OG_STORAGE_INDEXER URL, retry later |
 | `0x` prefix missing on OG key | Key format | OG_PRIVATE_KEY must start with `0x` |
-| `hot_wallet_index_seq` missing | DB not migrated | Run `npm run migrate` |
+| `hot_wallet_index_seq` missing | Baseline migration not deployed/resolved | Run `npm run migrate` on an authorized database |
 
 ## BUILD STATUS
 | # | Task | Status | Bounty |

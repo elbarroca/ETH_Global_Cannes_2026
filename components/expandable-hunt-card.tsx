@@ -449,15 +449,12 @@ function InlineDetail({
   ];
 
   const [narrativeDone, setNarrativeDone] = useState(() =>
-    typeof window !== "undefined" && huntNarrativeAlreadySeen(cycle.id),
+    typeof window !== "undefined" &&
+      (huntNarrativeAlreadySeen(cycle.id) ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches),
   );
   const [showFullStorageRoot, setShowFullStorageRoot] = useState(false);
   const [fullPriorCidIdx, setFullPriorCidIdx] = useState<number | null>(null);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (mq.matches) setNarrativeDone(true);
-  }, [cycle.id]);
 
   return (
     <>
@@ -985,13 +982,12 @@ export function ExpandableHuntCard({
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [actions, setActions] = useState<AgentActionRecord[]>([]);
-  const [loadingActions, setLoadingActions] = useState(false);
+  const [loadingActions, setLoadingActions] = useState(defaultExpanded);
   const wasComputingRef = useRef(!!computing);
 
   // Fetch actions when expanded
   useEffect(() => {
     if (!expanded || !userId) return;
-    setLoadingActions(true);
     getCycleDetail(userId, cycle.id)
       .then((data) => {
         if (data) setActions(data.actions);
@@ -1022,6 +1018,12 @@ export function ExpandableHuntCard({
     wasComputingRef.current = !!computing;
   }, [computing, expanded, userId, cycle.id]);
 
+  const toggleExpanded = () => {
+    const nextExpanded = !expanded;
+    if (nextExpanded) setLoadingActions(true);
+    setExpanded(nextExpanded);
+  };
+
   return (
     <div
       className={`bg-void-900 border rounded-2xl px-5 py-4 sm:px-6 sm:py-5 agent-card cursor-pointer transition-all ${
@@ -1031,7 +1033,7 @@ export function ExpandableHuntCard({
       <CompactView
         cycle={cycle}
         expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
+        onClick={toggleExpanded}
         computing={computing}
         computingLabel={computingLabel}
       />

@@ -182,9 +182,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [address]);
 
   useEffect(() => {
-    refetch();
+    const first = setTimeout(() => void refetch(), 0);
     const interval = setInterval(refetch, 10_000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(first);
+      clearInterval(interval);
+    };
   }, [refetch]);
 
   return (

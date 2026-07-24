@@ -2,6 +2,14 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A1 deterministic foundation
+
+- Added real lint, typecheck, unit, integration, end-to-end, resilience, redaction, environment-validation, generated-output cleanup, and secret-scan commands plus minimal Node 22/PostgreSQL 14 CI.
+- Added typed and redacted environment boundaries, safe Prisma/Postgres.js URL handling, an additive baseline migration, and disposable empty plus explicitly synthetic Cannes-shaped migration replay.
+- Repaired all 23 inherited lint errors without weakening global rules; 23 warnings remain explicit. The cold lockfile/Prisma/lint/typecheck/test/build gate passes locally.
+- Marked the two database aggregate GET routes request-time after cold builds proved they otherwise queried Prisma during prerender; CI uses a deliberately non-live public Dynamic UUID for offline prerendering.
+- Performed no sponsor call, shared/managed database effect, push, deployment, signature, transaction, form, spend, mainnet action, or claim promotion. Live Cannes migration equivalence, inherited dependency audit findings, release, and production readiness remain unproven.
+
 ## 2026-07-24 - A0 local-admission audit remediation
 
 - Recorded the independent `FIX` on A0_LOCAL commit `36783c69f249387943f6f4b89286e2b27660337e`: the active C0 prompt still blocked A1 on release-only gaps, and the evidence packet overstated the first stale-language check.

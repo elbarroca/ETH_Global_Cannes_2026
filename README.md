@@ -486,7 +486,6 @@ npm run naryo:logs               # Tail listener output
 ```bash
 npm run validate                 # 45-test suite across all layers
 npm run validate:approval        # Two-phase approval flow smoke test
-npm run validate:x402            # x402 payment flow smoke test
 
 # x402 paywall check — should return 402 before payment
 curl -s -o /dev/null -w "%{http_code}" localhost:4001/analyze

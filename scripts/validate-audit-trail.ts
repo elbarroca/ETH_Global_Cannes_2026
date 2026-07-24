@@ -8,7 +8,29 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import crypto from "node:crypto";
+import type { CompactCycleRecord } from "../src/types/index.js";
+
+type AuditCycleRecord = Omit<CompactCycleRecord, "adv"> & {
+  adv: {
+    a: { act: string; pct: number; att: string };
+    r: { obj: string; max: number; att: string };
+    e: { act: string; pct: number; sl: number; att: string };
+  };
+};
+
+interface StoredSpecialist {
+  name?: string;
+  signal?: string;
+  confidence?: number;
+}
+
+function isStoredSpecialist(value: unknown): value is StoredSpecialist {
+  return typeof value === "object" && value !== null;
+}
+
+function storedSpecialists(value: unknown): StoredSpecialist[] {
+  return Array.isArray(value) ? value.filter(isStoredSpecialist) : [];
+}
 
 let passed = 0;
 let failed = 0;
@@ -67,7 +89,7 @@ async function getOrCreateTestUser(): Promise<{
 // ─── Test 1: Build + Log CompactCycleRecord to HCS ─────────
 
 async function testHcsLog(user: { id: string; riskProfile: string; currentNav: number; lastCycleId: number }): Promise<{
-  record: Record<string, unknown>;
+  record: AuditCycleRecord;
   seqNum: number;
   hashscanUrl: string;
   cycleNumber: number;
@@ -83,7 +105,7 @@ async function testHcsLog(user: { id: string; riskProfile: string; currentNav: n
   const now = new Date().toISOString();
 
   // Build a realistic compact record using real-looking data
-  const record = {
+  const record: AuditCycleRecord = {
     c: cycleNumber,
     u: user.id,
     t: now,
@@ -114,7 +136,7 @@ async function testHcsLog(user: { id: string; riskProfile: string; currentNav: n
   // Log to HCS
   console.log("  Submitting to HCS (freeze \u2192 sign \u2192 execute)...");
   const t0 = Date.now();
-  const { seqNum, hashscanUrl } = await logCycle(topicId, record as any);
+  const { seqNum, hashscanUrl } = await logCycle(topicId, record);
   ok("HCS logCycle()", `seq=${seqNum} in ${Date.now() - t0}ms`);
   ok("Hashscan URL", hashscanUrl);
 
@@ -123,7 +145,7 @@ async function testHcsLog(user: { id: string; riskProfile: string; currentNav: n
 
 // ─── Test 2: Read back from Mirror Node and validate ────────
 
-async function testMirrorNodeReadback(topicId: string, expectedRecord: Record<string, unknown>, expectedSeq: number): Promise<void> {
+async function testMirrorNodeReadback(topicId: string, expectedRecord: AuditCycleRecord): Promise<void> {
   console.log("\n\u2550\u2550\u2550 TEST 2: Mirror Node Read-back + Validation \u2550\u2550\u2550");
 
   const { getHistory } = await import("../src/hedera/hcs.js");
@@ -148,7 +170,7 @@ async function testMirrorNodeReadback(topicId: string, expectedRecord: Record<st
   ok("Found our record", `cycle=${ours.c}, user=${ours.u.slice(0, 8)}...`);
 
   // Validate fields match
-  const expected = expectedRecord as any;
+  const expected = expectedRecord;
   if (ours.rp === expected.rp) {
     ok("Risk profile", ours.rp);
   } else {
@@ -207,14 +229,14 @@ async function testSupabasePersist(
   cycleNumber: number,
   hcsSeqNum: number,
   hashscanUrl: string,
-  record: Record<string, unknown>,
+  record: AuditCycleRecord,
 ): Promise<{ cycleDbId: string; actionIds: string[] }> {
   console.log("\n\u2550\u2550\u2550 TEST 3: Persist to Supabase via Prisma \u2550\u2550\u2550");
 
   const { logAction, logCycleRecord } = await import("../src/store/action-logger.js");
 
   const actionIds: string[] = [];
-  const expected = record as any;
+  const expected = record;
 
   // 3a. Log cycle start
   const startId = await logAction({
@@ -286,7 +308,7 @@ async function testSupabasePersist(
 
   // 3e. Save full cycle record
   const cycleDbId = await logCycleRecord(userId, cycleNumber, {
-    specialists: expected.s.map((sp: any) => ({
+    specialists: expected.s.map((sp) => ({
       name: sp.n,
       signal: sp.sig,
       confidence: sp.conf,
@@ -326,11 +348,11 @@ async function testSupabaseReadback(
   actionIds: string[],
   cycleNumber: number,
   hcsSeqNum: number,
-  expectedRecord: Record<string, unknown>,
+  expectedRecord: AuditCycleRecord,
 ): Promise<void> {
   console.log("\n\u2550\u2550\u2550 TEST 4: Supabase Read-back + Validation \u2550\u2550\u2550");
 
-  const { getUserCycles, getUserActions, getCycleActions } = await import("../src/store/action-logger.js");
+  const { getUserCycles, getUserActions } = await import("../src/store/action-logger.js");
 
   // 4a. Read cycle record
   const cycles = await getUserCycles(userId, 5);
@@ -344,14 +366,14 @@ async function testSupabaseReadback(
 
   ok("Cycle found", `id=${cycle.id.slice(0, 8)}, cycle#=${cycle.cycleNumber}`);
 
-  const expected = expectedRecord as any;
+  const expected = expectedRecord;
 
   // Validate specialist data
-  const specialists = cycle.specialists as any[];
-  if (Array.isArray(specialists) && specialists.length === 3) {
+  const specialists = storedSpecialists(cycle.specialists);
+  if (specialists.length === 3) {
     ok("Specialists in DB", `${specialists.length} stored`);
     for (const sp of specialists) {
-      const match = expected.s.find((e: any) => e.n === sp.name);
+      const match = expected.s.find((entry) => entry.n === sp.name);
       if (match && sp.signal === match.sig && sp.confidence === match.conf) {
         ok(`DB specialist ${sp.name}`, `${sp.signal} conf=${sp.confidence}`);
       } else {
@@ -435,7 +457,6 @@ async function testCrossCheck(
   userId: string,
   cycleNumber: number,
   hcsSeqNum: number,
-  expectedRecord: Record<string, unknown>,
 ): Promise<void> {
   console.log("\n\u2550\u2550\u2550 TEST 5: Cross-Check HCS \u2194 Supabase \u2550\u2550\u2550");
 
@@ -469,7 +490,7 @@ async function testCrossCheck(
   }
 
   // Cross-check: specialist count
-  const dbSpecs = dbCycle.specialists as any[];
+  const dbSpecs = storedSpecialists(dbCycle.specialists);
   if (hcsRecord.s.length === dbSpecs.length) {
     ok("Specialist count HCS \u2194 DB", `both have ${hcsRecord.s.length}`);
   } else {
@@ -479,7 +500,7 @@ async function testCrossCheck(
   // Cross-check: specialist signals match
   for (let i = 0; i < hcsRecord.s.length; i++) {
     const hcs = hcsRecord.s[i];
-    const db = dbSpecs.find((s: any) => s.name === hcs.n);
+    const db = dbSpecs.find((specialist) => specialist.name === hcs.n);
     if (db && db.signal === hcs.sig) {
       ok(`${hcs.n} signal HCS \u2194 DB`, `both: ${hcs.sig}`);
     } else {
@@ -572,7 +593,7 @@ async function main(): Promise<void> {
   const { record, seqNum, hashscanUrl, cycleNumber } = await testHcsLog(user);
 
   // Test 2: Read back from Mirror Node
-  await testMirrorNodeReadback(process.env.HCS_AUDIT_TOPIC_ID!, record, seqNum);
+  await testMirrorNodeReadback(process.env.HCS_AUDIT_TOPIC_ID!, record);
 
   // Test 3: Save to Supabase
   const { cycleDbId, actionIds } = await testSupabasePersist(
@@ -583,7 +604,7 @@ async function main(): Promise<void> {
   await testSupabaseReadback(user.id, cycleDbId, actionIds, cycleNumber, seqNum, record);
 
   // Test 5: Cross-check HCS ↔ Supabase
-  await testCrossCheck(user.id, cycleNumber, seqNum, record);
+  await testCrossCheck(user.id, cycleNumber, seqNum);
 
   // Test 6: User state update
   await testUserStateUpdate(user.id, cycleNumber);

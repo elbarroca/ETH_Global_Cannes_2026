@@ -155,9 +155,11 @@ function VerifyContent() {
   const [selected, setSelected] = useState<AgentKey>("SentimentBot");
   const { userId, user } = useUser();
   const searchParams = useSearchParams();
-  const [cycle, setCycle] = useState<CycleDetail | null>(null);
-  const [actions, setActions] = useState<AgentActionRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    cycle: CycleDetail | null;
+    actions: AgentActionRecord[];
+  } | null>(null);
 
   // Resolve the cycle number with a three-step fallback so a missing query
   // param or stale UserContext cache can never wedge the verification view:
@@ -177,25 +179,26 @@ function VerifyContent() {
       : user?.agent?.lastCycleId && user.agent.lastCycleId > 0
         ? user.agent.lastCycleId
         : null;
+  const requestKey = userId ? `${userId}:${paramOrCached ?? "latest"}` : null;
+  const loading = requestKey !== null && loaded?.key !== requestKey;
+  const cycle = loaded?.key === requestKey ? loaded.cycle : null;
+  const actions = loaded?.key === requestKey ? loaded.actions : [];
 
   useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+    if (!userId || !requestKey) return;
+    let cancelled = false;
 
     const loadCycle = async () => {
+      let nextCycle: CycleDetail | null = null;
+      let nextActions: AgentActionRecord[] = [];
       // Try the known cycle number first; fall back to /api/cycle/latest if
       // either (a) we had no number to begin with or (b) the detail lookup
       // returned null because the param pointed at a stale id.
       if (paramOrCached && paramOrCached > 0) {
         const detail = await getCycleDetail(userId, paramOrCached).catch(() => null);
         if (detail) {
-          setCycle(detail.cycle);
-          setActions(detail.actions);
-          setLoading(false);
-          return;
+          nextCycle = detail.cycle;
+          nextActions = detail.actions;
         }
       }
       // Fallback: hit /api/cycle/latest — it reads Prisma directly and is the
@@ -203,19 +206,22 @@ function VerifyContent() {
       // this will find it. EnrichedCycleResponse carries `cycleId` at the top
       // level; we then re-fetch via getCycleDetail so the attestation/action
       // lookup path this page already uses works unchanged.
-      const latest = await getLatestCycle(userId).catch(() => null);
-      if (latest && typeof latest.cycleId === "number" && latest.cycleId > 0) {
+      const latest = nextCycle ? null : await getLatestCycle(userId).catch(() => null);
+      if (!nextCycle && latest && typeof latest.cycleId === "number" && latest.cycleId > 0) {
         const detail = await getCycleDetail(userId, latest.cycleId).catch(() => null);
         if (detail) {
-          setCycle(detail.cycle);
-          setActions(detail.actions);
+          nextCycle = detail.cycle;
+          nextActions = detail.actions;
         }
       }
-      setLoading(false);
+      if (!cancelled) setLoaded({ key: requestKey, cycle: nextCycle, actions: nextActions });
     };
 
     void loadCycle();
-  }, [userId, paramOrCached]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, paramOrCached, requestKey]);
 
   const agent = AGENT_META[selected];
   const attestation = getAttestationForAgent(selected, cycle, actions);

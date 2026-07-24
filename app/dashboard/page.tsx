@@ -935,10 +935,10 @@ function ApprovalPanel({
 }) {
   const exec = pendingCycle.compactRecord.adv.e;
   const decision = pendingCycle.compactRecord.d;
-  const expiresAt = new Date(pendingCycle.expiresAt);
   const [timeLeft, setTimeLeft] = useState("");
 
   useEffect(() => {
+    const expiresAt = new Date(pendingCycle.expiresAt);
     const tick = () => {
       const diff = expiresAt.getTime() - Date.now();
       if (diff <= 0) {
@@ -1282,4 +1282,3 @@ function EmptyHuntsState() {
     </Card>
   );
 }
-
