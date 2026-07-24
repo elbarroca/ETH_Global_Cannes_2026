@@ -5,7 +5,7 @@ Paste this `/goal` once into one persistent Codex task. Do not launch the execut
 ```text
 /goal
 
-Continue AlphaDawg Lisbon from the current observed control frontier through A4-A7. Preserve every accepted guarantee, first make the registered specialists and prompt chain dispatch-safe, then reconcile A4/A5 and complete the remaining protected product path. Work autonomously on safe local tasks and fail closed on live effects, release claims, eligibility, and external authority.
+Continue AlphaDawg Lisbon from the current observed control frontier through A4-A7. Preserve every accepted guarantee. Treat the accepted R0 Claude-to-Codex migration as complete: reconcile and drift-check it, but never rerun it without concrete changed-file evidence. Then reconcile A4/A5 and complete the remaining protected product path. Work autonomously on safe local tasks and fail closed on live effects, release claims, eligibility, and external authority.
 
 OBJECTIVE
 
@@ -28,6 +28,7 @@ CONTROLLING FRONTIER
 - A3: remediation independently accepted at `9a4f41f8c679469dc230cba584bce84fcc3c65e5`.
 - A3 proof: fixture 12/12, pinned Go 3/3 plus build, combined integration 17/17, both migration lanes, and the complete cold gate passed.
 - A3 live: `NOT_RUN; LIVE_EFFECT_BLOCKED`. Production live A3 is intentionally unavailable before broker, signer, funding, upload, verifier, or network construction.
+- R0: all seven legacy Claude specialists were migrated into nine Codex-native project agents plus two Codex skills. The ownership-boundary remediation and independent read-only re-audit passed exact local SHA `a8a45286980c1312713872c4b8c90c90b283c3ed`; it is not pushed. Reconcile that result into the canonical ledgers before advancing.
 - A4: implemented and remediated locally, but canonical acceptance remains fail-closed until the exact unchanged-SHA audit is reconciled in `EVIDENCE.md` and `CLAIM-MATRIX.md`. Live ENS is not run.
 - A5: implemented and remediated locally, but canonical acceptance remains `PASS_TO_AUDIT` until an independent exact-SHA audit is reconciled. The creator-subname-publication-external-hire journey added by the current contract is not yet proven.
 - A6: not admitted for implementation; select the exact conditional Stack contribution or record `CUT_UNISWAP`.
@@ -56,7 +57,7 @@ BOOT AND RECONCILIATION
 - Require branch `Eth_global_lisbon_` and prove `9a4f41f8c679469dc230cba584bce84fcc3c65e5` plus baseline ancestry.
 - Inspect HEAD, status, all worktrees, remotes, upstream, common-dir writer lease, `ACTIVE-WRITER.md`, runtime/lockfile, evidence, claims, and external-effect rows.
 - Verify `origin/Eth_global_lisbon_` against local HEAD when it exists. Never force-push, rebase published history, reset, clean, overwrite, or steal a lease.
-- Stop mutation on unexpected dirty state, branch mismatch, unknown writer, token mismatch, or ambiguous external effect.
+- Return `BLOCKED_RECONCILIATION` and stop mutation on unexpected dirty state, branch mismatch, unknown writer, token mismatch, or ambiguous external effect. This is not terminal `STOP` while reconciliation remains possible.
 - Confirm the final A3 remediation audit is recorded as accepted. If controls drift back to pending, reconcile them read-only from immutable SHA evidence before selecting A4.
 - Reconcile the A4 and A5 writer/audit records against the exact commits and canonical evidence. Conflicting ledgers block advancement; they do not erase locally proven work.
 - Recheck time-sensitive ENS, 0G, sponsor, prize, and event requirements from primary official sources before relying on them.
@@ -75,7 +76,7 @@ WHAT IS ALREADY DONE
 
 SETUP AND EVIDENCE STILL REQUIRED
 
-1. `R0_AGENT_READY`: repair and dry-dispatch all registered specialists; give ENS one explicit owner; update current Lisbon bounty criteria, real paths, and installed API versions.
+1. `R0_AGENT_READY`: reconcile the accepted nine-agent/two-skill result at `a8a45286980c1312713872c4b8c90c90b283c3ed` into the canonical ledgers, then validate only current-tree drift and changed prompt surfaces. Do not repeat migration, recreate owners, or re-audit unchanged agent files.
 2. Reconcile the exact A4/A5 audit frontier without promoting writer prose.
 3. A4 ENSv2 compatibility: authenticated creator authority, canonical registry hierarchy, deterministic agent subname, permissions, resolver provenance, and pre/post execution checks.
 4. A5 protected creator -> immutable publication -> different-buyer hire -> verified receipt UI/API/browser journey, secure Telegram identity link, and complete required service fleet using only the kernel authority path.
@@ -98,28 +99,39 @@ AUTHORITY
 - Never print, commit, or log secret values, private keys, session material, PII, or unredacted sponsor responses.
 - If authority is missing, continue every safe local prerequisite and return `WAIT_GATE` only at the affected live boundary.
 
-OWNER QUESTIONS - ASK ONCE BEFORE EFFECTFUL WORK
+RECORDED OWNER ANSWERS - DO NOT ASK AGAIN
 
-Ask the owner this compact question batch after boot/reconciliation. Never request a token, private key, database URL, webhook secret, link code, session, or other secret value in chat or Git:
+- Deployment target: Vercel for the web/API and production Telegram webhook. Exact project, public URL, and a compatible continuous-worker host remain unset.
+- Telegram: production webhook mode is selected. `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` are stated to exist but are not verified; the public bot username, private smoke account, and whether linking is optional or demo-required remain unset.
+- Product decisions: C0 may choose the best lean UX, UI, accessibility, and performance implementation within the existing shell.
+- User-created agents: each creator authors bounded Markdown instructions plus structured metadata. The server validates them, creates an immutable manifest/version, binds the deterministic ENS subname, and publishes that version for other authenticated users to hire. One shared protected runtime executes versions; never deploy one service per user agent or execute uploaded code.
+- Creator payout: derive the payout destination from the authenticated creator wallet. Local settlement/accounting is not proof that the wallet received funds; an actual transfer requires an admitted rail and exact effect authorization.
+- ENS: use `barrocaa.eth` as the intended creator parent and derive deterministic agent subnames automatically. Chain/testnet, owner/delegate roles, write/readback scope, gas cap, and freshness remain unset. Direct ENSv2 live work remains blocked.
+- Browser journey: creator A and buyer B mean two different SIWE wallet accounts; no addresses or signing material have been supplied.
+- Arc: cut and remove it from the protected product/UI. Never leave `Waiting for Arc RPC`. A6 is optional Uniswap, not Arc, and still follows its separate pass-or-cut gate.
+- External effects: none are currently authorized. Vercel/Telegram configuration and credentials are setup facts, not deploy or webhook-registration authority.
 
-1. What is the intended public app URL and deployment provider/project for web/API, long-running worker, Telegram receiver, and specialist agents?
-2. Should Telegram use production webhook mode or local/worker polling mode, and is linking mandatory for every user or only the release/demo account? What is the public bot username, and are `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_WEBHOOK_SECRET` already configured in the named secret store? Confirm presence/location only.
-3. Which private Telegram account will perform the link smoke, and can the owner complete `/start CODE`, `/status`, one permitted command, and unlink interactively? Do not persist its numeric ID or chat ID in docs/evidence.
-4. Is the canonical expected fleet all 13 entries in `SWARM_AGENTS`; which, if any, are deliberately optional or cut, and what are their deployment/service names?
-5. What creator ENS parent, agent-label policy, chain/testnet, owner/delegate wallet, write/readback scope, gas cap, and freshness window should A4 target?
-6. Which two wallet accounts may be used as creator A and external buyer B for the browser journey? Addresses are public identifiers; signing material remains wallet-held.
-7. Is A6/Arc admitted or cut? A cut rail must render explicit unavailable/cut state rather than wait forever.
-8. Which exact effects are authorized now: push, managed migration, deployment, Telegram webhook registration, live agent health/function calls, ENS read/write, 0G call, signature/transaction, funding/spend, form, or public claim? For each authorized effect require target SHA, network/project, scope, cap, deadline, and evidence.
+REMAINING OWNER QUESTIONS - ASK ONCE BEFORE THE AFFECTED EXTERNAL GATE
 
-Record only non-secret answers and exact authorization rows. Continue all safe local R0/A4/A5 preparation while waiting; pause only at the affected external boundary.
+Ask only for: exact Vercel project/public URL and worker host; Telegram bot username, smoke account, and link requirement; ENS chain/testnet, owner/delegate, scope, gas cap, and freshness; confirmation that two distinct test wallets can be connected; and any exact effect-specific authorization row. Never request a secret value in chat or Git. Continue safe local work while these answers are pending.
 
 OPERATING MODEL
 
-- One persistent C0 coordinator.
-- One mutating writer at a time.
-- Maximum two useful read-only research/audit tasks; no duplicate work or broad swarm.
+- One persistent C0 coordinator owns planning, dispatch, gate decisions, and final status.
+- One mutating writer at a time. C0 makes no tracked-file mutation while that writer runs, and no next writer starts before the prior writer commits, returns, and releases its lease.
+- Split cross-domain mutations into sequential registered-owner handoffs with disjoint allowed paths; never give one agent another owner's domain.
+- Maximum two useful read-only research/audit tasks, and only against non-moving, nonduplicate targets; no broad swarm.
+- Before dispatch, call `list_agents`. If matching work is active, use `send_message` only for scoped context and wait only when its validated return blocks the next safe decision. Reuse a compatible idle agent with `followup_task` and a new task instance/generation instead of spawning a duplicate.
+- Track each subagent by canonical task name/agent ID, `agent_type`, task-instance ID, generation, status, and target SHA. Ambiguous agent state returns to reconciliation; never spawn around it.
+- Use `spawn_agent` only for bounded C0-owned subwork. Never use a user-owned task/thread as an internal subagent; create one only on an explicit owner request.
+- Dispatch only the Codex project agents in `.codex/agents/*.toml`, using the exact registered `agent_type`: `og-integrator`, `hedera-integrator`, `payments-integrator`, `frontend-builder`, `openclaw-builder`, `kernel-integrator`, `cycle-wirer`, `ens-integrator`, or `bounty-auditor`.
+- `.claude/**` is inactive provenance. Never dispatch a Claude agent, generic worker, or invented role when a named Codex owner exists. The two `.agents/skills/source-command-*` entries are workflows, not agents.
+- C0 uses Codex subagent dispatch itself; the operator does not create peer tasks or manually paste executor/auditor prompts. Use `bounty-auditor` only read-only against an immutable SHA.
+- Every writer task states that it is not alone in the codebase, must preserve unrelated edits, and must not revert another owner's work.
 - Use the matching specialist registered in `AGENTS.md` only after `R0_AGENT_READY` proves its instructions current.
-- Every dispatch must include: unique task ID, sprint, mode, start/control SHA, exact allowed paths, acceptance items, deadline, known blockers, allowed effects, verification commands, evidence files, and return schema.
+- Every dispatch must include: exact `agent_type`, unique task ID and task-instance ID, generation, sprint, mode, start/control/audit SHA as applicable, exact allowed paths, acceptance items, deadline, known blockers, allowed effects, verification commands, evidence files, and return schema.
+- Make every subagent message self-contained and pass only the required file/evidence pointers. When setting `agent_type`, `model`, or `reasoning_effort`, use `fork_turns: "none"` or the smallest useful positive count; full-history forks with overrides are invalid. Keep registered role defaults unless an override has concrete value. If choosing a model, use only a model listed by the current collaboration surface: prefer `gpt-5.6-terra` at medium effort for bounded read-only inventory/research and `gpt-5.6-sol` at high effort for protected mutation, security, cross-domain reasoning, or final audit. Never override a fixed role or invent a model name.
+- Continue only read-only, non-conflicting C0 reconciliation while subagents run. An agent return is advisory until C0 validates its target SHA, allowed paths, checks, evidence, and gate mapping.
 - Writers use `docs/lisbon/prompts/SPRINT-EXECUTOR.md`.
 - Auditors use `docs/lisbon/prompts/SPRINT-AUDIT.md` against an immutable committed SHA. Auditors never repair.
 
@@ -136,26 +148,24 @@ For each sprint:
 
 1. Prove the entry gate and current official/static compatibility.
 2. Select the smallest dependency-safe scope.
-3. Acquire the writer lease and implement locally.
+3. Dispatch the matching registered owner. That writer acquires the lease and implements locally while C0 makes no tracked-file mutation.
 4. Run focused checks, then the complete affected cold gate.
 5. Update evidence, claim controls, changelog, and writer ledger with exact facts.
-6. Create one atomic commit and release the matching lease.
-7. Launch an independent read-only audit against the immutable exit SHA.
-8. On `FIX`, allow one narrowed root-cause remediation generation, then rerun the full affected gate and re-audit.
-9. If the remediation still fails, return the exact blocker. Never weaken a protected guarantee or present a fixture as live.
-10. Advance autonomously when the next safe local gate is open.
+6. Create one atomic commit, release the matching lease, and validate the writer return.
+7. Prove the writer exit SHA equals the audit target, then launch an independent read-only audit against that immutable SHA.
+8. Wait for and validate the audit before opening another writer. Any later code, control, or evidence commit makes the prior audit stale.
+9. On `FIX`, run one numbered narrowed root-cause remediation generation at a time, preferably by reusing the matching writer with `followup_task`; reverify, commit, and audit the new SHA. Continue while findings are locally actionable.
+10. Return `BLOCKED` only for a genuine dependency, authority, or integrity blocker with an exact wake condition. Never weaken a protected guarantee or present a fixture as live.
+11. Advance autonomously when the next safe local gate is open.
 
 R0 - AGENT AND PROMPT READINESS
 
-- Audit `AGENTS.md`, every `.codex/agents/*.toml`, both converted
-  `.agents/skills/source-command-*/SKILL.md` workflows, and the
-  C0/executor/auditor chain. `.claude/**` is migration provenance only and
-  cannot dispatch work.
-- Require exactly one owner for authentication/kernel, ENS, 0G, UI/E2E, optional payments, cycle wiring, and final bounty audit. Add or narrow one ENS specialist owner for `src/ens/**` and related migrations/tests; do not leave ENS implicit inside a broad role.
-- Verify every declared path exists, every dependency/API version matches `package.json` plus installed types, and every command exists.
-- Remove or correct stale Cannes-only bounty rules, `VaultMind` identity, obsolete `src/dashboard/**` paths, stale 0G SDK versions/signatures, and any instruction that could revive a legacy success path.
-- Dry-dispatch each specialist read-only. Record agent, domain, allowed paths, dependencies, checks, conflicts, and verdict.
-- `R0_AGENT_READY` requires no missing owner, no overlapping writer scope, no nonexistent path, no stale API, and current Lisbon audit criteria.
+- Start from the accepted migration baseline `a8a45286980c1312713872c4b8c90c90b283c3ed`: nine `.codex/agents/*.toml` project agents plus two `.agents/skills/source-command-*/SKILL.md` workflows. `.claude/**` is inactive migration provenance; never rerun or edit it as current agent work.
+- Reconcile `docs/lisbon/evidence/R0-AGENT-READINESS.md` and its immutable re-audit into the canonical ledgers. Compare the current tree to that accepted matrix and revalidate only changed agent, skill, prompt, path, command, dependency/API, or Lisbon-criteria surfaces.
+- Confirm exactly one current owner for authentication/kernel, ENS, 0G, UI/E2E, optional payments, cycle wiring, and final bounty audit. `ens-integrator` already owns `src/ens/**` and its registered migrations/tests; do not add another ENS owner unless observed drift proves the registry changed.
+- Confirm the accepted remediation still excludes stale Cannes-only criteria, `VaultMind` identity, obsolete `src/dashboard/**` paths, stale SDK signatures, generic Cycle test ownership, and any legacy success path. Repair only a reproduced current-tree defect through its registered owner.
+- Record agent, domain, allowed paths, dependencies, checks, conflicts, changed-surface validation, and verdict. Do not dry-dispatch unchanged specialists again merely because this continuation started.
+- `R0_AGENT_READY` requires the accepted result to be canonical plus no current missing owner, overlap, nonexistent path, stale API, or stale Lisbon audit criterion.
 
 A4 - ENS AUTHORITY
 
@@ -184,21 +194,22 @@ Verify:
 - Forged writer; reverse-name spoof; normalization/collision error; registry alias/broken backlink; wrong parent/agent; unexpected role grant; inherited resolver mismatch; transfer/expiry/subregistry removal before request and during execution; stale data; wrong chain/version/root/registry/resolver; missing record; CCIP outage; timeout; replay; worker restart; and lease takeover.
 - Twenty duplicate submissions still converge to one effect.
 - Failure paths create no accepted delivery or replacement effect.
-- Independent immutable-SHA audit returns `PASS_A4_REMEDIATION` or equivalent accepted gate.
+- Independent immutable-SHA audit returns `PASS_TO_NEXT_GATE`; C0 maps that exact verdict and audit SHA to `A4_ACCEPTED`.
 
 A5 - PRODUCT UI, FUNCTIONALITY, AND E2E
 
 - Reconcile and accept the current A5 remediation on its exact unchanged SHA before extending it.
 - Reuse the existing dashboard and components; no broad redesign.
-- Implement one protected lifecycle: private creator draft -> ENS parent/subname binding -> authorized readback -> immutable version publication -> marketplace listing -> different authenticated buyer hire -> job -> verified receipt. Changes create a new immutable version.
+- Implement one protected lifecycle: bounded Markdown agent draft -> validated manifest -> ENS parent/subname binding -> authorized readback -> immutable version publication -> marketplace listing -> different authenticated buyer hire -> job -> verified receipt. Changes create a new immutable version.
+- Treat the Markdown as inert instructions, never executable uploaded code. Reuse the existing instructions field and manifest hashing; add no parser, plugin runtime, or per-agent service unless a proven requirement demands it.
 - Define “deploy agent” as activating the immutable application version/runtime. It never means an unproven contract deployment or live sponsor success.
 - Use only `/api/kernel/agents` and `/api/kernel/jobs` as authority. Legacy marketplace create/hire routes remain disabled or visibly non-authoritative.
 - Show connected wallet, creator ENS, full agent subname, canonical state, owner/delegate, immutable version/price, publication/hire eligibility, job state, ENS authority, 0G verification, Storage proof, canonical receipt, and explicit refusal/failure states.
 - Bind one SIWE-authenticated app user to one private-chat Telegram numeric identity with a short-lived single-use code. Make code consumption and binding atomic; rate-limit generation/redemption; reject expiry, replay, guessing, cross-user, group-chat, already-bound, and unauthorized relink attempts; provide authenticated unlink/relink and audit events. Username is never identity.
 - Choose exactly one Telegram receive mode. Webhook and polling must never run together. Production webhook mode fails closed when its secret is absent, verifies `getWebhookInfo`, and awaits or durably enqueues command work before returning; polling proves one singleton receiver.
 - Route `/start`, `/status`, `/run`, `/stop`, `/resume`, proof links, and notifications through the same server-side app user. Telegram cannot bypass SIWE, ENS, kernel, idempotency, approval, payment, or release policy; disable or label legacy-cycle commands outside the protected journey.
-- Derive expected agents from one canonical fleet registry. Each required web/API/worker/bot/specialist process must expose fresh non-secret health and exact release SHA/version. HTTP 200 alone is not functional readiness; run an authorized role-level smoke before promotion.
-- Treat the supplied screenshot as a regression baseline: identify and repair the exact `12/13` offline agent; make `Fresh authorization required` recover through bounded wallet reauthentication; and make `Waiting for Arc RPC` resolve or render explicit optional/cut/unavailable state. Empty activity is valid only before the first proven run and must explain the next action.
+- Derive the required platform service fleet from one canonical registry. User-created agent versions and the inherited 13 OpenClaw specialists are not separately deployed services and never count as online processes. Each required web/API/worker/Telegram/runtime service must expose fresh non-secret health and exact release SHA/version. HTTP 200 alone is not functional readiness; run an authorized role-level smoke before promotion.
+- Treat the supplied screenshot as a regression baseline: replace the misleading `12/13` legacy process count with required platform-service health; make `Fresh authorization required` recover through bounded wallet reauthentication; and replace `Waiting for Arc RPC` with an explicit removed/cut state. Empty activity is valid only before the first proven run and must explain the next action.
 - UI state never creates authority or converts mocks/cached flags/missing evidence into success.
 - Add functional API/integration coverage and one automated browser path where creator wallet A publishes and buyer wallet B hires the exact version through progress -> verified delivery -> receipt. Cover self/cross-user refusal, forgery, stale authority, version substitution, duplicate hire, and replay no-op.
 - Add a browser-plus-bot path: web generates code -> Telegram `/start CODE` -> web observes linked state -> linked command reaches the same backend user/job -> result/proof returns -> unlink. Prove forged webhook, expired/replayed code, second chat, and webhook/polling conflict fail closed.
@@ -215,9 +226,9 @@ A6 - OPTIONAL UNISWAP
 A7 - RELEASE AND SUBMISSION
 
 - Freeze one SHA and make no feature changes.
-- Re-run `R0_AGENT_READY` against the frozen checkout.
+- Re-run `R0_AGENT_READY` readiness-drift validation against the frozen checkout; never replay the migration.
 - Run the complete release contract in `docs/lisbon/GOALS.md` from a fresh checkout.
-- Deploy web/API, managed migration, and long-running worker only under exact authorization and from the same SHA.
+- Target Vercel for web/API and the Telegram webhook. Deploy it, the managed migration, and the separately compatible worker host only under exact authorization and from the same SHA.
 - Deploy or verify the Telegram receiver and every required agent from the same SHA/version. Reconcile public app URL, webhook-versus-polling state, health endpoints, and exact offline/degraded causes.
 - Run authorized live 0G and ENS smokes; run Uniswap only if A6 passed.
 - Run failure-first and success-plus-replay demos twice from resettable state within four minutes.
@@ -268,7 +279,7 @@ RECOVERY AND STOP RULES
 - On writer crash, preserve checkout, diff, lock, logs, journal, and possible external-effect state for adjudication.
 - On restart, reconstruct state from Git, remote refs, lease/mirror, evidence, controls, task returns, and observable agents before dispatch.
 - Missing credentials or live authority is `WAIT_GATE`/`LIVE_EFFECT_BLOCKED`, not global `STOP`, while safe local work remains.
-- `STOP` only for explicit owner cancellation, global deadline expiry, or unrecoverable repository integrity.
+- `STOP` only for explicit owner cancellation, expiry of an exact owner-supplied global deadline, or unrecoverable repository integrity. A missing or ambiguous deadline cannot expire.
 - Never declare `PASS_LIVE`, bounty qualification, production readiness, expected winnings, or `RELEASE_VALIDATED` from local evidence.
 
 REQUIRED OWNER WAKE PACKET
@@ -289,9 +300,10 @@ AFTER EVERY GATE OUTPUT
 
 checkpoint:
 head_sha:
+audit_sha:
 branch:
 remote_branch_sha:
-decision: BUILD | NARROW | WAIT_GATE | CUT | BLOCKED | RELEASE_VALIDATED
+decision: BUILD | NARROW | REMEDIATE | WAIT_GATE | CUT | BLOCKED | RELEASE_VALIDATED
 A0_local:
 A1:
 A2:
@@ -299,7 +311,7 @@ A3_fixture:
 A3_integration:
 A3_audit:
 A3_live:
-A4_agent_readiness:
+R0_agent_ready:
 A4_static:
 A4_ensv2_static:
 A4_fixture:
@@ -317,6 +329,7 @@ remaining_setup:
 blockers:
 commits:
 audits:
+agent_tasks:
 evidence:
 external_effects_attempted:
 remaining_external_effects:

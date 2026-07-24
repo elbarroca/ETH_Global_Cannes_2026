@@ -4,6 +4,52 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator /root
+task_id: PROMPT-CODEX-AGENTS-20260724
+task_instance_id: PROMPT-CODEX-AGENTS-20260724:A97D2175
+generation: 1
+sprint: control_prompt_update
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: a8a45286980c1312713872c4b8c90c90b283c3ed
+control_sha: a8a45286980c1312713872c4b8c90c90b283c3ed
+token: PROMPT-CODEX-AGENTS-A97D2175-9CBF-4D2F-B7D6-DBA3D6FE80F5
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T22:36:15Z
+expires_at: 2026-07-25T00:29:07Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/prompts/C0-A4-CONTINUATION.md
+  - docs/lisbon/prompts/SPRINT-EXECUTOR.md
+  - docs/lisbon/prompts/SPRINT-AUDIT.md
+  - docs/lisbon/prompts/README.md
+started_at: 2026-07-24T22:19:51Z
+deadline: 2026-07-25T00:29:07Z
+expected_exit: preserve the accepted Codex migration and make the continuation goal use bounded Codex delegation, context optimization, exact dispatch packets, and immutable-SHA audits
+acceptance_items:
+  - only .codex/agents/*.toml roles dispatch project work; .claude remains provenance
+  - executor and auditor packets bind an exact Codex agent_type and immutable scope
+  - accepted R0 migration is reconciled and drift-checked rather than rerun
+  - C0 inventories and reuses matching agents before bounded spawn; no duplicate writer or audit work
+  - self-contained fork and model policy uses only supported Codex collaboration settings
+  - answered owner questions are not asked again; unresolved setup remains explicit
+  - Vercel, Telegram webhook, barrocaa.eth, user-authored Markdown agents, and Arc cut are recorded without granting an external effect
+external_effect_authority: safe local prompt files, checks, and one atomic commit only; no push, deploy, managed migration, webhook registration, live call, signature, transaction, form, spend, or public claim
+completed_at: 2026-07-24T22:36:15Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - continuation preserves the accepted nine-agent two-skill migration and revalidates only observed changed-surface drift
+  - C0 uses list reuse follow-up bounded spawn self-contained context supported-model policy and exact agent task tracking
+  - writer and auditor packets bind exact agent type task instance generation scope effects checks evidence return schema and immutable SHA
+  - one-writer no-tracked-mutation serialization independent audit and numbered remediation loops passed two read-only prompt audits
+  - lint passed with zero errors and 23 inherited warnings; typecheck and 9 foundation tests passed
+  - secret scan production build prompt structure links agent registry migration boundary contradiction and diff checks passed
+result: PASS_PROMPT_CODEX_DELEGATION_OPTIMIZATION_LOCAL_ONLY
+lock_release: release only matching token PROMPT-CODEX-AGENTS-A97D2175-9CBF-4D2F-B7D6-DBA3D6FE80F5 after the containing commit
+status: closed
+```
+
+```yaml
+owner: C0 coordinator /root
 task_id: R0-AGENT-READY-20260724-G2
 task_instance_id: R0-AGENT-READY-20260724:G2:25B87ED4
 generation: 2

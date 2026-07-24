@@ -7,7 +7,7 @@ the original A0-A7 sequence. It must not dispatch current work.
 
 C0 combines the selected card from [`../SPRINTS.md`](../SPRINTS.md) with:
 
-- [`SPRINT-EXECUTOR.md`](SPRINT-EXECUTOR.md) for the sole writer;
-- [`SPRINT-AUDIT.md`](SPRINT-AUDIT.md) for an independent pinned-SHA audit.
+- [`SPRINT-EXECUTOR.md`](SPRINT-EXECUTOR.md) for the matching sole-writer `agent_type` from `.codex/agents/*.toml`;
+- [`SPRINT-AUDIT.md`](SPRINT-AUDIT.md) for the read-only `bounty-auditor` against an immutable SHA.
 
-The operator never pastes executor/auditor prompts into peer tasks. Historical prompts under `../archive/` are provenance only.
+C0 spawns these Codex project agents directly. The operator never pastes executor/auditor prompts into peer tasks, `.claude/**` never dispatches, and converted source-command skills are workflows rather than agents. Historical prompts under `../archive/` are provenance only.
