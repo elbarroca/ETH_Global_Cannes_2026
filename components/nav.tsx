@@ -191,7 +191,7 @@ export function Nav() {
           </button>
 
           {/* Dynamic widget — handles connect / disconnect / switch */}
-          <WalletConnectButton />
+          {mounted && <WalletConnectButton />}
         </div>
       </div>
 
