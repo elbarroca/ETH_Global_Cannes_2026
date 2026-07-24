@@ -3,6 +3,58 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: ENS Integrator /root/a4_ensv2_gap_inventory
+task_id: A4-ENSV2-HIERARCHY-20260724
+task_instance_id: A4-ENSV2-HIERARCHY-20260724:W1:7C5DC8B
+generation: 1
+sprint: A4
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: 7c5dc8b246d16583606d6bc6115429db81cc69e8
+control_sha: 7c5dc8b246d16583606d6bc6115429db81cc69e8
+token: A4-ENSV2-W1-7C5DC8B-11E4EEE2-C851-4812-8FD5-5108164CE06E
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T23:32:51Z
+expires_at: 2026-07-25T02:30:00Z
+allowed_paths:
+  - src/ens/authority.ts
+  - src/ens/viem-resolver.ts
+  - tests/helpers/ens.ts
+  - tests/a4/ens-authority.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-24T23:04:12Z
+deadline: 2026-07-25T02:30:00Z
+expected_exit: deterministic local ENSv2 hierarchy and permission owner layer passes the full local gate and is committed for independent audit
+external_effect_authority: safe local allowed files, installed-source inspection, tests, loopback/disposable databases, generated ignored output, and one atomic commit only
+scope_clarification:
+  - C0 authorized only official go1.23.10.darwin-arm64.tar.gz under a task-specific temporary directory
+  - require SHA-256 25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5 and exact go1.23.10 darwin/arm64 before use
+  - GOTOOLCHAIN=local; no system install or tracked toolchain file; delete the task-specific archive and toolchain before commit
+completed_at: 2026-07-24T23:32:51Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - stable schema-v1 resolution remains supported while deterministic schema-v2 hierarchy evidence is strict and bounded
+  - creator parent and agent label normalize separately, derive one exact subname, and persist DNS encoding plus immutable price/name/version evidence
+  - canonical root and Universal Resolver, Registry hierarchy, owner/delegate, roles/admin roles, grants, expiry, backlinks, aliasing, resolver policy, and CCIP provenance fail closed
+  - valid explicit and inherited fixtures, twenty duplicates, pre-execution denial, delivery drift, restart, and lease takeover pass 14 of 14 focused tests
+  - combined integration passes 31 of 31 tests plus both unchanged four-migration lanes; complete local gate passes
+  - official temporary Go 1.23.10 archive matched the pinned checksum/version and was deleted before closeout
+remaining_blocks:
+  - independent immutable-SHA owner-layer audit
+  - sequential Kernel draft/name/write/readback/publication gate
+  - every live ENS, sponsor, claim, A5, and release gate
+external_effects_attempted: one authorized checksum-pinned official Go toolchain download to task-specific temporary storage; no ENS, 0G, sponsor, managed database, signature, transaction, push, deploy, form, spend, or claim effect
+result: PASS_TO_AUDIT_OWNER_LAYER_LOCAL_ONLY
+lock_release: release only matching token A4-ENSV2-W1-7C5DC8B-11E4EEE2-C851-4812-8FD5-5108164CE06E after the containing commit and clean status
+status: closed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-R0-A4-RECONCILIATION-20260724
 task_instance_id: C0-R0-A4-RECONCILIATION-20260724:3C29B2A4

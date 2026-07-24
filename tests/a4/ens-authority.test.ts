@@ -33,9 +33,11 @@ import {
   type FixtureEnsAuthorityResolver,
 } from "../helpers/ens";
 import {
+  CANONICAL_UNIVERSAL_RESOLVER,
   checkFreshEnsAuthority,
   EnsAuthorityResolverError,
   type EnsAuthorityRuntime,
+  UNIVERSAL_RESOLVER_READINESS_VECTOR,
 } from "../../src/ens/authority";
 
 const NOW = new Date("2026-07-24T13:00:00.000Z");
@@ -120,6 +122,8 @@ function fixture(
     beforeResolve?: (request: Parameters<FixtureEnsAuthorityResolver["resolve"]>[0], call: number) => Promise<void>;
     disposableTestClock?: boolean;
     resolutionTimeoutMs?: number;
+    ensv2?: boolean;
+    runtime?: Partial<Omit<EnsAuthorityRuntime, "resolver">>;
   } = {},
 ): A4Fixture {
   const now = options.now ?? NOW;
@@ -132,6 +136,8 @@ function fixture(
     beforeResolve: options.beforeResolve,
     disposableTestClock: options.disposableTestClock,
     resolutionTimeoutMs: options.resolutionTimeoutMs,
+    ensv2: options.ensv2,
+    runtime: options.runtime,
   });
   const adapter = new StrictA3Adapter({
     authority: ens.runtime,
@@ -225,7 +231,7 @@ function object(value: unknown): Record<string, unknown> {
 
 function change(
   response: Record<string, unknown>,
-  target: "observation" | "record" | "creator" | "agent",
+  target: "observation" | "record" | "creator" | "agent" | "ensv2" | "parentLink" | "resolver" | "ccip",
   key: string,
   value: unknown,
 ): unknown {
@@ -235,14 +241,50 @@ function change(
     ? object(copy.observation)
     : target === "record"
       ? record
-      : object(record[target]);
+      : target === "creator" || target === "agent"
+        ? object(record[target])
+        : target === "ensv2"
+          ? object(record.ensv2)
+          : object(object(record.ensv2)[target]);
   selected[key] = value;
+  return copy;
+}
+
+function changeRole(
+  response: Record<string, unknown>,
+  index: number,
+  key: string,
+  value: unknown,
+): unknown {
+  const copy = structuredClone(response);
+  const roles = object(object(copy.record).ensv2).roles;
+  if (!Array.isArray(roles) || !roles[index]) throw new Error("A4_TEST_ROLE_MISSING");
+  object(roles[index])[key] = value;
+  return copy;
+}
+
+function addExternalGrant(response: Record<string, unknown>): unknown {
+  const copy = structuredClone(response);
+  const hierarchy = object(object(copy.record).ensv2);
+  const roles = hierarchy.roles;
+  if (!Array.isArray(roles) || !roles[0]) throw new Error("A4_TEST_ROLE_MISSING");
+  const grant = structuredClone(roles[0]);
+  object(grant).account = "0x9999999999999999999999999999999999999999";
+  hierarchy.externalGrants = [grant];
   return copy;
 }
 
 function requestFromClaim(claim: ClaimedJob): AdapterExecutionRequest {
   return { ...claim, signal: new AbortController().signal };
 }
+
+test("canonical Universal Resolver readiness vector is pinned without a live read", () => {
+  assert.equal(CANONICAL_UNIVERSAL_RESOLVER, "0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe");
+  assert.deepEqual(UNIVERSAL_RESOLVER_READINESS_VECTOR, {
+    name: "ur.integration-tests.eth",
+    address: "0x2222222222222222222222222222222222222222",
+  });
+});
 
 test("stable ENS authority gates the full A3 path twice and twenty duplicates settle once", async () => {
   const database = await startDisposableDatabase("a4-success");
@@ -290,6 +332,157 @@ test("stable ENS authority gates the full A3 path twice and twenty duplicates se
       refunds: 0,
       settlements: 1,
     });
+
+  } finally {
+    await database.close();
+  }
+});
+
+test("ENSv2 hierarchy fixture binds DNS names, permissions, CCIP provenance, and twenty duplicates once", async () => {
+  const database = await startDisposableDatabase("a4-v2-ok");
+  try {
+    const version = await setup(database);
+    const submissions = await Promise.all(Array.from({ length: 20 }, () => submit(
+      database,
+      version,
+      "a4-ensv2-twenty-duplicates",
+    )));
+    assert.equal(new Set(submissions.map(({ effectId }) => effectId)).size, 1);
+    const job = submissions[0];
+    if (!job) throw new Error("A4_TEST_ENSV2_JOB_MISSING");
+    const run = fixture(database, { ensv2: true });
+    assert.deepEqual(await runWorkerOnce({
+      ownerId: "a4-ensv2-success-worker",
+      concurrency: 1,
+      leaseSeconds: 30,
+      adapter: run.adapter,
+      sql: database.sql,
+      now: NOW,
+    }), { leaseAcquired: true, claimed: 1 });
+    const ensv2Errors = await database.sql<{ error_code: string | null }[]>`
+      SELECT error_code FROM ens_authority_checks WHERE job_id = ${job.jobId}::uuid AND decision = 'DENY'
+    `;
+    assert.equal(ensv2Errors.length, 0);
+    const binding = run.ens.calls[0]?.binding;
+    assert.ok(binding?.ensv2);
+    assert.equal(binding.agentLabel, "research");
+    assert.equal(binding.agentName, "research.creator.alphadawg.eth");
+    assert.match(binding.creatorDnsName, /^0x[0-9a-f]+$/);
+    assert.match(binding.agentDnsName, /^0x[0-9a-f]+$/);
+    assert.equal(binding.universalResolver, CANONICAL_UNIVERSAL_RESOLVER.toLowerCase());
+    assert.equal(binding.priceAtomic, "1000");
+    assert.equal(binding.ensv2.agentParentRegistry, binding.ensv2.creatorCanonicalRegistry);
+    assert.deepEqual(run.ens.calls.map(({ operation }) => operation), [
+      "COMPUTE_SERVICE",
+      "COMPUTE_HEADERS",
+      "COMPUTE_REQUEST",
+      "COMPUTE_SIGNATURE",
+      "STORAGE_WRITE",
+      "STORAGE_READBACK",
+      "ACCEPT_DELIVERY",
+    ]);
+    assert.deepEqual(await snapshot(database, job.jobId), {
+      authority_allows: 7,
+      authority_denies: 0,
+      authority_checks: 7,
+      bindings: 1,
+      commissions: 1,
+      effect_state: "SUCCEEDED",
+      effects: 1,
+      job_state: "SUCCEEDED",
+      receipts: 1,
+      refunds: 0,
+      settlements: 1,
+    });
+    const inheritedJob = await submit(database, version, "a4-ensv2-inherited-resolver", new Date(NOW.getTime() + 1));
+    const inherited = fixture(database, { ensv2: true, now: new Date(NOW.getTime() + 1) });
+    if (!inherited.authority.ensv2) throw new Error("A4_TEST_ENSV2_POLICY_MISSING");
+    inherited.authority.ensv2 = {
+      ...inherited.authority.ensv2,
+      agentCanonicalRegistry: null,
+      resolverMode: "INHERITED",
+    };
+    assert.deepEqual(await runWorkerOnce({
+      ownerId: "a4-ensv2-success-worker",
+      concurrency: 1,
+      leaseSeconds: 30,
+      adapter: inherited.adapter,
+      sql: database.sql,
+      now: new Date(NOW.getTime() + 1),
+    }), { leaseAcquired: true, claimed: 1 });
+    const inheritedBinding = inherited.ens.calls[0]?.binding.ensv2;
+    assert.equal(inheritedBinding?.agentCanonicalRegistry, null);
+    assert.equal(inheritedBinding?.resolverMode, "INHERITED");
+    assert.equal(inheritedBinding?.resolverSuffix, "creator.alphadawg.eth");
+    assert.equal((await snapshot(database, inheritedJob.jobId)).job_state, "SUCCEEDED");
+  } finally {
+    await database.close();
+  }
+});
+
+test("ENSv2 name boundary rejects reverse, unsupported, reserved, confusable, collision, and suffix spoof inputs", async () => {
+  const database = await startDisposableDatabase("a4-ensv2-names");
+  try {
+    const version = await setup(database);
+    const cases: Array<{
+      name: string;
+      runtime: Partial<Omit<EnsAuthorityRuntime, "resolver">>;
+    }> = [
+      {
+        name: "reverse",
+        runtime: {
+          creatorName: "1.0.0.127.in-addr.reverse",
+          agentName: "research.1.0.0.127.in-addr.reverse",
+        },
+      },
+      {
+        name: "unsupported-namespace",
+        runtime: { creatorName: "creator.example", agentName: "research.creator.example" },
+      },
+      {
+        name: "reserved",
+        runtime: { agentLabel: "admin", agentName: "admin.creator.alphadawg.eth" },
+      },
+      {
+        name: "confusable",
+        runtime: { agentLabel: "rеsearch", agentName: "rеsearch.creator.alphadawg.eth" },
+      },
+      {
+        name: "collision",
+        runtime: { agentLabel: "research", agentName: "research.other.creator.alphadawg.eth" },
+      },
+      {
+        name: "suffix-spoof",
+        runtime: { agentLabel: "research", agentName: "research.creator.alphadawg.eth.evil.eth" },
+      },
+      {
+        name: "malformed",
+        runtime: { creatorName: "creator..alphadawg.eth", agentName: "research.creator..alphadawg.eth" },
+      },
+    ];
+    for (let index = 0; index < cases.length; index += 1) {
+      const item = cases[index];
+      const now = new Date(NOW.getTime() + index * 10);
+      const submitted = await submit(database, version, `a4-ensv2-name-${item.name}`, now);
+      const run = fixture(database, { ensv2: true, now, runtime: item.runtime });
+      await runWorkerOnce({
+        ownerId: "a4-ensv2-name-worker",
+        concurrency: 1,
+        leaseSeconds: 30,
+        adapter: run.adapter,
+        sql: database.sql,
+        now,
+      });
+      assert.deepEqual(run.compute.calls, { headers: 0, request: 0, resolve: 0, signature: 0, verify: 0 }, item.name);
+      assert.equal(run.storage.calls, 0, item.name);
+      assert.equal(run.verifier.calls, 0, item.name);
+      const state = await snapshot(database, submitted.jobId);
+      assert.equal(state.job_state, "FAILED", item.name);
+      assert.equal(state.receipts, 0, item.name);
+      assert.equal(state.settlements, 0, item.name);
+      assert.equal(state.commissions, 0, item.name);
+      assert.equal(state.refunds, 1, item.name);
+    }
   } finally {
     await database.close();
   }
@@ -511,6 +704,90 @@ test("malformed, stale, forged, mismatched, replayed, outage, and timeout author
   }
 });
 
+test("ENSv2 hierarchy, roles, expiry, resolver policy, and CCIP failures refuse before A3", async () => {
+  const database = await startDisposableDatabase("a4-v2-refuse");
+  try {
+    const version = await setup(database);
+    const wrongAddress = "0x9999999999999999999999999999999999999999";
+    const wrongNode = `0x${"9".repeat(64)}`;
+    const expired = new Date(NOW.getTime() - 1).toISOString();
+    const cases: Array<{ name: string; mutate: EnsFixtureMutator }> = [
+      { name: "wrong-root", mutate: (r) => change(r, "record", "rootRegistry", wrongAddress) },
+      { name: "wrong-universal-resolver", mutate: (r) => change(r, "record", "universalResolver", wrongAddress) },
+      { name: "wrong-price", mutate: (r) => change(r, "record", "priceAtomic", "999") },
+      { name: "wrong-creator-dns", mutate: (r) => change(r, "record", "creatorDnsName", "0x00") },
+      { name: "wrong-agent-label", mutate: (r) => change(r, "record", "agentLabel", "wrong") },
+      {
+        name: "missing-creator-registry",
+        mutate: (r) => change(r, "ensv2", "creatorCanonicalRegistry", "0x0000000000000000000000000000000000000000"),
+      },
+      { name: "wrong-creator-registry", mutate: (r) => change(r, "ensv2", "creatorCanonicalRegistry", wrongAddress) },
+      { name: "broken-parent-registry", mutate: (r) => change(r, "ensv2", "agentParentRegistry", wrongAddress) },
+      { name: "wrong-find-owner", mutate: (r) => change(r, "ensv2", "owner", wrongAddress) },
+      { name: "subregistry-removed", mutate: (r) => change(r, "ensv2", "agentCanonicalRegistry", null) },
+      { name: "subregistry-replaced", mutate: (r) => change(r, "ensv2", "agentCanonicalRegistry", wrongAddress) },
+      { name: "wrong-role-admin", mutate: (r) => changeRole(r, 0, "adminRole", wrongNode) },
+      { name: "wrong-role-account", mutate: (r) => changeRole(r, 0, "account", wrongAddress) },
+      { name: "external-grant", mutate: addExternalGrant },
+      { name: "parent-expired", mutate: (r) => change(r, "ensv2", "parentExpiry", expired) },
+      { name: "agent-expired", mutate: (r) => change(r, "ensv2", "agentExpiry", expired) },
+      { name: "role-expired", mutate: (r) => changeRole(r, 0, "expiresAt", expired) },
+      { name: "broken-forward-link", mutate: (r) => change(r, "parentLink", "forward", false) },
+      { name: "broken-back-link", mutate: (r) => change(r, "parentLink", "back", false) },
+      { name: "registry-alias", mutate: (r) => change(r, "ensv2", "alias", true) },
+      { name: "wrong-winning-resolver", mutate: (r) => change(r, "resolver", "address", wrongAddress) },
+      { name: "wrong-winning-suffix", mutate: (r) => change(r, "resolver", "suffix", "creator.alphadawg.eth") },
+      { name: "wrong-inherited-policy", mutate: (r) => change(r, "resolver", "mode", "INHERITED") },
+      { name: "ccip-wrong-universal", mutate: (r) => change(r, "ccip", "universalResolver", wrongAddress) },
+      { name: "ccip-wrong-gateway", mutate: (r) => change(r, "ccip", "gateway", "https://wrong.fixture.invalid") },
+      { name: "ccip-outage", mutate: (r) => change(r, "ccip", "status", "FAILED") },
+      {
+        name: "ccip-malformed",
+        mutate: (r) => {
+          const copy = structuredClone(r);
+          delete object(object(object(copy.record).ensv2).ccip).responseHash;
+          return copy;
+        },
+      },
+      {
+        name: "hierarchy-missing",
+        mutate: (r) => {
+          const copy = structuredClone(r);
+          delete object(copy.record).ensv2;
+          return copy;
+        },
+      },
+    ];
+    for (let index = 0; index < cases.length; index += 1) {
+      const item = cases[index];
+      const now = new Date(NOW.getTime() + index * 10);
+      const submitted = await submit(database, version, `a4-ensv2-refuse-${item.name}`, now);
+      const run = fixture(database, { ensv2: true, mutator: item.mutate, now });
+      await runWorkerOnce({
+        ownerId: "a4-ensv2-refusal-worker",
+        concurrency: 1,
+        leaseSeconds: 30,
+        adapter: run.adapter,
+        sql: database.sql,
+        now,
+      });
+      assert.deepEqual(run.compute.calls, { headers: 0, request: 0, resolve: 0, signature: 0, verify: 0 }, item.name);
+      assert.equal(run.storage.calls, 0, item.name);
+      assert.equal(run.verifier.calls, 0, item.name);
+      const state = await snapshot(database, submitted.jobId);
+      assert.equal(state.job_state, "FAILED", item.name);
+      assert.equal(state.effect_state, "FAILED", item.name);
+      assert.equal(state.receipts, 0, item.name);
+      assert.equal(state.settlements, 0, item.name);
+      assert.equal(state.commissions, 0, item.name);
+      assert.equal(state.refunds, 1, item.name);
+      assert.equal(state.authority_denies, 1, item.name);
+    }
+  } finally {
+    await database.close();
+  }
+});
+
 test("transfer during execution and resumed A3 stages recheck only remaining operations", async () => {
   const database = await startDisposableDatabase("a4-resume");
   try {
@@ -575,6 +852,53 @@ test("transfer during execution and resumed A3 stages recheck only remaining ope
   }
 });
 
+test("ENSv2 transfer, expiry, subregistry, role, and resolver-policy drift during execution deny delivery", async () => {
+  const database = await startDisposableDatabase("a4-v2-drift");
+  try {
+    const version = await setup(database);
+    const wrongAddress = "0x9999999999999999999999999999999999999999";
+    const wrongNode = `0x${"9".repeat(64)}`;
+    const expired = new Date(NOW.getTime() - 1).toISOString();
+    const cases: Array<{ name: string; mutate: EnsFixtureMutator }> = [
+      { name: "transfer", mutate: (r) => change(r, "agent", "owner", wrongAddress) },
+      { name: "expiry", mutate: (r) => change(r, "ensv2", "agentExpiry", expired) },
+      { name: "subregistry", mutate: (r) => change(r, "ensv2", "agentCanonicalRegistry", null) },
+      { name: "role", mutate: (r) => changeRole(r, 0, "adminRole", wrongNode) },
+      { name: "resolver-policy", mutate: (r) => change(r, "resolver", "mode", "INHERITED") },
+    ];
+    for (let index = 0; index < cases.length; index += 1) {
+      const item = cases[index];
+      const now = new Date(NOW.getTime() + index * 10);
+      const submitted = await submit(database, version, `a4-ensv2-delivery-${item.name}`, now);
+      const run = fixture(database, {
+        ensv2: true,
+        now,
+        mutator: (response, request, call) => request.phase === "PRE_DELIVERY"
+          ? item.mutate(response, request, call)
+          : response,
+      });
+      await runWorkerOnce({
+        ownerId: "a4-ensv2-delivery-worker",
+        concurrency: 1,
+        leaseSeconds: 30,
+        adapter: run.adapter,
+        sql: database.sql,
+        now,
+      });
+      assert.deepEqual([run.compute.calls.request, run.storage.calls, run.verifier.calls], [1, 1, 1], item.name);
+      const state = await snapshot(database, submitted.jobId);
+      assert.equal(state.job_state, "FAILED", item.name);
+      assert.equal(state.receipts, 0, item.name);
+      assert.equal(state.settlements, 0, item.name);
+      assert.equal(state.commissions, 0, item.name);
+      assert.equal(state.refunds, 1, item.name);
+      assert.equal(state.authority_denies, 1, item.name);
+    }
+  } finally {
+    await database.close();
+  }
+});
+
 async function expireClaim(database: DisposableDatabase, jobId: string, at: Date): Promise<void> {
   const expired = new Date(at.getTime() - 1);
   const heartbeat = new Date(at.getTime() - 2);
@@ -597,6 +921,7 @@ test("READBACK restart and lease takeover re-resolve delivery authority without 
       const claim = (await claimJobs(ownerA, 1, 30, { now: caseTime, sql: database.sql }))[0];
       if (!claim) throw new Error("A4_TEST_CLAIM_MISSING");
       const first = fixture(database, {
+        ensv2: true,
         now: caseTime,
         hooks: { afterReadbackVerified: async () => { throw new A3SimulatedCrashError(); } },
       });
@@ -604,7 +929,9 @@ test("READBACK restart and lease takeover re-resolve delivery authority without 
       const recoveryTime = new Date(caseTime.getTime() + 31_000);
       await expireClaim(database, submitted.jobId, recoveryTime);
       const recoveryAuthority = createEnsAuthorityFixture({
+        ensv2: true,
         now: recoveryTime,
+        runtime: { ensv2: first.authority.ensv2 },
         mutator: transferred
           ? (response) => change(response, "creator", "owner", "0x9999999999999999999999999999999999999999")
           : undefined,
@@ -629,7 +956,10 @@ test("READBACK restart and lease takeover re-resolve delivery authority without 
       }), { leaseAcquired: true, claimed: 1 });
       assert.equal(adapterCalls, 0);
       const state = await snapshot(database, submitted.jobId);
-      assert.equal(state.job_state, transferred ? "FAILED" : "SUCCEEDED");
+      const errors = await database.sql<{ error_code: string | null }[]>`
+        SELECT error_code FROM effects WHERE job_id = ${submitted.jobId}::uuid
+      `;
+      assert.equal(state.job_state, transferred ? "FAILED" : "SUCCEEDED", errors[0]?.error_code ?? undefined);
       assert.equal(state.receipts, transferred ? 0 : 1);
       assert.equal(state.refunds, transferred ? 1 : 0);
     }
@@ -647,7 +977,7 @@ test("lease takeover during PRE_EXECUTION and PRE_DELIVERY cannot persist stale 
     assert.equal((await acquireWorkerLease("a4-takeover-pre-a", 30, { now: NOW, sql: database.sql })).acquired, true);
     const preClaim = (await claimJobs("a4-takeover-pre-a", 1, 30, { now: NOW, sql: database.sql }))[0];
     if (!preClaim) throw new Error("A4_TEST_PRE_CLAIM_MISSING");
-    const pre = fixture(database);
+    const pre = fixture(database, { ensv2: true });
     pre.ens.setBeforeResolve(async (request) => {
       if (request.operation !== "COMPUTE_SERVICE") return;
       await expireClaim(database, preJob.jobId, NOW);
@@ -674,7 +1004,7 @@ test("lease takeover during PRE_EXECUTION and PRE_DELIVERY cannot persist stale 
 
     const deliveryTime = new Date(NOW.getTime() + 70_000);
     const deliveryJob = await submit(database, version, "a4-takeover-delivery", deliveryTime);
-    const delivery = fixture(database, { now: deliveryTime });
+    const delivery = fixture(database, { ensv2: true, now: deliveryTime });
     delivery.ens.setBeforeResolve(async (request) => {
       if (request.phase !== "PRE_DELIVERY") return;
       await expireClaim(database, deliveryJob.jobId, deliveryTime);

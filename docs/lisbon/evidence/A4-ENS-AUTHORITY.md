@@ -83,15 +83,55 @@ Toolchain: Node `v22.22.3`, npm `10.9.8`, Prisma/Client `6.19.3`, TypeScript `5.
 | `npm run build` | 0 | Next `16.2.2` compiled, typechecked, and generated 31/31 static pages. |
 | post-build artifacts / production start | 0 | `prerender-manifest.json`, `BUILD_ID`, and `required-server-files.json` exist; `export-detail.json` is absent; `next start` became ready in 134 ms and served the loopback root. |
 
+## ENSv2 owner-layer extension
+
+- Task: `A4-ENSV2-HIERARCHY-20260724`
+- Task instance: `A4-ENSV2-HIERARCHY-20260724:W1:7C5DC8B`
+- Start/control SHA: `7c5dc8b246d16583606d6bc6115429db81cc69e8`
+- Observed through: `2026-07-24T23:30:07Z`
+- Result: `PASS_TO_AUDIT_OWNER_LAYER; PASS_FIXTURE; PASS_INTEGRATION; LOCAL_ONLY`
+- Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
+
+The accepted stable schema-v1 resolver and `checkFreshEnsAuthority` call contract remain supported. The owner layer adds a strict schema-v2 deterministic fixture policy without a live ENSv2 client, deployment address, or invented ABI. Creator parent and agent label are ENSIP-15-normalized separately, restricted to the admitted ASCII `.eth` product namespace, deterministically joined, and DNS-encoded with installed `viem@2.47.6` before binding. Reverse namespaces, malformed/unsupported/confusable labels, reserved labels, normalization collisions, and suffix spoofing deny before A3.
+
+The immutable canonical binding and persisted record bytes now include direct price, normalized and DNS names, the agent label/full subname, root Registry, canonical Universal Resolver, canonical creator Registry, equal agent parent Registry, optional exact agent Registry, owner/delegate, contract/name roles and admin roles, grant expiries, parent/agent expiry, forward/back links, alias status, winning resolver/suffix, explicit/inherited policy, CCIP gateway/status/response hash, and the existing version/manifest/capabilities/service/payout/chain/block/transaction/time/freshness/policy/job/effect evidence. Existing database columns and the already-applied migration are unchanged; expanded evidence is carried inside the existing bounded immutable canonical bytes/hash.
+
+Deterministic fixtures enforce nonzero creator canonical Registry, exact parent Registry equality, expected owner or admitted delegate, exact optional agent Registry, exact roles/admin roles, no external grant, unexpired lineage, intact backlinks, non-alias state, exact resolver policy, and verified CCIP provenance. Wrong/missing/replaced Registry, owner, role/admin role, external grant, expiry, backlink, alias, root, resolver, suffix, inheritance mode, DNS form, price, Universal Resolver, or CCIP response is terminal. Pre-execution cases create zero Compute/Storage/verifier calls; drift during execution creates no delivery, receipt, settlement, commission, or replacement effect. Recovery and takeover re-resolve without replaying completed adapter work.
+
+The canonical Universal Resolver is pinned at `0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe`. The official readiness vector `ur.integration-tests.eth -> 0x2222222222222222222222222222222222222222` is asserted as a deterministic constant only; no live resolution occurred. Both explicit and inherited resolver policies pass valid fixtures, including the valid absence of an agent subregistry.
+
+Fourteen focused A4 tests pass. They retain all nine accepted stable tests and add the readiness vector, valid ENSv2 hierarchy with twenty duplicate submissions, name-boundary refusals, a data-driven hierarchy/role/expiry/resolver/CCIP refusal matrix, delivery-time transfer/expiry/subregistry/role/resolver drift, and ENSv2 restart/takeover coverage. Combined integration passes 31/31 reported TypeScript tests plus both unchanged four-migration lanes.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| `npm ci --legacy-peer-deps` | 0 | Installed from the committed lock; no manifest or lockfile changed. |
+| loopback-placeholder `npx prisma validate` / `npx prisma generate` | 0 | Schema valid and Prisma Client `6.19.3` generated. The first bare validate exited 1 only because `DIRECT_URL` was unset; no connection was attempted. |
+| `npx tsx scripts/test-migrations.ts` | 0 | Empty and synthetic Cannes-shaped four-migration lanes passed; sentinel SHA-256 stayed `fb8aece1677586a330f0cfeb0850b71488849302324eb1d6a079673e35e3829e`. |
+| `npm run validate:env` | 0 | Offline protected defaults passed without secrets. |
+| `npm run lint` / `npm run typecheck` | 0 | Zero lint errors, 23 inherited warnings, no A4 warning, and strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | 9/9 foundation, 9/9 authentication, and 13/13 kernel tests passed. |
+| checksum-pinned `npm run test:go` | 0 | Official temporary Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`; the task-specific archive/toolchain was deleted. |
+| checksum-pinned `npm run test:a3` | 0 | 12/12 A3 tests passed. |
+| `npm run test:a4` | 0 | 14/14 stable plus ENSv2 focused tests passed. |
+| `npm run test:a5` | 0 | 3/3 A5 tests passed. |
+| checksum-pinned `npm run test:integration` | 0 | 31/31 reported TypeScript tests plus both migration lanes passed. |
+| `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 4/4, 1/1, and 3/3 tests passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` | 0 | Protected boot, tracked secret scan, and entrypoint syntax passed. |
+| `npm run build` | 0 | Next `16.2.11` compiled, typechecked, and generated 31/31 static pages. |
+
+The host initially had no Go executable. C0 authorized one official `https://go.dev/dl/go1.23.10.darwin-arm64.tar.gz` download under a task-specific `/tmp` directory only. SHA-256 matched `25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`; `go version` was exactly `go1.23.10 darwin/arm64`; the archive and extracted toolchain were deleted before closeout. This was local verification tooling, not ENS, 0G, sponsor, product, or release evidence.
+
 ## Remaining blocks
 
 - The independent pinned-SHA re-audit accepted exact unchanged remediation SHA
   `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9`; the subsequent A5 writer ledger
   records that acceptance before its start. This accepts only the stable A4
-  base. The expanded ENSv2 creator/subname hierarchy contract remains local
-  implementation and audit work before the current `A4_ACCEPTED` gate opens.
+  base. The local ENSv2 hierarchy owner layer now returns
+  `PASS_TO_AUDIT_OWNER_LAYER`; independent exact-SHA audit and the sequential
+  Kernel draft/name/write/readback/publication gate remain required before
+  current `A4_ACCEPTED` can open.
 - `PASS_LIVE` is `NOT_RUN` and `LIVE_EFFECT_BLOCKED`; no live ENS write/readback or public identifier exists.
 - Production A3 live execution remains intentionally unavailable. Rights/license/team/owner records, event-window classification, sponsor access/caps, inherited dependency findings, README claim drift, deployment, push, forms, and release audit remain unresolved.
 - Stable local ENS causality does not establish ENS qualification, production readiness, release validity, Lisbon-window classification, or expected winnings.
 
-External effects attempted: none. Sponsor calls: none. Managed/shared database effects: none. User signatures, network transactions, deployments, pushes, forms, funding, uploads, spend, mainnet value, public identifiers, live proof, and claim promotion: none.
+External effects attempted in the ENSv2 owner-layer task: one explicitly authorized checksum-pinned official Go toolchain download to task-specific temporary storage, deleted before closeout. Sponsor/ENS/0G/API calls: none. Managed/shared database effects: none. User signatures, network transactions, deployments, pushes, forms, funding, uploads, spend, mainnet value, public identifiers, live proof, and claim promotion: none.

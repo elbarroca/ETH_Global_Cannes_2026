@@ -1,9 +1,13 @@
 import type { Address, PublicClient } from "viem";
 import {
+  CANONICAL_UNIVERSAL_RESOLVER,
   EnsAuthorityResolverError,
+  UNIVERSAL_RESOLVER_READINESS_VECTOR,
   type EnsAuthorityResolver,
   type EnsAuthorityResolutionRequest,
 } from "./authority";
+
+export { CANONICAL_UNIVERSAL_RESOLVER, UNIVERSAL_RESOLVER_READINESS_VECTOR };
 
 const registryAbi = [{
   type: "function",
@@ -46,8 +50,11 @@ function requiredText(value: string | null): string {
 
 export function createViemEnsAuthorityResolver(
   client: PublicClient,
-  universalResolverAddress: Address,
+  universalResolverAddress: Address = CANONICAL_UNIVERSAL_RESOLVER,
 ): EnsAuthorityResolver {
+  if (universalResolverAddress.toLowerCase() !== CANONICAL_UNIVERSAL_RESOLVER.toLowerCase()) {
+    throw new Error("ENS_AUTHORITY_UNIVERSAL_RESOLVER_MISMATCH");
+  }
   return {
     async resolve(request: EnsAuthorityResolutionRequest, signal: AbortSignal): Promise<unknown> {
       try {

@@ -2,6 +2,16 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - A4 deterministic ENSv2 hierarchy owner layer
+
+- Preserved the accepted stable schema-v1 viem resolver and `checkFreshEnsAuthority` call contract while adding a strict schema-v2 deterministic ENSv2 fixture policy. No live ENSv2 client, deployment address, ABI, dependency, schema, migration, kernel, worker, 0G, API, or UI change was introduced.
+- Normalized the creator parent and agent label separately with installed `viem@2.47.6`, deterministically derived the full subname, DNS-encoded both names, and rejected reverse/unsupported namespaces, malformed/confusable/reserved labels, normalization collisions, and suffix spoofing.
+- Extended immutable canonical binding/record evidence with direct price, DNS names, canonical root and Universal Resolver, creator/parent/optional-agent Registries, owner/delegate, contract/name roles and admin roles, grant/registration expiry, backlinks, alias state, winning resolver/suffix, explicit/inherited policy, and CCIP provenance/status/hash.
+- Added fail-closed hierarchy validation for missing/replaced Registries, transfer, unexpected role/admin/external grant, expiry, broken backlinks, aliasing, root/resolver/inheritance drift, and malformed/outage CCIP responses. Invalid pre-execution state causes zero A3 calls; delivery-time drift causes no receipt, settlement, commission, or replacement effect.
+- Pinned the canonical Universal Resolver and official readiness vector as deterministic constants only. Added valid explicit/inherited fixtures, twenty-duplicate convergence, the denial matrix, delivery drift, restart/recovery, and lease takeover coverage while retaining all stable tests.
+- Passed 14/14 focused A4 tests, A3 12/12, A5 3/3, combined integration 31/31 plus both unchanged migration lanes, and the complete local gate. An explicitly authorized official Go 1.23.10 archive matched the pinned SHA-256, ran only from task-specific temporary storage with `GOTOOLCHAIN=local`, and was deleted before closeout.
+- Returned only `PASS_TO_AUDIT_OWNER_LAYER; LOCAL_ONLY`. Kernel draft/name/write/readback/publication gating, independent exact-SHA audit, `A4_ACCEPTED`, live ENS, sponsor qualification, A5 advancement, push, deployment, managed migration, signatures, transactions, spend, public identifiers, and claim promotion remain closed.
+
 ## 2026-07-24 - R0 and stable A4 audit reconciliation
 
 - Canonically recorded the accepted independent R0 re-audit at exact SHA `a8a45286980c1312713872c4b8c90c90b283c3ed` and verified that later drift is confined to the reviewed C0/executor/auditor prompt update.
