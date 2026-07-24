@@ -4,6 +4,46 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator task /root
+task_id: A1-DETERMINISTIC-FOUNDATION-REMEDIATION-G1-20260724
+task_instance_id: A1-DETERMINISTIC-FOUNDATION-REMEDIATION-G1-20260724:4140D7A3
+generation: 1
+sprint: A1_remediation
+mode: sole_writer
+branch: developer
+start_sha: c2359f766e61ea0d5b8735992de971101ee962bd
+control_sha: c2359f766e61ea0d5b8735992de971101ee962bd
+token: 4140D7A3-E309-4470-BFE7-613944557C52
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T01:38:37Z
+expires_at: 2026-07-24T03:30:00Z
+allowed_paths:
+  - README.md
+  - components/hunt/hunt-pipeline-arrows.tsx
+  - scripts/test-migrations.ts
+  - docs/lisbon/evidence/A1-DETERMINISTIC-FOUNDATION.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-24T01:21:21Z
+expected_exit: close the four A1 audit findings at root cause and pass the complete local gate
+lock_release: release only token 4140D7A3-E309-4470-BFE7-613944557C52 after the atomic remediation commit
+completed_at: 2026-07-24T01:38:37Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - README makes committed migrations canonical and labels prisma push noncanonical development-only
+  - deterministic synthetic sentinel identity and full-row SHA-256 match exactly before and after baseline resolution
+  - inherited Cannes bounty claims and estimate are not presented as current Lisbon evidence or expected winnings
+  - malformed no-anchor pipeline timestamps render unavailable while valid-anchor interpolation stays deterministic
+  - full cold and auxiliary A1 gates pass with zero lint errors and no effectful validate command
+  - exact eight-path, Markdown, YAML, diff, lockfile, lease, and secret checks pass
+  - no sponsor call, shared database effect, push, deployment, signature, transaction, form, spend, mainnet action, or claim promotion occurred
+audit_verdict: pending_pinned_exit_reaudit
+status: complete
+```
+
+```yaml
+owner: C0 coordinator task /root
 task_id: A1-DETERMINISTIC-FOUNDATION-20260724T0107WEST
 task_instance_id: A1-DETERMINISTIC-FOUNDATION-20260724T0107WEST:1E701677
 sprint: A1

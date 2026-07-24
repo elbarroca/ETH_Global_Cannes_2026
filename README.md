@@ -452,7 +452,9 @@ cp .env.example .env
 ### 3. One-time on-chain + DB setup
 
 ```bash
-npm run prisma:push              # Sync schema to Supabase
+npm run migrate                  # Canonical: deploy committed migrations to an authorized DB
+# `npm run prisma:push` is dev-only for disposable databases; it is not a
+# migration/release path and does not create the custom hot-wallet sequence.
 npm run setup:topic              # Create HCS topic → HCS_AUDIT_TOPIC_ID
 npm run setup:token              # Create HTS fund token → HTS_FUND_TOKEN_ID
 npm run setup:og                 # Fund 0G broker (10 0G deposit)
@@ -503,24 +505,31 @@ npm run demo:auto-approve        # Flip flag so cycles commit without /approve
 
 ---
 
-## Bounties Targeted
+## Inherited Cannes Bounty Claims (Prior Work)
 
-Based on `progress/BOUNTY-ELIGIBILITY-E2E-PROOF.md` (validated live against testnets):
+The table below is an inherited Cannes snapshot from
+`progress/BOUNTY-ELIGIBILITY-E2E-PROOF.md`. Its historical testnet claims were
+not revalidated by Lisbon A1. It is not current Lisbon eligibility, sponsor
+proof, release evidence, expected winnings, or production status. See the
+[Lisbon Claim Matrix](docs/lisbon/CLAIM-MATRIX.md) for the current fail-closed
+state.
 
-| # | Bounty | Prize | Status | Evidence |
+| # | Bounty | Prize | Historical Cannes status | Inherited evidence claim |
 |:--|:-------|:------|:-------|:---------|
-| 1 | **0G — Best OpenClaw Agent** | $6K | Complete | 14 OpenClaw workspaces · sealed inference · Storage RAG DAG via `priorCids` · iNFT `0x73e3…` deployed |
-| 2 | **0G — Best DeFi App** | $6K | Complete | Multi-agent swarm · TEE attestation per call · Arc Uniswap V3 settlement · iNFT identity |
-| 3 | **Arc — Best Agentic Economy with Nanopayments** | $6K | Complete | 3,709+ live x402 payments · Circle Gateway batching · gas-free agent-to-agent USDC |
-| 4 | **Hedera — AI & Agentic Payments** | $6K | Complete | HCS 6,249+ messages · HTS deposit/withdraw · Scheduled Transactions · OpenClaw ACP integration |
-| 5 | **Hedera — ioBuilders Naryo Builder Challenge** | $3.5K | Complete | `AlphaDawgAuditLog.sol` at `0x66D2…` · 9 Naryo filters · multi-DLT correlation · CrossChainCorrelation event on-chain |
-| 6 | 0G — Wildcard | $3K | Secondary | iNFT marketplace + evolving agent identity |
-| 7 | Arc — Chain Abstracted USDC | $3K | Secondary | Circle MPC + Gateway abstraction over Arc + Hedera settlement |
-| 8 | Hedera — Tokenization | $2.5K | Low confidence | VMF HTS token with KYC — weak real-world-asset fit |
-| — | Hedera — No Solidity Allowed | $3K | N/A | Mutually exclusive with Naryo (chose Naryo) |
-| — | Arc — Smart Contracts / Prediction Markets | $6K | Not claimed | Out of scope |
+| 1 | **0G — Best OpenClaw Agent** | $6K | Inherited: Complete | 14 OpenClaw workspaces · sealed inference · Storage RAG DAG via `priorCids` · iNFT `0x73e3…` deployed |
+| 2 | **0G — Best DeFi App** | $6K | Inherited: Complete | Multi-agent swarm · TEE attestation per call · Arc Uniswap V3 settlement · iNFT identity |
+| 3 | **Arc — Best Agentic Economy with Nanopayments** | $6K | Inherited: Complete | 3,709+ live x402 payments · Circle Gateway batching · gas-free agent-to-agent USDC |
+| 4 | **Hedera — AI & Agentic Payments** | $6K | Inherited: Complete | HCS 6,249+ messages · HTS deposit/withdraw · Scheduled Transactions · OpenClaw ACP integration |
+| 5 | **Hedera — ioBuilders Naryo Builder Challenge** | $3.5K | Inherited: Complete | `AlphaDawgAuditLog.sol` at `0x66D2…` · 9 Naryo filters · multi-DLT correlation · CrossChainCorrelation event on-chain |
+| 6 | 0G — Wildcard | $3K | Inherited: Secondary | iNFT marketplace + evolving agent identity |
+| 7 | Arc — Chain Abstracted USDC | $3K | Inherited: Secondary | Circle MPC + Gateway abstraction over Arc + Hedera settlement |
+| 8 | Hedera — Tokenization | $2.5K | Inherited: Low confidence | VMF HTS token with KYC — weak real-world-asset fit |
+| — | Hedera — No Solidity Allowed | $3K | Inherited: N/A | Mutually exclusive with Naryo (chose Naryo) |
+| — | Arc — Smart Contracts / Prediction Markets | $6K | Inherited: Not claimed | Out of scope |
 
-**Realistic target pool:** ~$27K across **5 primary + 2 secondary** bounties.
+**Inherited Cannes planning estimate (not a Lisbon forecast):** ~$27K across
+**5 primary + 2 secondary** bounties. Current expected-winnings floor remains
+`$0` until sponsor and release gates pass.
 
 ---
 

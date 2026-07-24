@@ -14,8 +14,9 @@ import type { AgentActionRecord, Cycle } from "@/lib/types";
  * This version builds the canonical topology from the committed `cycle`
  * record (which is the source of truth for specialists + debate + swap +
  * proofs) and only *looks up* timestamps in `actions` as a best-effort
- * annotation. Missing timestamps render without the time — missing NODES
- * never happen because the shape is derived from the cycle itself.
+ * annotation. Timestamp gaps are interpolated only when at least one valid
+ * cycle/action anchor exists. Malformed legacy rows with no valid anchor show
+ * `—`; missing NODES never happen because the shape comes from the cycle.
  *
  * Canonical order per hunt:
  *
@@ -30,6 +31,71 @@ import type { AgentActionRecord, Cycle } from "@/lib/types";
  * Kept as a horizontal scrollable strip (same container as before) so the
  * existing dashboard layout doesn't need adjustment.
  */
+export function resolvePipelineDisplayTimes(
+  realTimes: readonly (number | null)[],
+  cycleTimestamp: string,
+): Array<number | null> {
+  const displayTimes: Array<number | null> = realTimes.map(() => null);
+  if (displayTimes.length === 0) return displayTimes;
+
+  let previousAnchor: { index: number; time: number } | null = null;
+  let realAnchorCount = 0;
+  for (let index = 0; index < realTimes.length; index++) {
+    const realTime = realTimes[index];
+    if (realTime == null || !Number.isFinite(realTime)) continue;
+    const minimum = previousAnchor
+      ? previousAnchor.time + (index - previousAnchor.index)
+      : realTime;
+    const normalizedTime = Math.max(realTime, minimum);
+    displayTimes[index] = normalizedTime;
+    previousAnchor = { index, time: normalizedTime };
+    realAnchorCount += 1;
+  }
+
+  const cycleTime = new Date(cycleTimestamp).getTime();
+  const cycleIsValid = Number.isFinite(cycleTime);
+  const tailIndex = displayTimes.length - 1;
+  if (cycleIsValid && displayTimes[tailIndex] == null) {
+    const minimum = previousAnchor
+      ? previousAnchor.time + (tailIndex - previousAnchor.index)
+      : cycleTime;
+    const terminalTime = Math.max(cycleTime, minimum);
+    displayTimes[tailIndex] = terminalTime;
+    previousAnchor = { index: tailIndex, time: terminalTime };
+  }
+
+  const anchors: Array<{ index: number; time: number }> = [];
+  for (let index = 0; index < displayTimes.length; index++) {
+    const time = displayTimes[index];
+    if (time != null) anchors.push({ index, time });
+  }
+  if (anchors.length === 0) return displayTimes;
+
+  const first = anchors[0];
+  const leadStep = realAnchorCount === 0 && cycleIsValid && first.index > 0
+    ? 60_000 / first.index
+    : 1_000;
+  for (let index = first.index - 1; index >= 0; index--) {
+    displayTimes[index] = first.time - leadStep * (first.index - index);
+  }
+
+  for (let anchorIndex = 0; anchorIndex < anchors.length - 1; anchorIndex++) {
+    const start = anchors[anchorIndex];
+    const end = anchors[anchorIndex + 1];
+    const steps = end.index - start.index;
+    for (let offset = 1; offset < steps; offset++) {
+      displayTimes[start.index + offset] = start.time + ((end.time - start.time) * offset) / steps;
+    }
+  }
+
+  const last = anchors[anchors.length - 1];
+  for (let index = last.index + 1; index < displayTimes.length; index++) {
+    displayTimes[index] = last.time + (index - last.index) * 1_000;
+  }
+
+  return displayTimes;
+}
+
 export function HuntPipelineArrows({
   cycle,
   actions,
@@ -169,71 +235,16 @@ export function HuntPipelineArrows({
     realMs: msOf("HUNT_COMPLETE") ?? msOf("CYCLE_COMPLETED"),
   });
 
-  // ── Fill timestamp gaps ──────────────────────────────────────────────
-  //
-  // A committed hunt always has a start and an end in real time — but the
-  // intermediate nodes can be missing from the agent_actions log (rows with
-  // null cycle_id that fell outside the fallback window, or writes lost to
-  // transient DB errors). Rather than rendering "—" placeholders we
-  // synthesize plausible timestamps by linearly interpolating between the
-  // real anchors we DO have, so the canonical diagram looks fully populated.
-  //
-  //   Anchors (in priority order):
-  //     • first real realMs in the node list → pipeline start
-  //     • last real realMs in the node list → pipeline end (usually HCS)
-  //     • cycle.timestamp (commit time)   → terminal "Sealed" anchor
-  //
-  //   When no anchors exist at all (stale legacy rows), fall back to
-  //   cycle.timestamp - 60s as the start so the diagram still renders a
-  //   monotonically-increasing sequence of times.
-  const realMsValues = nodes
-    .map((n) => n.realMs)
-    .filter((v): v is number => v != null && Number.isFinite(v));
-  const parsedCycleEndMs = new Date(cycle.timestamp).getTime();
-  const cycleEndMs = Number.isFinite(parsedCycleEndMs)
-    ? parsedCycleEndMs
-    : realMsValues.length > 0
-      ? Math.max(...realMsValues)
-      : 0;
-  const anchorStart = realMsValues.length > 0 ? Math.min(...realMsValues) : cycleEndMs - 60_000;
-  const anchorEnd = realMsValues.length > 0 ? Math.max(...realMsValues, cycleEndMs) : cycleEndMs;
-  const totalSpan = Math.max(anchorEnd - anchorStart, (nodes.length - 1) * 1000); // at least 1s/node
-
-  // Walk once to stamp every node. For gaps, interpolate proportionally
-  // between the previous known time and the next known time (or, if there
-  // is no next known time, step forward by a fixed per-node delta).
-  // This yields strictly monotonic times that look organic.
-  const perNodeStep = totalSpan / Math.max(nodes.length - 1, 1);
-  let lastMs = anchorStart;
-  for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i];
-    if (node.realMs != null) {
-      lastMs = Math.max(node.realMs, lastMs + 1);
-      node.displayMs = lastMs;
-      continue;
-    }
-    // No real time — find the next known anchor to interpolate towards.
-    let nextReal: number | null = null;
-    let gap = 1;
-    for (let j = i + 1; j < nodes.length; j++) {
-      if (nodes[j].realMs != null) {
-        nextReal = nodes[j].realMs!;
-        gap = j - i + 1;
-        break;
-      }
-    }
-    const nextTarget = nextReal ?? anchorEnd;
-    // Step proportionally between lastMs and the next anchor.
-    const span = nextTarget - lastMs;
-    const step = gap > 1 ? span / gap : perNodeStep;
-    lastMs = Math.max(lastMs + Math.max(step, 1), lastMs + 1);
-    node.displayMs = lastMs;
-  }
-  // Ensure Sealed snaps to the real commit timestamp.
-  if (nodes.length > 0) {
-    const tail = nodes[nodes.length - 1];
-    if (tail.realMs == null) tail.displayMs = cycleEndMs;
-  }
+  // Fill gaps only from valid action or cycle anchors. With no valid anchor,
+  // every timestamp remains null and renders as unavailable rather than epoch.
+  const displayTimes = resolvePipelineDisplayTimes(
+    nodes.map((node) => node.realMs),
+    cycle.timestamp,
+  );
+  const renderedNodes: RenderedPipelineNode[] = nodes.map((node, index) => ({
+    ...node,
+    displayMs: displayTimes[index] ?? null,
+  }));
 
   return (
     <div className="rounded-xl border border-void-800 bg-void-950/50 p-4 overflow-x-auto">
@@ -241,7 +252,7 @@ export function HuntPipelineArrows({
         Pipeline (canonical)
       </p>
       <div className="flex flex-nowrap items-stretch gap-0 min-w-min pb-1">
-        {nodes.map((node, i) => (
+        {renderedNodes.map((node, i) => (
           <div key={node.key} className="flex items-center shrink-0">
             {i > 0 && (
               <span
@@ -253,7 +264,7 @@ export function HuntPipelineArrows({
             )}
             <div
               className={`rounded-xl border px-3 py-2.5 min-w-[88px] max-w-[200px] ${node.accent}`}
-              title={`${node.short}${node.sub ? ` · ${node.sub}` : ""} @ ${formatMs(node.displayMs)}${node.realMs == null ? " (interpolated)" : ""}`}
+              title={`${node.short}${node.sub ? ` · ${node.sub}` : ""} @ ${formatMs(node.displayMs)}${node.displayMs == null ? " (timestamp unavailable)" : node.realMs == null ? " (interpolated)" : ""}`}
             >
               <div className="text-xs sm:text-sm font-bold font-mono uppercase tracking-tight leading-tight flex items-center gap-1.5">
                 {node.emoji && <span>{node.emoji}</span>}
@@ -282,14 +293,15 @@ interface PipelineNode {
   accent: string;
   /** Real timestamp from agent_actions (ms epoch), or null when not logged. */
   realMs: number | null;
-  /** Final timestamp used for rendering — real when present, otherwise
-   *  interpolated between the real anchors in the same hunt. Always set
-   *  before the JSX render. */
-  displayMs?: number;
   emoji?: string;
 }
 
-function formatMs(ms: number | undefined): string {
+interface RenderedPipelineNode extends PipelineNode {
+  /** Render timestamp, interpolated only from valid anchors; null means unavailable. */
+  displayMs: number | null;
+}
+
+function formatMs(ms: number | null | undefined): string {
   if (ms == null || !Number.isFinite(ms)) return "—";
   return new Date(ms).toLocaleTimeString("en-US", {
     hour: "2-digit",

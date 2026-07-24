@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A1 independent-audit remediation G1
+
+- Recorded the independent `FIX` on A1 commit `c2359f766e61ea0d5b8735992de971101ee962bd` and used the single permitted remediation generation.
+- Made committed migrations the canonical README database setup path and labeled `prisma:push` noncanonical/disposable-development-only.
+- Upgraded the synthetic Cannes-shaped replay from a row-count check to expected sentinel identity plus exact Node SHA-256 equality over every deterministic row value before resolution and after deploy.
+- Relabeled inherited Cannes bounty statuses and the `$27K` estimate as prior-work claims, not current Lisbon eligibility, sponsor proof, release evidence, expected winnings, or production status.
+- Replaced epoch-zero timestamps for malformed no-anchor legacy rows with unavailable (`—`) while retaining deterministic interpolation whenever a valid cycle/action anchor exists.
+- Performed no sponsor call, shared/managed database effect, push, deployment, signature, transaction, form, spend, mainnet action, or claim promotion.
+
 ## 2026-07-24 - A1 deterministic foundation
 
 - Added real lint, typecheck, unit, integration, end-to-end, resilience, redaction, environment-validation, generated-output cleanup, and secret-scan commands plus minimal Node 22/PostgreSQL 14 CI.

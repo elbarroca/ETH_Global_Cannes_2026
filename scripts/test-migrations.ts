@@ -1,20 +1,114 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import { resolvePipelineDisplayTimes } from "../components/hunt/hunt-pipeline-arrows";
 import { isLoopbackDatabaseUrl } from "../src/config/env";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PRISMA = resolve(ROOT, "node_modules/.bin/prisma");
 const SCHEMA = resolve(ROOT, "prisma/schema.prisma");
 const BASELINE_MIGRATION = "20260724011500_baseline";
+const SENTINEL_ID = "a1-cannes-sentinel";
+const SENTINEL_WALLET = "0xa1cannessentinel";
+const SENTINEL_TIMESTAMP = "2026-07-24T00:00:00.000Z";
+
+type DatabaseClient = ReturnType<typeof postgres>;
 
 interface LocalPostgres {
   adminUrl: string;
   close: () => Promise<void>;
+}
+
+interface SentinelRow {
+  id: string;
+  wallet_address: string;
+  proxy_wallet: unknown;
+  telegram: unknown;
+  agent: unknown;
+  fund: unknown;
+  inft_token_id: number | null;
+  created_at: string;
+  updated_at: string;
+  hot_wallet_index: number | null;
+  hot_wallet_address: string | null;
+}
+
+interface SentinelSnapshot {
+  id: string;
+  walletAddress: string;
+  sha256: string;
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error("sentinel snapshot contains a non-finite number");
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
+      left.localeCompare(right),
+    );
+    return `{${entries
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
+      .join(",")}}`;
+  }
+  throw new Error("sentinel snapshot contains a non-JSON value");
+}
+
+function verifyPipelineTimestampFallback(): void {
+  const unavailable = resolvePipelineDisplayTimes([null, null, null], "malformed-timestamp");
+  if (unavailable.some((time) => time !== null)) {
+    throw new Error("malformed pipeline without anchors must render timestamps unavailable");
+  }
+
+  const actionAnchored = resolvePipelineDisplayTimes([1_000, null, null], "malformed-timestamp");
+  if (canonicalJson(actionAnchored) !== canonicalJson([1_000, 2_000, 3_000])) {
+    throw new Error("pipeline action-anchor interpolation is not deterministic");
+  }
+
+  const cycleAnchored = resolvePipelineDisplayTimes(
+    [null, null, null],
+    "1970-01-01T00:02:00.000Z",
+  );
+  if (canonicalJson(cycleAnchored) !== canonicalJson([60_000, 90_000, 120_000])) {
+    throw new Error("pipeline cycle-anchor interpolation is not deterministic");
+  }
+}
+
+async function snapshotSentinel(sql: DatabaseClient): Promise<SentinelSnapshot> {
+  const rows = await sql<SentinelRow[]>`
+    SELECT
+      id,
+      wallet_address,
+      proxy_wallet,
+      telegram,
+      agent,
+      fund,
+      inft_token_id,
+      to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+      to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated_at,
+      hot_wallet_index,
+      hot_wallet_address
+    FROM users
+    WHERE id = ${SENTINEL_ID}
+  `;
+  if (rows.length !== 1) throw new Error("synthetic Cannes sentinel identity is missing or duplicated");
+
+  const row = rows[0];
+  if (row.id !== SENTINEL_ID || row.wallet_address !== SENTINEL_WALLET) {
+    throw new Error("synthetic Cannes sentinel identity does not match the expected fixture");
+  }
+  const sha256 = createHash("sha256").update(canonicalJson(row)).digest("hex");
+  return { id: row.id, walletAddress: row.wallet_address, sha256 };
 }
 
 function redactUrls(value: string): string {
@@ -118,7 +212,7 @@ async function dropDatabase(adminUrl: string, database: string): Promise<void> {
   }
 }
 
-async function prepareCannesShape(url: string): Promise<void> {
+async function prepareCannesShape(url: string): Promise<SentinelSnapshot> {
   run(PRISMA, ["db", "push", "--skip-generate", "--schema", SCHEMA], prismaEnv(url));
   const sql = postgres(url, { max: 1 });
   try {
@@ -129,15 +223,59 @@ async function prepareCannesShape(url: string): Promise<void> {
     `);
     await sql`SELECT setval('hot_wallet_index_seq', 42, true)`;
     await sql`
-      INSERT INTO users (id, wallet_address)
-      VALUES ('a1-cannes-sentinel', '0xa1cannessentinel')
+      INSERT INTO users (
+        id,
+        wallet_address,
+        proxy_wallet,
+        telegram,
+        agent,
+        fund,
+        inft_token_id,
+        created_at,
+        updated_at,
+        hot_wallet_index,
+        hot_wallet_address
+      )
+      VALUES (
+        ${SENTINEL_ID},
+        ${SENTINEL_WALLET},
+        ${sql.json({ walletId: "a1-wallet-id", address: "0xa1proxy" })},
+        ${sql.json({
+          chatId: "a1-chat",
+          username: "a1-sentinel",
+          verified: true,
+          notifyPreference: "every_cycle",
+        })},
+        ${sql.json({
+          active: false,
+          goal: "synthetic-cannes-shape",
+          cycleCount: 3,
+          cyclesRemaining: 2,
+          lastCycleAt: "2026-07-23T23:00:00.000Z",
+          lastCycleId: 17,
+          riskProfile: "balanced",
+          maxTradePercent: 10,
+        })},
+        ${sql.json({ currentNav: 123.45, depositedUsdc: 100, htsShareBalance: 10 })},
+        101,
+        ${SENTINEL_TIMESTAMP},
+        ${SENTINEL_TIMESTAMP},
+        42,
+        '0xa1hotwallet'
+      )
     `;
+    return await snapshotSentinel(sql);
   } finally {
     await sql.end({ timeout: 1 });
   }
 }
 
-async function verifyDatabase(url: string, expectedUsers: number, expectedNextSequenceValue: number): Promise<void> {
+async function verifyDatabase(
+  url: string,
+  expectedUsers: number,
+  expectedNextSequenceValue: number,
+  expectedSentinel: SentinelSnapshot | null,
+): Promise<void> {
   run(PRISMA, ["migrate", "status", "--schema", SCHEMA], prismaEnv(url));
   const sql = postgres(url, { max: 1 });
   try {
@@ -195,12 +333,24 @@ async function verifyDatabase(url: string, expectedUsers: number, expectedNextSe
     if (Number(nextRows[0]?.next_value) !== expectedNextSequenceValue) {
       throw new Error("disposable database failed sequence-state preservation check");
     }
+    if (expectedSentinel) {
+      const observedSentinel = await snapshotSentinel(sql);
+      if (
+        observedSentinel.id !== expectedSentinel.id ||
+        observedSentinel.walletAddress !== expectedSentinel.walletAddress ||
+        observedSentinel.sha256 !== expectedSentinel.sha256
+      ) {
+        throw new Error("synthetic Cannes sentinel identity or value hash changed across baseline resolution");
+      }
+      console.log(`Synthetic Cannes sentinel preserved: sha256=${observedSentinel.sha256}`);
+    }
   } finally {
     await sql.end({ timeout: 1 });
   }
 }
 
 async function main(): Promise<void> {
+  verifyPipelineTimestampFallback();
   const suppliedUrl = process.env.TEST_DATABASE_URL;
   const local = suppliedUrl ? null : await startLocalPostgres();
   const adminUrl = suppliedUrl ?? local?.adminUrl;
@@ -220,16 +370,16 @@ async function main(): Promise<void> {
     await createDatabase(adminUrl, cannesDatabase);
 
     run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(emptyUrl));
-    await verifyDatabase(emptyUrl, 0, 1);
+    await verifyDatabase(emptyUrl, 0, 1, null);
 
-    await prepareCannesShape(cannesUrl);
+    const sentinelBeforeResolution = await prepareCannesShape(cannesUrl);
     run(
       PRISMA,
       ["migrate", "resolve", "--applied", BASELINE_MIGRATION, "--schema", SCHEMA],
       prismaEnv(cannesUrl),
     );
     run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(cannesUrl));
-    await verifyDatabase(cannesUrl, 1, 43);
+    await verifyDatabase(cannesUrl, 1, 43, sentinelBeforeResolution);
 
     console.log("Migration replay passed: empty deploy and Cannes-shaped baseline resolution");
   } finally {
