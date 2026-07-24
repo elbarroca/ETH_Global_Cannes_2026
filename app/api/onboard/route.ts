@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const result = await authenticateRequest(request);
+    const result = await authenticateRequest(request, { requiredAction: "onboard" });
     if (!result.ok) return result.response;
 
     const text = await request.text();

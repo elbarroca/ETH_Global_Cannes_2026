@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { privateKeyToAccount } from "viem/accounts";
 import { AuthError } from "../../src/auth/errors";
+import { authenticateRequest, extractSessionToken } from "../../src/auth/http";
 import { getAuthPolicy } from "../../src/auth/policy";
 import {
   createAuthChallenge,
@@ -20,8 +21,10 @@ import {
 
 const PRIVATE_KEY = `0x${"11".repeat(32)}` as const;
 const OTHER_PRIVATE_KEY = `0x${"22".repeat(32)}` as const;
+const ACTION_PRIVATE_KEY = `0x${"33".repeat(32)}` as const;
 const account = privateKeyToAccount(PRIVATE_KEY);
 const otherAccount = privateKeyToAccount(OTHER_PRIVATE_KEY);
+const actionAccount = privateKeyToAccount(ACTION_PRIVATE_KEY);
 let database: DisposableDatabase;
 
 before(async () => {
@@ -232,4 +235,121 @@ test("verification route issues an HttpOnly SameSite cookie without exposing its
     SELECT token_hash FROM auth_sessions WHERE challenge_id = ${challenge.id}::uuid
   `;
   assert.equal(rows[0]?.token_hash, sha256(token));
+});
+
+test("authenticate sessions cannot onboard while an onboard authorization can", async () => {
+  const policy = getAuthPolicy();
+  const authenticateChallenge = await createAuthChallenge(
+    { walletAddress: actionAccount.address, action: "authenticate" },
+    policy,
+    { sql: database.sql },
+  );
+  const authenticateSignature = await actionAccount.signMessage({
+    message: authenticateChallenge.message,
+  });
+  const authenticated = await verifyAuthChallenge(
+    {
+      challengeId: authenticateChallenge.id,
+      message: authenticateChallenge.message,
+      signature: authenticateSignature,
+    },
+    policy,
+    { sql: database.sql },
+  );
+  const rejected = await onboardRoute(new Request("http://localhost:3000/api/onboard", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${authenticated.token}`,
+      "content-type": "application/json",
+    },
+    body: "{}",
+  }));
+  assert.equal(rejected.status, 403);
+  assert.equal((await rejected.json() as { code: string }).code, "AUTH_ACTION_REQUIRED");
+  const before = await database.sql<{ count: string }[]>`
+    SELECT count(*)::text AS count FROM users WHERE wallet_address = ${actionAccount.address.toLowerCase()}
+  `;
+  assert.equal(before[0]?.count, "0");
+
+  const onboardChallenge = await createAuthChallenge(
+    { walletAddress: actionAccount.address, action: "onboard" },
+    policy,
+    { sql: database.sql },
+  );
+  const onboardSignature = await actionAccount.signMessage({ message: onboardChallenge.message });
+  const onboardAuthorization = await verifyAuthChallenge(
+    {
+      challengeId: onboardChallenge.id,
+      message: onboardChallenge.message,
+      signature: onboardSignature,
+    },
+    policy,
+    { sql: database.sql },
+  );
+  const accepted = await onboardRoute(new Request("http://localhost:3000/api/onboard", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${onboardAuthorization.token}`,
+      "content-type": "application/json",
+    },
+    body: "{}",
+  }));
+  assert.equal(accepted.status, 201);
+  assert.equal(
+    (await accepted.json() as { walletAddress: string }).walletAddress,
+    actionAccount.address.toLowerCase(),
+  );
+
+  const protectedWithOnboard = await authenticateRequest(new Request("http://localhost:3000", {
+    headers: { authorization: `Bearer ${onboardAuthorization.token}` },
+  }), { requireUser: true });
+  assert.equal(protectedWithOnboard.ok, false);
+  if (protectedWithOnboard.ok) throw new Error("TEST_ONBOARD_SESSION_UNEXPECTEDLY_AUTHORIZED");
+  assert.equal(protectedWithOnboard.response.status, 403);
+
+  const freshChallenge = await createAuthChallenge(
+    { walletAddress: actionAccount.address, action: "authenticate" },
+    policy,
+    { sql: database.sql },
+  );
+  const freshSignature = await actionAccount.signMessage({ message: freshChallenge.message });
+  const freshAuthorization = await verifyAuthChallenge(
+    {
+      challengeId: freshChallenge.id,
+      message: freshChallenge.message,
+      signature: freshSignature,
+    },
+    policy,
+    { sql: database.sql },
+  );
+  const protectedWithFreshAuth = await authenticateRequest(new Request("http://localhost:3000", {
+    headers: { authorization: `Bearer ${freshAuthorization.token}` },
+  }), { requireUser: true });
+  assert.equal(protectedWithFreshAuth.ok, true);
+});
+
+test("malformed percent-encoded session cookies fail closed without mutation", async () => {
+  const before = await database.sql<{ users: string; sessions: string }[]>`
+    SELECT
+      (SELECT count(*)::text FROM users) AS users,
+      (SELECT count(*)::text FROM auth_sessions) AS sessions
+  `;
+  const request = new Request("http://localhost:3000/api/onboard", {
+    method: "POST",
+    headers: {
+      cookie: "alphadawg_session=%E0%A4%A",
+      "content-type": "application/json",
+    },
+    body: "{}",
+  });
+  assert.equal(extractSessionToken(request), null);
+  const response = await onboardRoute(request);
+  assert.equal(response.status, 401);
+  assert.equal((await response.json() as { code: string }).code, "AUTH_REQUIRED");
+  const after = await database.sql<{ users: string; sessions: string }[]>`
+    SELECT
+      (SELECT count(*)::text FROM users) AS users,
+      (SELECT count(*)::text FROM auth_sessions) AS sessions
+  `;
+  assert.deepEqual(after[0], before[0]);
 });

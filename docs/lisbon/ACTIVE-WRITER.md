@@ -4,6 +4,64 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator task /root
+task_id: A2-AUTHENTICATED-KERNEL-REMEDIATION-G1-20260724
+task_instance_id: A2-AUTHENTICATED-KERNEL-REMEDIATION-G1-20260724:E170CD9A
+generation: 1
+sprint: A2_remediation
+mode: sole_writer
+branch: developer
+start_sha: 2f623a25fbbf4d226657a439a3ed3bbf47cfc7a7
+control_sha: 2f623a25fbbf4d226657a439a3ed3bbf47cfc7a7
+token: E170CD9A-E7F3-4F1D-AA9A-CCA93C32437C
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T03:32:59Z
+expires_at: 2026-07-24T07:01:17Z
+allowed_paths:
+  - src/worker/**
+  - src/kernel/service.ts
+  - src/auth/service.ts
+  - app/api/onboard/route.ts
+  - src/auth/http.ts
+  - tests/integration/**
+  - tests/auth/**
+  - tests/kernel/**
+  - docs/lisbon/evidence/A2-AUTHENTICATED-KERNEL.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+scope_amendments:
+  - authorized_at_utc: 2026-07-24T03:05:31Z
+    path: src/kernel/service.ts
+    reason: queued cancellation owns the atomic PENDING-or-RUNNING effect terminalization needed after a transient worker requeue
+  - authorized_at_utc: 2026-07-24T03:25:59Z
+    path: src/auth/service.ts
+    reason: fresh authenticate sessions must resolve an existing unique wallet-to-user mapping without creating a user or weakening action checks
+started_at: 2026-07-24T03:01:17Z
+expected_exit: fence every worker mutation by current claim authority, close auth-action and cookie parsing gaps, pass full cold gate, and return one atomic remediation commit
+lock_release: release only token E170CD9A-E7F3-4F1D-AA9A-CCA93C32437C after the atomic A2 remediation commit
+completed_at: 2026-07-24T03:32:59Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - stale A heartbeat success failure retry and finalization were rejected after B reclaimed the exact job with zero observed mutation to B claim state
+  - B alone terminalized one effect receipt settlement and commission after reclaim
+  - heartbeat lease loss suppressed terminal persistence hook finalization and financial mutation
+  - transient retry then queued cancellation left no terminal job with a nonterminal effect and created one refund
+  - authenticate action could not onboard onboard action could and fresh authenticate resolved the existing user for normal protected use
+  - malformed percent cookie returned 401 with user and session counts unchanged
+  - cold install Prisma lint typecheck all A1 and A2 tests migration replay secret scan boot smoke and 31-page build passed
+  - no schema migration package lockfile README sponsor shared database deployment push signature transaction form spend mainnet action or claim promotion change occurred
+remaining_blocks:
+  - production adapter remains A3_NOT_CONFIGURED
+  - pinned remediation exit re-audit is pending
+  - README.md line 7 remains RELEASE_CLAIM_DRIFT_BLOCKED outside remediation scope
+audit_verdict: pending_pinned_exit_reaudit
+result: PASS_TO_REAUDIT
+status: closed
+```
+
+```yaml
+owner: C0 coordinator task /root
 task_id: A2-AUTHENTICATED-KERNEL-20260724
 task_instance_id: A2-AUTHENTICATED-KERNEL-20260724:3920D88F
 sprint: A2

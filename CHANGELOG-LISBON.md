@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A2 independent-audit remediation G1
+
+- Fenced worker success, failure, retry, heartbeat, and terminalization with the current lease owner, worker epoch, exact job claim version/effect identity, and unexpired database leases; gave reconciliation separate exact-expired-version authority.
+- Added deterministic A→expiry/reconcile→B reclaim coverage proving every late A mutation is rejected without changing B's claim, B alone terminalizes one effect, and heartbeat lease loss cannot persist or finalize.
+- Made queued cancellation atomically terminalize either a pending or retry-running effect, assert that no nonterminal effect remains, and only then refund; added the terminal-job/effect consistency regression.
+- Enforced SIWE `onboard` action for onboarding and fresh `authenticate` action for normal protected use; fresh sessions resolve only an existing unique wallet/user mapping, while malformed target-cookie encoding fails closed without mutation.
+- Repeated the full cold local gate: 0 lint errors with 23 inherited warnings; unit 9/9, auth 7/7, kernel 13/13, integration 5/5 plus both migration lanes, e2e 4/4, resilience 1/1, redaction 3/3, protected boot, secret scan, entrypoint syntax, and 31/31-page production build passed.
+- Performed no schema/migration/package/lockfile/README change, sponsor call, shared/managed database effect, deployment, push, user signature, network transaction, form, spend, mainnet action, or claim promotion. A2 remains local-only and requires pinned-SHA re-audit.
+
 ## 2026-07-24 - A2 authenticated commerce kernel
 
 - Added canonical SIWE challenge/verification with explicit domain, chain, wallet, action, nonce, audience, URI, issued-at, and expiry binding; one-time transactional consume; hash-only opaque sessions; HttpOnly/SameSite cookies; and bearer support.

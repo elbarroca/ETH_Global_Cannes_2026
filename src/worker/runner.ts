@@ -27,9 +27,14 @@ export interface WorkerRunOptions {
   afterTerminalEffectPersisted?: (job: ClaimedJob) => Promise<void>;
 }
 
-async function processClaimedJob(job: ClaimedJob, options: WorkerRunOptions): Promise<void> {
+async function processClaimedJob(
+  job: ClaimedJob,
+  options: WorkerRunOptions,
+  leaseLost: () => boolean,
+): Promise<void> {
   const adapter = options.adapter ?? new ProtectedA3Adapter();
   if (adapter.key !== job.adapterKey) throw new Error("WORKER_ADAPTER_POLICY_MISMATCH");
+  if (leaseLost()) return;
   let result;
   try {
     result = await adapter.execute({
@@ -39,14 +44,17 @@ async function processClaimedJob(job: ClaimedJob, options: WorkerRunOptions): Pr
       input: job.input,
     });
   } catch {
+    if (leaseLost()) return;
     await requeueAfterTransientFailure(job, { now: options.now, sql: options.sql });
     return;
   }
+  if (leaseLost()) return;
+  let persisted = false;
   if (result.ok) {
     const proofHash = /^[0-9a-f]{64}$/.test(result.proofHash)
       ? result.proofHash
       : domainHash("adapter-proof", result.proofHash);
-    await persistSuccessfulEffect(job, result.result, proofHash, {
+    persisted = await persistSuccessfulEffect(job, result.result, proofHash, {
       now: options.now,
       sql: options.sql,
     });
@@ -54,10 +62,15 @@ async function processClaimedJob(job: ClaimedJob, options: WorkerRunOptions): Pr
     await requeueAfterTransientFailure(job, { now: options.now, sql: options.sql });
     return;
   } else {
-    await persistFailedEffect(job, result.errorCode, { now: options.now, sql: options.sql });
+    persisted = await persistFailedEffect(job, result.errorCode, {
+      now: options.now,
+      sql: options.sql,
+    });
   }
+  if (!persisted || leaseLost()) return;
   await options.afterTerminalEffectPersisted?.(job);
-  await finalizePersistedEffect(job.jobId, { now: options.now, sql: options.sql });
+  if (leaseLost()) return;
+  await finalizePersistedEffect(job, { now: options.now, sql: options.sql });
 }
 
 export async function runWorkerOnce(options: WorkerRunOptions): Promise<{
@@ -83,25 +96,40 @@ export async function runWorkerOnce(options: WorkerRunOptions): Promise<{
     options.leaseSeconds,
     { now: options.now, sql: options.sql },
   );
+  let leaseLost = false;
+  const activeJobs = new Map(jobs.map((job) => [job.jobId, job]));
+  const markLeaseLost = (code: string): void => {
+    if (leaseLost) return;
+    leaseLost = true;
+    console.error(JSON.stringify({
+      level: "error",
+      context: "kernel.worker.heartbeat",
+      code,
+    }));
+  };
   const heartbeatMs = Math.max(1_000, Math.floor(options.leaseSeconds * 1_000 / 3));
   const heartbeat = options.now || jobs.length === 0
     ? null
     : setInterval(() => {
+        const heartbeatJobs = [...activeJobs.values()];
+        if (heartbeatJobs.length === 0) return;
         void heartbeatClaimedJobs(
           options.ownerId,
-          jobs.map((job) => job.jobId),
+          heartbeatJobs,
           options.leaseSeconds,
           { sql: options.sql },
-        ).catch(() => {
-          console.error(JSON.stringify({
-            level: "error",
-            context: "kernel.worker.heartbeat",
-            code: "WORKER_HEARTBEAT_FAILED",
-          }));
-        });
+        ).then((renewed) => {
+          if (!renewed) markLeaseLost("WORKER_CLAIM_LOST");
+        }).catch(() => markLeaseLost("WORKER_HEARTBEAT_FAILED"));
       }, heartbeatMs);
   try {
-    await Promise.all(jobs.map((job) => processClaimedJob(job, options)));
+    await Promise.all(jobs.map(async (job) => {
+      try {
+        await processClaimedJob(job, options, () => leaseLost);
+      } finally {
+        activeJobs.delete(job.jobId);
+      }
+    }));
   } finally {
     if (heartbeat) clearInterval(heartbeat);
   }
@@ -126,7 +154,14 @@ export function startKernelWorker(options: {
         concurrency: options.concurrency,
         leaseSeconds: options.leaseSeconds,
       });
-      await heartbeatWorkerLease(ownerId, options.leaseSeconds);
+      const renewed = await heartbeatWorkerLease(ownerId, options.leaseSeconds);
+      if (!renewed) {
+        console.error(JSON.stringify({
+          level: "error",
+          context: "kernel.worker",
+          code: "WORKER_LEASE_LOST",
+        }));
+      }
     } catch (error) {
       const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
         ? error.message

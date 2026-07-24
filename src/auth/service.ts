@@ -252,10 +252,12 @@ export async function verifyAuthChallenge(
     }
     const sessions = await tx<SessionRow[]>`
       INSERT INTO auth_sessions (
-        id, challenge_id, token_hash, wallet_address, action, expires_at, created_at
+        id, challenge_id, token_hash, wallet_address, user_id, action, expires_at, created_at
       ) VALUES (
         ${sessionId}::uuid, ${challenge.id}::uuid, ${tokenHash},
-        ${challenge.walletAddress}, ${challenge.action}, ${sessionExpiresAt}, ${now}
+        ${challenge.walletAddress},
+        (SELECT id FROM users WHERE wallet_address = ${challenge.walletAddress}),
+        ${challenge.action}, ${sessionExpiresAt}, ${now}
       )
       RETURNING id, wallet_address, user_id, action, expires_at
     `;

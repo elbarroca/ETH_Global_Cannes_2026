@@ -187,7 +187,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
       assert.equal(new Set(claimed.map((job) => job.jobId)).size, 4);
       assert.equal(await heartbeatClaimedJobs(
         owner,
-        claimed.map((job) => job.jobId),
+        claimed,
         30,
         { now: new Date(BASE_TIME.getTime() + 20_000), sql: database.sql },
       ), true);
@@ -352,7 +352,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
       const amount = order[0];
       if (!amount) throw new Error("TEST_ORDER_NOT_FOUND");
       const race = await Promise.allSettled([
-        finalizePersistedEffect(job.jobId, { now, sql: database.sql }),
+        finalizePersistedEffect(job, { now, sql: database.sql }),
         database.sql`
           INSERT INTO refunds (job_id, amount_atomic, asset, reason_code, created_at)
           VALUES (${job.jobId}::uuid, ${amount.amount_atomic}::bigint, ${amount.asset}, 'RACE_REFUND', ${now})

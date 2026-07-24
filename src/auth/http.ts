@@ -3,7 +3,7 @@ import { validateEnvironment } from "../config/env";
 import { AuthError, safeErrorCode } from "./errors";
 import { getAuthPolicy } from "./policy";
 import { getSessionPrincipal, revokeSession } from "./service";
-import type { SessionPrincipal } from "./types";
+import type { AuthAction, SessionPrincipal } from "./types";
 
 export interface AuthenticatedRequest {
   principal: SessionPrincipal;
@@ -14,28 +14,47 @@ export type AuthResult =
   | { ok: true; auth: AuthenticatedRequest }
   | { ok: false; response: NextResponse };
 
-function cookieValue(header: string | null, name: string): string | null {
-  if (!header) return null;
+interface ParsedCookieValue {
+  found: boolean;
+  malformed: boolean;
+  value: string | null;
+}
+
+function cookieValue(header: string | null, name: string): ParsedCookieValue {
+  if (!header) return { found: false, malformed: false, value: null };
   for (const part of header.split(";")) {
     const [rawName, ...rawValue] = part.trim().split("=");
-    if (rawName === name) return decodeURIComponent(rawValue.join("="));
+    if (rawName !== name) continue;
+    try {
+      return { found: true, malformed: false, value: decodeURIComponent(rawValue.join("=")) };
+    } catch {
+      return { found: true, malformed: true, value: null };
+    }
   }
-  return null;
+  return { found: false, malformed: false, value: null };
 }
 
 export function extractSessionToken(request: Request): string | null {
   const policy = getAuthPolicy();
   const authorization = request.headers.get("authorization");
+  const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
   const bearerMatch = authorization?.match(/^Bearer ([A-Za-z0-9_-]{43})$/);
   const bearer = bearerMatch?.[1] ?? null;
-  const cookie = cookieValue(request.headers.get("cookie"), policy.sessionCookie);
+  const parsedCookie = cookieValue(request.headers.get("cookie"), policy.sessionCookie);
+  if (parsedCookie.malformed) return null;
+  if (parsedCookie.found && !tokenPattern.test(parsedCookie.value ?? "")) return null;
+  const cookie = parsedCookie.value;
   if (bearer && cookie && bearer !== cookie) return null;
   return bearer ?? cookie;
 }
 
 export async function authenticateRequest(
   request: Request,
-  options: { requireUser?: boolean; claimedUserId?: string | null } = {},
+  options: {
+    requireUser?: boolean;
+    claimedUserId?: string | null;
+    requiredAction?: AuthAction;
+  } = {},
 ): Promise<AuthResult> {
   const token = extractSessionToken(request);
   if (!token) {
@@ -54,6 +73,16 @@ export async function authenticateRequest(
       response: NextResponse.json(
         { error: "Session is invalid or expired", code: "AUTH_SESSION_EXPIRED" },
         { status: 401 },
+      ),
+    };
+  }
+  const requiredAction = options.requiredAction ?? (options.requireUser ? "authenticate" : null);
+  if (requiredAction && principal.action !== requiredAction) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Fresh authorization is required for this action", code: "AUTH_ACTION_REQUIRED" },
+        { status: 403 },
       ),
     };
   }

@@ -394,11 +394,21 @@ export async function cancelBuyerJob(
             lease_owner = NULL, lease_expires_at = NULL, updated_at = ${now}
         WHERE id = ${jobId}::uuid AND state = 'QUEUED' AND version = ${job.version}
       `;
-      await tx`
+      const canceledEffects = await tx<{ id: string }[]>`
         UPDATE effects
         SET state = 'CANCELED', terminal_at = ${now}, error_code = 'JOB_CANCELED', updated_at = ${now}
-        WHERE job_id = ${jobId}::uuid AND state = 'PENDING'
+        WHERE job_id = ${jobId}::uuid AND state IN ('PENDING', 'RUNNING')
+        RETURNING id
       `;
+      if (canceledEffects.length !== 1) throw new Error("KERNEL_EFFECT_CANCEL_INVARIANT");
+      const nonterminalEffects = await tx<{ count: string }[]>`
+        SELECT count(*)::text AS count
+        FROM effects
+        WHERE job_id = ${jobId}::uuid AND state IN ('PENDING', 'RUNNING')
+      `;
+      if (nonterminalEffects[0]?.count !== "0") {
+        throw new Error("KERNEL_EFFECT_TERMINALITY_INVARIANT");
+      }
       await tx`
         INSERT INTO job_events (job_id, version, event_type, from_state, to_state, payload, created_at)
         VALUES (${jobId}::uuid, ${nextVersion}, 'JOB_CANCELED', 'QUEUED', 'CANCELED', ${tx.json({})}, ${now})
