@@ -2,6 +2,16 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A3 strict 0G fixture and integration
+
+- Replaced the authoritative `A3_NOT_CONFIGURED` worker seam with a disabled-by-default strict 0G adapter while retaining the old protected adapter only as an explicit A2 compatibility fixture.
+- Added exact creator/buyer/version/manifest/input/provider/model/nonce/deadline/policy/job/effect request binding, fatal signed-text UTF-8 equality, acknowledged separated-TEE signer validation, exact response/signature schemas, and removal of malformed-proof re-hashing.
+- Added a unique-by-effect staged A3 journal with immutable bindings/evidence, legal versioned transitions, current owner+epoch+claim-version fencing at every mutation, ambiguous-dispatch refusal, and zero-repeat crash recovery.
+- Added a Go `1.23.10` stdin/stdout verifier pinned to official `0g-storage-client v1.3.0`; production uses a non-FullTrusted indexer and `Download(..., true)`, bounded temporary readback, exact canonical receipt/root/digest/size checks, and nonzero fail-closed exits.
+- Added server-only exact live provider/model/funding/cap gates; disabled and fixture paths load no broker/indexer and perform no funding call. CI now installs Go `1.23.10` and runs the Go/A3 lanes.
+- Passed 8/8 focused A3 TypeScript tests, two Go tests, combined integration 13/13 plus both three-migration replay lanes, and the full local cold gate. Fourteen terminal mutations created zero receipt, settlement, commission, rating, trade action, second effect, or fake proof.
+- Performed no sponsor/provider/indexer/RPC call, shared/managed database effect, upload, deployment, push, user signature, network transaction, form, spend, mainnet action, public identifier, live proof, or claim promotion. `PASS_LIVE`, release, and 0G qualification remain blocked.
+
 ## 2026-07-24 - A2 independent-audit remediation G1
 
 - Fenced worker success, failure, retry, heartbeat, and terminalization with the current lease owner, worker epoch, exact job claim version/effect identity, and unexpired database leases; gave reconciliation separate exact-expired-version authority.

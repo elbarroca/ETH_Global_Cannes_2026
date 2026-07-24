@@ -235,7 +235,7 @@ async function assertLease(
   return lease;
 }
 
-async function currentClaimHeld(
+export async function currentClaimHeld(
   tx: DatabaseClient,
   job: ClaimedJob,
   now: Date,
@@ -363,7 +363,7 @@ export async function persistSuccessfulEffect(
   job: ClaimedJob,
   result: CanonicalValue,
   proofHash: string,
-  options: { now?: Date; sql?: DatabaseClient } = {},
+  options: { now?: Date; sql?: DatabaseClient; requireA3Readback?: boolean } = {},
 ): Promise<boolean> {
   if (!/^[0-9a-f]{64}$/.test(proofHash)) throw new Error("WORKER_INVALID_PROOF_HASH");
   const sql = options.sql ?? getDb();
@@ -372,6 +372,22 @@ export async function persistSuccessfulEffect(
   return sql.begin(async (transaction) => {
     const tx = transactionClient(transaction);
     if (!(await currentClaimHeld(tx, job, now))) return false;
+    if (options.requireA3Readback) {
+      const journals = await tx<{ effect_id: string }[]>`
+        SELECT effect_id
+        FROM a3_execution_journals
+        WHERE effect_id = ${job.effectId}
+          AND job_id = ${job.jobId}::uuid
+          AND stage = 'READBACK_VERIFIED'
+          AND proof_hash = ${proofHash}
+          AND result = ${tx.json(result)}
+          AND readback_root = expected_root
+          AND readback_digest = expected_digest
+          AND readback_size = expected_size
+        FOR UPDATE
+      `;
+      if (journals.length !== 1) return false;
+    }
     const effects = await tx<{ id: string }[]>`
       UPDATE effects
       SET state = 'SUCCEEDED', result_hash = ${resultHash}, result = ${tx.json(result)},

@@ -546,3 +546,51 @@ model WorkerLease {
 
   @@map("worker_leases")
 }
+
+model A3ExecutionJournal {
+  effectId             String    @id @map("effect_id")
+  jobId                String    @unique @map("job_id") @db.Uuid
+  intentId             String    @map("intent_id") @db.Uuid
+  agentVersionId       String    @map("agent_version_id") @db.Uuid
+  schemaVersion        Int       @default(1) @map("schema_version")
+  version              Int       @default(0)
+  stage                String
+  creatorUserId        String    @map("creator_user_id")
+  creatorWallet        String    @map("creator_wallet")
+  buyerUserId          String    @map("buyer_user_id")
+  buyerWallet          String    @map("buyer_wallet")
+  agentVersionNumber   Int       @map("agent_version_number")
+  manifest             Json
+  manifestHash         String    @map("manifest_hash")
+  input                 Json
+  inputHash            String    @map("input_hash")
+  provider              String
+  model                 String
+  nonce                 String
+  deadlineAt            DateTime  @map("deadline_at") @db.Timestamptz(6)
+  policyVersion         String    @map("policy_version")
+  requestBytes          String    @map("request_bytes")
+  requestHash           String    @map("request_hash")
+  requestId             String?   @map("request_id")
+  signerAddress         String?   @map("signer_address")
+  responseContent       String?   @map("response_content")
+  responseHash          String?   @map("response_hash")
+  computeReceiptBytes   String?   @map("compute_receipt_bytes")
+  computeReceiptDigest  String?   @map("compute_receipt_digest")
+  storageReceiptBytes   String?   @map("storage_receipt_bytes")
+  storageReceiptDigest  String?   @map("storage_receipt_digest")
+  expectedRoot          String?   @map("expected_root")
+  expectedDigest        String?   @map("expected_digest")
+  expectedSize          Int?      @map("expected_size")
+  readbackRoot          String?   @map("readback_root")
+  readbackDigest        String?   @map("readback_digest")
+  readbackSize          Int?      @map("readback_size")
+  result                Json?
+  proofHash             String?   @map("proof_hash")
+  errorCode             String?   @map("error_code")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([jobId, stage], map: "idx_a3_journals_job_stage")
+  @@map("a3_execution_journals")
+}

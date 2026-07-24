@@ -136,3 +136,9 @@ Toolchain: Node `v22.22.3`, npm `10.9.8`, Prisma/Client `6.19.3`, TypeScript `5.
 - Inherited npm audit findings, routes outside the A2 mutation allowlist, rights/license/team/owner records, event-window classification, sponsor access/caps, live proofs, deployment, and independent release audit remain unresolved.
 
 External effects attempted: none. Sponsor calls: none. Managed/shared database effects: none. User signatures, transactions, forms, deployment, push, spend, mainnet value, and claim promotion: none.
+
+## A3 compatibility status — 2026-07-24
+
+Independent re-audit accepted A2 remediation at control SHA `dd336b840edb4de97fc382298c5a0c0c658f6f9f` before A3 opened. A3 preserves the A2 worker authority tuple and transactionally re-proves current lease owner, worker epoch, exact claim version/effect identity, and both expiries before every new journal mutation. Existing success/failure/requeue/finalization fencing remains unchanged except that strict success additionally requires an exact `READBACK_VERIFIED` A3 journal result and proof.
+
+The authoritative runner now defaults to the strict A3 adapter. `ProtectedA3Adapter` remains only as an explicit A2 compatibility fixture and still returns `A3_NOT_CONFIGURED`; it is no longer the default worker seam. Malformed adapter proof strings now fail instead of being re-hashed into valid-looking proof values. Exact A3 evidence is in [`A3-STRICT-0G.md`](A3-STRICT-0G.md).

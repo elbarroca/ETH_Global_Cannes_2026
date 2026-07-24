@@ -4,6 +4,64 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator task /root
+task_id: A3-STRICT-0G-FIXTURE-INTEGRATION-20260724
+task_instance_id: A3-STRICT-0G-FIXTURE-INTEGRATION-20260724:3EFB753E
+sprint: A3
+mode: sole_writer
+branch: developer
+start_sha: dd336b840edb4de97fc382298c5a0c0c658f6f9f
+control_sha: dd336b840edb4de97fc382298c5a0c0c658f6f9f
+token: 3EFB753E-44AB-4FC5-AC06-DF67929282E8
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T04:47:29Z
+expires_at: 2026-07-24T15:48:15Z
+allowed_paths:
+  - .env.example
+  - .github/workflows/ci.yml
+  - package.json
+  - prisma/schema.prisma
+  - prisma/migrations/<timestamp>_strict_0g/migration.sql
+  - scripts/test-migrations.ts
+  - src/config/env.ts
+  - src/config/og-compute.ts
+  - src/og/strict-a3.ts
+  - src/og/storage-verifier.ts
+  - src/worker/adapter.ts
+  - src/worker/runner.ts
+  - src/worker/store.ts
+  - tests/a3/**
+  - tests/integration/worker-fencing.test.ts
+  - tools/0g-storage-verifier/**
+  - docs/lisbon/evidence/A3-STRICT-0G.md
+  - docs/lisbon/evidence/A2-AUTHENTICATED-KERNEL.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-24T03:48:15Z
+expected_exit: strict offline 0G fixture and disposable-PostgreSQL A3 integration with durable claim-fenced recovery, live paths blocked, full gate, and one atomic commit
+lock_release: release only token 3EFB753E-44AB-4FC5-AC06-DF67929282E8 after the atomic A3 commit or a recorded BLOCKED closeout
+completed_at: 2026-07-24T04:47:29Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - strict Compute binds the exact canonical creator buyer version manifest input provider model nonce deadline policy intent job and effect request before single-use headers
+  - exactly one signature object is schema-checked verified by the installed verifier and UTF-8 byte-matched to accepted assistant content
+  - unique versioned journal stages are lineage-bound append-only claim-fenced and refuse ambiguous Compute or Storage redispatch
+  - pinned Go 1.23.10 verifier uses official 0g-storage-client v1.3.0 non-FullTrusted indexer construction and proof-enabled Download
+  - eight focused A3 TypeScript tests two Go tests combined integration thirteen of thirteen both migration lanes and the complete cold local gate passed
+  - fourteen terminal mutation cases created zero receipt settlement commission rating trade second effect or fake proof
+  - package-lock remained byte-identical and no sponsor provider indexer RPC shared database deployment push signature transaction form spend or claim promotion occurred
+remaining_blocks:
+  - independent pinned exit SHA audit is pending
+  - PASS_LIVE is NOT_RUN and LIVE_EFFECT_BLOCKED without exact authority public identifiers and proof-enabled live readback
+  - release claim rights event-window dependency README deployment and A7 gates remain blocked
+audit_verdict: pending_pinned_exit_audit
+result: PASS_FIXTURE_PASS_INTEGRATION_PASS_TO_AUDIT
+status: closed
+```
+
+```yaml
+owner: C0 coordinator task /root
 task_id: A2-AUTHENTICATED-KERNEL-REMEDIATION-G1-20260724
 task_instance_id: A2-AUTHENTICATED-KERNEL-REMEDIATION-G1-20260724:E170CD9A
 generation: 1

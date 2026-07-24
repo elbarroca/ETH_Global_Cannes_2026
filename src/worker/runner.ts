@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { domainHash } from "../kernel/canonical";
 import type { KernelAdapter } from "./adapter";
-import { ProtectedA3Adapter } from "./adapter";
+import { StrictA3Adapter } from "../og/strict-a3";
 import {
   acquireWorkerLease,
   claimJobs,
@@ -31,8 +30,9 @@ async function processClaimedJob(
   job: ClaimedJob,
   options: WorkerRunOptions,
   leaseLost: () => boolean,
+  signal: AbortSignal,
 ): Promise<void> {
-  const adapter = options.adapter ?? new ProtectedA3Adapter();
+  const adapter = options.adapter ?? new StrictA3Adapter({ sql: options.sql, now: options.now });
   if (adapter.key !== job.adapterKey) throw new Error("WORKER_ADAPTER_POLICY_MISMATCH");
   if (leaseLost()) return;
   let result;
@@ -40,8 +40,18 @@ async function processClaimedJob(
     result = await adapter.execute({
       effectId: job.effectId,
       jobId: job.jobId,
+      intentId: job.intentId,
+      buyerUserId: job.buyerUserId,
       agentVersionId: job.agentVersionId,
+      ownerUserId: job.ownerUserId,
+      leaseOwner: job.leaseOwner,
+      workerEpoch: job.workerEpoch,
+      claimVersion: job.claimVersion,
+      leaseExpiresAt: job.leaseExpiresAt,
+      attempt: job.attempt,
+      maxAttempts: job.maxAttempts,
       input: job.input,
+      signal,
     });
   } catch {
     if (leaseLost()) return;
@@ -51,13 +61,23 @@ async function processClaimedJob(
   if (leaseLost()) return;
   let persisted = false;
   if (result.ok) {
-    const proofHash = /^[0-9a-f]{64}$/.test(result.proofHash)
-      ? result.proofHash
-      : domainHash("adapter-proof", result.proofHash);
-    persisted = await persistSuccessfulEffect(job, result.result, proofHash, {
-      now: options.now,
-      sql: options.sql,
-    });
+    if (result.verified !== true) {
+      persisted = await persistFailedEffect(job, "A3_VERIFICATION_REQUIRED", {
+        now: options.now,
+        sql: options.sql,
+      });
+    } else if (!/^[0-9a-f]{64}$/.test(result.proofHash)) {
+      persisted = await persistFailedEffect(job, "A3_INVALID_PROOF_HASH", {
+        now: options.now,
+        sql: options.sql,
+      });
+    } else {
+      persisted = await persistSuccessfulEffect(job, result.result, result.proofHash, {
+        now: options.now,
+        sql: options.sql,
+        requireA3Readback: adapter.requiresVerifiedJournal === true,
+      });
+    }
   } else if (result.retryable) {
     await requeueAfterTransientFailure(job, { now: options.now, sql: options.sql });
     return;
@@ -98,9 +118,11 @@ export async function runWorkerOnce(options: WorkerRunOptions): Promise<{
   );
   let leaseLost = false;
   const activeJobs = new Map(jobs.map((job) => [job.jobId, job]));
+  const controllers = new Map(jobs.map((job) => [job.jobId, new AbortController()]));
   const markLeaseLost = (code: string): void => {
     if (leaseLost) return;
     leaseLost = true;
+    for (const controller of controllers.values()) controller.abort();
     console.error(JSON.stringify({
       level: "error",
       context: "kernel.worker.heartbeat",
@@ -125,9 +147,12 @@ export async function runWorkerOnce(options: WorkerRunOptions): Promise<{
   try {
     await Promise.all(jobs.map(async (job) => {
       try {
-        await processClaimedJob(job, options, () => leaseLost);
+        const controller = controllers.get(job.jobId);
+        if (!controller) throw new Error("WORKER_ABORT_CONTROLLER_MISSING");
+        await processClaimedJob(job, options, () => leaseLost, controller.signal);
       } finally {
         activeJobs.delete(job.jobId);
+        controllers.delete(job.jobId);
       }
     }));
   } finally {

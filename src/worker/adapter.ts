@@ -3,8 +3,18 @@ import type { CanonicalValue } from "../kernel/canonical";
 export interface AdapterExecutionRequest {
   effectId: string;
   jobId: string;
+  intentId: string;
+  buyerUserId: string;
   agentVersionId: string;
+  ownerUserId: string;
+  leaseOwner: string;
+  workerEpoch: string;
+  claimVersion: number;
+  leaseExpiresAt: Date;
+  attempt: number;
+  maxAttempts: number;
   input: { prompt: string };
+  signal: AbortSignal;
 }
 
 export type AdapterExecutionResult =
@@ -22,6 +32,7 @@ export type AdapterExecutionResult =
 
 export interface KernelAdapter {
   readonly key: "protected-a3";
+  readonly requiresVerifiedJournal?: boolean;
   execute(request: AdapterExecutionRequest): Promise<AdapterExecutionResult>;
 }
 

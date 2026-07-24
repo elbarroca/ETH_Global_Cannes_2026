@@ -14,6 +14,8 @@ const OPTIONAL_HTTP_URLS = [
   "FNG_API_URL",
 ] as const;
 
+const STRICT_A3_AUTHORIZATION_PREFIX = "0g-live-v1";
+
 type EnvironmentSource = Record<string, string | undefined>;
 
 export interface EnvironmentOptions {
@@ -38,7 +40,20 @@ export interface ValidatedEnvironment {
   authChallengeTtlSeconds: number;
   authSessionTtlSeconds: number;
   authSessionCookie: string;
+  strictA3: StrictA3Environment;
 }
+
+export type StrictA3Environment =
+  | { mode: "disabled" }
+  | {
+      mode: "live";
+      provider: string;
+      model: string;
+      rpcUrl: string;
+      storageIndexerUrl: string;
+      storageVerifierPath: string;
+      maxSpendAtomic: number;
+    };
 
 export class EnvironmentValidationError extends Error {
   readonly issues: readonly string[];
@@ -247,6 +262,76 @@ export function validateEnvironment(
     if (!source.SIWE_AUDIENCE) issues.push("SIWE_AUDIENCE: required in production");
   }
 
+  const strictA3LiveEnabled = parseBoolean(
+    "A3_0G_LIVE_ENABLED",
+    source.A3_0G_LIVE_ENABLED,
+    false,
+    issues,
+  );
+  let strictA3: StrictA3Environment = { mode: "disabled" };
+  if (strictA3LiveEnabled) {
+    const fundingAuthorized = parseBoolean(
+      "A3_0G_FUNDING_AUTHORIZED",
+      source.A3_0G_FUNDING_AUTHORIZED,
+      false,
+      issues,
+    );
+    if (!fundingAuthorized) {
+      issues.push("A3_0G_FUNDING_AUTHORIZED: exact live funding authorization is required");
+    }
+    const provider = source.OG_PROVIDER_ADDRESS?.toLowerCase() ?? "";
+    if (!/^0x[0-9a-f]{40}$/.test(provider)) {
+      issues.push("OG_PROVIDER_ADDRESS: expected an EVM address for strict A3 live mode");
+    }
+    const model = source.OG_COMPUTE_MODEL ?? "";
+    if (!/^[A-Za-z0-9._/-]{1,128}$/.test(model)) {
+      issues.push("OG_COMPUTE_MODEL: expected an exact bounded model identifier");
+    }
+    const maxSpendAtomic = parseInteger(
+      "A3_0G_MAX_SPEND_ATOMIC",
+      source.A3_0G_MAX_SPEND_ATOMIC,
+      0,
+      1,
+      1_000_000_000,
+      issues,
+    );
+    const expectedAuthorization =
+      `${STRICT_A3_AUTHORIZATION_PREFIX}:${provider}:${model}:${maxSpendAtomic}`;
+    if (source.A3_0G_SPEND_AUTHORIZATION !== expectedAuthorization) {
+      issues.push("A3_0G_SPEND_AUTHORIZATION: must bind the exact provider, model, and cap");
+    }
+    const rpcUrl = parseUrl("OG_RPC_URL", source.OG_RPC_URL, new Set(["https:"]), true, issues);
+    const storageIndexerUrl = parseUrl(
+      "OG_STORAGE_INDEXER",
+      source.OG_STORAGE_INDEXER,
+      new Set(["https:"]),
+      true,
+      issues,
+    );
+    const storageVerifierPath = source.OG_STORAGE_VERIFIER_PATH ?? "";
+    if (
+      !storageVerifierPath.startsWith("/") ||
+      storageVerifierPath.includes("\0") ||
+      storageVerifierPath.split("/").includes("..")
+    ) {
+      issues.push("OG_STORAGE_VERIFIER_PATH: expected an absolute normalized path");
+    }
+    if (!/^0x[0-9a-fA-F]{64}$/.test(source.OG_PRIVATE_KEY ?? "")) {
+      issues.push("OG_PRIVATE_KEY: required for strict A3 live mode");
+    }
+    if (provider && model && rpcUrl && storageIndexerUrl && storageVerifierPath) {
+      strictA3 = {
+        mode: "live",
+        provider,
+        model,
+        rpcUrl,
+        storageIndexerUrl,
+        storageVerifierPath,
+        maxSpendAtomic,
+      };
+    }
+  }
+
   if (issues.length > 0) throw new EnvironmentValidationError(issues);
 
   return {
@@ -267,6 +352,7 @@ export function validateEnvironment(
     authChallengeTtlSeconds,
     authSessionTtlSeconds,
     authSessionCookie,
+    strictA3,
   };
 }
 

@@ -41,6 +41,10 @@ jobs:
         with:
           cache: npm
           node-version: 22
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.10
+          cache-dependency-path: tools/0g-storage-verifier/go.sum
       - run: npm ci --legacy-peer-deps
       - run: npx prisma validate
       - run: npx prisma generate
@@ -50,6 +54,7 @@ jobs:
       - run: npm test
       - run: npm run test:auth
       - run: npm run test:kernel
+      - run: npm run test:go
       - run: npm run test:integration
       - run: npm run test:e2e
       - run: npm run test:resilience

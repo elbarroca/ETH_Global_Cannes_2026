@@ -14,6 +14,7 @@ const PRISMA = resolve(ROOT, "node_modules/.bin/prisma");
 const SCHEMA = resolve(ROOT, "prisma/schema.prisma");
 const BASELINE_MIGRATION = "20260724011500_baseline";
 const A2_MIGRATION = "20260724024500_authenticated_kernel";
+const A3_MIGRATION = "20260724041000_strict_0g";
 const BASELINE_SQL = resolve(ROOT, "prisma/migrations", BASELINE_MIGRATION, "migration.sql");
 const SENTINEL_ID = "a1-cannes-sentinel";
 const SENTINEL_WALLET = "0xa1cannessentinel";
@@ -287,10 +288,12 @@ async function verifyDatabase(
       jobs: string | null;
       effects: string | null;
       worker_leases: string | null;
+      a3_execution_journals: string | null;
       user_count: string;
       migration_count: string;
       baseline_count: string;
       a2_count: string;
+      a3_count: string;
       invariant_trigger_count: string;
       sequence_type: string;
       sequence_start: string;
@@ -308,6 +311,7 @@ async function verifyDatabase(
         to_regclass('public.jobs')::text AS jobs,
         to_regclass('public.effects')::text AS effects,
         to_regclass('public.worker_leases')::text AS worker_leases,
+        to_regclass('public.a3_execution_journals')::text AS a3_execution_journals,
         (SELECT count(*)::text FROM users) AS user_count,
         (
           SELECT count(*)::text
@@ -323,6 +327,10 @@ async function verifyDatabase(
           WHERE migration_name = ${A2_MIGRATION} AND finished_at IS NOT NULL
         ) AS a2_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A3_MIGRATION} AND finished_at IS NOT NULL
+        ) AS a3_count,
+        (
           SELECT count(*)::text FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN (
             'agent_versions_immutable_published',
@@ -331,7 +339,8 @@ async function verifyDatabase(
             'effects_legal_transitions',
             'settlements_exclusive_verified',
             'refunds_exclusive_terminal',
-            'commissions_verified_settlement_only'
+            'commissions_verified_settlement_only',
+            'a3_journals_legal_transitions'
           )
         ) AS invariant_trigger_count,
         seq.data_type AS sequence_type,
@@ -353,11 +362,13 @@ async function verifyDatabase(
       result.jobs !== "jobs" ||
       result.effects !== "effects" ||
       result.worker_leases !== "worker_leases" ||
+      result.a3_execution_journals !== "a3_execution_journals" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 2 ||
+      Number(result.migration_count) !== 3 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
-      Number(result.invariant_trigger_count) !== 7 ||
+      Number(result.a3_count) !== 1 ||
+      Number(result.invariant_trigger_count) !== 8 ||
       result.sequence_type !== "bigint" ||
       result.sequence_start !== "1" ||
       result.sequence_min !== "1" ||

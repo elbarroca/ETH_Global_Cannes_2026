@@ -1,13 +1,50 @@
 import { ethers } from "ethers";
 import { createRequire } from "node:module";
 
-// Force CJS resolution — the ESM build of @0glabs/0g-serving-broker is broken
-// (lib.esm/index.mjs references exports that don't exist in the bundled chunk)
-const require = createRequire(import.meta.url);
-const ogBrokerModule = require("@0glabs/0g-serving-broker");
+export interface OgService {
+  provider: string;
+  serviceType: string;
+  url: string;
+  model: string;
+  verifiability: string;
+  additionalInfo: string;
+  teeSignerAddress: string;
+  teeSignerAcknowledged: boolean;
+  inputPrice: bigint;
+  outputPrice: bigint;
+}
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OGBroker = any;
+export interface OGBroker {
+  inference: {
+    listService(offset?: number, limit?: number, includeUnacknowledged?: boolean): Promise<OgService[]>;
+    getServiceMetadata(providerAddress: string): Promise<{ endpoint: string; model: string }>;
+    getRequestHeaders(providerAddress: string, content?: string): Promise<Record<string, string>>;
+    checkProviderSignerStatus(providerAddress: string): Promise<{
+      isAcknowledged: boolean;
+      teeSignerAddress: string;
+    }>;
+    processResponse(providerAddress: string, chatId?: string, content?: string): Promise<boolean | null>;
+    startAutoFunding(providerAddress: string): Promise<void>;
+  };
+  ledger: {
+    depositFund(amount: number): Promise<void>;
+    transferFund(providerAddress: string, serviceType: string, amount: bigint): Promise<void>;
+  };
+}
+
+export interface OgInferenceVerifier {
+  fetchSignatureByChatID(
+    providerBrokerUrl: string,
+    chatId: string,
+    model: string,
+  ): Promise<{ text: string; signature: string }>;
+  verifySignature(message: string, signature: string, expectedAddress: string): boolean;
+}
+
+interface OgBrokerModule {
+  createZGComputeNetworkBroker(wallet: ethers.Wallet): Promise<OGBroker>;
+  InferenceVerifier: OgInferenceVerifier;
+}
 
 const OG_RPC_URL = process.env.OG_RPC_URL ?? "https://evmrpc-testnet.0g.ai";
 
@@ -17,7 +54,28 @@ export const OG_PROVIDER = process.env.OG_PROVIDER_ADDRESS!;
 let ogProviderInstance: ethers.JsonRpcProvider | null = null;
 let ogWalletInstance: ethers.Wallet | null = null;
 let brokerInstance: OGBroker | null = null;
+let brokerModuleInstance: OgBrokerModule | null = null;
 let autoFundingStarted = false;
+
+function getBrokerModule(): OgBrokerModule {
+  if (brokerModuleInstance) return brokerModuleInstance;
+  // Force CJS resolution only at the live boundary. The package's ESM build is
+  // broken, and disabled/fixture A3 execution must not import broker code.
+  const require = createRequire(import.meta.url);
+  const loaded: unknown = require("@0glabs/0g-serving-broker");
+  if (!loaded || typeof loaded !== "object") throw new Error("OG_BROKER_MODULE_INVALID");
+  const candidate = loaded as Partial<OgBrokerModule>;
+  if (
+    typeof candidate.createZGComputeNetworkBroker !== "function" ||
+    !candidate.InferenceVerifier ||
+    typeof candidate.InferenceVerifier.fetchSignatureByChatID !== "function" ||
+    typeof candidate.InferenceVerifier.verifySignature !== "function"
+  ) {
+    throw new Error("OG_BROKER_MODULE_INVALID");
+  }
+  brokerModuleInstance = candidate as OgBrokerModule;
+  return brokerModuleInstance;
+}
 
 function getPrivateKey(): string {
   const raw = process.env.OG_PRIVATE_KEY!;
@@ -40,7 +98,7 @@ export function getOgWallet(): ethers.Wallet {
 
 export async function getBroker(): Promise<OGBroker> {
   if (!brokerInstance) {
-    brokerInstance = await ogBrokerModule.createZGComputeNetworkBroker(getOgWallet());
+    brokerInstance = await getBrokerModule().createZGComputeNetworkBroker(getOgWallet());
 
     // Start auto-funding to prevent mid-cycle balance failures.
     // Gated behind ENABLE_BACKGROUND_WORKERS because startAutoFunding spawns an
@@ -61,4 +119,8 @@ export async function getBroker(): Promise<OGBroker> {
     }
   }
   return brokerInstance;
+}
+
+export function getInferenceVerifier(): OgInferenceVerifier {
+  return getBrokerModule().InferenceVerifier;
 }
