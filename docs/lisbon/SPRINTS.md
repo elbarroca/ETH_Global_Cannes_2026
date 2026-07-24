@@ -12,7 +12,7 @@ These are acceptance cards, not standalone prompts. C0 runs them in order using 
 | `A3` strict 0G | 3-5 h | Writer | A2 + 0G static gate | Verified inference and proof-enabled Storage readback are mandatory for delivery. |
 | `R0` agent and prompt readiness | 45-90 min | Control writer + read-only audit | Current controls | Every specialist has current paths/APIs, one non-overlapping domain, and complete A4-A7 acceptance coverage. |
 | `A4` ENS authority | 2-4 h | Writer | A3 + R0 + ENS static gate | Canonical creator authority and deterministic agent subnames gate publication, 0G, and delivery. |
-| `A5` product UI and E2E | 3-5 h | Writer | Accepted A4 | One protected creator -> publish -> different-buyer hire -> receipt path is usable, accessible, and automatically tested. |
+| `A5` product UI and E2E | 5-8 h | Writer | Accepted A4 | Creator -> publish -> external hire -> receipt, Telegram identity linking, required service health, and the UI are usable and automatically tested. |
 | `A6` optional Uniswap | max 4 h | Writer or CUT | Frozen A5 core + admission + 6 h reserve | Exact admitted contribution passes removal and live gates, or is cut untouched. |
 | `A7` release and submission | Remaining >=4 h | Writer | Required gates pass; A6 pass/cut | One SHA passes clean-clone release, two demos, deployment, evidence, and final audit. |
 
@@ -118,12 +118,17 @@ Deliver:
 - Derive creator/buyer identity server-side. A draft is not hireable; publish only the exact immutable version/name binding; changes create a new version. Define “deploy agent” as activating the application version/runtime, never as unproven contract or sponsor deployment.
 - Use only `/api/kernel/agents` and `/api/kernel/jobs` as protected authority. Legacy marketplace create/hire routes remain disabled or visibly non-authoritative.
 - Show connected wallet, creator name, agent subname, canonical state, owner/delegate, immutable version/price, publication/hire eligibility, job state, ENS authority, 0G verification, Storage proof, canonical receipt, and explicit failure/refusal states.
+- Bind Telegram to the authenticated app user through one short-lived, single-use code and private-chat numeric identity. Prove expiry, replay, cross-user, group-chat, forged-webhook, unlink/relink, and webhook-versus-polling refusal. Telegram commands use the same backend identity and never bypass the protected kernel.
+- Select exactly one Telegram receive mode. Production webhook mode requires a configured secret and durable/awaited command handling; production must never accept unsigned updates when the secret is absent.
+- Derive the expected agent/service fleet from one registry. Health requires fresh non-effectful checks plus exact release SHA/version; functional readiness requires separately authorized role-level smokes. UI badges never manufacture health.
+- Treat the observed `12/13 ONLINE`, stale wallet authorization, permanent Arc wait, and empty feed as regression cases. Identify the failed agent, prove wallet retry recovery, and show optional Arc as healthy or explicitly cut instead of loading forever.
 - Keep model output advisory. The UI cannot create authority, rewrite terminal state, or show success from mocks, cached flags, or missing evidence.
 - Add functional API/integration tests for the complete path and refusal cases.
 - Add one automated browser path with creator wallet A publishing an agent subname and buyer wallet B hiring its exact version through progress -> verified delivery -> receipt; cover self/cross-user refusal, forgery, stale authority, version substitution, duplicate hire, and replay no-op.
+- Add a browser-plus-bot path for web link-code generation -> Telegram `/start CODE` -> web linked-state refresh -> linked command -> same-user result/proof notification -> unlink. Tokens, codes, chat IDs, and PII never enter logs, screenshots, or fixtures.
 - Check desktop and mobile layouts, keyboard flow, labels, focus, loading, empty, error, offline, and long-content states. Capture same-SHA screenshots only after automation passes.
 
-Gate: build/start, functional tests, automated critical-path UI tests, accessibility baseline, and two local reset/replays pass without manual data repair.
+Gate: build/start, functional tests, automated critical-path UI tests, Telegram identity/security tests, required service health, accessibility baseline, zero required browser console/network errors, and two local reset/replays pass without manual data repair.
 
 ## A6 - optional Uniswap
 
@@ -150,6 +155,7 @@ Deliver:
 - Deploy web/API, PostgreSQL migration, and long-running worker from the same SHA only under exact current authorization. Expose non-secret release and evidence versions.
 - Run authorized live 0G and ENS smokes; run Uniswap only if A6 passed.
 - Prove the same creator parent, agent subname, immutable version, marketplace listing, external-buyer job, receipt, and release SHA across UI, API, worker, database, evidence, deployment, and video.
+- Prove the public app URL, Telegram receiver, worker, and every required agent report the same release SHA; verify Telegram webhook/polling state and an app-link command/result round-trip.
 - Run failure-first and success-plus-replay demos twice from resettable state within four minutes.
 - Complete current sponsor requirements, README/setup, prior-work disclosure, changelog, AI disclosure, public identifiers, demo script/video, and submission evidence.
 - Re-run `R0_AGENT_READY`, then run the current Lisbon Bounty Auditor on the frozen SHA. No critical/high finding may remain.

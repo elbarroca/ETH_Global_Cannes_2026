@@ -4,6 +4,47 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Codex under project-owner direction
+task_id: TELEGRAM-AGENT-UI-GOAL-20260724
+task_instance_id: TELEGRAM-AGENT-UI-GOAL-20260724:0EC63C69
+generation: 1
+sprint: A5_A7_control_extension
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: f876541f070b85294e7c6d95824eea911ab95fac
+control_sha: f876541f070b85294e7c6d95824eea911ab95fac
+token: TG-UI-GOAL-0EC63C69-7631-4D99-BF96-00E03B95EE04
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T21:25:18Z
+expires_at: 2026-07-24T22:25:18Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/SPRINTS.md
+  - docs/lisbon/prompts/C0-A4-CONTINUATION.md
+started_at: 2026-07-24T21:25:18Z
+expected_exit: add owner questions Telegram-to-app identity service deployment health and UI load gates to the canonical A5-A7 prompt
+external_effect_authority: local files checks and one atomic commit only; no push deploy webhook registration bot call managed migration sponsor call signature transaction spend or public claim
+completed_at: 2026-07-24T21:28:26Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - traced the existing Neon link-code Telegram deep-link bot webhook/polling health-registry and Playwright paths without calling Telegram or deployed services
+  - canonical A5 now requires atomic private-chat identity binding one receive mode same-user commands unlink/relink security tests and production webhook fail-closed behavior
+  - agent readiness derives the required fleet from one registry and requires fresh health exact release SHA plus separately authorized functional smokes
+  - screenshot states 12 of 13 online fresh authorization required indefinite Arc wait and empty activity are explicit regressions
+  - continuation prompt asks one non-secret owner question batch before effectful work and continues safe local preparation while answers are pending
+  - Markdown structure local links prompt fences diff check and tracked secret scan pass
+  - lint passed with zero errors and 23 inherited warnings; strict typecheck passed; foundation tests passed 9 of 9
+remaining_blocks:
+  - this changes the controlling prompt only; Telegram linking agent deployment wallet recovery and UI/runtime behavior are not yet implemented or live-validated
+  - owner answers and exact authorization rows remain required before push deploy webhook registration live health/function calls ENS/0G effects signatures transactions or spend
+audit_verdict: PASS_CONTROL_UPDATE_LOCAL_ONLY
+result: PASS_TELEGRAM_AGENT_UI_PROMPT_EXTENSION
+lock_release: release only matching token TG-UI-GOAL-0EC63C69-7631-4D99-BF96-00E03B95EE04 after one atomic commit and clean status
+status: closed
+```
+
+```yaml
+owner: Codex under project-owner direction
 task_id: ENSV2-GOAL-AND-A4-A7-PROMPT-20260724
 task_instance_id: ENSV2-GOAL-AND-A4-A7-PROMPT-20260724:B97B4AD3
 generation: 1

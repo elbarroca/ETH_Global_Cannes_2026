@@ -78,7 +78,7 @@ SETUP AND EVIDENCE STILL REQUIRED
 1. `R0_AGENT_READY`: repair and dry-dispatch all registered specialists; give ENS one explicit owner; update current Lisbon bounty criteria, real paths, and installed API versions.
 2. Reconcile the exact A4/A5 audit frontier without promoting writer prose.
 3. A4 ENSv2 compatibility: authenticated creator authority, canonical registry hierarchy, deterministic agent subname, permissions, resolver provenance, and pre/post execution checks.
-4. A5 protected creator -> immutable publication -> different-buyer hire -> verified receipt UI/API/browser journey using only the kernel authority path.
+4. A5 protected creator -> immutable publication -> different-buyer hire -> verified receipt UI/API/browser journey, secure Telegram identity link, and complete required service fleet using only the kernel authority path.
 5. A6 explicit admission or evidence-backed `CUT_UNISWAP`.
 6. A7 same-SHA deployment, live smokes, demo, evidence, documentation, and current Lisbon bounty audit.
 7. A future reviewed production 0G adapter. Credentials alone cannot re-enable the removed live path.
@@ -97,6 +97,21 @@ AUTHORITY
 - Mainnet value remains prohibited.
 - Never print, commit, or log secret values, private keys, session material, PII, or unredacted sponsor responses.
 - If authority is missing, continue every safe local prerequisite and return `WAIT_GATE` only at the affected live boundary.
+
+OWNER QUESTIONS - ASK ONCE BEFORE EFFECTFUL WORK
+
+Ask the owner this compact question batch after boot/reconciliation. Never request a token, private key, database URL, webhook secret, link code, session, or other secret value in chat or Git:
+
+1. What is the intended public app URL and deployment provider/project for web/API, long-running worker, Telegram receiver, and specialist agents?
+2. Should Telegram use production webhook mode or local/worker polling mode, and is linking mandatory for every user or only the release/demo account? What is the public bot username, and are `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_WEBHOOK_SECRET` already configured in the named secret store? Confirm presence/location only.
+3. Which private Telegram account will perform the link smoke, and can the owner complete `/start CODE`, `/status`, one permitted command, and unlink interactively? Do not persist its numeric ID or chat ID in docs/evidence.
+4. Is the canonical expected fleet all 13 entries in `SWARM_AGENTS`; which, if any, are deliberately optional or cut, and what are their deployment/service names?
+5. What creator ENS parent, agent-label policy, chain/testnet, owner/delegate wallet, write/readback scope, gas cap, and freshness window should A4 target?
+6. Which two wallet accounts may be used as creator A and external buyer B for the browser journey? Addresses are public identifiers; signing material remains wallet-held.
+7. Is A6/Arc admitted or cut? A cut rail must render explicit unavailable/cut state rather than wait forever.
+8. Which exact effects are authorized now: push, managed migration, deployment, Telegram webhook registration, live agent health/function calls, ENS read/write, 0G call, signature/transaction, funding/spend, form, or public claim? For each authorized effect require target SHA, network/project, scope, cap, deadline, and evidence.
+
+Record only non-secret answers and exact authorization rows. Continue all safe local R0/A4/A5 preparation while waiting; pause only at the affected external boundary.
 
 OPERATING MODEL
 
@@ -176,10 +191,17 @@ A5 - PRODUCT UI, FUNCTIONALITY, AND E2E
 - Define “deploy agent” as activating the immutable application version/runtime. It never means an unproven contract deployment or live sponsor success.
 - Use only `/api/kernel/agents` and `/api/kernel/jobs` as authority. Legacy marketplace create/hire routes remain disabled or visibly non-authoritative.
 - Show connected wallet, creator ENS, full agent subname, canonical state, owner/delegate, immutable version/price, publication/hire eligibility, job state, ENS authority, 0G verification, Storage proof, canonical receipt, and explicit refusal/failure states.
+- Bind one SIWE-authenticated app user to one private-chat Telegram numeric identity with a short-lived single-use code. Make code consumption and binding atomic; rate-limit generation/redemption; reject expiry, replay, guessing, cross-user, group-chat, already-bound, and unauthorized relink attempts; provide authenticated unlink/relink and audit events. Username is never identity.
+- Choose exactly one Telegram receive mode. Webhook and polling must never run together. Production webhook mode fails closed when its secret is absent, verifies `getWebhookInfo`, and awaits or durably enqueues command work before returning; polling proves one singleton receiver.
+- Route `/start`, `/status`, `/run`, `/stop`, `/resume`, proof links, and notifications through the same server-side app user. Telegram cannot bypass SIWE, ENS, kernel, idempotency, approval, payment, or release policy; disable or label legacy-cycle commands outside the protected journey.
+- Derive expected agents from one canonical fleet registry. Each required web/API/worker/bot/specialist process must expose fresh non-secret health and exact release SHA/version. HTTP 200 alone is not functional readiness; run an authorized role-level smoke before promotion.
+- Treat the supplied screenshot as a regression baseline: identify and repair the exact `12/13` offline agent; make `Fresh authorization required` recover through bounded wallet reauthentication; and make `Waiting for Arc RPC` resolve or render explicit optional/cut/unavailable state. Empty activity is valid only before the first proven run and must explain the next action.
 - UI state never creates authority or converts mocks/cached flags/missing evidence into success.
 - Add functional API/integration coverage and one automated browser path where creator wallet A publishes and buyer wallet B hires the exact version through progress -> verified delivery -> receipt. Cover self/cross-user refusal, forgery, stale authority, version substitution, duplicate hire, and replay no-op.
+- Add a browser-plus-bot path: web generates code -> Telegram `/start CODE` -> web observes linked state -> linked command reaches the same backend user/job -> result/proof returns -> unlink. Prove forged webhook, expired/replayed code, second chat, and webhook/polling conflict fail closed.
 - Verify keyboard flow, labels, focus, loading, empty, error, offline, long content, desktop, and mobile.
-- Require build/start, automated critical path, accessibility baseline, and two local reset/replays without manual repair.
+- Load `/`, `/dashboard`, `/marketplace`, `/verify`, and protected job detail with zero uncaught console errors, failed required requests, hydration errors, clipped controls, or horizontal overflow across supported desktop/mobile widths.
+- Require build/start, automated critical path, Telegram link/security tests, complete required fleet health, accessibility baseline, and two local reset/replays without manual repair.
 
 A6 - OPTIONAL UNISWAP
 
@@ -193,8 +215,10 @@ A7 - RELEASE AND SUBMISSION
 - Re-run `R0_AGENT_READY` against the frozen checkout.
 - Run the complete release contract in `docs/lisbon/GOALS.md` from a fresh checkout.
 - Deploy web/API, managed migration, and long-running worker only under exact authorization and from the same SHA.
+- Deploy or verify the Telegram receiver and every required agent from the same SHA/version. Reconcile public app URL, webhook-versus-polling state, health endpoints, and exact offline/degraded causes.
 - Run authorized live 0G and ENS smokes; run Uniswap only if A6 passed.
 - Run failure-first and success-plus-replay demos twice from resettable state within four minutes.
+- Include one web-to-Telegram link and command/result round-trip plus one creator-A to buyer-B protected marketplace run in both demos.
 - Repair README claim drift; complete setup, prior-work disclosure, changelog, AI disclosure, public identifiers, screenshots, demo/video, and current sponsor artifacts.
 - Run the current Lisbon Bounty Auditor. No critical/high finding may remain.
 - `RELEASE_VALIDATED` requires code, deployment, database, worker, receipts, UI, evidence, video, and claims to bind one unchanged SHA.
@@ -280,6 +304,9 @@ A4_integration:
 A4_live:
 A5:
 A5_creator_publish_hire:
+A5_telegram_link:
+A5_agent_fleet:
+A5_ui_load:
 A6:
 A7:
 completed:
