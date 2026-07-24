@@ -2,17 +2,26 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardBody } from "@/components/ui/card";
-import { Badge, ZeroGBadge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
+import { CopyableIdentifier, EvidenceStatus } from "@/components/ui/evidence";
 import { DawgSpinner } from "@/components/dawg-spinner";
 import { CreateAgentModal } from "@/components/create-agent-modal";
-import { getLeaderboard, getMyAgents, hireAgent, fireAgent } from "@/lib/api";
+import { KernelJobDialog } from "@/components/kernel-job-dialog";
+import {
+  fireAgent,
+  getLeaderboard,
+  getMyAgents,
+  getPublishedAgents,
+  hireAgent,
+  type HiredAgent,
+  type PublishedAgent,
+} from "@/lib/api";
 import type {
   Agent,
   SwarmHealthResponse,
   MarketplaceEarningsResponse,
   SwarmHealthState,
 } from "@/lib/types";
-import type { HiredAgent } from "@/lib/api";
 import { useUser } from "@/contexts/user-context";
 import { agentLabel, agentEmoji } from "@/lib/swarm-endpoints";
 import { arcAddressUrl, inftTokenUrl } from "@/lib/links";
@@ -56,6 +65,27 @@ export default function MarketplacePage() {
   const [health, setHealth] = useState<SwarmHealthResponse | null>(null);
   const [earnings, setEarnings] = useState<MarketplaceEarningsResponse | null>(null);
   const [showCreateAgent, setShowCreateAgent] = useState(false);
+  const [publishedAgents, setPublishedAgents] = useState<PublishedAgent[]>([]);
+  const [loadingPublished, setLoadingPublished] = useState(true);
+  const [publishedError, setPublishedError] = useState<string | null>(null);
+  const [selectedPublishedAgent, setSelectedPublishedAgent] = useState<PublishedAgent | null>(null);
+
+  const fetchProtectedAgents = useCallback(async () => {
+    setLoadingPublished(true);
+    setPublishedError(null);
+    try {
+      setPublishedAgents(await getPublishedAgents());
+    } catch (error) {
+      setPublishedAgents([]);
+      setPublishedError(error instanceof Error ? error.message : "Published agents could not be loaded.");
+    } finally {
+      setLoadingPublished(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchProtectedAgents();
+  }, [fetchProtectedAgents]);
 
   // Poll swarm health + marketplace earnings every 15s so the cards show live
   // online dots and cumulative USDC earned per specialist.
@@ -141,8 +171,8 @@ export default function MarketplacePage() {
         inftTokenId: e.inftTokenId ?? null,
         storageRootHash: e.storageRootHash ?? null,
         storageUri: e.storageUri ?? null,
-        model: "glm-5-chat",
-        provider: "0G Sealed TEE",
+        model: "Unspecified",
+        provider: "Unverified",
         creator: "AlphaDawg",
         isActive: e.active,
         walletAddress: e.walletAddress ?? undefined,
@@ -185,8 +215,8 @@ export default function MarketplacePage() {
     // intentionally hides the "#XXXX" line when no real token exists.
     inftId: "",
     inftTokenId: null,
-    model: "glm-5-chat",
-    provider: "0G Sealed TEE",
+    model: "Unspecified",
+    provider: "Unverified",
     creator: "AlphaDawg",
     isActive: true,
     walletAddress: h.walletAddress ?? undefined,
@@ -227,6 +257,8 @@ export default function MarketplacePage() {
   const swarmOnline = health?.summary.online ?? 0;
   const swarmTotal = health?.summary.total ?? 0;
   const availableCount = marketplaceAgents.length;
+  const viewerPublishedAgents = publishedAgents.filter((agent) => agent.ownedByViewer);
+  const availablePublishedAgents = publishedAgents.filter((agent) => !agent.ownedByViewer);
 
   // Top-5 ELO standings — drawn from the same leaderboard fetch so the strip
   // at the top of the marketplace is always coherent with the cards below.
@@ -236,10 +268,69 @@ export default function MarketplacePage() {
 
   return (
     <main className="max-w-7xl mx-auto px-5 py-6 space-y-6">
+      <section className="space-y-4" aria-labelledby="protected-agent-registry-title">
+        <div className="rounded-2xl border border-dawg-500/30 bg-void-900 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="max-w-2xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 id="protected-agent-registry-title" className="text-xl font-bold text-void-100">
+                  Protected agent registry
+                </h1>
+                <Badge variant="amber">Immutable versions</Badge>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-void-400">
+                Publish an authenticated agent version or submit a job against a version published by another owner. Published status confirms the registry record only; execution evidence is reported per job.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCreateAgent(true)}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-dawg-500 px-4 text-sm font-bold text-black transition-colors hover:bg-dawg-400"
+            >
+              + Publish agent
+            </button>
+          </div>
+        </div>
+
+        {loadingPublished ? (
+          <EmptyState>
+            <DawgSpinner size={56} label="Loading published agents…" />
+          </EmptyState>
+        ) : publishedError ? (
+          <div role="alert" className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-blood-500/25 bg-blood-900/10 px-4 text-center">
+            <p className="text-sm text-blood-300">{publishedError}</p>
+            <button
+              type="button"
+              onClick={() => void fetchProtectedAgents()}
+              className="mt-3 min-h-11 rounded-xl border border-void-700 px-4 text-sm font-semibold text-void-200 hover:bg-void-800"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <ProtectedAgentGroup
+              title="Published by you"
+              subtitle="Immutable protected versions owned by the authenticated wallet."
+              agents={viewerPublishedAgents}
+              empty="You have not published a protected agent version yet."
+              onRun={setSelectedPublishedAgent}
+            />
+            <ProtectedAgentGroup
+              title="Available agents"
+              subtitle="Versions published by other owners. Runtime availability is not inferred from publication."
+              agents={availablePublishedAgents}
+              empty="No agent versions from other owners are published yet."
+              onRun={setSelectedPublishedAgent}
+            />
+          </div>
+        )}
+      </section>
+
       {/* ── HERO — Nasdaq LED marketplace board ─────────────────────── */}
       <section
         className="nasdaq-led nasdaq-scanlines relative overflow-hidden rounded-2xl border-2 border-dawg-500/60 shadow-[0_0_0_1px_rgba(0,0,0,0.9),0_10px_50px_-10px_rgba(255,199,0,0.35)]"
-        aria-label="AlphaDawg specialist marketplace board"
+        aria-label="Legacy AlphaDawg hunt-pack marketplace board"
       >
         <div className="h-[3px] w-full bg-gradient-to-r from-transparent via-dawg-500 to-transparent" />
         <div className="nasdaq-dot-matrix pointer-events-none absolute inset-0 opacity-70" aria-hidden="true" />
@@ -249,26 +340,23 @@ export default function MarketplacePage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-dawg-500/20 px-5 py-2 text-xs uppercase">
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#39FF7A] opacity-60" />
-                  <span className="nasdaq-led-green relative inline-flex h-2.5 w-2.5 rounded-full bg-[#39FF7A]" />
-                </span>
-                <span className="nasdaq-led-green text-[18px] leading-none">LIVE</span>
+                <span className="h-2.5 w-2.5 rounded-full bg-void-500" aria-hidden="true" />
+                <span className="nasdaq-led-dim text-[18px] leading-none">LEGACY DATA</span>
               </span>
               <span className="nasdaq-led-dim text-[18px] leading-none">||</span>
               <span className="text-[18px] leading-none">
                 PACK
                 <span className="nasdaq-led-dim mx-2">·</span>
-                <span className="nasdaq-led-bright">SPECIALIST MARKETPLACE</span>
+                <span className="nasdaq-led-bright">LEGACY HUNT PACK</span>
               </span>
               <span className="nasdaq-led-dim text-[18px] leading-none">||</span>
               <span className="nasdaq-led-dim hidden text-[16px] leading-none md:inline">
-                ERC-7857 · 0G CHAIN · X402 PAYWALLS
+                OBSERVED HEALTH · EARNINGS · ELO
               </span>
             </div>
             <div className="flex items-center gap-3">
               <span className="nasdaq-led-dim text-[16px] leading-none tabular-nums">
-                {user?.inftTokenId != null ? `LEAD DAWG #${user.inftTokenId}` : "LEAD DAWG · UNMINTED"}
+                {user?.inftTokenId != null ? `LEAD DAWG #${user.inftTokenId}` : "LEAD DAWG · NO TOKEN RECORD"}
               </span>
             </div>
           </div>
@@ -285,9 +373,9 @@ export default function MarketplacePage() {
                 </span>
               </div>
               <p className="mt-3 max-w-md text-[13px] leading-relaxed text-void-400">
-                Every specialist is an iNFT with a TEE-sealed inference
-                endpoint, an x402 paywall, and an on-chain ELO score. Vote on
-                each hunt to move the standings.
+                Browse the existing hunt-pack leaderboard. Health, earnings,
+                storage, and iNFT identity appear only when the corresponding
+                record is available.
               </p>
             </div>
 
@@ -313,7 +401,7 @@ export default function MarketplacePage() {
               <LedMarketTile
                 label="SWARM ONLINE"
                 value={swarmTotal > 0 ? `${swarmOnline}/${swarmTotal}` : "—"}
-                sub="LIVE ON FLY.IO"
+                sub="OBSERVED HEALTH"
                 tone={swarmOnline === swarmTotal && swarmTotal > 0 ? "green" : "bright"}
               />
               <LedMarketTile
@@ -370,15 +458,15 @@ export default function MarketplacePage() {
       {/* ── YOUR PACK ────────────────────────────────────────────────── */}
       <section className="space-y-4">
         <SectionHeader
-          title="Your pack"
-          subtitle="Specialists your Lead Dawg currently hires"
+          title="Legacy hunt pack"
+          subtitle="Specialists used by the existing Lead Dawg hunt flow"
           count={loadingPack ? null : packSize}
           right={
             <span className="inline-flex items-center gap-1.5 rounded-md border border-void-700/50 bg-void-800/60 px-2.5 py-1 font-mono text-[11px] text-void-400">
               <span className="h-1.5 w-1.5 rounded-full bg-dawg-400" />
               {user?.inftTokenId != null
                 ? `Lead Dawg · iNFT #${user.inftTokenId}`
-                : "Lead Dawg · not minted"}
+                : "Lead Dawg · no token record"}
             </span>
           }
         />
@@ -417,17 +505,11 @@ export default function MarketplacePage() {
       {/* ── MARKETPLACE ──────────────────────────────────────────────── */}
       <section className="space-y-4">
         <SectionHeader
-          title="Marketplace"
-          subtitle="Community-built specialists — minted as iNFTs on 0G"
+          title="Legacy iNFT marketplace"
+          subtitle="Existing community specialist hire flow"
           count={loadingMarketplace ? null : availableCount}
           right={
-            <button
-              onClick={() => setShowCreateAgent(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-gold-400/20 bg-gold-400/10 px-4 py-2 text-sm font-medium text-gold-400 transition-colors hover:border-gold-400/40 hover:bg-gold-400/20"
-            >
-              <span className="text-base leading-none">+</span>
-              <span>Deploy your agent</span>
-            </button>
+            <Badge variant="gray">Legacy flow</Badge>
           }
         />
 
@@ -450,7 +532,7 @@ export default function MarketplacePage() {
             <div className="text-sm text-void-400">
               All available specialists are hired.
               <br />
-              <span className="text-void-600">Check back after the next deploy.</span>
+              <span className="text-void-600">Check back after the next registry refresh.</span>
             </div>
           </EmptyState>
         ) : (
@@ -473,13 +555,17 @@ export default function MarketplacePage() {
 
       {showCreateAgent && (
         <CreateAgentModal
-          createdBy={user?.proxyWallet?.address ?? userId ?? null}
-          onClose={() => setShowCreateAgent(false)}
-          onCreated={() => {
-            // Refetch the leaderboard so the newly deployed agent shows up
-            // in the Marketplace grid. The modal closes itself on "Close".
-            void fetchLeaderboard();
+          onClose={() => {
+            setShowCreateAgent(false);
+            void fetchProtectedAgents();
           }}
+          onCreated={() => void fetchProtectedAgents()}
+        />
+      )}
+      {selectedPublishedAgent && (
+        <KernelJobDialog
+          agent={selectedPublishedAgent}
+          onClose={() => setSelectedPublishedAgent(null)}
         />
       )}
     </main>
@@ -487,6 +573,94 @@ export default function MarketplacePage() {
 }
 
 // ── Shared sub-components ─────────────────────────────────────────────
+
+function ProtectedAgentGroup({
+  title,
+  subtitle,
+  agents,
+  empty,
+  onRun,
+}: {
+  title: string;
+  subtitle: string;
+  agents: PublishedAgent[];
+  empty: string;
+  onRun: (agent: PublishedAgent) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <SectionHeader title={title} subtitle={subtitle} count={agents.length} />
+      {agents.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-void-800 bg-void-900/40 px-4 py-8 text-center text-sm text-void-500">
+          {empty}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {agents.map((agent) => (
+            <ProtectedAgentCard key={agent.versionId} agent={agent} onRun={() => onRun(agent)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProtectedAgentCard({
+  agent,
+  onRun,
+}: {
+  agent: PublishedAgent;
+  onRun: () => void;
+}) {
+  return (
+    <Card className="min-w-0 overflow-hidden">
+      <CardBody className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-bold text-void-100">{agent.name}</h3>
+              <EvidenceStatus state="verified" label="Published" />
+              {agent.ownedByViewer && <Badge variant="gray">Yours</Badge>}
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-void-400">{agent.description}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <div className="font-pixel text-2xl leading-none text-dawg-300">V{agent.version}</div>
+            <div className="mt-1 font-mono text-[10px] text-void-500">
+              {agent.priceAtomic} {agent.asset}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {agent.capabilities.map((capability) => (
+            <span key={capability} className="rounded-md border border-void-700 bg-void-950 px-2 py-1 font-mono text-[10px] text-void-300">
+              {capability}
+            </span>
+          ))}
+        </div>
+
+        <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+          <CopyableIdentifier label="Owner wallet" value={agent.ownerWallet} />
+          <CopyableIdentifier label="Manifest hash" value={agent.manifestHash} />
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-void-800 pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-md text-xs leading-relaxed text-void-500">
+            Runtime status is unknown until a job records its own evidence.
+          </p>
+          <button
+            type="button"
+            onClick={onRun}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-dawg-500/40 bg-dawg-500/10 px-4 text-sm font-semibold text-dawg-300 transition-colors hover:border-dawg-500/70 hover:bg-dawg-500/15"
+          >
+            Submit protected job
+          </button>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
 
 type LedTone = "bright" | "green" | "dim";
 
@@ -673,7 +847,7 @@ function InftPill({
   }
   return (
     <span className="inline-flex items-center rounded-md border border-void-800 bg-void-900/60 px-2 py-0.5 font-mono text-[10px] text-void-600">
-      iNFT · not minted
+      iNFT · no token record
     </span>
   );
 }
@@ -690,7 +864,7 @@ function StoragePill({ rootHash }: { rootHash: string | null | undefined }) {
   if (!rootHash) {
     return (
       <span className="inline-flex items-center rounded-md border border-void-800 bg-void-900/60 px-2 py-0.5 font-mono text-[10px] text-void-600">
-        0G Storage · pending
+        Storage evidence · unavailable
       </span>
     );
   }
@@ -852,7 +1026,6 @@ function CommunityAgentCard({
               {agent.skill}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <ZeroGBadge />
               <InftPill inftId={agent.inftId} inftTokenId={agent.inftTokenId} />
               <StoragePill rootHash={agent.storageRootHash} />
             </div>

@@ -1,356 +1,366 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardBody } from "@/components/ui/card";
-import { Badge, SealedBadge } from "@/components/ui/badge";
+import { Dialog } from "@/components/ui/dialog";
+import { CopyableIdentifier, EvidenceStatus } from "@/components/ui/evidence";
 import {
   generateAgentInstructions,
-  createMarketplaceAgent,
+  publishKernelAgent,
   type GeneratedInstructions,
-  type CreatedAgent,
+  type PublishedAgent,
 } from "@/lib/api";
 
+const CAPABILITIES = [
+  {
+    id: "market-analysis",
+    label: "Market analysis",
+    detail: "Analyze market structure and supplied market evidence.",
+  },
+  {
+    id: "risk-analysis",
+    label: "Risk analysis",
+    detail: "Identify constraints, downside, and decision risk.",
+  },
+  {
+    id: "research",
+    label: "Research",
+    detail: "Synthesize evidence into a concise research response.",
+  },
+] as const;
+
+type Capability = (typeof CAPABILITIES)[number]["id"];
+type Step = "define" | "generating" | "review" | "publishing" | "published";
+
 interface CreateAgentModalProps {
-  createdBy?: string | null;
   onClose: () => void;
-  onCreated?: (agent: CreatedAgent) => void;
+  onCreated?: (agent: PublishedAgent) => void;
 }
 
-interface ToolDef {
-  id: string;
-  label: string;
-  detail: string;
+function generationEvidence(
+  generated: GeneratedInstructions,
+  instructionsEdited: boolean,
+): { state: "verified" | "unavailable"; label: string } {
+  if (instructionsEdited) {
+    return { state: "unavailable", label: "Edited draft · provenance cleared" };
+  }
+  if (generated.fallback) {
+    return { state: "unavailable", label: "Fallback draft" };
+  }
+  if (generated.teeVerified === true) {
+    return { state: "verified", label: "Verified generation" };
+  }
+  return { state: "unavailable", label: "Unverified generation" };
 }
 
-// Mock pre-tools — these are the default capabilities every AlphaDawg agent
-// inherits. For now the checklist is purely UI (we persist the selections
-// into `marketplace_agents.tools` so they can drive real capability gating
-// later without a second migration).
-const DEFAULT_TOOLS: ToolDef[] = [
-  { id: "og-sealed-inference", label: "0G Sealed Inference", detail: "TEE-verified LLM calls" },
-  { id: "tee-attestation", label: "TEE Attestation", detail: "On-chain attestation hash per call" },
-  { id: "hedera-hcs-audit", label: "Hedera HCS Audit", detail: "Immutable audit log" },
-  { id: "x402-paywall", label: "x402 Paywall", detail: "Arc USDC nanopayments ($0.001/query)" },
-  { id: "0g-storage-memory", label: "0G Storage Memory", detail: "RAG memory across cycles" },
-  { id: "on-chain-elo", label: "On-chain ELO", detail: "Reputation tracked on Hedera" },
-  { id: "real-time-market-data", label: "Market Data Feed", detail: "CoinGecko + Etherscan live feed" },
-];
-
-const EMOJI_CHOICES = ["🤖", "🧠", "🐋", "📈", "🔍", "⚡", "🎯", "🛰️", "🔥", "💎"];
-
-type Step = "form" | "generating" | "preview" | "deploying" | "done" | "error";
-
-export function CreateAgentModal({ createdBy, onClose, onCreated }: CreateAgentModalProps) {
-  const [step, setStep] = useState<Step>("form");
+export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) {
+  const [step, setStep] = useState<Step>("define");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [emoji, setEmoji] = useState<string>("🤖");
   const [instructions, setInstructions] = useState("");
   const [generated, setGenerated] = useState<GeneratedInstructions | null>(null);
-  const [selectedTools, setSelectedTools] = useState<Set<string>>(
-    () => new Set(DEFAULT_TOOLS.map((t) => t.id)),
+  const [instructionsEdited, setInstructionsEdited] = useState(false);
+  const [selectedCapabilities, setSelectedCapabilities] = useState<Set<Capability>>(
+    () => new Set<Capability>(["research"]),
   );
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [createdAgent, setCreatedAgent] = useState<CreatedAgent | null>(null);
+  const [publishedAgent, setPublishedAgent] = useState<PublishedAgent | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [publicationUncertain, setPublicationUncertain] = useState(false);
 
+  const isBusy = step === "generating" || step === "publishing";
   const canGenerate =
     name.trim().length >= 2 &&
-    name.trim().length <= 40 &&
+    name.trim().length <= 80 &&
     description.trim().length >= 10 &&
     description.trim().length <= 800 &&
-    step === "form";
+    selectedCapabilities.size >= 1 &&
+    selectedCapabilities.size <= 3;
+  const canPublish =
+    instructions.trim().length >= 20 &&
+    instructions.trim().length <= 4_000 &&
+    selectedCapabilities.size >= 1 &&
+    selectedCapabilities.size <= 3;
 
-  async function handleGenerate() {
-    setErrorMsg(null);
+  function toggleCapability(capability: Capability): void {
+    setSelectedCapabilities((current) => {
+      const next = new Set(current);
+      if (next.has(capability)) next.delete(capability);
+      else next.add(capability);
+      return next;
+    });
+  }
+
+  async function handleGenerate(): Promise<void> {
+    if (!canGenerate) return;
+    setErrorMessage(null);
     setStep("generating");
     try {
       const result = await generateAgentInstructions(name.trim(), description.trim());
       setGenerated(result);
       setInstructions(result.markdown);
-      setStep("preview");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : String(err));
-      setStep("form");
+      setInstructionsEdited(false);
+      setStep("review");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Instructions could not be generated.");
+      setStep("define");
     }
   }
 
-  async function handleDeploy() {
-    setErrorMsg(null);
-    setStep("deploying");
+  function handleManualDraft(): void {
+    if (!canGenerate) return;
+    setErrorMessage(null);
+    setGenerated(null);
+    setInstructions("");
+    setInstructionsEdited(false);
+    setStep("review");
+  }
+
+  async function handlePublish(): Promise<void> {
+    if (!canPublish) return;
+    setErrorMessage(null);
+    setPublicationUncertain(false);
+    setStep("publishing");
     try {
-      const agent = await createMarketplaceAgent({
+      const agent = await publishKernelAgent({
         name: name.trim(),
         description: description.trim(),
         instructions: instructions.trim(),
-        tools: Array.from(selectedTools),
-        emoji,
-        createdBy: createdBy ?? undefined,
-        attestationHash: generated?.attestationHash ?? null,
+        capabilities: Array.from(selectedCapabilities).sort(),
       });
-      setCreatedAgent(agent);
-      setStep("done");
+      setPublishedAgent(agent);
+      setStep("published");
       onCreated?.(agent);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : String(err));
-      setStep("preview");
+    } catch (error) {
+      const responseWasLost = error instanceof TypeError;
+      setPublicationUncertain(responseWasLost);
+      setErrorMessage(responseWasLost
+        ? "The publication response was unavailable, so registry state is unknown. Close and refresh the registry before trying this draft again."
+        : error instanceof Error
+          ? error.message
+          : "The agent could not be published.");
+      setStep("review");
     }
   }
 
-  function toggleTool(id: string) {
-    setSelectedTools((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const evidence = generated
+    ? generationEvidence(generated, instructionsEdited)
+    : { state: "unavailable" as const, label: "Manual draft" };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void-950/80 backdrop-blur-sm py-10 px-4">
-      <Card className="w-full max-w-2xl">
-        <CardBody className="space-y-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs text-void-500 uppercase tracking-wider">Build Your Specialist</p>
-              <p className="text-xl font-bold text-gold-400">Create Your Own Agent</p>
-              <p className="text-xs text-void-500 mt-1">
-                Describe what your agent should do. 0G Compute will craft the instructions
-                inside a TEE enclave and mint it into the marketplace.
-              </p>
+    <Dialog
+      open
+      title="Publish a protected agent"
+      description="Define the role, review its instructions, then publish an immutable version. Ownership and commercial policy are assigned by the authenticated server."
+      onClose={onClose}
+      dismissible={!isBusy}
+      className="max-w-2xl"
+    >
+      <div className="mb-5 grid grid-cols-3 gap-2" aria-label="Publication progress">
+        {(["Define", "Review", "Publish"] as const).map((label, index) => {
+          const activeIndex = step === "define" || step === "generating"
+            ? 0
+            : step === "review"
+              ? 1
+              : 2;
+          return (
+            <div key={label} className="min-w-0">
+              <div className={`h-1 rounded-full ${index <= activeIndex ? "bg-dawg-500" : "bg-void-800"}`} />
+              <span className={`mt-1.5 block text-[10px] font-semibold uppercase tracking-wider ${index === activeIndex ? "text-dawg-300" : "text-void-600"}`}>
+                {label}
+              </span>
             </div>
-            <button
-              onClick={onClose}
-              className="text-void-500 hover:text-void-300 text-lg leading-none px-2"
-              aria-label="Close"
-            >
-              ×
-            </button>
+          );
+        })}
+      </div>
+
+      {(step === "define" || step === "generating") && (
+        <div className="space-y-5">
+          <div className="space-y-1.5">
+            <label htmlFor="agent-name" className="text-xs font-semibold text-void-300">
+              Agent name
+            </label>
+            <input
+              id="agent-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={80}
+              disabled={isBusy}
+              placeholder="Evidence Researcher"
+              className="min-h-11 w-full rounded-xl border border-void-800 bg-void-950 px-3 text-sm text-void-100 placeholder:text-void-600 focus:border-dawg-500 focus:outline-none"
+            />
+            <p className="text-right font-mono text-[10px] text-void-600">{name.length} / 80</p>
           </div>
 
-          {/* ── Step: Form ───────────────────────────────── */}
-          {(step === "form" || step === "generating") && (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[11px] uppercase tracking-wider text-void-500">
-                  Agent Name
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. GasWatcher"
-                  maxLength={40}
-                  disabled={step === "generating"}
-                  className="w-full px-3 py-2.5 bg-void-950 border border-void-800 focus:border-dawg-500 focus:outline-none rounded-xl text-sm text-void-200 placeholder:text-void-600"
-                />
-              </div>
+          <div className="space-y-1.5">
+            <label htmlFor="agent-description" className="text-xs font-semibold text-void-300">
+              What should this agent do?
+            </label>
+            <textarea
+              id="agent-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              maxLength={800}
+              rows={4}
+              disabled={isBusy}
+              placeholder="Describe the evidence it should analyze and the decisions it should support."
+              className="w-full resize-y rounded-xl border border-void-800 bg-void-950 px-3 py-2.5 text-sm leading-relaxed text-void-100 placeholder:text-void-600 focus:border-dawg-500 focus:outline-none"
+            />
+            <p className="text-right font-mono text-[10px] text-void-600">{description.length} / 800</p>
+          </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] uppercase tracking-wider text-void-500">
-                  Emoji
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {EMOJI_CHOICES.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      onClick={() => setEmoji(e)}
-                      disabled={step === "generating"}
-                      className={`w-9 h-9 rounded-lg border text-lg transition-colors ${
-                        emoji === e
-                          ? "border-dawg-500 bg-dawg-500/10"
-                          : "border-void-800 bg-void-950 hover:border-void-700"
-                      }`}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] uppercase tracking-wider text-void-500">
-                  What should your agent do?
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. Monitor gas prices and flag when network congestion creates arbitrage opportunities on DEXes."
-                  rows={4}
-                  maxLength={800}
-                  disabled={step === "generating"}
-                  className="w-full px-3 py-2.5 bg-void-950 border border-void-800 focus:border-dawg-500 focus:outline-none rounded-xl text-sm text-void-200 placeholder:text-void-600 resize-none"
-                />
-                <p className="text-[10px] text-void-600 text-right">
-                  {description.length} / 800
-                </p>
-              </div>
-
-              {errorMsg && (
-                <p className="text-xs text-blood-400 bg-blood-950/30 border border-blood-900/40 rounded-lg px-3 py-2">
-                  {errorMsg}
-                </p>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleGenerate}
-                  disabled={!canGenerate}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-dawg-500 hover:bg-dawg-400 disabled:opacity-50 disabled:cursor-not-allowed text-void-950 text-sm font-bold rounded-xl transition-colors"
-                >
-                  {step === "generating" ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-void-950 border-t-transparent rounded-full animate-spin" />
-                      Generating via 0G…
-                    </>
-                  ) : (
-                    "Generate Instructions"
-                  )}
-                </button>
-                <button
-                  onClick={onClose}
-                  disabled={step === "generating"}
-                  className="px-4 py-3 bg-void-800 hover:bg-void-700 disabled:opacity-60 text-void-300 text-sm font-bold rounded-xl border border-void-700 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Step: Preview generated markdown + tools ─── */}
-          {(step === "preview" || step === "deploying") && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{emoji}</span>
-                  <span className="text-sm font-semibold text-void-100">{name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {generated?.fallback ? (
-                    <Badge variant="amber">Fallback template</Badge>
-                  ) : (
-                    <SealedBadge />
-                  )}
-                  {generated?.attestationHash && !generated.fallback && (
-                    <span className="text-[10px] font-mono text-void-500">
-                      att: {generated.attestationHash.slice(0, 8)}…
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-semibold text-void-300">Capabilities</legend>
+            <p className="text-xs text-void-600">Choose one to three protected capabilities.</p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {CAPABILITIES.map((capability) => {
+                const selected = selectedCapabilities.has(capability.id);
+                return (
+                  <button
+                    key={capability.id}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={selected}
+                    disabled={isBusy}
+                    onClick={() => toggleCapability(capability.id)}
+                    className={`min-h-24 rounded-xl border p-3 text-left transition-colors ${selected ? "border-dawg-500/60 bg-dawg-500/10" : "border-void-800 bg-void-950 hover:border-void-700"}`}
+                  >
+                    <span className="flex items-center gap-2 text-xs font-semibold text-void-100">
+                      <span className={`grid h-4 w-4 place-items-center rounded border text-[10px] ${selected ? "border-dawg-500 bg-dawg-500 text-black" : "border-void-700"}`} aria-hidden="true">
+                        {selected ? "✓" : ""}
+                      </span>
+                      {capability.label}
                     </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] uppercase tracking-wider text-void-500">
-                  Generated Instructions (editable)
-                </label>
-                <textarea
-                  value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
-                  rows={12}
-                  disabled={step === "deploying"}
-                  className="w-full px-3 py-2.5 bg-void-950 border border-void-800 focus:border-dawg-500 focus:outline-none rounded-xl text-xs font-mono text-void-300 resize-y"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] uppercase tracking-wider text-void-500">
-                  Default Tools (attached at deploy)
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {DEFAULT_TOOLS.map((tool) => {
-                    const checked = selectedTools.has(tool.id);
-                    return (
-                      <button
-                        key={tool.id}
-                        type="button"
-                        onClick={() => toggleTool(tool.id)}
-                        disabled={step === "deploying"}
-                        className={`flex items-start gap-2 text-left px-3 py-2 rounded-lg border transition-colors ${
-                          checked
-                            ? "border-dawg-500/50 bg-dawg-500/5"
-                            : "border-void-800 bg-void-950 hover:border-void-700"
-                        }`}
-                      >
-                        <span
-                          className={`mt-0.5 w-3.5 h-3.5 flex items-center justify-center rounded border text-[10px] ${
-                            checked
-                              ? "bg-dawg-500 border-dawg-500 text-void-950"
-                              : "border-void-700"
-                          }`}
-                        >
-                          {checked ? "✓" : ""}
-                        </span>
-                        <span className="flex-1 min-w-0">
-                          <span className="block text-xs font-semibold text-void-200">
-                            {tool.label}
-                          </span>
-                          <span className="block text-[10px] text-void-500 truncate">
-                            {tool.detail}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {errorMsg && (
-                <p className="text-xs text-blood-400 bg-blood-950/30 border border-blood-900/40 rounded-lg px-3 py-2">
-                  {errorMsg}
-                </p>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleDeploy}
-                  disabled={step === "deploying" || instructions.trim().length < 20}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-dawg-500 hover:bg-dawg-400 disabled:opacity-50 text-void-950 text-sm font-bold rounded-xl transition-colors"
-                >
-                  {step === "deploying" ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-void-950 border-t-transparent rounded-full animate-spin" />
-                      Deploying to Marketplace…
-                    </>
-                  ) : (
-                    "+ Deploy Agent"
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setStep("form");
-                    setGenerated(null);
-                    setInstructions("");
-                  }}
-                  disabled={step === "deploying"}
-                  className="px-4 py-3 bg-void-800 hover:bg-void-700 disabled:opacity-60 text-void-300 text-sm font-bold rounded-xl border border-void-700 transition-colors"
-                >
-                  Back
-                </button>
-              </div>
+                    <span className="mt-2 block text-[11px] leading-relaxed text-void-500">
+                      {capability.detail}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
+          </fieldset>
+
+          {errorMessage && (
+            <p role="alert" className="rounded-xl border border-blood-500/30 bg-blood-900/25 px-3 py-2 text-sm text-blood-300">
+              {errorMessage}
+            </p>
           )}
 
-          {/* ── Step: Done ─────────────────────────────── */}
-          {step === "done" && createdAgent && (
-            <div className="text-center space-y-3 py-4">
-              <p className="text-4xl">{createdAgent.emoji}</p>
-              <p className="text-lg font-bold text-green-400">Agent Deployed</p>
-              <p className="text-sm text-void-300">
-                <span className="font-semibold">{createdAgent.name}</span> is live in the
-                marketplace at ELO {createdAgent.reputation}.
-              </p>
-              <p className="text-[10px] font-mono text-void-600">id: {createdAgent.id}</p>
-              <button
-                onClick={onClose}
-                className="px-6 py-2 bg-void-800 hover:bg-void-700 text-void-300 text-sm rounded-xl border border-void-700 transition-colors"
-              >
-                Close
-              </button>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={onClose} disabled={isBusy} className="min-h-11 rounded-xl border border-void-700 px-4 text-sm font-semibold text-void-300 hover:bg-void-800 disabled:opacity-50">
+              Cancel
+            </button>
+            <button type="button" onClick={handleManualDraft} disabled={!canGenerate || isBusy} className="min-h-11 rounded-xl border border-dawg-500/40 px-4 text-sm font-semibold text-dawg-300 hover:bg-dawg-500/10 disabled:cursor-not-allowed disabled:opacity-45">
+              Write instructions manually
+            </button>
+            <button type="button" onClick={handleGenerate} disabled={!canGenerate || isBusy} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-dawg-500 px-5 text-sm font-bold text-black hover:bg-dawg-400 disabled:cursor-not-allowed disabled:opacity-45">
+              {step === "generating" && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" aria-hidden="true" />}
+              {step === "generating" ? "Generating draft…" : "Generate draft"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(step === "review" || step === "publishing") && (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-void-800 bg-void-950/55 p-3">
+            <div>
+              <p className="text-sm font-semibold text-void-100">{name}</p>
+              <p className="mt-0.5 text-xs text-void-500">Review every instruction before publishing.</p>
             </div>
+            <EvidenceStatus state={evidence.state} label={evidence.label} />
+          </div>
+
+          {generated && !instructionsEdited && generated.teeVerified === true && !generated.fallback && generated.attestationHash && (
+            <CopyableIdentifier label="Generation attestation" value={generated.attestationHash} />
           )}
-        </CardBody>
-      </Card>
-    </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="agent-instructions" className="text-xs font-semibold text-void-300">
+              Instructions
+            </label>
+            <textarea
+              id="agent-instructions"
+              value={instructions}
+              onChange={(event) => {
+                setInstructions(event.target.value);
+                setInstructionsEdited(true);
+              }}
+              maxLength={4_000}
+              rows={14}
+              disabled={isBusy}
+              className="w-full resize-y rounded-xl border border-void-800 bg-void-950 px-3 py-2.5 font-mono text-xs leading-relaxed text-void-200 focus:border-dawg-500 focus:outline-none"
+            />
+            <p className="text-right font-mono text-[10px] text-void-600">{instructions.length} / 4,000</p>
+          </div>
+
+          <div className="rounded-xl border border-dawg-500/20 bg-dawg-500/5 p-3 text-xs leading-relaxed text-void-400">
+            Publishing creates an immutable version. It does not claim that a runtime is available; compute, storage, ENS, receipt, and financial evidence are evaluated per submitted job.
+          </div>
+
+          {errorMessage && (
+            <p role="alert" className="rounded-xl border border-blood-500/30 bg-blood-900/25 px-3 py-2 text-sm text-blood-300">
+              {errorMessage}
+            </p>
+          )}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setStep("define")} disabled={isBusy} className="min-h-11 rounded-xl border border-void-700 px-4 text-sm font-semibold text-void-300 hover:bg-void-800 disabled:opacity-50">
+              Back
+            </button>
+            <button type="button" onClick={handlePublish} disabled={!canPublish || isBusy || publicationUncertain} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-dawg-500 px-5 text-sm font-bold text-black hover:bg-dawg-400 disabled:cursor-not-allowed disabled:opacity-45">
+              {step === "publishing" && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" aria-hidden="true" />}
+              {step === "publishing"
+                ? "Publishing version…"
+                : publicationUncertain
+                  ? "Refresh registry before retry"
+                  : "Publish immutable version"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === "published" && publishedAgent && (
+        <div className="space-y-5">
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-lg font-bold text-void-100">{publishedAgent.name}</p>
+                <p className="mt-1 text-sm text-void-400">Immutable version {publishedAgent.version} is published.</p>
+              </div>
+              <EvidenceStatus state="verified" label="Published" />
+            </div>
+          </div>
+
+          <dl className="grid gap-2 rounded-xl border border-void-800 bg-void-950/45 p-3 text-xs sm:grid-cols-2">
+            <div>
+              <dt className="uppercase tracking-wider text-void-600">Price</dt>
+              <dd className="mt-1 font-mono text-void-200">{publishedAgent.priceAtomic} {publishedAgent.asset}</dd>
+            </div>
+            <div>
+              <dt className="uppercase tracking-wider text-void-600">Published at</dt>
+              <dd className="mt-1 text-void-200">{new Date(publishedAgent.publishedAt).toLocaleString()}</dd>
+            </div>
+          </dl>
+
+          <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+            <CopyableIdentifier label="Agent ID" value={publishedAgent.agentId} />
+            <CopyableIdentifier label="Version ID" value={publishedAgent.versionId} />
+            <CopyableIdentifier label="Owner wallet" value={publishedAgent.ownerWallet} />
+            <CopyableIdentifier label="Manifest hash" value={publishedAgent.manifestHash} />
+            <CopyableIdentifier label="Prompt hash" value={publishedAgent.promptHash} />
+            <CopyableIdentifier label="Config hash" value={publishedAgent.configHash} />
+          </div>
+
+          <p className="text-xs leading-relaxed text-void-500">
+            Published status confirms the immutable registry record only. Runtime and proof status will be reported on each job.
+          </p>
+
+          <div className="flex justify-end">
+            <button type="button" onClick={onClose} className="min-h-11 rounded-xl bg-dawg-500 px-5 text-sm font-bold text-black hover:bg-dawg-400">
+              Close receipt
+            </button>
+          </div>
+        </div>
+      )}
+    </Dialog>
   );
 }
