@@ -24,6 +24,7 @@ Manual migration reconciliation:
 - Replaced stale VaultMind/Cannes paths, versions, APIs, bounties, and live-success instructions.
 - Added explicit Kernel and ENS owners.
 - Narrowed every mutation domain and made the Bounty Auditor read-only.
+- Removed generic Cycle test ownership; test mutations require an exact C0 owner handoff.
 - Rewrote command placeholders as normal Codex skill inputs.
 - Preserved existing Circle and Neon Codex skills unchanged.
 

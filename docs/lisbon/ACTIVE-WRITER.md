@@ -4,6 +4,43 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator /root
+task_id: R0-AGENT-READY-20260724-G2
+task_instance_id: R0-AGENT-READY-20260724:G2:25B87ED4
+generation: 2
+sprint: R0
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 80ca507afe89e19feac34c8f5144caf968e5ad0b
+control_sha: 80ca507afe89e19feac34c8f5144caf968e5ad0b
+token: R0-AGENT-READY-G2-25B87ED4-62C8-41C3-A967-F72C5505EB4E
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T22:13:38Z
+expires_at: 2026-07-25T00:13:38Z
+allowed_paths:
+  - .agents/skills/source-command-build-specialist/SKILL.md
+  - .codex/migrate-to-codex-report.txt
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/R0-AGENT-READINESS.md
+started_at: 2026-07-24T22:13:38Z
+deadline: 2026-07-25T00:13:38Z
+expected_exit: remove generic Cycle test authority and return one immutable local SHA for read-only re-audit
+acceptance_items:
+  - build-specialist assigns Cycle only its registered mutation domain
+  - tests remain under exact specialist ownership or a sequential C0 path amendment
+  - Codex validation, lint, typecheck, tests, secret scan, build, and diff check remain green
+external_effect_authority: safe local files, checks, and one atomic commit only; no push, deploy, managed migration, live call, signature, transaction, form, spend, or claim
+completed_at: 2026-07-24T22:14:34Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - removed the converted skill's generic Cycle test mutation authority
+  - Codex target validation, lint, typecheck, 9 foundation tests, secret scan, production build, and diff check passed
+result: PASS_TO_REAUDIT_LOCAL_ONLY
+lock_release: release only matching token R0-AGENT-READY-G2-25B87ED4-62C8-41C3-A967-F72C5505EB4E after the containing commit
+status: closed
+```
+
+```yaml
+owner: C0 coordinator /root
 task_id: R0-AGENT-READY-20260724
 task_instance_id: R0-AGENT-READY-20260724:7F0FC69E
 generation: 1

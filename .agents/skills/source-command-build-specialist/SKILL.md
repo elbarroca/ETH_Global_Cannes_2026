@@ -15,7 +15,7 @@ authority.
 2. Reuse an existing registry entry and port when possible. Reject duplicate
    IDs, ports, endpoints, roles, or service names.
 3. Split mutation by owner:
-   - `cycle-wirer`: registry, server, prompt, orchestration, and tests.
+   - `cycle-wirer`: registry, server, prompt, and orchestration only.
    - `openclaw-builder`: workspace/config only when explicitly required.
 4. Serialize those writers through C0; never give one writer both domains.
 5. Keep output non-authoritative unless kernel, ENS, 0G, idempotency, and

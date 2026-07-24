@@ -4,9 +4,9 @@
 - Sprint: `R0`
 - Start/control SHA: `7134e1ec0227250c0f9927259ed64d5e0267081d`
 - Branch: `Eth_global_lisbon_`
-- Observed through: `2026-07-24T22:06:10Z`
+- Observed through: `2026-07-24T22:13:38Z`
 - Exit SHA: derive from the containing commit
-- Result: `PASS_TO_AUDIT; LOCAL_ONLY`
+- Result: `PASS_TO_REAUDIT; LOCAL_ONLY`
 
 ## Start and authority
 
@@ -106,9 +106,12 @@ not promote live ENS evidence.
 | `npm run scan:secrets` | passed |
 | `npm run build` | passed |
 | `git diff --check` | passed |
+| Read-only Codex dry dispatch | `FIX` at `80ca507afe89e19feac34c8f5144caf968e5ad0b`; generic Cycle test ownership removed in G2 |
 
-An independent current-snapshot dry-dispatch audit is required before the
-containing SHA can be accepted as `R0_AGENT_READY`.
+The first independent `bounty-auditor` dry dispatch proved real custom-agent
+execution and found one broad phrase assigning unspecified tests to the Cycle
+Wirer. G2 removed that authority; a re-audit of the containing SHA is required
+before it can be accepted as `R0_AGENT_READY`.
 
 ## Boundary
 
