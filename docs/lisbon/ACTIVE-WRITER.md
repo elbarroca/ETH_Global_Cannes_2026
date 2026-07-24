@@ -4,6 +4,52 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: C0 coordinator /root
+task_id: C0-R0-A4-RECONCILIATION-20260724
+task_instance_id: C0-R0-A4-RECONCILIATION-20260724:3C29B2A4
+generation: 1
+sprint: control_reconciliation
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: d76a66aed3a509071430916d07783625e04e9883
+control_sha: d76a66aed3a509071430916d07783625e04e9883
+token: C0-RECONCILE-3C29B2A4-4949-48C4-ACA3-6E4943D9539F
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T22:50:02Z
+expires_at: 2026-07-25T00:50:02Z
+allowed_paths:
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/evidence/R0-AGENT-READINESS.md
+started_at: 2026-07-24T22:50:02Z
+deadline: 2026-07-25T00:50:02Z
+expected_exit: canonically reconcile the accepted R0 and stable A4 remediation audits without reopening either implementation; preserve A5 as exact-SHA audit-pending
+acceptance_items:
+  - accepted R0 audit SHA a8a45286980c1312713872c4b8c90c90b283c3ed is canonical
+  - current-tree drift is limited to the already-reviewed prompt/control delta after a8a4528
+  - accepted stable A4 audit SHA 1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9 is canonical only as the base for the expanded ENSv2 sprint
+  - A5 remains PASS_TO_AUDIT and no later gate or live claim opens
+external_effect_authority: safe local control files, deterministic checks, and one atomic commit only; no push, deploy, managed migration, webhook registration, live call, signature, transaction, form, spend, or public claim
+completed_at: 2026-07-24T22:52:27Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - branch and both required ancestors passed; both worktrees were clean; physical and mirrored lease tokens matched
+  - no agent skill AGENTS package manifest or lockfile changed after accepted R0 SHA a8a4528; only the reviewed prompt and writer-ledger surfaces changed
+  - current ETHGlobal Lisbon prize and official ENS Universal Resolver ENSv2 overview and readiness pages preserve the recorded gates
+  - lint passed with zero errors and 23 inherited warnings; strict typecheck and 9 of 9 foundation tests passed
+  - tracked secret scan production build 31 of 31 pages prompt-link scan changed-surface scan and diff check passed
+  - R0 is canonical as R0_AGENT_READY; stable A4 is canonical only as the accepted base; A5 remains PASS_TO_AUDIT
+external_effects_attempted: none
+result: PASS_CONTROL_RECONCILIATION_LOCAL_ONLY
+lock_release: release only matching token C0-RECONCILE-3C29B2A4-4949-48C4-ACA3-6E4943D9539F after the containing commit
+status: closed
+```
+
+```yaml
+owner: C0 coordinator /root
 task_id: PROMPT-CODEX-AGENTS-20260724
 task_instance_id: PROMPT-CODEX-AGENTS-20260724:A97D2175
 generation: 1

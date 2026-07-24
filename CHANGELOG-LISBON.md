@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - R0 and stable A4 audit reconciliation
+
+- Canonically recorded the accepted independent R0 re-audit at exact SHA `a8a45286980c1312713872c4b8c90c90b283c3ed` and verified that later drift is confined to the reviewed C0/executor/auditor prompt update.
+- Canonically recorded the accepted stable A4 remediation re-audit at exact SHA `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9` as the base for the expanded ENSv2 creator/subname sprint; this does not open current `A4_ACCEPTED` or any live gate.
+- Refreshed the official Lisbon prize and ENS Universal Resolver/ENSv2 guidance. ENSv2 remains pre-final; no live request, write, signature, transaction, deployment, push, or claim promotion was attempted.
+- Preserved A5 as exact-SHA audit-pending and every live/release effect as blocked.
+
 ## 2026-07-24 - R0 Codex agent and prompt readiness
 
 - Migrated all seven legacy specialist definitions into validated

@@ -4,9 +4,9 @@
 - Sprint: `R0`
 - Start/control SHA: `7134e1ec0227250c0f9927259ed64d5e0267081d`
 - Branch: `Eth_global_lisbon_`
-- Observed through: `2026-07-24T22:13:38Z`
-- Exit SHA: derive from the containing commit
-- Result: `PASS_TO_REAUDIT; LOCAL_ONLY`
+- Observed through: `2026-07-24T22:50:02Z`
+- Exit/audit SHA: `a8a45286980c1312713872c4b8c90c90b283c3ed`
+- Result: `PASS_REAUDIT; R0_AGENT_READY; LOCAL_ONLY`
 
 ## Start and authority
 
@@ -106,15 +106,29 @@ not promote live ENS evidence.
 | `npm run scan:secrets` | passed |
 | `npm run build` | passed |
 | `git diff --check` | passed |
-| Read-only Codex dry dispatch | `FIX` at `80ca507afe89e19feac34c8f5144caf968e5ad0b`; generic Cycle test ownership removed in G2 |
+| Read-only Codex dry dispatch | `FIX` at `80ca507afe89e19feac34c8f5144caf968e5ad0b`; generic Cycle test ownership removed in G2; independent re-audit accepted exact G2 SHA `a8a45286980c1312713872c4b8c90c90b283c3ed` |
+| Continuation changed-surface scan | no agent, converted skill, `AGENTS.md`, package manifest, or lockfile drift after the accepted SHA |
+| Continuation local checks | lint passed with 23 inherited warnings; typecheck, 9/9 foundation tests, secret scan, 31-page build, prompt-link scan, and diff check passed |
 
 The first independent `bounty-auditor` dry dispatch proved real custom-agent
 execution and found one broad phrase assigning unspecified tests to the Cycle
-Wirer. G2 removed that authority; a re-audit of the containing SHA is required
-before it can be accepted as `R0_AGENT_READY`.
+Wirer. G2 removed that authority. The controlling continuation records the
+independent read-only re-audit as `PASS_TO_NEXT_GATE` on exact unchanged SHA
+`a8a45286980c1312713872c4b8c90c90b283c3ed`.
+
+## Continuation drift reconciliation
+
+The current HEAD descends from the accepted audit SHA. No `.codex/agents/**`,
+converted skill, `AGENTS.md`, package manifest, or lockfile changed after that
+SHA. The only post-audit delta is the bounded C0/executor/auditor prompt update
+at `d76a66aed3a509071430916d07783625e04e9883`; its recorded local checks and two
+read-only prompt reviews passed. Current primary sources still preserve the
+same selected tracks, ENS Universal Resolver address/test vector, supported
+`viem >=2.35.0` floor, and pre-final ENSv2 hierarchy/permissions boundary.
+No migration or unchanged-agent audit was rerun.
 
 ## Boundary
 
-This packet proves local dispatch readiness only. It does not prove A4/A5
-acceptance, a live service fleet, production readiness, sponsor qualification,
-or `RELEASE_VALIDATED`.
+This packet proves `R0_AGENT_READY` for local dispatch only. It does not prove
+A4/A5 completion, a live service fleet, production readiness, sponsor
+qualification, or `RELEASE_VALIDATED`.

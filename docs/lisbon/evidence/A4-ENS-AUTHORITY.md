@@ -6,8 +6,8 @@
 - Control SHA: `ac939141af51b46342b218a977f85027017c4c85`
 - Branch: `Eth_global_lisbon_`
 - Observed through: `2026-07-24T14:31:17Z`
-- Exit SHA: derive from the commit containing this packet
-- Result: `AUDIT_FIX_REMEDIATED; PASS_FIXTURE; PASS_INTEGRATION; PASS_TO_AUDIT; LOCAL_ONLY`
+- Exit/audit SHA: `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9`
+- Result: `PASS_REAUDIT_BASE; PASS_FIXTURE; PASS_INTEGRATION; LOCAL_ONLY`
 - Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
 
 ## Result and boundary
@@ -85,7 +85,11 @@ Toolchain: Node `v22.22.3`, npm `10.9.8`, Prisma/Client `6.19.3`, TypeScript `5.
 
 ## Remaining blocks
 
-- An independent pinned-SHA A4 remediation re-audit is required before A5 opens.
+- The independent pinned-SHA re-audit accepted exact unchanged remediation SHA
+  `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9`; the subsequent A5 writer ledger
+  records that acceptance before its start. This accepts only the stable A4
+  base. The expanded ENSv2 creator/subname hierarchy contract remains local
+  implementation and audit work before the current `A4_ACCEPTED` gate opens.
 - `PASS_LIVE` is `NOT_RUN` and `LIVE_EFFECT_BLOCKED`; no live ENS write/readback or public identifier exists.
 - Production A3 live execution remains intentionally unavailable. Rights/license/team/owner records, event-window classification, sponsor access/caps, inherited dependency findings, README claim drift, deployment, push, forms, and release audit remain unresolved.
 - Stable local ENS causality does not establish ENS qualification, production readiness, release validity, Lisbon-window classification, or expected winnings.
