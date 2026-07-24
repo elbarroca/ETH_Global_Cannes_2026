@@ -4,6 +4,31 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Codex under project-owner direction
+task_id: A7-MICRO-COMMITS-20260724
+task_instance_id: A7-MICRO-COMMITS-20260724:2445DA17
+generation: 1
+sprint: A7_release_prerequisites
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: 7287d85f76bff6d8c59d2def35a416a0c80a4944
+control_sha: 7287d85f76bff6d8c59d2def35a416a0c80a4944
+token: A7-MICRO-COMMITS-2445DA17-EFC8-48CB-94C9-6E62092F6AC2
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T20:56:40Z
+expires_at: 2026-07-24T21:56:40Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - components/nav.tsx
+  - package.json
+  - .env.example
+started_at: 2026-07-24T20:56:40Z
+expected_exit: preserve the three user changes as separate verified local commits, close this record, and release only the matching lock
+external_effect_authority: local files, checks, and atomic commits only; no push deployment form transaction spend or public claim
+status: active
+```
+
+```yaml
+owner: Codex under project-owner direction
 task_id: NEON-DATABASE-MIGRATION-20260724
 task_instance_id: NEON-DATABASE-MIGRATION-20260724:8BDDD6D5
 generation: 1
