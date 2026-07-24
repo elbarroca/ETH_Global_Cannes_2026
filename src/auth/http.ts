@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateEnvironment } from "../config/env";
 import { AuthError, safeErrorCode } from "./errors";
-import { getAuthPolicy } from "./policy";
 import { getSessionPrincipal, revokeSession } from "./service";
 import type { AuthAction, SessionPrincipal } from "./types";
 
@@ -20,6 +19,17 @@ interface ParsedCookieValue {
   value: string | null;
 }
 
+const DEFAULT_SESSION_COOKIE = "alphadawg_session";
+const SESSION_COOKIE_NAME_PATTERN = /^[A-Za-z0-9_-]{3,64}$/;
+const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+function sessionCookieName(): string {
+  const configured = process.env.AUTH_SESSION_COOKIE;
+  return configured && SESSION_COOKIE_NAME_PATTERN.test(configured)
+    ? configured
+    : DEFAULT_SESSION_COOKIE;
+}
+
 function cookieValue(header: string | null, name: string): ParsedCookieValue {
   if (!header) return { found: false, malformed: false, value: null };
   for (const part of header.split(";")) {
@@ -35,14 +45,13 @@ function cookieValue(header: string | null, name: string): ParsedCookieValue {
 }
 
 export function extractSessionToken(request: Request): string | null {
-  const policy = getAuthPolicy();
   const authorization = request.headers.get("authorization");
-  const tokenPattern = /^[A-Za-z0-9_-]{43}$/;
   const bearerMatch = authorization?.match(/^Bearer ([A-Za-z0-9_-]{43})$/);
+  if (authorization !== null && !bearerMatch) return null;
   const bearer = bearerMatch?.[1] ?? null;
-  const parsedCookie = cookieValue(request.headers.get("cookie"), policy.sessionCookie);
+  const parsedCookie = cookieValue(request.headers.get("cookie"), sessionCookieName());
   if (parsedCookie.malformed) return null;
-  if (parsedCookie.found && !tokenPattern.test(parsedCookie.value ?? "")) return null;
+  if (parsedCookie.found && !SESSION_TOKEN_PATTERN.test(parsedCookie.value ?? "")) return null;
   const cookie = parsedCookie.value;
   if (bearer && cookie && bearer !== cookie) return null;
   return bearer ?? cookie;

@@ -3,6 +3,60 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: A5 audit remediation sole writer /root/a5_remediation_writer
+task_id: A5-AUDIT-REMEDIATION-G1-20260724
+task_instance_id: A5-AUDIT-REMEDIATION-G1-20260724:636B8EDB
+generation: 1
+sprint: A5_remediation
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: cb3a82d4c657e7e8b8b89e9a2bed560ac47af273
+control_sha: cb3a82d4c657e7e8b8b89e9a2bed560ac47af273
+token: A5-AUDIT-REMEDIATION-G1-20260724-636B8EDB-A52D-4AAB-9F91-664F5F14DD54
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-24T19:39:26Z
+expires_at: 2026-07-24T22:30:00Z
+allowed_paths:
+  - package.json
+  - package-lock.json
+  - .env.example
+  - contexts/wagmi-provider.tsx
+  - components/wallet-connect.tsx
+  - src/auth/http.ts
+  - tests/auth/siwe.test.ts
+  - tests/a5/**
+  - tests/playwright/a5-ui.spec.ts only if required for the wallet regression
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+started_at: 2026-07-24T19:00:29Z
+expected_exit: zero production critical or high advisories, tracked-state bare build, native injected wallet support, and unauthenticated missing-policy kernel reads bounded to 401 with zero database access
+external_effect_authority: safe local files exact package install generated build and test artifacts loopback HTTP disposable PostgreSQL and one atomic local commit only
+admission_evidence:
+  - branch Eth_global_lisbon_ is clean at exact start and control SHA cb3a82d4c657e7e8b8b89e9a2bed560ac47af273
+  - A4 accepted base remains 1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9
+  - no physical lock or active mirror existed before atomic acquisition
+completed_at: 2026-07-24T19:39:26Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - production npm audit has zero critical and zero high advisories after bounded upgrades overrides and dead dependency removal with residual risk classified
+  - native Wagmi injected wallet support requires no Dynamic or WalletConnect build identifier and passes tracked-state build start and Chromium gates
+  - absent malformed bearer and malformed cookie authentication return bounded 401 before SIWE policy or database access with zero user or session mutation
+  - cold install Prisma environment both migration lanes lint typecheck every test lane pinned Go build start Playwright audits secret diff allowlist and staged review pass
+remaining_blocks:
+  - exact unchanged containing SHA requires independent disposable-checkout audit before the next gate opens
+  - residual production moderate and low advisories plus dev-only high advisories require separately admitted incompatible-major migration if pursued
+  - live sponsor effects managed migration deployment push release and claim promotion remain blocked
+audit_verdict: PASS_TO_AUDIT
+result: PASS_A5_AUDIT_REMEDIATION_LOCAL_ONLY
+lock_release: release only matching token A5-AUDIT-REMEDIATION-G1-20260724-636B8EDB-A52D-4AAB-9F91-664F5F14DD54 after required gates one atomic commit clean status and mirrored closure
+status: closed
+```
+
+```yaml
 owner: A5 UI and control-surface sole writer /root
 task_id: A5-UI-CONTROL-SURFACE-20260724
 task_instance_id: A5-UI-CONTROL-SURFACE-20260724:DEF3962A

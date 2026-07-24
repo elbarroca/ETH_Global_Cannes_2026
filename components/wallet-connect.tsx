@@ -1,50 +1,79 @@
 "use client";
 
-import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
+import {
+  useConnect,
+  useConnection,
+  useConnectors,
+  useDisconnect,
+} from "wagmi";
+import { arcTestnet } from "@/lib/arc-chain";
 
-/**
- * Compact wallet action button.
- *
- * - Disconnected: full "Connect Wallet" CTA → opens Dynamic auth flow.
- * - Connected: minimal icon button (⋮) → opens Dynamic user profile
- *   (network switch, copy address, disconnect). The user's address + chain
- *   are displayed separately in `<Nav />` via `UserWalletPill`, so we avoid
- *   duplicating that information here.
- */
 export function WalletConnectButton() {
-  const { setShowAuthFlow, setShowDynamicUserProfile } = useDynamicContext();
-  const isLoggedIn = useIsLoggedIn();
+  const { isConnected } = useConnection();
+  const [connector] = useConnectors();
+  const connect = useConnect();
+  const disconnect = useDisconnect();
 
-  if (!isLoggedIn) {
+  if (!isConnected) {
+    const label = !connector
+      ? "Wallet unavailable"
+      : connect.isPending
+        ? "Connecting…"
+        : connect.error
+          ? "Retry Wallet"
+          : "Connect Wallet";
+
     return (
-      <button
-        onClick={() => setShowAuthFlow(true)}
-        className="shine-sweep flex items-center gap-2 px-3 py-1.5 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-sm font-bold rounded-lg transition-colors cursor-pointer"
-      >
-        Connect Wallet
-      </button>
+      <>
+        <button
+          type="button"
+          disabled={!connector || connect.isPending}
+          aria-busy={connect.isPending}
+          onClick={() => {
+            if (!connector) return;
+            connect.reset();
+            connect.mutate({ connector, chainId: arcTestnet.id });
+          }}
+          className="shine-sweep flex items-center gap-2 rounded-lg bg-dawg-500 px-3 py-1.5 text-sm font-bold text-void-950 transition-colors hover:bg-dawg-400 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {label}
+        </button>
+        {connect.error && (
+          <span className="sr-only" role="alert">
+            Wallet connection failed. Try again.
+          </span>
+        )}
+      </>
     );
   }
 
+  const label = disconnect.isPending
+    ? "Disconnecting wallet…"
+    : disconnect.error
+      ? "Retry wallet disconnect"
+      : "Disconnect wallet";
+
   return (
-    <button
-      onClick={() => setShowDynamicUserProfile(true)}
-      title="Wallet settings"
-      className="flex items-center justify-center w-8 h-8 rounded-lg bg-void-800 hover:bg-void-700 border border-void-700/60 text-void-400 hover:text-void-200 transition-colors"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        className="w-4 h-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+    <>
+      <button
+        type="button"
+        disabled={disconnect.isPending}
+        aria-busy={disconnect.isPending}
+        aria-label={label}
+        title={label}
+        onClick={() => {
+          disconnect.reset();
+          disconnect.mutate();
+        }}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-void-700/60 bg-void-800 text-void-400 transition-colors hover:bg-void-700 hover:text-void-200 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <circle cx="12" cy="12" r="1" />
-        <circle cx="12" cy="5" r="1" />
-        <circle cx="12" cy="19" r="1" />
-      </svg>
-    </button>
+        <span aria-hidden="true">×</span>
+      </button>
+      {disconnect.error && (
+        <span className="sr-only" role="alert">
+          Wallet disconnect failed. Try again.
+        </span>
+      )}
+    </>
   );
 }

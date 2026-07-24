@@ -3,10 +3,13 @@
 - Task: `A5-UI-CONTROL-SURFACE-20260724`
 - Sprint: `A5`
 - Start/control SHA: `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9`
+- Remediation task: `A5-AUDIT-REMEDIATION-G1-20260724`
+- Remediation start/control SHA: `cb3a82d4c657e7e8b8b89e9a2bed560ac47af273`
+- Applicable defect evidence: audit commit `b918553` identifies the repaired findings but is not exact-SHA acceptance
 - Branch: `Eth_global_lisbon_`
-- Observed through: `2026-07-24T18:21:20Z`
+- Observed through: `2026-07-24T19:39:26Z`
 - Exit SHA: derive from the commit containing this packet
-- Result: `PASS_UI; PASS_A5_READ_MODEL; PASS_BROWSER; PASS_REVIEW; LOCAL_ONLY`
+- Result: `PASS_UI; PASS_A5_READ_MODEL; PASS_BROWSER; PASS_REVIEW; PASS_A5_AUDIT_REMEDIATION; PASS_TO_AUDIT; LOCAL_ONLY`
 - Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
 
 ## Product result
@@ -47,26 +50,39 @@ Playwright `1.61.1` runs Chromium against `next build` plus `next start` with mo
 7. effective 200% browser-zoom reflow; and
 8. reduced-motion animation suppression.
 
+## Audit remediation G1
+
+- The browser wallet surface now uses one Wagmi `injected({ shimDisconnect: true })` connector. Dynamic, RainbowKit, WalletConnect, their imports, and their public environment IDs are absent from the production dependency and tracked configuration surfaces. No vendor environment ID or secret is needed to build; the only runtime prerequisite for wallet interaction is a user-provided EIP-1193 browser wallet.
+- Session token extraction uses a bounded default cookie name without invoking SIWE policy validation. A present malformed Authorization header, malformed target cookie, or missing token returns `401 AUTH_REQUIRED` before `getSessionPrincipal`, policy, or kernel/database access. Well-formed unknown sessions remain read-only lookups returning 401; action and ownership mismatches remain 403.
+- Production dependency risk is 0 critical, 0 high, 4 moderate, and 13 low. Bounded upgrades/overrides cover Next, Express, Prisma, ethers, Sharp, Axios, gRPC, archive/form/URI/serialization/CSS/WebSocket paths, while dead Dynamic/RainbowKit/WalletConnect and direct UUID declarations are removed.
+- The residual production advisories are inherited low-severity 0G/Hashgraph cryptography paths and a moderate Telegram `@cypress/request` path; npm offers only incompatible 0G `2.0.0`, Hashgraph, or Telegram `1.2.0` changes. The full audit's six highs (`brace-expansion`, `immutable`, `js-yaml`, `serialize-javascript`, `tmp`, and `undici`) are dev-only lint/Hardhat/coverage/compiler paths and cannot enter `npm ci --omit=dev` production output.
+
 ## Local gate
 
 | Command/check | Result |
 |---|---|
+| `npm ci --legacy-peer-deps` | PASS: exact cold install and Prisma postinstall generation |
+| `prisma validate`; `npm run prisma:generate` | PASS |
+| `npm run validate:env` with and without required loopback database URLs | PASS |
+| `tsx scripts/test-migrations.ts` | PASS: fresh plus synthetic Cannes upgrade; sentinel SHA-256 preserved |
 | `npm run lint` | PASS: zero errors; 23 inherited warnings |
 | `npm run typecheck` | PASS |
 | `npm test` | PASS: 9/9 |
-| `npm run test:auth` | PASS: 7/7 |
+| `npm run test:auth` | PASS: 9/9, including six missing/malformed direct/route 401 responses plus unknown-session refusal and zero mutation |
 | `npm run test:kernel` | PASS: 13/13 |
-| `npm run test:go` with verified Go `1.23.10` PATH | PASS: verifier tests and build |
+| `npm run test:go` with checksum-verified Go `1.23.10` | PASS: verifier tests and build |
 | `npm run test:integration` | PASS: 26/26 plus both four-migration replay lanes |
 | `npm run test:a3` | PASS: 12/12 |
 | `npm run test:a4` | PASS: 9/9 |
-| `npm run test:a5` | PASS: 2/2 |
+| `npm run test:a5` | PASS: 3/3, including the native-wallet/dependency/config regression |
 | `npm run test:e2e` | PASS: 4/4 |
 | `npm run test:resilience` | PASS: 1/1 |
 | `npm run test:redaction` | PASS: 3/3 |
 | `npm run test:boot` | PASS: protected smoke, workers disabled |
-| `npm run build` | PASS: Next `16.2.2`, 31/31 static pages |
+| former wallet IDs empty + `npm run build` and `npm run start` | PASS: Next `16.2.11`; root/dashboard 200 and unauthenticated kernel 401 |
 | `npm run test:playwright` | PASS: 8/8 Chromium production-browser tests |
+| `npm audit --omit=dev --json` | Expected exit 1 for residual moderate/low; PASS threshold: 0 critical, 0 high, 4 moderate, 13 low |
+| `npm audit --json` | Expected exit 1: 0 critical, 6 dev-only high, 13 moderate, 22 low; classified and isolated |
 | `git diff --check` | PASS |
 | `npm run scan:secrets` | PASS: no high-confidence tracked-file pattern |
 | independent final review and remediation re-review | PASS: no remaining actionable finding |
@@ -76,6 +92,6 @@ Playwright `1.61.1` runs Chromium against `next build` plus `next start` with mo
 - `PASS_LIVE` remains `NOT_RUN; LIVE_EFFECT_BLOCKED`. No live ENS, 0G Compute, Storage, Arc, Hedera, Circle, or sponsor endpoint evidence was created by A5.
 - Production A3 execution remains intentionally unavailable unless separately configured and authorized. Configuration identifiers are not job proof.
 - No database migration was added. Managed migration, deployment, push, forms, transaction, signature, funding, upload, spend, public claim, Lisbon-window classification, track qualification, and release remain outside this local UI phase.
-- Inherited dependency advisories and earlier README/release claim drift remain separate unresolved release concerns.
+- Residual moderate/low production advisories and six dev-only high advisories remain explicitly classified; incompatible majors require a separately admitted migration. Earlier README/release claim drift remains release-blocking and outside this remediation.
 
 External effects attempted: none. Local effects were limited to repository files, package installation, generated build/test output, the release-candidate screenshot, loopback production servers, disposable PostgreSQL clusters, and one authorized local commit.

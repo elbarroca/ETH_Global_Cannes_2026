@@ -2,6 +2,14 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-24 - A5 independent-audit remediation G1
+
+- Classified the A5 dependency findings instead of applying blind majors. Removed the production-reachable Dynamic/RainbowKit/WalletConnect tree and unused direct `uuid` declarations; applied bounded package upgrades and transitive overrides; and reduced the production audit to 0 critical, 0 high, 4 moderate, and 13 low advisories. The remaining production findings require incompatible 0G, Hedera, or Telegram majors; the six full-audit highs are confined to lint, Hardhat, Solidity coverage, and their test/compiler dependencies.
+- Replaced Dynamic with one native Wagmi injected connector and removed both public wallet IDs from the example environment. A tracked-state build, production start, and Chromium suite now pass with the former Dynamic and WalletConnect variables explicitly empty.
+- Moved missing and malformed session refusal ahead of SIWE policy and database access. Absent sessions, malformed bearer headers, and malformed cookies now return deterministic `401 AUTH_REQUIRED`; wrong-action/identity cases retain bounded 403 responses, and the auth regression proves zero user/session mutation.
+- Passed cold install, Prisma validate/generate, environment validation, both fresh and synthetic-upgrade migration lanes, lint/typecheck, every test lane, pinned Go `1.23.10`, bare build/start, Playwright 8/8, production/full audits, secret scan, whitespace, exact allowlist, and staged-diff review.
+- Performed no push, deployment, managed migration, sponsor call, shared-system write, signature, transaction, funding, form, upload, spend, public identifier, release claim, or track promotion. This containing commit returns `PASS_TO_AUDIT`; exact-SHA acceptance must come from the subsequent disposable-checkout audit.
+
 ## 2026-07-24 - A5 whole-product UI and protected control surface
 
 - Preserved the dark Nasdaq shell, existing route URLs, and navigation labels while adding keyboard-safe mobile navigation, global focus/active/disabled/reduced-motion rules, and responsive layouts with no horizontal overflow from 390 through 1,440 CSS pixels.

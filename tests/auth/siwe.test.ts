@@ -13,6 +13,7 @@ import {
 import { POST as onboardRoute } from "../../app/api/onboard/route";
 import { POST as challengeRoute } from "../../app/api/auth/siwe/challenge/route";
 import { POST as verifyRoute } from "../../app/api/auth/siwe/verify/route";
+import { GET as jobsRoute } from "../../app/api/kernel/jobs/route";
 import {
   configureDatabaseEnvironment,
   startDisposableDatabase,
@@ -34,6 +35,99 @@ before(async () => {
 
 after(async () => {
   await database.close();
+});
+
+test("production requests without a session fail before SIWE policy or database access", async () => {
+  const keys = [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "SIWE_DOMAIN",
+    "SIWE_URI",
+    "SIWE_AUDIENCE",
+    "AUTH_SESSION_COOKIE",
+  ] as const;
+  const saved = new Map(keys.map((key) => [key, process.env[key]]));
+  const before = await database.sql<{ users: string; sessions: string }[]>`
+    SELECT
+      (SELECT count(*)::text FROM users) AS users,
+      (SELECT count(*)::text FROM auth_sessions) AS sessions
+  `;
+
+  try {
+    Object.assign(process.env, {
+      NODE_ENV: "production",
+      DATABASE_URL: "not-a-database-url",
+    });
+    delete process.env.SIWE_DOMAIN;
+    delete process.env.SIWE_URI;
+    delete process.env.SIWE_AUDIENCE;
+    delete process.env.AUTH_SESSION_COOKIE;
+
+    const requests = [
+      new Request("http://localhost:3000/api/kernel/jobs"),
+      new Request("http://localhost:3000/api/kernel/jobs", {
+        headers: { authorization: "Bearer invalid" },
+      }),
+      new Request("http://localhost:3000/api/kernel/jobs", {
+        headers: { cookie: "alphadawg_session=%E0%A4%A" },
+      }),
+    ];
+    for (const request of requests) {
+      const direct = await authenticateRequest(request, { requireUser: true });
+      assert.equal(direct.ok, false);
+      if (direct.ok) throw new Error("TEST_UNAUTHENTICATED_REQUEST_AUTHORIZED");
+      assert.equal(direct.response.status, 401);
+      assert.equal((await direct.response.json() as { code: string }).code, "AUTH_REQUIRED");
+
+      const response = await jobsRoute(request);
+      assert.equal(response.status, 401);
+      assert.equal((await response.json() as { code: string }).code, "AUTH_REQUIRED");
+    }
+    assert.throws(() => getAuthPolicy(), /SIWE_DOMAIN: required in production/);
+  } finally {
+    for (const key of keys) {
+      const value = saved.get(key);
+      if (value === undefined) delete process.env[key];
+      else Object.assign(process.env, { [key]: value });
+    }
+  }
+
+  const after = await database.sql<{ users: string; sessions: string }[]>`
+    SELECT
+      (SELECT count(*)::text FROM users) AS users,
+      (SELECT count(*)::text FROM auth_sessions) AS sessions
+  `;
+  assert.deepEqual(after[0], before[0]);
+});
+
+test("unknown well-formed sessions return 401 with zero mutation", async () => {
+  const before = await database.sql<{ challenges: string; users: string; sessions: string }[]>`
+    SELECT
+      (SELECT count(*)::text FROM auth_challenges) AS challenges,
+      (SELECT count(*)::text FROM users) AS users,
+      (SELECT count(*)::text FROM auth_sessions) AS sessions
+  `;
+  const request = new Request("http://localhost:3000/api/kernel/jobs", {
+    headers: { authorization: `Bearer ${"A".repeat(43)}` },
+  });
+
+  const direct = await authenticateRequest(request, { requireUser: true });
+  assert.equal(direct.ok, false);
+  if (direct.ok) throw new Error("TEST_UNKNOWN_SESSION_AUTHORIZED");
+  assert.equal(direct.response.status, 401);
+  assert.equal((await direct.response.json() as { code: string }).code, "AUTH_SESSION_EXPIRED");
+
+  const response = await jobsRoute(request);
+  assert.equal(response.status, 401);
+  assert.equal((await response.json() as { code: string }).code, "AUTH_SESSION_EXPIRED");
+
+  const after = await database.sql<{ challenges: string; users: string; sessions: string }[]>`
+    SELECT
+      (SELECT count(*)::text FROM auth_challenges) AS challenges,
+      (SELECT count(*)::text FROM users) AS users,
+      (SELECT count(*)::text FROM auth_sessions) AS sessions
+  `;
+  assert.deepEqual(after[0], before[0]);
 });
 
 test("challenge route rejects malformed JSON without persistence", async () => {
