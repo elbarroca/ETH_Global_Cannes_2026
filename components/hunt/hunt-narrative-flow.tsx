@@ -202,8 +202,8 @@ function infraBody(a: AgentActionRecord): string {
     case "STORAGE_UPLOADED": {
       const h = typeof p?.storageHash === "string" ? p.storageHash : "";
       return h
-        ? `0G Storage sealed · ${h.slice(0, 12)}…${h.slice(-6)}`
-        : "0G Storage sealed · swarm memory persisted";
+        ? `0G Storage identifier · ${h.slice(0, 12)}…${h.slice(-6)}`
+        : "0G Storage action recorded without a root";
     }
     case "HCS_LOGGED": {
       const seq = typeof p?.seqNum === "number" ? p.seqNum : null;
@@ -502,7 +502,7 @@ export function HuntNarrativeFlow({
       <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3 border-b border-void-800/80 bg-void-950/60">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs sm:text-sm font-bold uppercase tracking-[0.15em] text-dawg-400 shrink-0">
-            Live stream
+            Timed replay
           </span>
           <span className="text-xs sm:text-sm text-void-500 font-mono truncate">
             #{cycle.id} · {Math.min(idx + 1, phases.length)}/{phases.length}

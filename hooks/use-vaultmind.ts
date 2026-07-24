@@ -39,6 +39,7 @@ export function useCycleHistory(limit = 10) {
   const [loading, setLoading] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(
     async (newOffset = 0) => {
@@ -53,6 +54,9 @@ export function useCycleHistory(limit = 10) {
         }
         setHasMore(data.length === limit);
         setOffset(newOffset + data.length);
+        setError(null);
+      } catch (fetchError) {
+        setError(fetchError instanceof Error ? fetchError.message : "Hunt history is unavailable.");
       } finally {
         setLoading(false);
       }
@@ -66,7 +70,7 @@ export function useCycleHistory(limit = 10) {
 
   const loadMore = () => fetch(offset);
 
-  return { history, loading, hasMore, loadMore, refetch: () => fetch(0) };
+  return { history, loading, error, hasMore, loadMore, refetch: () => fetch(0) };
 }
 
 export function useTriggerCycle() {

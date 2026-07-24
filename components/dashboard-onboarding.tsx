@@ -69,7 +69,7 @@ export function DashboardOnboardingModal({ open, onDismiss }: DashboardOnboardin
 
           <p className="text-sm text-void-300 leading-relaxed">
             A <strong className="text-gold-300 font-semibold">hunt</strong> is one full turn: your agent hires specialists with micropayments,
-            runs an adversarial debate in sealed inference, then commits the decision to Hedera and optional 0G storage.
+            runs an adversarial debate, then records any Hedera and 0G identifiers returned by that cycle.
           </p>
 
           <div
@@ -113,7 +113,7 @@ export function DashboardOnboardingModal({ open, onDismiss }: DashboardOnboardin
             <p className={SECTION_LABEL}>Terms</p>
             <dl className="grid gap-2.5 sm:grid-cols-2">
               {[
-                { k: "TEE / Sealed", c: "text-teal-400", d: "Inference in a trusted environment; outputs attested." },
+                { k: "TEE evidence", c: "text-teal-400", d: "Shown only when a selected action includes an attestation and verified flag." },
                 { k: "x402", c: "text-emerald-400", d: "Micropayments on Arc (e.g. $0.001) per specialist call." },
                 { k: "HCS", c: "text-blue-400", d: "Hedera Consensus Service — immutable cycle audit log." },
                 { k: "OG / 0G", c: "text-purple-400", d: "Decentralized storage for rich records and memory." },
@@ -131,7 +131,7 @@ export function DashboardOnboardingModal({ open, onDismiss }: DashboardOnboardin
 
           <div className="rounded-lg border border-void-800 bg-void-950/60 px-3.5 py-2.5">
             <p className="text-[11px] text-void-500 leading-relaxed">
-              <span className="text-void-400 font-medium">Layout:</span> the right column is live swarm / network activity.
+              <span className="text-void-400 font-medium">Layout:</span> the right column is observed swarm / network activity.
               The center column is <strong className="text-void-400">your</strong> completed hunts — they only change when a new hunt finishes.
             </p>
           </div>

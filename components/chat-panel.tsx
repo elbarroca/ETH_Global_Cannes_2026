@@ -119,7 +119,7 @@ export function ChatPanel({ userId, onClose }: ChatPanelProps) {
           <div className="flex flex-col leading-none">
             <span className="text-sm font-bold text-void-100">Lead Dawg</span>
             <span className="font-mono text-[10px] text-void-500">
-              sealed · 0G Compute TEE
+              Legacy assistant · proof shown per response
             </span>
           </div>
         </div>
@@ -166,7 +166,7 @@ export function ChatPanel({ userId, onClose }: ChatPanelProps) {
             <div className="inline-flex items-center gap-2 rounded-xl border border-void-700/50 bg-void-800 px-3 py-2">
               <DawgSpinner size={16} />
               <span className="font-mono text-[11px] text-void-500">
-                Running sealed inference…
+                Waiting for assistant response…
               </span>
             </div>
           </div>
@@ -230,7 +230,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           <div className="mt-2 flex items-center gap-1.5 border-t border-void-700/50 pt-1.5 font-mono text-[10px]">
             <span className="inline-flex items-center gap-1 rounded-md border border-gold-400/25 bg-gold-400/10 px-1.5 py-0.5 text-gold-400">
               <span className="h-1 w-1 rounded-full bg-gold-400 animate-pulse" />
-              sealed
+              Compute response flag
             </span>
             {teeOk && <span className="text-gold-400">TEE ✓</span>}
             {attest && (

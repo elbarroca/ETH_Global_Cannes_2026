@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DawgSpinner } from "@/components/dawg-spinner";
@@ -22,37 +22,31 @@ export default function PortfolioPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async (silent = false): Promise<void> => {
     if (!userId) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    setError(null);
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await fetch(`/api/portfolio/${userId}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as PortfolioResponse;
-        if (!cancelled) {
-          setData(json);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-          setLoading(false);
-        }
-      }
-    };
+    if (!silent) setLoading(true);
+    try {
+      const res = await fetch(`/api/portfolio/${userId}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Portfolio API returned ${res.status}`);
+      setData((await res.json()) as PortfolioResponse);
+      setError(null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Portfolio data is unavailable.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
     void load();
-    const interval = setInterval(load, 10_000);
+    const interval = setInterval(() => void load(true), 10_000);
     return () => {
-      cancelled = true;
       clearInterval(interval);
     };
-  }, [userId]);
+  }, [load]);
 
   if (!isConnected || !userId) {
     return (
@@ -73,13 +67,20 @@ export default function PortfolioPage() {
     );
   }
 
-  if (error || !data) {
+  if (!data) {
     return (
       <main className="max-w-screen-2xl mx-auto px-5 py-8">
         <h1 className="font-pixel text-lg text-void-200 mb-4">Portfolio</h1>
         <div className="rounded-2xl border border-blood-900/30 bg-blood-950/10 px-6 py-8 text-center">
           <p className="text-sm text-blood-300/90">Failed to load portfolio data.</p>
           {error && <p className="text-xs text-void-500 font-mono mt-2">{error}</p>}
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="mt-4 min-h-11 rounded-xl border border-void-700 px-4 text-sm font-semibold text-void-200 hover:bg-void-800"
+          >
+            Retry portfolio
+          </button>
         </div>
       </main>
     );
@@ -107,6 +108,15 @@ export default function PortfolioPage() {
         </div>
       </header>
 
+      {error && (
+        <div role="status" className="flex flex-col gap-3 rounded-xl border border-dawg-500/25 bg-dawg-500/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-void-400">Showing the last portfolio snapshot. Refresh failed: {error}</p>
+          <button type="button" onClick={() => void load()} className="min-h-11 rounded-xl border border-void-700 px-4 text-sm font-semibold text-void-200 hover:bg-void-800">
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Total NAV" value={`$${data.totalNav.toFixed(2)}`} valueClass={KPI_STYLES.nav} />
         <KpiCard label="USDC" value={`$${data.current.usdcDeposited.toFixed(2)}`} valueClass={KPI_STYLES.default} />
@@ -125,10 +135,35 @@ export default function PortfolioPage() {
               <span className="h-px w-6 bg-dawg-500/60" aria-hidden />
               Current allocation
             </div>
-            <Badge variant="gray">live</Badge>
+            <Badge variant="gray">Modeled snapshot</Badge>
           </CardHeader>
           <CardBody className="pt-4 pb-6">
             <PortfolioPie positions={data.current.positions} totalUsd={data.current.totalUsd} />
+            <details className="mt-5 rounded-xl border border-void-800 bg-void-950/45">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-void-300">
+                Allocation data table
+              </summary>
+              <div className="overflow-x-auto border-t border-void-800">
+                <table className="w-full min-w-[520px] text-left text-sm">
+                  <thead className="text-[10px] uppercase tracking-wider text-void-600">
+                    <tr><th className="px-4 py-2">Asset</th><th className="px-4 py-2">Amount</th><th className="px-4 py-2">Modeled USD</th><th className="px-4 py-2">Share</th></tr>
+                  </thead>
+                  <tbody>
+                    {data.current.positions.map((position) => (
+                      <tr key={position.symbol} className="border-t border-void-800/70 text-void-300">
+                        <th scope="row" className="px-4 py-2 font-semibold">{position.symbol}</th>
+                        <td className="px-4 py-2 font-mono">{position.amount}</td>
+                        <td className="px-4 py-2 font-mono">${position.usdValue.toFixed(2)}</td>
+                        <td className="px-4 py-2 font-mono">{position.sharePct.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+            <p className="mt-3 text-xs text-void-600">
+              Non-USDC values use the portfolio API&apos;s fixed demo-price model; they are not a market-price feed.
+            </p>
           </CardBody>
         </Card>
       </section>
@@ -144,6 +179,29 @@ export default function PortfolioPage() {
           </CardHeader>
           <CardBody className="pt-2 pb-5">
             <EvolutionChart evolution={data.evolution} />
+            <details className="mt-4 rounded-xl border border-void-800 bg-void-950/45">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-void-300">
+                NAV history data table
+              </summary>
+              <div className="overflow-x-auto border-t border-void-800">
+                <table className="w-full min-w-[620px] text-left text-sm">
+                  <thead className="text-[10px] uppercase tracking-wider text-void-600">
+                    <tr><th className="px-4 py-2">Hunt</th><th className="px-4 py-2">Time</th><th className="px-4 py-2">Decision</th><th className="px-4 py-2">NAV snapshot</th><th className="px-4 py-2">Arc tx</th></tr>
+                  </thead>
+                  <tbody>
+                    {data.evolution.map((point) => (
+                      <tr key={point.cycleId} className="border-t border-void-800/70 text-void-300">
+                        <th scope="row" className="px-4 py-2 font-semibold">#{point.cycleNumber}</th>
+                        <td className="px-4 py-2">{new Date(point.timestamp).toLocaleString()}</td>
+                        <td className="px-4 py-2">{point.action} {point.pct}% {point.asset}</td>
+                        <td className="px-4 py-2 font-mono">${point.navAfter.toFixed(2)}</td>
+                        <td className="px-4 py-2 font-mono">{point.swapTxHash ? `${point.swapTxHash.slice(0, 10)}…` : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
           </CardBody>
         </Card>
       </section>

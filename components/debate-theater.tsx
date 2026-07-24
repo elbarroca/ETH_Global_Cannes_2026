@@ -187,13 +187,13 @@ export function DebateTheater({
           {isActive && (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono bg-dawg-500/15 text-dawg-300 border border-dawg-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-dawg-400 animate-pulse" />
-              live
+              In progress
             </span>
           )}
           {allTee && !isActive && (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono bg-gold-400/10 text-gold-400 border border-gold-400/20">
               <span className="w-1.5 h-1.5 rounded-full bg-gold-400" />
-              TEE sealed
+              TEE attestations present
             </span>
           )}
         </div>

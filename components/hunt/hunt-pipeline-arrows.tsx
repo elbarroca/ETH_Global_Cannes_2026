@@ -226,10 +226,10 @@ export function HuntPipelineArrows({
     });
   }
 
-  // 11. Terminal sealed marker.
+  // 11. Terminal recorded marker.
   nodes.push({
-    key: "sealed",
-    short: "Sealed",
+    key: "recorded",
+    short: "Recorded",
     sub: `${cycle.trade.action} ${cycle.trade.percentage}% ${cycle.trade.asset}`,
     accent: "border-dawg-500/50 bg-dawg-500/10 text-dawg-300",
     realMs: msOf("HUNT_COMPLETE") ?? msOf("CYCLE_COMPLETED"),

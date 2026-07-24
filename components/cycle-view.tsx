@@ -14,7 +14,7 @@ export function CycleView({ cycle }: { cycle: Cycle }) {
 
   return (
     <div className="bg-void-900 rounded-2xl border border-void-800 overflow-hidden">
-      {/* Header — cycle ID + user goal + live badge */}
+      {/* Header — cycle ID, user goal, and recorded-state badge. */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-void-800 gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-void-500 font-mono text-sm shrink-0">Hunt #{cycle.id}</span>
@@ -37,7 +37,7 @@ export function CycleView({ cycle }: { cycle: Cycle }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="w-2 h-2 bg-blood-500 rounded-full animate-pulse" />
-          <span className="text-xs text-blood-300 font-mono">LIVE</span>
+          <span className="text-xs text-blood-300 font-mono">RECORDED</span>
         </div>
       </div>
 

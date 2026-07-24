@@ -28,9 +28,13 @@ export default function DepositPage() {
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<{
-    txHash: string;
-    amount: string;
     kind: Tab;
+    identifier: string;
+    grossAmount: number;
+    fee: number;
+    netAmount: number;
+    remainingBalance: number | null;
+    status: string;
     at: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +70,16 @@ export default function DepositPage() {
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       setStep("recording");
       await deposit(userId, parsedAmount, txHash);
-      setLastReceipt({ txHash, amount: parsedAmount.toFixed(2), kind: "deposit", at: Date.now() });
+      setLastReceipt({
+        kind: "deposit",
+        identifier: txHash,
+        grossAmount: parsedAmount,
+        fee: 0,
+        netAmount: parsedAmount,
+        remainingBalance: null,
+        status: "confirmed on Arc and recorded",
+        at: Date.now(),
+      });
       setAmount("");
       // Refetch the user record AND force-refresh the live balance so every
       // UI surface (nav chip, hero DEPOSITED, this page, dashboard card)
@@ -89,8 +102,17 @@ export default function DepositPage() {
     setLoading(true);
     setError(null);
     try {
-      await withdraw(userId, parseFloat(amount));
-      setLastReceipt({ txHash: "", amount: parseFloat(amount).toFixed(2), kind: "withdraw", at: Date.now() });
+      const receipt = await withdraw(userId, parseFloat(amount));
+      setLastReceipt({
+        kind: "withdraw",
+        identifier: receipt.circleTxId,
+        grossAmount: receipt.grossAmount,
+        fee: receipt.fee,
+        netAmount: receipt.netAmount,
+        remainingBalance: receipt.remainingBalance,
+        status: receipt.transactionStatus,
+        at: Date.now(),
+      });
       setAmount("");
       await Promise.all([refetch(), refreshAgentBalance()]);
     } catch (err) {
@@ -118,6 +140,7 @@ export default function DepositPage() {
   return (
     <main className="max-w-screen-2xl mx-auto px-5 py-5">
       <div className="max-w-xl mx-auto space-y-4">
+        <h1 className="sr-only">Fund or withdraw from the agent wallet</h1>
 
         {/* Hero — Nasdaq LED balance display */}
         <div className="nasdaq-led nasdaq-scanlines nasdaq-dot-matrix rounded-2xl px-6 py-8 border border-dawg-500/20 glow-card text-center">
@@ -192,10 +215,15 @@ export default function DepositPage() {
         {/* Deposit / Withdraw card */}
         <div className="bg-void-900 border border-void-800 rounded-2xl overflow-hidden">
           {/* Tab switcher */}
-          <div className="flex border-b border-void-800">
+          <div className="flex border-b border-void-800" role="tablist" aria-label="Wallet transaction type">
             {(["deposit", "withdraw"] as Tab[]).map((t) => (
               <button
+                type="button"
                 key={t}
+                id={`${t}-tab`}
+                role="tab"
+                aria-selected={tab === t}
+                aria-controls="wallet-transaction-panel"
                 onClick={() => setTab(t)}
                 className={`flex-1 py-3.5 text-sm font-bold uppercase tracking-wider transition-all ${
                   tab === t
@@ -210,7 +238,12 @@ export default function DepositPage() {
             ))}
           </div>
 
-          <div className="p-5 space-y-5">
+          <div
+            id="wallet-transaction-panel"
+            role="tabpanel"
+            aria-labelledby={`${tab}-tab`}
+            className="p-5 space-y-5"
+          >
             {/* Where funds go */}
             {tab === "deposit" && proxyAddress && (
               <div className="flex items-center gap-3 px-3 py-2.5 bg-void-950 border border-void-800 rounded-xl">
@@ -230,7 +263,9 @@ export default function DepositPage() {
             <div className="space-y-3">
               <div className="relative">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 font-pixel text-[24px] text-void-600">$</div>
+                <label htmlFor="wallet-amount" className="sr-only">Amount in USDC</label>
                 <input
+                  id="wallet-amount"
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
@@ -247,6 +282,7 @@ export default function DepositPage() {
               <div className="flex gap-2">
                 {QUICK_AMOUNTS.map((q) => (
                   <button
+                    type="button"
                     key={q}
                     onClick={() => setAmount(q.toString())}
                     className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border ${
@@ -260,6 +296,7 @@ export default function DepositPage() {
                 ))}
                 {deposited > 0 && tab === "withdraw" && (
                   <button
+                    type="button"
                     onClick={() => setAmount(deposited.toString())}
                     className="flex-1 py-2 rounded-lg text-xs font-bold bg-void-950 text-blood-400 border border-blood-500/30 hover:bg-blood-500/10 transition-all"
                   >
@@ -271,6 +308,7 @@ export default function DepositPage() {
 
             {/* Submit */}
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={isProcessing || !amount || !isConnected}
               className={`shine-sweep w-full py-4 disabled:opacity-40 font-bold text-sm uppercase tracking-wider rounded-xl transition-all ${
@@ -307,12 +345,12 @@ export default function DepositPage() {
 
             {/* Success receipt */}
             {lastReceipt && !isProcessing && (
-              <div className="border border-emerald-500/30 bg-emerald-500/5 rounded-xl p-4 space-y-2">
+              <div aria-live="polite" className="border border-emerald-500/30 bg-emerald-500/5 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                     <span className="text-sm font-bold text-emerald-300">
-                      {lastReceipt.kind === "deposit" ? "Deposit confirmed" : "Withdrawal confirmed"}
+                      {lastReceipt.kind === "deposit" ? "Deposit recorded" : "Withdrawal response received"}
                     </span>
                   </div>
                   <button
@@ -323,17 +361,26 @@ export default function DepositPage() {
                     ✕
                   </button>
                 </div>
-                <p className="font-pixel text-[20px] text-emerald-400 glow-green">
-                  ${lastReceipt.amount} USDC
+                <dl className="grid grid-cols-2 gap-2 text-xs">
+                  <div><dt className="text-void-600">Gross amount</dt><dd className="mt-1 font-mono text-void-200">${lastReceipt.grossAmount.toFixed(2)}</dd></div>
+                  <div><dt className="text-void-600">Fee</dt><dd className="mt-1 font-mono text-void-200">${lastReceipt.fee.toFixed(2)}</dd></div>
+                  <div><dt className="text-void-600">Net amount</dt><dd className="mt-1 font-mono text-emerald-300">${lastReceipt.netAmount.toFixed(2)}</dd></div>
+                  <div><dt className="text-void-600">Actual status</dt><dd className="mt-1 font-mono text-void-200">{lastReceipt.status}</dd></div>
+                  {lastReceipt.remainingBalance !== null && (
+                    <div><dt className="text-void-600">Remaining balance</dt><dd className="mt-1 font-mono text-void-200">${lastReceipt.remainingBalance.toFixed(2)}</dd></div>
+                  )}
+                </dl>
+                <p className="break-all font-mono text-[11px] text-void-500">
+                  {lastReceipt.kind === "deposit" ? "Arc transaction" : "Circle transaction"}: {lastReceipt.identifier}
                 </p>
-                {lastReceipt.txHash && (
+                {lastReceipt.kind === "deposit" && (
                   <a
-                    href={arcTxUrl(lastReceipt.txHash) ?? "#"}
+                    href={arcTxUrl(lastReceipt.identifier) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 text-xs font-mono text-teal-300 hover:text-teal-200 underline decoration-dotted"
                   >
-                    {lastReceipt.txHash.slice(0, 10)}…{lastReceipt.txHash.slice(-8)}
+                    {lastReceipt.identifier.slice(0, 10)}…{lastReceipt.identifier.slice(-8)}
                     <span className="text-[10px]">↗ ArcScan</span>
                   </a>
                 )}

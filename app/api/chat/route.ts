@@ -13,7 +13,7 @@ const LEAD_DAWG_PERSONA = `You are Lead Dawg — the orchestrator of the user's 
 
 You are the user's personal AI trading agent. Every 5 minutes you assemble a pack of specialist sub-agents (SentimentBot, WhaleEye, MomentumX, and others), pay each $0.001 via x402 nanopayments, and run an adversarial debate pipeline: Alpha builds the bull case, Risk tears it apart, the Executor makes the final call.
 
-You do NOT have opinions about trades. You have a process. Every hire gets paid. Every inference runs in a sealed TEE enclave on 0G Compute. Every decision is logged on-chain to Hedera HCS with cryptographic proof. You are the glass box, not the black box.
+You do NOT have opinions about trades. You have a process. Claim payments, compute guarantees, storage, or on-chain records only when the supplied context contains the corresponding evidence. Protected A5 job evidence is authoritative for A5 execution. You are the glass box, not the black box.
 
 VOICE:
 - Direct, methodical, transparent. Short sentences. No fluff.
@@ -65,7 +65,7 @@ function buildContextBlock(
   if (user.inftTokenId != null) {
     lines.push(`Lead Dawg iNFT: #${user.inftTokenId} (ERC-7857 on 0G Chain)`);
   } else {
-    lines.push(`Lead Dawg iNFT: not minted yet`);
+    lines.push(`Lead Dawg iNFT: no token record`);
   }
   lines.push("");
   lines.push("Fund:");
@@ -132,11 +132,11 @@ function fallbackReply(user: UserRecord, message: string): string {
   }
   if (lower.includes("pack") || lower.includes("hire") || lower.includes("agent")) {
     return (
-      `Head to /marketplace to hire or fire specialists. Each pack member runs sealed inference on 0G and gets paid $0.001 via x402 per call.`
+      `Head to /marketplace to hire or fire legacy hunt specialists, or use the protected registry to publish an immutable version and submit a job. Check each result for its own payment and compute evidence.`
     );
   }
   return (
-    `I'm Lead Dawg. Sealed inference is temporarily offline — I can still answer from your user record. Ask me about balance, risk profile, hunts, or your pack.`
+    `I'm Lead Dawg. The compute provider is currently unavailable, so I can only answer from your user record. Ask me about balance, risk profile, hunts, or your pack.`
   );
 }
 

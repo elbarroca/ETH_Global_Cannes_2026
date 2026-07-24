@@ -13,17 +13,17 @@ export default function HistoryPage() {
   // "Load more" for deeper history. Each enriched row is heavy (narrative +
   // payments + specialist picks + debate reasoning), so 8/page keeps the
   // initial payload in a reasonable range on slow networks.
-  const { history, loading, hasMore, loadMore } = useCycleHistory(8);
+  const { history, loading, error, hasMore, loadMore, refetch } = useCycleHistory(8);
 
   const cycles = history.map((record) => mapEnrichedResponseToCycle(record));
 
   return (
     <main className="max-w-7xl mx-auto px-5 py-5 space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <h1 className="text-lg font-bold text-void-100">Hunt log</h1>
         <p className="text-sm text-void-500">
-          All hunts recorded on Hedera HCS + 0G Sealed Inference
+          Legacy cycle records with proof links shown only when present
         </p>
       </div>
 
@@ -41,7 +41,21 @@ export default function HistoryPage() {
       )}
 
       {/* Empty */}
-      {!loading && cycles.length === 0 && (
+      {error && (
+        <div role="alert" className="rounded-2xl border border-blood-500/30 bg-blood-900/15 px-5 py-4">
+          <p className="text-sm font-semibold text-blood-200">Hunt history is unavailable</p>
+          <p className="mt-1 text-sm text-void-500">{error}</p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="mt-3 min-h-11 rounded-xl border border-void-700 px-4 text-sm font-semibold text-void-200 hover:bg-void-800"
+          >
+            Retry history
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && cycles.length === 0 && (
         <div className="bg-void-900 border border-void-800 rounded-2xl px-6 py-12 text-center">
           <p className="text-void-400 text-sm">
             No hunts recorded yet. Start your first hunt from the dashboard.
@@ -84,6 +98,10 @@ export default function HistoryPage() {
             Load more
           </button>
         )
+      )}
+
+      {!loading && !error && !hasMore && cycles.length > 0 && (
+        <p className="py-3 text-center text-xs text-void-600">End of recorded hunt history.</p>
       )}
     </main>
   );

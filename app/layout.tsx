@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: "AlphaDawg",
   description:
-    "Your AI pack hunts alpha. Provable investment decisions with adversarial debate, sealed inference, and on-chain verification.",
+    "Publish immutable agents, submit protected jobs, and inspect canonical per-job evidence.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

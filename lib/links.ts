@@ -166,9 +166,8 @@ export function arcAddressUrl(address: string): string {
   return `${ARCSCAN_BASE}/address/${address}`;
 }
 
-// ── Unified "live contracts" table ──────────────────────────────────────────
-// The four smart contracts / chain-level assets that judges need to verify in
-// one click. Consumed by the `<LiveContractsMenu>` dropdown in SwarmStatusBar.
+// ── Unified configured-asset table ───────────────────────────────────────────
+// Explorer destinations for configured contracts and chain-level identifiers.
 
 export interface LiveContract {
   /** Short label — e.g. "iNFT Contract". */
@@ -187,28 +186,28 @@ export const LIVE_CONTRACTS: readonly LiveContract[] = [
   {
     label: "VaultMindAgent iNFT",
     chain: "0G Chain",
-    description: "ERC-7857 intelligent NFT — each user's agent identity is minted here",
+    description: "Configured ERC-7857 contract address; inspect the explorer for token records",
     href: ogChainAddressUrl(INFT_CONTRACT_ADDRESS),
     identifier: INFT_CONTRACT_ADDRESS,
   },
   {
     label: "HCS Audit Topic",
     chain: "Hedera",
-    description: "Immutable per-cycle audit trail — every decision logged as a topic message",
+    description: "Configured HCS topic; inspect the mirror record for observed messages",
     href: hashscanTopicUrl(HCS_TOPIC_ID),
     identifier: HCS_TOPIC_ID,
   },
   {
     label: "HTS Fund Token",
     chain: "Hedera",
-    description: "VMF share token for fractional fund exposure",
+    description: "Configured VMF share-token identifier",
     href: hashscanTokenUrl(HTS_FUND_TOKEN_ID),
     identifier: HTS_FUND_TOKEN_ID,
   },
   {
     label: "Arc Swap Router",
     chain: "Arc",
-    description: "MockSwapRouter handling every real trade tx on Arc testnet",
+    description: "Configured Arc testnet swap-router address",
     href: arcAddressUrl(ARC_SWAP_ROUTER_ADDRESS),
     identifier: ARC_SWAP_ROUTER_ADDRESS,
   },

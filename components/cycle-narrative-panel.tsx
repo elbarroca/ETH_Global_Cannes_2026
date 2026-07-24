@@ -67,7 +67,7 @@ export function CycleNarrativePanel({ narrative }: { narrative: CycleNarrative }
               <span className="text-base font-bold text-gold-400">
                 ${cycleLiquidity.availableUsd.toFixed(4)}
               </span>
-              <span className="text-void-500">USDC ready to deploy</span>
+              <span className="text-void-500">USDC available for allocation</span>
               <span className="text-void-700">·</span>
               <span className="text-void-500">
                 proxy ${cycleLiquidity.proxyUsd.toFixed(4)}

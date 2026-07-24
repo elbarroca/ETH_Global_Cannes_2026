@@ -83,7 +83,7 @@ export function HuntCard({ cycle }: { cycle: Cycle }) {
         <div className="flex items-center gap-3 text-xs text-void-600 flex-wrap">
           <span>{specialistCount} specialists</span>
           <span className="w-1 h-1 rounded-full bg-void-700" />
-          <span>{specialistCount * 2} sealed inferences</span>
+          <span>{specialistCount} specialist results</span>
           <span className="w-1 h-1 rounded-full bg-void-700" />
           <span>${cost} spent</span>
           {swapHref && cycle.swap?.txHash && (

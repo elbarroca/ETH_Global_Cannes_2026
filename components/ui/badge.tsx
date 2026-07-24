@@ -52,7 +52,7 @@ export function SealedBadge({ onClick }: { onClick?: () => void }) {
       className="font-pixel glow-dawg inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[14px] leading-none uppercase tracking-wider bg-black text-[#FFCC00] border border-dawg-500/40 hover:border-dawg-500/70 transition-colors"
     >
       <span className="w-1.5 h-1.5 rounded-full bg-dawg-400 shadow-[0_0_8px_rgba(255,199,0,0.9)] animate-pulse" />
-      SEALED
+      ATTESTATION
     </button>
   );
 }
@@ -62,14 +62,14 @@ export function LiveBadge({ variant = "dark" }: { variant?: "dark" | "light" }) 
     return (
       <span className="font-pixel inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[14px] leading-none uppercase tracking-wider bg-white text-emerald-800 border-2 border-neutral-900 shadow-sm">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shadow-[0_0_6px_rgba(5,150,105,0.85)] animate-pulse" />
-        LIVE
+        OBSERVED
       </span>
     );
   }
   return (
     <span className="font-pixel glow-green inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[14px] leading-none uppercase tracking-wider bg-black text-[#39FF7A] border border-emerald-500/40">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse" />
-      LIVE
+      OBSERVED
     </span>
   );
 }

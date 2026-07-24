@@ -1,5 +1,5 @@
 import { Card, CardHeader, CardBody, CodeBlock } from "@/components/ui/card";
-import { SealedBadge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 
 export function AgentGridCard({
   emoji,
@@ -25,7 +25,7 @@ export function AgentGridCard({
           <span>{emoji}</span>
           <span>{title}</span>
         </div>
-        {sealed && <SealedBadge />}
+        {sealed && <Badge variant="green">Attestation present</Badge>}
       </CardHeader>
       <CardBody className="space-y-3">
         <CodeBlock className="streaming-text">

@@ -51,7 +51,7 @@ export function RagStatusLine({ userId }: { userId: string }) {
         </p>
       )}
       <p className="text-[10px] text-void-600 mt-1.5">
-        CLI live check (downloads from 0G):{" "}
+        Manual CLI read check (downloads from 0G):{" "}
         <code className="text-void-500">npx tsx scripts/inspect-rag-eligibility.ts</code>
       </p>
     </div>

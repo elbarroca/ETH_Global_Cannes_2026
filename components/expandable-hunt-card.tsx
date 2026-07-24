@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, type CSSProperties } from "react";
+import { useState, useEffect, useCallback, useId, useRef, type CSSProperties } from "react";
 import { Card, CardHeader, CardBody, CodeBlock } from "@/components/ui/card";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
 import { ComputeLog } from "@/components/compute-log";
@@ -58,12 +58,14 @@ function CompactView({
   onClick,
   computing,
   computingLabel,
+  panelId,
 }: {
   cycle: Cycle;
   expanded: boolean;
   onClick: () => void;
   computing?: boolean;
   computingLabel?: string;
+  panelId: string;
 }) {
   const style = ACTION_STYLES[cycle.trade.action] ?? ACTION_STYLES.HOLD;
   const time = new Date(cycle.timestamp).toLocaleTimeString("en-US", {
@@ -79,7 +81,13 @@ function CompactView({
   const stop = (e: React.MouseEvent) => e.stopPropagation();
 
   return (
-    <button onClick={onClick} className="w-full text-left group">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={expanded}
+      aria-controls={panelId}
+      className="w-full text-left group"
+    >
       {/* Top strip — hunt number + time + action badge */}
       <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-3 mb-3">
         <div className="flex items-baseline gap-3 min-w-0 flex-wrap">
@@ -204,7 +212,7 @@ function CompactView({
         <span className="text-void-600 hidden sm:inline" aria-hidden>
           ·
         </span>
-        <span>{specCount * 2} sealed inferences</span>
+        <span>{specCount} specialist results</span>
         <span className="text-void-600 hidden sm:inline" aria-hidden>
           ·
         </span>
@@ -761,7 +769,7 @@ function InlineDetail({
                           None recorded for this hunt: no <code className="text-void-500">priorCids</code> in the committed
                           narrative (e.g. first hunt(s), no older cycles with a 0G <code className="text-void-500">sh</code>{" "}
                           pointer, or hunt committed before RAG metadata shipped). The root hash above still proves this
-                          hunt&apos;s blob was stored; full live read check:{" "}
+                          hunt&apos;s blob was stored; manual read check:{" "}
                           <code className="text-void-500">npx tsx scripts/inspect-rag-eligibility.ts</code>.
                         </p>
                       </div>
@@ -781,7 +789,7 @@ function InlineDetail({
                         </a>
                       </div>
                     ) : (
-                      <span className="text-xs text-void-600">No iNFT minted</span>
+                      <span className="text-xs text-void-600">No iNFT token record</span>
                     )}
                   </div>
                   {cycle.memory.length > 0 && (
@@ -1023,6 +1031,7 @@ export function ExpandableHuntCard({
     if (nextExpanded) setLoadingActions(true);
     setExpanded(nextExpanded);
   };
+  const panelId = useId();
 
   return (
     <div
@@ -1036,10 +1045,11 @@ export function ExpandableHuntCard({
         onClick={toggleExpanded}
         computing={computing}
         computingLabel={computingLabel}
+        panelId={panelId}
       />
 
       {/* Inline expand area using CSS grid animation */}
-      <div className="hunt-expand-grid" data-open={expanded ? "true" : "false"}>
+      <div id={panelId} className="hunt-expand-grid" data-open={expanded ? "true" : "false"}>
         <div className="hunt-expand-inner">
           {expanded && (
             <div
@@ -1059,7 +1069,7 @@ export function ExpandableHuntCard({
                       <div className="text-xs text-void-400 mt-0.5">{computingStage}</div>
                     )}
                     <div className="text-[10px] text-void-600 mt-1">
-                      Showing last committed hunt until the new one finishes. Live logs will appear below.
+                      Showing the last committed hunt until the new one finishes. Progress logs will appear below.
                     </div>
                   </div>
                 </div>
