@@ -1,23 +1,55 @@
 import type { CycleNarrative } from "@/src/agents/narrative";
+import type {
+  KernelJobDetail,
+  KernelJobListItem,
+  JobSnapshot,
+  PublishedAgent,
+  SubmittedJob,
+} from "@/src/kernel/types";
 import type { TokenPick } from "@/src/types/index";
+
+export type {
+  KernelJobDetail,
+  KernelJobListItem,
+  JobSnapshot,
+  PublishedAgent,
+  SubmittedJob,
+} from "@/src/kernel/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 const FETCH_RETRIES = 3;
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string | null,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   let lastErr: unknown;
-  for (let attempt = 1; attempt <= FETCH_RETRIES; attempt++) {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const requestHeaders = new Headers(init?.headers);
+  if (!requestHeaders.has("Content-Type")) requestHeaders.set("Content-Type", "application/json");
+  const retryable = method === "GET" || method === "HEAD" || requestHeaders.has("Idempotency-Key");
+  const attempts = retryable ? FETCH_RETRIES : 1;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       const res = await fetch(url, {
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json", ...init?.headers },
         ...init,
+        credentials: "same-origin",
+        headers: requestHeaders,
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error((err as { error?: string }).error ?? res.statusText);
+        const err = await res.json().catch(() => ({ error: res.statusText, code: null }));
+        const payload = err as { error?: string; code?: string | null };
+        throw new ApiError(payload.error ?? res.statusText, res.status, payload.code ?? null);
       }
       return res.json() as Promise<T>;
     } catch (e) {
@@ -26,7 +58,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       const transient =
         e instanceof TypeError &&
         (e.message === "Failed to fetch" || e.message === "Load failed");
-      if (aborted || !transient || attempt === FETCH_RETRIES) {
+      if (aborted || !transient || attempt === attempts) {
         throw e;
       }
       await new Promise((r) => setTimeout(r, 120 * attempt));
@@ -70,6 +102,16 @@ export interface UserRecord {
   hotWalletIndex: number | null;
   hotWalletAddress: string | null;
   inftTokenId: number | null;
+}
+
+export interface WithdrawReceipt {
+  success: boolean;
+  circleTxId: string;
+  grossAmount: number;
+  fee: number;
+  netAmount: number;
+  remainingBalance: number;
+  transactionStatus: string;
 }
 
 export interface SpecialistResult {
@@ -286,6 +328,73 @@ export async function getAuthSession(): Promise<AuthSessionResponse | null> {
   );
 }
 
+export interface PublishKernelAgentInput {
+  name: string;
+  description: string;
+  instructions: string;
+  capabilities: readonly string[];
+}
+
+export async function getPublishedAgents(signal?: AbortSignal): Promise<PublishedAgent[]> {
+  const response = await apiFetch<{ agents: PublishedAgent[] }>("/api/kernel/agents", {
+    cache: "no-store",
+    signal,
+  });
+  return response.agents;
+}
+
+export async function publishKernelAgent(
+  input: PublishKernelAgentInput,
+): Promise<PublishedAgent> {
+  const response = await apiFetch<{ agent: PublishedAgent }>("/api/kernel/agents", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return response.agent;
+}
+
+export async function getKernelJobs(signal?: AbortSignal): Promise<KernelJobListItem[]> {
+  const response = await apiFetch<{ jobs: KernelJobListItem[] }>("/api/kernel/jobs", {
+    cache: "no-store",
+    signal,
+  });
+  return response.jobs;
+}
+
+export async function getKernelJobDetail(
+  jobId: string,
+  signal?: AbortSignal,
+): Promise<KernelJobDetail> {
+  const response = await apiFetch<{ job: KernelJobDetail }>(
+    `/api/kernel/jobs?jobId=${encodeURIComponent(jobId)}`,
+    { cache: "no-store", signal },
+  );
+  return response.job;
+}
+
+export async function submitKernelJob(
+  input: { agentVersionId: string; prompt: string },
+  idempotencyKey: string,
+): Promise<SubmittedJob> {
+  const response = await apiFetch<{ job: SubmittedJob }>("/api/kernel/jobs", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({
+      agentVersionId: input.agentVersionId,
+      input: { prompt: input.prompt },
+    }),
+  });
+  return response.job;
+}
+
+export async function cancelKernelJob(jobId: string): Promise<JobSnapshot> {
+  const response = await apiFetch<{ job: JobSnapshot }>(
+    `/api/kernel/jobs/${encodeURIComponent(jobId)}/cancel`,
+    { method: "POST", body: "{}" },
+  );
+  return response.job;
+}
+
 export async function onboard(): Promise<OnboardResponse> {
   return apiFetch<OnboardResponse>("/api/onboard", {
     method: "POST",
@@ -318,11 +427,29 @@ export async function deposit(userId: string, amount: number, txHash?: string): 
   });
 }
 
-export async function withdraw(userId: string, amount: number): Promise<UserRecord> {
-  return apiFetch("/api/withdraw", {
+interface WithdrawRouteResponse {
+  success: boolean;
+  withdrawn: number;
+  fee: number;
+  remainingUsdc: number;
+  txStatus: string;
+  circleTxId: string;
+}
+
+export async function withdraw(userId: string, amount: number): Promise<WithdrawReceipt> {
+  const receipt = await apiFetch<WithdrawRouteResponse>("/api/withdraw", {
     method: "POST",
     body: JSON.stringify({ userId, amount }),
   });
+  return {
+    success: receipt.success,
+    circleTxId: receipt.circleTxId,
+    grossAmount: amount,
+    fee: receipt.fee,
+    netAmount: receipt.withdrawn,
+    remainingBalance: receipt.remainingUsdc,
+    transactionStatus: receipt.txStatus,
+  };
 }
 
 export async function getUser(walletAddress: string): Promise<UserRecord | null> {
@@ -346,7 +473,7 @@ export async function getCycleHistory(
   return apiFetch<EnrichedCycleResponse[]>(
     `/api/cycle/history/${userId}?limit=${limit}&offset=${offset}`,
     { cache: "no-store" },
-  ).catch(() => []);
+  );
 }
 
 export async function triggerCycle(userId: string, goal?: string): Promise<CycleResult> {

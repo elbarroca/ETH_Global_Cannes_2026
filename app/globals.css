@@ -72,6 +72,62 @@ body {
   font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-dawg-400) !important;
+  outline-offset: 3px;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.dialog-panel {
+  width: 100%;
+  max-height: calc(100dvh - 2rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-void-700);
+  border-radius: 1rem;
+  background: var(--color-void-900);
+}
+
+.identifier-value {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 40rem) {
+  .dialog-backdrop {
+    align-items: end;
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .dialog-panel {
+    max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top)));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 1rem 1rem 0 0;
+  }
+}
+
 /* ───────── Motion ───────── */
 
 @keyframes pulse-dot {
