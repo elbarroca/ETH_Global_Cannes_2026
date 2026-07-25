@@ -220,6 +220,21 @@ The prescribed floor passed from the immutable clone: both migration lanes; lint
 
 The audit verified origin remained exactly at unattributed partial W3 `7d9dad5`, final W3 remained local, and the external-effect ledger granted no repeat or final push authority. This verdict closes only the W3 compatibility HIGH and opens the next sequential publication work; it does not grant current `A4_ACCEPTED`, live ENS, sponsor, push, A5, or release authority.
 
+## Kernel publication-handoff immutable audit
+
+- Audit SHA: `4e741d05d25e49ed9a0a8964a3119a1ae98f3e59`
+- Tree: `a89da23341db397770b0ddcecc56c0996c701176`
+- Audited range: `b41f3ed522670db020c4a2dba0402584dca803dc..4e741d05d25e49ed9a0a8964a3119a1ae98f3e59`
+- Result: `FIX; LOCAL_ONLY`
+
+The independent detached audit found three HIGH publication-integrity defects. Production `POST /api/kernel/agents` calls `publishAgentVersion` without an `A4PublicationAuthority`, so `PUBLISH_VERSION` always refuses; the only adapter is a test fixture, while direct service use accepts a Kernel-only summary that is not a persisted accepted `src/ens` decision. Database constraints require only shape-valid publication fields and permit `WRITE_PREPARED` to become public and hireable without a foreign-keyed A4 decision or matching `PUBLISH_VERSION` event. Freshness is validated against time captured before asynchronous authority resolution and is not rechecked with database time inside the publication transaction.
+
+The audit also found MEDIUM gaps: `CREATE_DRAFT` has no durable action identity, exact `BIND_NAME` replay appends duplicate events, and the route neither bounds JSON bodies nor maps malformed JSON to a bounded client error. Minimum repair is sequential: ENS owns a publication-specific durable decision from accepted resolution; Kernel consumes it server-side by decision ID, enforces the decision/event/state transition atomically with commit-time freshness, adds owner/action idempotency, and bounds route parsing.
+
+The prescribed immutable-tree floor passed: environment and Prisma checks; both five-migration lanes; lint with zero errors and 23 inherited warnings; typecheck; foundation 9/9; auth 9/9; kernel 17/17; checksum-pinned Go 1.23.10; A3 12/12; A4 16/16; A5 3/3; integration 33/33 plus migrations; e2e 4/4; resilience 1/1; redaction 3/3; protected boot; secret and shell checks; `git diff --check`; Next 16.2.11 build with 31/31 pages; and loopback root HTTP 200. Temporary tooling and audit artifacts were deleted. No sponsor API, ENS/0G/Uniswap call, shared database, managed migration, signature, transaction, push, deployment, form, funding, upload, spend, identifier, or claim occurred.
+
+Current `A4_ACCEPTED`, A5 acceptance, live ENS, sponsor, push, release, and public-claim gates remain closed.
+
 ## Remaining blocks
 
 - The independent pinned-SHA re-audit accepted exact unchanged remediation SHA

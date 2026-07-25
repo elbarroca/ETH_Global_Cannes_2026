@@ -3,6 +3,57 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-KERNEL-W2-AUDIT-RECONCILIATION-20260725
+task_instance_id: C0-KERNEL-W2-AUDIT-RECONCILIATION-20260725:4E741D0
+generation: 1
+sprint: A4_kernel_handoff_audit_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: 4e741d05d25e49ed9a0a8964a3119a1ae98f3e59
+control_sha: 4e741d05d25e49ed9a0a8964a3119a1ae98f3e59
+audit_sha: 4e741d05d25e49ed9a0a8964a3119a1ae98f3e59
+token: C0-KERNEL-W2-AUDIT-RECONCILE-4E741D0-010C8E18-F56D-4800-8BE8-760E93400E91
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T02:29:51Z
+expires_at: 2026-07-25T03:30:00Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T02:29:51Z
+deadline: 2026-07-25T03:30:00Z
+expected_exit: record the exact immutable Kernel W2 FIX verdict without gate promotion and yield the next writer slot to the reserved README and mandatory A6 control repair task
+acceptance_items:
+  - bind the audit to exact target 4e741d0 tree a89da23 and parent b41f3ed
+  - record all three HIGH and both MEDIUM findings without overstating the green verification floor
+  - preserve A4_ACCEPTED A5 acceptance live sponsor push release and claim blocks
+  - commit only local canonical controls and release the matching lease
+external_effect_authority: safe local control files deterministic checks and one atomic local commit only; no product change push deploy managed migration live call signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T02:33:51Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - immutable audit bound to exact SHA 4e741d0 tree a89da23 and parent b41f3ed returned FIX
+  - three HIGH publication authority database integrity and freshness findings plus two MEDIUM idempotency and body-boundary findings are canonical
+  - the audit passed both five-migration lanes every test lane checksum-pinned Go secret shell diff build and loopback HTTP checks
+  - reconciliation lint had zero errors and 23 inherited warnings typecheck foundation 9 of 9 secret scan diff check and 31-page build passed
+  - A4_ACCEPTED A5 live sponsor push release and claim gates remain closed
+remaining_blocks:
+  - sequential ENS durable publication-decision ownership followed by Kernel database and API enforcement remediation
+  - immutable-SHA remediation audit before A4 acceptance
+  - every live ENS sponsor push release and public claim gate
+external_effects_attempted: none
+result: KERNEL_HANDOFF_AUDIT_FIX_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-KERNEL-W2-AUDIT-RECONCILE-4E741D0-010C8E18-F56D-4800-8BE8-760E93400E91 after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: Kernel Integrator /root/a5_kernel_lifecycle
 task_id: A5-KERNEL-LIFECYCLE-20260725
 task_instance_id: A5-KERNEL-LIFECYCLE-20260725:W2:B41F3ED

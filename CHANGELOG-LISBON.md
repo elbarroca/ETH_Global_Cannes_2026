@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - Kernel lifecycle immutable audit
+
+- Reconciled independent audit verdict `FIX` for exact SHA `4e741d05d25e49ed9a0a8964a3119a1ae98f3e59` and range `b41f3ed522670db020c4a2dba0402584dca803dc..4e741d05d25e49ed9a0a8964a3119a1ae98f3e59`.
+- Recorded three HIGH findings: production publication has no accepted A4 adapter; database publication is not bound to a durable A4 decision and atomic publication event; and freshness is validated against pre-resolution time instead of database commit time. Durable action idempotency and bounded malformed-body handling are also incomplete.
+- The immutable checkout passed both five-migration lanes, lint/typecheck, every test lane, checksum-pinned Go, secret/shell/diff checks, the 31-page build, and loopback production HTTP 200. No live call, shared database, migration, signature, transaction, push, deploy, form, funding, upload, spend, identifier, or claim occurred.
+- Kept current `A4_ACCEPTED`, A5 acceptance, live ENS, sponsor, push, release, and claim gates closed. Next code work requires sequential ENS then Kernel ownership and another immutable-SHA audit.
+
 ## 2026-07-25 - A5 protected Kernel lifecycle and A4 publication handoff
 
 - Replaced immediate protected publication with typed `CREATE_DRAFT`, `BIND_NAME`, `PREPARE_ENS_WRITE`, and `PUBLISH_VERSION` actions. Drafts are server-owned, private, non-hireable, and use bounded inert Markdown.
