@@ -4,6 +4,72 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Release Integrator /root
+task_id: AGENT-WALLET-PAYMENTS-R1-LATE
+task_instance_id: AGENT-WALLET-PAYMENTS-R1-LATE:R1:55C69EF
+generation: 1
+sprint: Contain the late Circle agent-wallet adapter write
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 55c69ef4296ebc45372e47b01691c32187b249be
+control_sha: 55c69ef4296ebc45372e47b01691c32187b249be
+token: AGENT-WALLET-PAYMENTS-R1-LATE-55C69EF-20260725T223104Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T22:32:58Z
+expires_at: 2026-07-26T01:31:04Z
+allowed_paths:
+  - src/payments/circle-wallet.ts
+  - tests/payments/agent-wallet.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T22:31:04Z
+deadline: 2026-07-26T01:31:04Z
+expected_exit: validate and atomically contain only the late two-file Circle adapter
+external_effect_authority: local files deterministic mocked tests and one atomic local commit only; no real Circle call wallet creation funding transfer network managed database push deploy signature transaction spend or claim
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T22:32:58Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+evidence: focused Circle adapter 4/4, base 10/10, typecheck, scoped and full lint, production build, secret scan, and diff check passed
+remaining_block: Graph Kernel G1 owns the next serialized writer slot
+verdict: PASS_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token AGENT-WALLET-PAYMENTS-R1-LATE-55C69EF-20260725T223104Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
+owner: Payments Integrator /root/agent_wallet_payments_r1
+task_id: AGENT-WALLET-PAYMENTS-R1
+task_instance_id: AGENT-WALLET-PAYMENTS-R1:R1:55C69EF
+generation: 1
+sprint: Add the protected Circle developer-controlled agent-wallet adapter
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 55c69ef4296ebc45372e47b01691c32187b249be
+control_sha: 55c69ef4296ebc45372e47b01691c32187b249be
+token: AGENT-WALLET-PAYMENTS-R1-55C69EF-20260725T222840Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T22:30:11Z
+expires_at: 2026-07-26T01:28:40Z
+allowed_paths:
+  - src/payments/circle-wallet.ts
+  - tests/payments/agent-wallet.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T22:28:40Z
+deadline: 2026-07-26T01:28:40Z
+expected_exit: unique mocked Circle SCA identity per protected agent on UNI-SEPOLIA with strict fail-closed validation
+external_effect_authority: local files deterministic mocked tests and one atomic local commit only; no real Circle call wallet creation funding transfer network managed database push deploy signature transaction spend or claim
+external_effects_attempted: none
+claim_changes: none
+cancelled_at: 2026-07-25T22:30:11Z
+exit_sha: 55c69ef4296ebc45372e47b01691c32187b249be
+evidence: no admitted adapter or test path was visible at cancellation; late task writes subsequently appeared and were fenced under AGENT-WALLET-PAYMENTS-R1-LATE
+remaining_block: late task writes were contained separately; Graph Kernel G1 owns the next serialized writer slot
+verdict: CANCELLED_NO_TASK_CHANGES; LOCAL_ONLY
+lock_release: release exact token AGENT-WALLET-PAYMENTS-R1-55C69EF-20260725T222840Z without a containing commit because no task-owned implementation changes existed
+status: cancelled
+```
+
+```yaml
+owner: Release Integrator /root
 task_id: GOAL-MCP-WIRE-R7
 task_instance_id: GOAL-MCP-WIRE-R7:R7:BBA836F
 generation: 1

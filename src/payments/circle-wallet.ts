@@ -1,4 +1,5 @@
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
+import { isAddress, type Address } from "viem";
 
 // Arc USDC is the chain's NATIVE currency — Circle's transfer API uses the
 // `blockchain` tag (ARC-TESTNET) instead of an ERC-20 token address. Keeping
@@ -7,6 +8,10 @@ import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-
 export const USDC_ARC = process.env.USDC_ARC_ADDRESS ?? "0x3600000000000000000000000000000000000000";
 
 const CIRCLE_BLOCKCHAIN = "ARC-TESTNET" as const;
+const CIRCLE_AGENT_BLOCKCHAIN = "UNI-SEPOLIA" as const;
+const CIRCLE_AGENT_ACCOUNT_TYPE = "SCA" as const;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // CoinGecko endpoint for price lookups
 const COINGECKO_API = "https://api.coingecko.com/api/v3";
@@ -22,6 +27,14 @@ const COINGECKO_IDS: Record<string, string> = {
 
 type CircleClient = ReturnType<typeof initiateDeveloperControlledWalletsClient>;
 let client: CircleClient | null = null;
+
+export interface AgentWalletIdentity {
+  provider: "circle";
+  walletId: string;
+  address: Address;
+  network: typeof CIRCLE_AGENT_BLOCKCHAIN;
+  accountType: typeof CIRCLE_AGENT_ACCOUNT_TYPE;
+}
 
 function getClient(): CircleClient {
   if (!client) {
@@ -59,6 +72,50 @@ export async function createProxyWallet(
   }
 
   return { walletId: wallet.id, address: wallet.address };
+}
+
+export async function createAgentWallet(
+  agentId: string,
+  idempotencyKey: string,
+  circle: Pick<CircleClient, "createWallets"> = getClient(),
+): Promise<AgentWalletIdentity> {
+  if (!UUID.test(agentId)) throw new Error("agentId must be a UUID");
+  if (!UUID_V4.test(idempotencyKey)) throw new Error("idempotencyKey must be a UUIDv4");
+
+  const walletSetId = getWalletSetId();
+  if (!UUID.test(walletSetId)) throw new Error("CIRCLE_WALLET_SET_ID must be a UUID");
+
+  const response = await circle.createWallets({
+    walletSetId,
+    blockchains: [CIRCLE_AGENT_BLOCKCHAIN],
+    count: 1,
+    accountType: CIRCLE_AGENT_ACCOUNT_TYPE,
+    idempotencyKey,
+    metadata: [{ name: `AlphaDawg-Agent-${agentId}`, refId: agentId }],
+  });
+
+  const wallets = response.data?.wallets;
+  if (wallets?.length !== 1) throw new Error("Circle agent wallet creation returned an invalid wallet count");
+  const wallet = wallets[0];
+  if (!UUID.test(wallet.id)) throw new Error("Circle agent wallet returned an invalid wallet ID");
+  if (!isAddress(wallet.address, { strict: true }) || /^0x0{40}$/i.test(wallet.address)) {
+    throw new Error("Circle agent wallet returned an invalid address");
+  }
+  if (wallet.blockchain !== CIRCLE_AGENT_BLOCKCHAIN) {
+    throw new Error("Circle agent wallet returned an unexpected network");
+  }
+  if (wallet.state !== "LIVE") throw new Error("Circle agent wallet is not live");
+  if (wallet.walletSetId !== walletSetId) {
+    throw new Error("Circle agent wallet returned an unexpected wallet set");
+  }
+
+  return {
+    provider: "circle",
+    walletId: wallet.id,
+    address: wallet.address,
+    network: CIRCLE_AGENT_BLOCKCHAIN,
+    accountType: CIRCLE_AGENT_ACCOUNT_TYPE,
+  };
 }
 
 export async function getProxyBalance(
