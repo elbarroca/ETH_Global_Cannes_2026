@@ -2,13 +2,20 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - A4 W3 immutable-range audit
+
+- Independent detached-clone audit accepted exact target `9288ab265323248c7ff3bbaaa75b184f66887521` and full W3 range `8839d26b0b62824baec2211b4c8767d91e58a0a8..196ed92b5b29db381118ba41c703eebbb6d7540b` with no W3 finding.
+- Confirmed Unicode parent and multi-label schema-v1 normal/recovered delivery preserves exact binding bytes/hash, while strict schema-v2 refuses the same class before A3 and retains hierarchy, both role scopes, resolver, CCIP, freshness, and no-fallback enforcement.
+- Passed the complete prescribed immutable-clone floor, including A4 16/16 and integration 33/33 plus both migration lanes. Clean `npm ci` remains a later release-floor requirement because this read-only audit reused inherited clone-on-write dependencies.
+- Returned `PASS_TO_NEXT_GATE; LOCAL_ONLY` only for W3 compatibility. Sequential Kernel publication, current `A4_ACCEPTED`, live ENS, sponsor qualification, A5 acceptance, push, and release remain closed.
+
 ## 2026-07-25 - A4 schema-v1 name compatibility remediation
 
 - Split runtime name preparation by policy generation. Schema-v1 now uses the exact pre-owner-layer ENSIP-15 normalization plus strict parent/descendant check; schema-v2 retains its ASCII `.eth`, single-label, reserved-label, collision, deterministic full-name, DNS, hierarchy, role, and evidence rules without fallback.
 - Replaced the covered ASCII legacy regression with a pre-seeded exact binding for `créateur.eth` and multi-label descendant `tier.research.créateur.eth`. Normal execution and simulated post-readback lease-takeover recovery preserve bytes/hash and produce one effect, receipt, settlement, and commission with no refund/replacement and zero recovery-adapter calls. The same Unicode class remains refused under schema-v2 before A3.
 - Passed A4 16/16, A3 12/12, A5 3/3, integration 33/33 plus both four-migration lanes, and the complete local floor. The checksum-pinned official Go 1.23.10 darwin/arm64 archive/toolchain/cache and verifier binary were deleted after verification.
-- Control deviation: while the matching W3 lease remained active, an unattributed external actor created and pushed intermediate commit `7d9dad522d6ef820e6e4ce646edf7011f8559c3c`. It contains only the W3 production patch and initial active-writer mirror; neither W3 nor C0 issued a commit/push command, and no repeat or replacement push is authorized. Final audit must cover the complete two-commit range from `8839d26b0b62824baec2211b4c8767d91e58a0a8` through the containing evidence commit.
-- W2 remains `AUDIT_FIX`; W3 returns only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. Independent range audit, Kernel publication, `A4_ACCEPTED`, live ENS, sponsor qualification, A5 advancement, release, public identifiers, and claim promotion remain closed.
+- Control deviation: while the matching W3 lease remained active, an unattributed external actor created and pushed intermediate commit `7d9dad522d6ef820e6e4ce646edf7011f8559c3c`. It contains only the W3 production patch and initial active-writer mirror; neither W3 nor C0 issued a commit/push command, and no repeat or replacement push is authorized. The subsequent independent audit covered the complete two-commit W3 range and accepted it.
+- W2 remains historical `AUDIT_FIX`; W3 writer returned only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`, and the subsequent immutable-range audit above returned `PASS_TO_NEXT_GATE; LOCAL_ONLY`. Kernel publication, current `A4_ACCEPTED`, live ENS, sponsor qualification, A5 acceptance, release, public identifiers, and claim promotion remain closed.
 
 ## 2026-07-25 - README narrative and provable architecture
 

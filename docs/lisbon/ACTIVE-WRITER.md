@@ -3,6 +3,58 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-A4-W3-AUDIT-RECONCILIATION-20260725
+task_instance_id: C0-A4-W3-AUDIT-RECONCILIATION-20260725:D2824C0
+generation: 1
+sprint: A4_audit_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: d2824c020907b76dfa631505a46c539cd5e108a9
+control_sha: d2824c020907b76dfa631505a46c539cd5e108a9
+audit_sha: 9288ab265323248c7ff3bbaaa75b184f66887521
+audited_w3_start_sha: 8839d26b0b62824baec2211b4c8767d91e58a0a8
+audited_w3_final_sha: 196ed92b5b29db381118ba41c703eebbb6d7540b
+token: C0-A4-W3-AUDIT-RECONCILE-D2824C0-354C4953-AC91-4F9D-90B5-CAD24CB5E393
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T01:33:19Z
+expires_at: 2026-07-25T02:33:19Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T01:33:19Z
+deadline: 2026-07-25T02:33:19Z
+expected_exit: canonically record independent W3 PASS_TO_NEXT_GATE without granting A4 acceptance or promoting unrelated A5 UI work
+acceptance_items:
+  - record closure of the prior schema-v1 Unicode and multi-label compatibility HIGH on exact immutable target 9288ab2
+  - retain strict schema-v2 refusal hierarchy role-scope resolver CCIP freshness and no-fallback evidence
+  - retain observed-unreconciled push state final W3 local-only state and release-only clean-install limitation
+  - keep Kernel publication A4 acceptance A5 live sponsor push release and claim gates closed
+external_effect_authority: safe local control files deterministic checks and one atomic local commit only; no implementation change push deploy managed migration live call signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T01:36:12Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - independent detached audit accepted exact target 9288ab2 and full W3 range 8839d26 through 196ed92 with no W3 finding
+  - Unicode parent and multi-label schema-v1 normal and recovered delivery retain immutable bytes and hash while schema-v2 refuses the same class before A3
+  - all prescribed audit lanes pass including A4 16 of 16 integration 33 of 33 plus both migration lanes build 31 pages and loopback HTTP 200
+  - clean npm ci remains a release-only requirement because the audit reused inherited clone-on-write dependencies
+  - unrelated A5 UI commit d2824c0 is preserved without A4 or A5 promotion
+  - git diff check secret scan lint typecheck tests and production build passed; lint retained 23 inherited warnings and zero errors
+remaining_blocks:
+  - sequential ENS and Kernel draft name write readback publication gate before current A4 acceptance
+  - live ENS sponsor A5 acceptance push release and public claim gates
+external_effects_attempted: none
+result: PASS_W3_AUDIT_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-A4-W3-AUDIT-RECONCILE-D2824C0-354C4953-AC91-4F9D-90B5-CAD24CB5E393 after the containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: Frontend Builder /root/a5_taste_audit
 task_id: A5-NAV-DASH-TASTE-20260725
 task_instance_id: A5-NAV-DASH-TASTE-20260725:W1:9288AB2

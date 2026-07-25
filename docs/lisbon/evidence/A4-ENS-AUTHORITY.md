@@ -177,7 +177,7 @@ The complete immutable-clone floor otherwise passed: both migration lanes; lint 
 - Generation: `3`
 - Start/control SHA: `8839d26b0b62824baec2211b4c8767d91e58a0a8`
 - Intermediate exit SHA: `7d9dad522d6ef820e6e4ce646edf7011f8559c3c`
-- Final exit SHA: `DERIVE_FROM_CONTAINING_COMMIT`
+- Final exit SHA: `196ed92b5b29db381118ba41c703eebbb6d7540b`
 - Result: `PASS_TO_AUDIT_REMEDIATION; PASS_FIXTURE; PASS_INTEGRATION; LOCAL_ONLY`
 - Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
 
@@ -207,14 +207,27 @@ The focused legacy regression pre-seeds the exact canonical schema-v1 bytes/hash
 
 Control deviation: while the exact W3 physical lease and mirrored token remained active, an unattributed external actor created and pushed `7d9dad522d6ef820e6e4ce646edf7011f8559c3c` to `origin/Eth_global_lisbon_`. Read-only comparison against `8839d26b0b62824baec2211b4c8767d91e58a0a8` proves that commit contains only `src/ens/authority.ts` and the initial W3 `ACTIVE-WRITER.md` record and exactly matches the applied production patch/mirror. No W3 or C0 command authorized that commit or push, and no repeat, amendment, replacement, or force push is authorized. The remaining local commit contains only regression/evidence/ledger closeout; independent audit must cover the full two-commit range.
 
+## W3 independent immutable-range audit
+
+- Audit target: `9288ab265323248c7ff3bbaaa75b184f66887521`
+- Audit tree: `e0eb87f168dd88a28e3d0ab7a96607e2e604473f`
+- Audited W3 range: `8839d26b0b62824baec2211b4c8767d91e58a0a8..196ed92b5b29db381118ba41c703eebbb6d7540b`
+- Result: `PASS_TO_NEXT_GATE; LOCAL_ONLY`
+
+The independent detached-clone audit found no HIGH, MEDIUM, or LOW defect in the W3 range. It reproduced exact Unicode parent and multi-label descendant schema-v1 normal execution and READBACK takeover with immutable bytes/hash, one effect and lawful delivery, no refund/replacement, and zero recovery-adapter calls. It also confirmed that schema-v2 retains ASCII `.eth`, single-label, reserved-label, collision, DNS, hierarchy, mixed `CONTRACT`/`NAME` roles, resolver, CCIP, freshness, and no-fallback enforcement and rejects the same Unicode class before Compute, Storage, or verifier activity.
+
+The prescribed floor passed from the immutable clone: both migration lanes; lint with zero errors and 23 inherited warnings; typecheck; foundation 9/9; auth 9/9; kernel 13/13; Go verifier; A3 12/12; A4 16/16; A5 3/3; integration 33/33 plus migrations; e2e 4/4; resilience 1/1; redaction 3/3; boot; secret scan; shell syntax; build 31/31; and loopback HTTP 200. Extra `npm ls --all` against inherited clone-on-write dependencies exited 1 for optional/peer/extraneous entries; clean `npm ci` remains required at the release floor and was not authorized in this read-only audit.
+
+The audit verified origin remained exactly at unattributed partial W3 `7d9dad5`, final W3 remained local, and the external-effect ledger granted no repeat or final push authority. This verdict closes only the W3 compatibility HIGH and opens the next sequential publication work; it does not grant current `A4_ACCEPTED`, live ENS, sponsor, push, A5, or release authority.
+
 ## Remaining blocks
 
 - The independent pinned-SHA re-audit accepted exact unchanged remediation SHA
   `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9`; the subsequent A5 writer ledger
   records that acceptance before its start. This accepts only the stable A4
-  base. The first ENSv2 hierarchy owner layer and W2 remediation are
-  `AUDIT_FIX`. W3 is only `PASS_TO_AUDIT_REMEDIATION`; independent audit of
-  its exact two-commit range and the sequential Kernel draft/name/write/readback/publication gate remain required before
+  base. The first ENSv2 hierarchy owner layer and W2 remediation remain
+  historical `AUDIT_FIX`, and W3 exact-range audit is `PASS_TO_NEXT_GATE`.
+  The sequential Kernel draft/name/write/readback/publication gate remains required before
   current `A4_ACCEPTED` can open.
 - `PASS_LIVE` is `NOT_RUN` and `LIVE_EFFECT_BLOCKED`; no live ENS write/readback or public identifier exists.
 - Production A3 live execution remains intentionally unavailable. Rights/license/team/owner records, event-window classification, sponsor access/caps, inherited dependency findings, README claim drift, deployment, push, forms, and release audit remain unresolved.
