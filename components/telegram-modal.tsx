@@ -25,6 +25,7 @@ const FOCUSABLE_SELECTOR = [
 
 export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const refreshButtonRef = useRef<HTMLButtonElement>(null);
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [secondsLeft, setSecondsLeft] = useState(Math.floor(CODE_TTL_MS / 1000));
   const [expired, setExpired] = useState(false);
@@ -50,10 +51,15 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
 
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      const activeElement = document.activeElement;
+      const focusIsOutside = activeElement === panel || !panel.contains(activeElement);
+      if (focusIsOutside) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && activeElement === first) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && activeElement === last) {
         event.preventDefault();
         first.focus();
       }
@@ -65,6 +71,11 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
       document.body.style.overflow = previousOverflow;
     };
   }, []);
+
+  useEffect(() => {
+    if (!expired || refreshing) return;
+    (refreshButtonRef.current ?? panelRef.current)?.focus();
+  }, [expired, refreshing]);
 
   useEffect(() => {
     if (!linkCode) return;
@@ -210,6 +221,7 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
                 This code expired without linking an account.
               </p>
               <button
+                ref={refreshButtonRef}
                 type="button"
                 onClick={() => void handleRefresh()}
                 disabled={refreshing}

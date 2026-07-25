@@ -3,6 +3,49 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/a5_taste_audit
+task_id: A5-UI-TASTE-REMEDIATION-20260725
+task_instance_id: A5-UI-TASTE-REMEDIATION-20260725:W2:333B873
+generation: 2
+sprint: A5_local_design_remediation
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 333b8739bd653a89122d92091020c3edf7b9dff7
+control_sha: 333b8739bd653a89122d92091020c3edf7b9dff7
+required_ancestor: 0c1ebaf4dd574e7e6e75f50000271f1444f63409
+token: A5-TASTE-W2-333B873-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T00:39:54Z
+expires_at: 2026-07-25T02:15:00Z
+allowed_paths:
+  - components/telegram-modal.tsx
+  - tests/playwright/a5-ui.spec.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T00:39:54Z
+deadline: 2026-07-25T02:15:00Z
+expected_exit: close audited Telegram focus containment gaps and recapture settled local UI evidence with focused regressions
+external_effect_authority: safe local allowed files, deterministic checks, loopback browser verification, screenshots as UI evidence only, and one atomic commit; no push deploy sponsor call signature transaction form spend upload public claim or gate advancement
+completed_at: 2026-07-25T00:45:54Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - focus containment routes initial reverse tab panel focus and any external focus to the correct dialog boundary
+  - expiry transfers focus to Create new code and both tab directions stay contained when it is the only active control
+  - failed refresh restores focus after the temporarily disabled recovery control becomes active again
+  - Playwright exercises keyboard copy refusal and recovery with Enter and Space while focus remains inside the dialog
+  - landing evidence is captured under reduced motion only after visible opacity one and all desktop mobile screenshots wait for the settled route and viewport state
+  - lint passed with zero errors and 23 inherited warnings; typecheck foundation 9 of 9 A5 3 of 3 Playwright 10 of 10 secret scan 31-page production build and diff check passed
+remaining_blocks:
+  - independent immutable-SHA W2 audit
+  - separately scoped nav dashboard hierarchy Motion and gradient follow-up
+  - live Telegram same-SHA protected journey and every A5 release sponsor bounty deployment push and public claim gate
+external_effects_attempted: none
+result: PASS_TO_AUDIT_FOCUS_REMEDIATION_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token A5-TASTE-W2-333B873-20260725 after the containing commit and clean allowed-path verification
+status: closed
+```
+
+```yaml
 owner: Root README task 019f9691-557e-73d2-bc5f-30b9fe6a6154
 task_id: README-GOALS-CLAIM-DRIFT-20260725
 task_instance_id: README-GOALS-CLAIM-DRIFT-20260725:W1:B72F5BB

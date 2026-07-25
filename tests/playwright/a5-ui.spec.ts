@@ -401,6 +401,7 @@ test("preserves the product shell without horizontal overflow", async ({ page })
 });
 
 test("presents one fail-closed agent-commerce story on the landing page", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
 
@@ -410,6 +411,7 @@ test("presents one fail-closed agent-commerce story on the landing page", async 
   await expect(page.getByText(/Local product capture with fixture data/)).toBeVisible();
   await expect(page.getByText(/Drafts, fixtures, caches, and HTTP 200 responses/)).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/Observed HCS sequence|Configured explorer identifiers|How a hunt flows/);
+  await expect(page.locator(".fade-in-up").first()).toHaveCSS("opacity", "1");
   await page.screenshot({
     path: "test-results/visual/a5-landing-desktop-1440x900.png",
     fullPage: true,
@@ -417,6 +419,8 @@ test("presents one fail-closed agent-commerce story on the landing page", async 
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Hire agents. Verify every outcome." })).toBeVisible();
+  await expect(page.locator(".fade-in-up").first()).toHaveCSS("opacity", "1");
   await page.screenshot({
     path: "test-results/visual/a5-landing-mobile-390x844.png",
     fullPage: true,
@@ -437,6 +441,12 @@ test("keeps Telegram linking explicit, contained, and fail-closed", async ({ pag
   await expect(dialog.getByLabel(`One-time Telegram code ${TELEGRAM_LINK_CODE}`)).toHaveText(
     TELEGRAM_LINK_CODE,
   );
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "Copy code" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("link", { name: "Open Telegram" })).toBeFocused();
+
+  await page.waitForTimeout(100);
   await page.screenshot({ path: "test-results/visual/a5-telegram-mobile-390x844.png" });
   const mobileOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth,
@@ -444,15 +454,13 @@ test("keeps Telegram linking explicit, contained, and fail-closed", async ({ pag
   expect(mobileOverflow).toBeLessThanOrEqual(1);
 
   await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(dialog).toBeVisible();
+  await page.waitForTimeout(100);
   await page.screenshot({ path: "test-results/visual/a5-telegram-desktop-1440x900.png" });
 
-  await page.keyboard.press("Tab");
-  await expect(dialog.getByRole("link", { name: "Open Telegram" })).toBeFocused();
+  await dialog.focus();
   await page.keyboard.press("Shift+Tab");
   await expect(dialog.getByRole("button", { name: "Copy code" })).toBeFocused();
-
-  await dialog.getByRole("button", { name: "Copy code" }).click();
-  await expect(dialog.getByText("Code copied to the clipboard.")).toBeVisible();
 
   await page.evaluate(() => {
     Object.defineProperty(navigator, "clipboard", {
@@ -464,17 +472,39 @@ test("keeps Telegram linking explicit, contained, and fail-closed", async ({ pag
       },
     });
   });
-  await dialog.getByRole("button", { name: "Copied" }).click();
+  await page.keyboard.press("Enter");
   await expect(dialog.getByText(/Clipboard access was refused/)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Copy failed" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("link", { name: "Open Telegram" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "Copy failed" })).toBeFocused();
+
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (): Promise<void> => undefined },
+    });
+  });
+  await page.keyboard.press("Space");
+  await expect(dialog.getByText("Code copied to the clipboard.")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Copied" })).toBeFocused();
 
   await page.clock.fastForward(TELEGRAM_CODE_TTL_MS + 1_000);
   await expect(dialog.getByText("This code expired without linking an account.")).toBeVisible();
+  const refreshButton = dialog.getByRole("button", { name: "Create new code" });
+  await expect(refreshButton).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(refreshButton).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(refreshButton).toBeFocused();
 
   await page.route("**/api/onboard", async (route) => {
     await fulfillJson(route, { error: "Fresh authorization required" }, 401);
   });
-  await dialog.getByRole("button", { name: "Create new code" }).click();
+  await page.keyboard.press("Enter");
   await expect(dialog.getByText("A new code could not be created. Try again.")).toBeVisible();
+  await expect(refreshButton).toBeFocused();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
