@@ -169,7 +169,7 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
                 href={deepLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-xl bg-dawg-500 px-5 py-3 font-bold text-void-950 transition-[background-color,transform] hover:bg-dawg-400 active:translate-y-px"
+                className="cta-primary inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-xl px-5 py-3 font-bold"
               >
                 Open Telegram
               </a>
@@ -226,7 +226,7 @@ export function TelegramModal({ linkCode, onRefresh }: TelegramModalProps) {
                 onClick={() => void handleRefresh()}
                 disabled={refreshing}
                 aria-busy={refreshing}
-                className="mt-4 min-h-11 rounded-xl bg-dawg-500 px-5 py-2.5 font-semibold text-void-950 transition-[background-color,transform] hover:bg-dawg-400 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+                className="cta-primary mt-4 min-h-11 rounded-xl px-5 py-2.5 font-semibold disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {refreshing ? "Creating new code" : "Create new code"}
               </button>

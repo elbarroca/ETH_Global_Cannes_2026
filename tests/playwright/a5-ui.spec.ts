@@ -353,20 +353,36 @@ async function expectNoOverflow(page: Page): Promise<void> {
 
 test.beforeEach(async ({ page }) => { await installApiMocks(page); });
 
-test("landing communicates the protected recurring loop at 375, 768, and 1440", async ({ page }) => {
+test("landing explains the two protected paths at 375, 768, and 1440", async ({ page }) => {
   const errors = monitorErrors(page);
   for (const width of [375, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 375 ? 812 : 950 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "One goal. A verified agent loop." })).toBeVisible();
-    await expect(page.getByRole("link", { name: "AlphaDawg home" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Define a protected goal/ })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Explore agents/ })).toBeVisible();
-    await expect(page.getByText("Publish, hire, prove")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Get work done with reviewed agents." })).toBeVisible();
+    const home = page.getByRole("link", { name: "AlphaDawg home" });
+    await expect(home).toBeVisible();
+    await expect(home.locator('img[src*="logo-square.png"]')).toBeVisible();
+    await expect(page.getByRole("link", { name: /Hire an agent/ }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /Create an agent/ }).first()).toBeVisible();
+    await expect(page.getByText("Choose a goal, hire a reviewed agent, and inspect the result and proof.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "How AlphaDawg works" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Choose your path" })).toBeVisible();
+    await expect(page.getByText("You earn only when another user hires it and receipt-backed settlement succeeds.", { exact: false })).toBeVisible();
+    await expect(page.getByText("A hire count alone is not payment evidence.", { exact: false })).toBeVisible();
     await expectNoOverflow(page);
     await page.screenshot({ path: `test-results/visual/a5-landing-${width}.png`, fullPage: true });
   }
   expect(errors).toEqual([]);
+});
+
+test("landing core content remains visible without client JavaScript", async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Get work done with reviewed agents." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How AlphaDawg works" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Choose your path" })).toBeVisible();
+  await context.close();
 });
 
 test("does not request protected data before ready and normalizes nested signature rejection", async ({ page }) => {
@@ -489,7 +505,8 @@ test("marketplace preserves URL tabs, dense authority rows, and external hire", 
   await expect(page.getByText(AVAILABLE_AGENT.fullSubname).first()).toBeVisible();
   await expect(page.getByText("Version 1").first()).toBeVisible();
   await expect(page.getByText("ID 44444444")).toBeVisible();
-  await expect(page.getByText("1000 USDC_ATOMIC").first()).toBeVisible();
+  await expect(page.getByText("0.001 USDC (1,000 atomic units)").first()).toBeVisible();
+  await expect(page.getByText("Unavailable until the protected owner projection lands").first()).toBeVisible();
   await expect(page.getByText("Provenance recorded")).toBeVisible();
   await page.getByRole("link", { name: "Hire agent" }).click();
   await expect(page).toHaveURL(new RegExp(`agentId=${AVAILABLE_AGENT.versionId}`));
@@ -515,17 +532,30 @@ test("catalog V3 creation sends only template identity fields and publishes the 
   await expect(page.getByRole("dialog", { name: "Create a protected agent" })).toBeVisible();
   await expect(page.getByRole("list", { name: "Publication progress" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Identity" })).toBeVisible();
+  const dialogBox = await page.getByRole("dialog", { name: "Create a protected agent" }).boundingBox();
+  const stageBox = await page.getByTestId("agent-stage").boundingBox();
+  const descriptionBox = await page.getByLabel("Description").boundingBox();
+  expect(dialogBox?.height).toBeLessThan(760);
+  expect(stageBox?.height).toBeLessThan(380);
+  expect(descriptionBox?.height).toBeLessThan(140);
+  await page.getByLabel("Agent name").focus();
+  await expect(page.getByLabel("Agent name")).toBeFocused();
+  expect(await page.getByLabel("Agent name").evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("solid");
   await page.getByLabel("Agent name").fill("Bounded Market Researcher");
   await page.getByLabel("Description").fill("Researches bounded market evidence with explicit source and execution limits.");
   await page.getByRole("button", { name: /Continue/ }).click();
+  await expect(page.getByTestId("agent-stage")).toBeFocused();
+  expect(await page.getByTestId("agent-stage").evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("none");
   await expect(page.getByRole("button", { name: /Alpha Researcher/ })).toBeVisible();
   await page.getByRole("button", { name: /Alpha Researcher/ }).click();
+  await page.getByText("Inspect exact skills and constraints").click();
+  await page.getByText("Inspect catalog provider readiness").click();
   await expect(page.locator("[data-category-heading-icon]")).toHaveCount(4);
   await expect(page.getByText("The role and reasoning stance the agent follows.")).toBeVisible();
   await expect(page.getByText("Read-only sources the protected runtime may query.")).toBeVisible();
   await expect(page.getByText("Included by template").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Catalog provider readiness" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Catalog provider readiness" }).locator("..").getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Provider readiness is separate from the selected skills.", { exact: false })).toBeVisible();
+  await expect(page.getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
   await page.locator('[data-category-icon="PERSONA"]').scrollIntoViewIfNeeded();
   await page.screenshot({ path: "test-results/visual/a5-create-capabilities-1440.png" });
   await page.getByRole("button", { name: /Continue/ }).click();
@@ -541,6 +571,8 @@ test("catalog V3 creation sends only template identity fields and publishes the 
   await page.getByRole("button", { name: "Publish immutable version" }).click();
   await expect(page.getByRole("heading", { name: "Publication receipt" })).toBeVisible();
   await expect(page.getByLabel("Publication receipt").getByText("ELIGIBLE", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Publication receipt").getByText("0.001 USDC (1,000 atomic units)")).toBeVisible();
+  await expect(page.getByLabel("Publication receipt").getByText("Settled earnings unavailable until the protected owner projection lands.")).toBeVisible();
   await page.getByRole("button", { name: /View my agents/ }).click();
   await expect(page).toHaveURL(/view=mine/);
   expect(errors).toEqual([]);
@@ -556,7 +588,9 @@ test("agent catalog empty state and provider availability remain explicit", asyn
   await page.getByLabel("Description").fill("Shows exact provider availability from the authenticated catalog response.");
   await page.getByRole("button", { name: /Continue/ }).click();
   await page.getByRole("button", { name: /Alpha Researcher/ }).click();
-  const availability = page.getByRole("heading", { name: "Catalog provider readiness" }).locator("..");
+  const providerSummary = page.getByText("Inspect catalog provider readiness");
+  await providerSummary.click();
+  const availability = providerSummary.locator("..");
   await expect(availability.getByText("AVAILABLE", { exact: true }).first()).toBeVisible();
   await expect(availability.getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
 });

@@ -12,6 +12,7 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import { WalletConnectButton } from "./wallet-connect";
+import { DawgLogo } from "./dawg-logo";
 import { useUser } from "@/contexts/user-context";
 
 const PRIMARY = [
@@ -48,20 +49,33 @@ export function Nav() {
 
   return (
     <MotionConfig reducedMotion="user" transition={{ duration: 0.18 }}>
-      <header className="sticky top-0 z-50 border-b border-void-800 bg-void-950/95 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-void-800/80 bg-void-950/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[90rem] items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex min-h-11 items-center gap-2 text-sm font-bold tracking-[0.08em] text-dawg-400" aria-label="AlphaDawg home">
+          <Link href="/" className="group flex min-h-11 items-center gap-2 text-sm font-bold tracking-[0.08em] text-dawg-400" aria-label="AlphaDawg home">
+            <DawgLogo title="" src="/logo-square.png" size={32} className="h-8 w-8 rounded-[10px] transition-transform duration-300 group-hover:scale-105" />
             <span>AlphaDawg</span>
           </Link>
 
-          <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">
+          <nav aria-label="Primary" className="hidden items-center gap-1 rounded-[14px] border border-void-800/70 bg-void-900/50 p-1 md:flex">
             {PRIMARY.map(({ href, label, icon: Icon }) => {
               const active = isActive(pathname, href);
               return (
-                <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`relative inline-flex min-h-11 items-center gap-2 rounded-[10px] px-4 text-sm ${active ? "text-dawg-300" : "text-void-400 hover:text-void-100"}`}>
-                  <Icon size={17} aria-hidden />
-                  {label}
-                  {active && <motion.span layoutId="primary-nav" className="absolute inset-x-3 bottom-0 h-px bg-dawg-500" transition={reduceMotion ? { duration: 0 } : undefined} />}
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative inline-flex min-h-10 items-center gap-2 rounded-[10px] px-4 text-sm transition-colors duration-200 ${active ? "text-void-950 font-semibold" : "text-void-400 hover:text-void-100"}`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="primary-nav-pill"
+                      className="absolute inset-0 rounded-[10px] bg-gradient-to-b from-dawg-300 to-dawg-500"
+                      style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 6px 18px -8px rgba(244,197,66,0.55)" }}
+                      transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
+                    />
+                  )}
+                  <Icon size={17} weight={active ? "fill" : "regular"} aria-hidden className="relative z-10" />
+                  <span className="relative z-10">{label}</span>
                 </Link>
               );
             })}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardBody } from "@/components/ui/card";
+import { WarningCircleIcon } from "@phosphor-icons/react";
 
 interface PreconditionModalProps {
   title: string;
@@ -20,27 +20,30 @@ export function PreconditionModal({
   onNavigate,
 }: PreconditionModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-void-950/80 backdrop-blur-sm">
-      <Card className="w-full max-w-sm mx-4">
-        <CardBody className="space-y-4 text-center">
-          <p className="text-lg font-bold text-void-200">{title}</p>
-          <p className="text-sm text-void-400">{body}</p>
-          <div className="flex gap-3">
+    <div className="dialog-backdrop">
+      <div className="dialog-panel max-w-sm">
+        <div className="px-6 py-7 text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-[12px] border border-dawg-700/40 bg-dawg-500/10">
+            <WarningCircleIcon size={24} weight="duotone" className="text-dawg-400" aria-hidden />
+          </span>
+          <h2 className="mt-4 text-lg font-bold text-void-100 text-balance">{title}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-void-400 text-pretty">{body}</p>
+          <div className="mt-6 flex gap-3">
             <button
               onClick={() => onNavigate(ctaHref)}
-              className="flex-1 px-4 py-3 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-sm font-bold rounded-xl transition-colors"
+              className="cta-primary flex-1 rounded-[11px] px-4 py-3 text-sm font-bold"
             >
               {ctaLabel}
             </button>
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-3 bg-void-800 hover:bg-void-700 text-void-300 text-sm font-bold rounded-xl transition-colors border border-void-700"
+              className="flex-1 rounded-[11px] border border-void-700 bg-void-800 px-4 py-3 text-sm font-semibold text-void-300 transition-colors hover:bg-void-700 hover:text-void-100"
             >
               Dismiss
             </button>
           </div>
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

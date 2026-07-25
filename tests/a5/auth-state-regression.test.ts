@@ -89,3 +89,29 @@ test("creation wizard explains locked catalog capabilities and canonical ENS pre
   assert.doesNotMatch(creator, /\.creator\.eth/);
   assert.doesNotMatch(creator, /skillIds:\s*|mcpBindings:\s*/);
 });
+
+test("premium creator surfaces remain server-visible and evidence-conditional", async () => {
+  const [landing, styles, nav, creator, marketplace] = await Promise.all([
+    readFile(`${root}/app/page.tsx`, "utf8"),
+    readFile(`${root}/app/globals.css`, "utf8"),
+    readFile(`${root}/components/nav.tsx`, "utf8"),
+    readFile(`${root}/components/create-agent-modal.tsx`, "utf8"),
+    readFile(`${root}/app/marketplace/page.tsx`, "utf8"),
+  ]);
+
+  assert.match(landing, /src="\/alphadawg-hero-dog\.png"/);
+  assert.match(landing, /Choose a goal, hire a reviewed agent, and inspect the result and proof\./);
+  assert.match(landing, /You earn only when another user hires it and receipt-backed settlement succeeds\./);
+  assert.match(landing, /A hire count alone is not payment evidence\. AlphaDawg does not estimate future earnings\./);
+  assert.doesNotMatch(landing, /HeroVisual|<Reveal|0G Compute[\s\S]*Every model call|Hedera HCS|Arc x402/);
+  assert.match(nav, /<DawgLogo[\s\S]*src="\/logo-square\.png"/);
+  assert.match(styles, /\[tabindex\]:not\(\[tabindex="-1"\]\)/);
+  assert.doesNotMatch(styles, /textarea, \[tabindex\]\):focus-visible/);
+  assert.match(creator, /data-testid="agent-stage"[\s\S]*tabIndex=\{-1\}/);
+  assert.doesNotMatch(creator, /pb-20|min-h-32|rows=\{5\}|max-w-6xl/);
+  assert.match(creator, /It is not a contract deployment or proof that the runtime or providers are online\./);
+  assert.match(creator, /Settled earnings unavailable until the protected owner projection lands\./);
+  assert.match(marketplace, /Verified external hires/);
+  assert.match(marketplace, /Runtime proof and financial outcome remain attached to each job\./);
+  assert.doesNotMatch([landing, nav, creator, marketplace].join("\n"), /[—–]/);
+});

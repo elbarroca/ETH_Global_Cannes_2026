@@ -1,116 +1,159 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRightIcon,
-  ChartLineUpIcon,
-  CheckCircleIcon,
-  GitBranchIcon,
-  MagnifyingGlassIcon,
+  RobotIcon,
   ShieldCheckIcon,
   TargetIcon,
 } from "@phosphor-icons/react/dist/ssr";
 
 export const metadata: Metadata = {
-  title: "AlphaDawg | Protected recurring goals",
-  description: "Define a recurring goal, hire immutable agents, and inspect exact evidence.",
+  title: "AlphaDawg | Hire or publish protected agents",
+  description:
+    "Hire reviewed agents for clear goals, or publish your own agent with a protected price and receipt-backed settlement.",
 };
 
-const LANES = [
-  { label: "Research", detail: "Collect source evidence", icon: MagnifyingGlassIcon },
-  { label: "Risk", detail: "Test limits and refusals", icon: ShieldCheckIcon },
-  { label: "Market", detail: "Read conditions and signals", icon: ChartLineUpIcon },
-] as const;
-
-const FLOW = [
-  ["Goal", "Set the objective, cadence, agent count, and hard atomic limits."],
-  ["Agents", "Match reviewed external canonical versions by required capability."],
-  ["Report", "Converge parallel jobs into one evidence-linked conclusion."],
-  ["Proof", "Inspect ENS, MCP, compute, storage, receipt, and financial outcome."],
+const STEPS = [
+  {
+    title: "Choose a goal",
+    detail: "Describe the work and the limits that matter.",
+    icon: TargetIcon,
+  },
+  {
+    title: "Hire a reviewed agent",
+    detail: "Pick an eligible published version with a clear protected price.",
+    icon: RobotIcon,
+  },
+  {
+    title: "Inspect the result and proof",
+    detail: "See the job result, exact refusal, and available evidence in one place.",
+    icon: ShieldCheckIcon,
+  },
 ] as const;
 
 export default function LandingPage() {
   return (
     <main>
-      <section className="mx-auto grid max-w-[90rem] items-center gap-9 px-4 py-8 sm:px-6 md:py-12 lg:grid-cols-[minmax(0,0.82fr)_minmax(34rem,1.18fr)] lg:gap-12 lg:py-16">
-        <div className="max-w-xl">
-          <p className="instrument-label text-dawg-400">Protected recurring goals</p>
-          <h1 className="mt-5 max-w-[13ch] text-4xl font-semibold leading-[1.02] tracking-[-0.05em] text-void-100 sm:text-5xl lg:text-6xl">
-            One goal. A verified agent loop.
-          </h1>
-          <p className="mt-5 max-w-[32rem] text-base leading-relaxed text-void-400 sm:text-lg">
-            Define one objective. Immutable agents run in parallel. Every result stays bounded by evidence and approval.
-          </p>
-          <div className="mt-7 flex flex-wrap items-center gap-3">
-            <Link href="/dashboard" className="instrument-button instrument-button-primary">
-              Define a protected goal <ArrowRightIcon size={17} aria-hidden />
-            </Link>
-            <Link href="/marketplace?view=available" className="instrument-button instrument-button-secondary">
-              Explore agents <ArrowRightIcon size={17} aria-hidden />
-            </Link>
+      <section className="ambient-hero border-b border-void-800">
+        <div className="mx-auto grid max-w-[90rem] items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[minmax(0,0.82fr)_minmax(28rem,1.18fr)] lg:gap-14 lg:py-16">
+          <div className="max-w-2xl">
+            <p className="instrument-label text-dawg-400">Protected agent work</p>
+            <h1 className="display-hero mt-5 max-w-[14ch] text-5xl text-void-100 sm:text-6xl lg:text-7xl">
+              Get work done with reviewed agents.
+            </h1>
+            <p className="mt-6 max-w-[38rem] text-lg leading-relaxed text-void-300">
+              Choose a goal, hire a reviewed agent, and inspect the result and proof.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/marketplace?view=available"
+                className="cta-primary inline-flex min-h-12 items-center gap-2 whitespace-nowrap rounded-[11px] px-5 text-sm font-bold"
+              >
+                Hire an agent
+                <ArrowRightIcon size={17} weight="bold" aria-hidden />
+              </Link>
+              <Link
+                href="/marketplace?view=drafts&create=1"
+                className="inline-flex min-h-12 items-center gap-2 whitespace-nowrap rounded-[11px] border border-void-700 bg-void-900 px-5 text-sm font-semibold text-void-200 transition-colors hover:border-dawg-700 hover:text-void-100"
+              >
+                Create an agent
+                <ArrowRightIcon size={17} aria-hidden />
+              </Link>
+            </div>
           </div>
-          <p className="mt-4 max-w-lg text-xs leading-relaxed text-void-500">
-            New wallets onboard first, then explicitly authorize the workspace. Neither signature authorizes a transaction.
-          </p>
+
+          <div className="overflow-hidden rounded-[14px] border border-void-800 bg-void-900 shadow-[inset_0_1px_0_rgba(244,197,66,0.12)]">
+            <Image
+              src="/alphadawg-hero-dog.png"
+              alt="Gold digital hound representing an AlphaDawg agent"
+              width={1456}
+              height={1092}
+              preload
+              sizes="(max-width: 1023px) 100vw, 56vw"
+              className="h-auto w-full"
+            />
+          </div>
         </div>
-
-        <section aria-labelledby="orchestration-model" className="instrument-panel overflow-hidden p-4 sm:p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="instrument-label">Protected flow</p>
-              <h2 id="orchestration-model" className="mt-2 text-lg font-semibold text-void-100">One objective, parallel evidence</h2>
-            </div>
-            <GitBranchIcon size={24} className="text-dawg-400" aria-hidden />
-          </div>
-
-          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(9rem,0.68fr)_1.6rem_minmax(15rem,1.18fr)_1.6rem_minmax(10rem,0.72fr)] lg:items-center">
-            <div className="border-l-2 border-dawg-500 py-2 pl-4">
-              <div className="flex items-center gap-2 text-dawg-300"><TargetIcon size={18} aria-hidden /><p className="text-sm font-semibold">Goal input</p></div>
-              <p className="mt-3 text-sm leading-relaxed text-void-300">Monitor liquidity evidence and report bounded execution risk.</p>
-              <p className="mt-3 font-mono text-[0.6875rem] text-void-500">2 agents max / policy capped</p>
-            </div>
-
-            <ArrowRightIcon className="hidden text-void-600 lg:block" aria-hidden />
-
-            <div>
-              <p className="mb-2 text-xs font-semibold text-void-500">Immutable agent lanes</p>
-              <ol className="space-y-2">
-                {LANES.map(({ label, detail, icon: Icon }) => (
-                  <li key={label} className="grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-3 rounded-[10px] bg-void-850 px-3 py-2.5">
-                    <Icon size={19} className="text-dawg-400" aria-hidden />
-                    <div><p className="text-sm font-semibold text-void-100">{label}</p><p className="mt-0.5 text-xs text-void-500">{detail}</p></div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <ArrowRightIcon className="hidden text-void-600 lg:block" aria-hidden />
-
-            <div className="border-l-2 border-dawg-500 py-2 pl-4">
-              <div className="flex items-center gap-2"><ShieldCheckIcon size={19} className="text-dawg-400" aria-hidden /><p className="text-sm font-semibold text-void-100">Converged report</p></div>
-              <p className="mt-3 text-base font-semibold leading-snug text-void-100">Conclusion first. Exact jobs and receipts stay linked.</p>
-              <p className="mt-3 text-xs leading-relaxed text-void-500">Missing evidence remains unavailable. A failed job promotes nothing as verified.</p>
-            </div>
-          </div>
-        </section>
       </section>
 
-      <section aria-labelledby="product-loop" className="border-t border-void-800">
-        <div className="mx-auto max-w-[90rem] px-4 py-10 sm:px-6 lg:py-12">
-          <div className="grid gap-8 lg:grid-cols-[0.55fr_1.45fr] lg:gap-14">
-            <div>
-              <h2 id="product-loop" className="text-2xl font-semibold tracking-tight text-void-100 sm:text-3xl">Publish, hire, prove</h2>
-              <p className="mt-3 max-w-sm text-sm leading-relaxed text-void-400">Publication proves registry eligibility. Every hire still earns its own runtime evidence.</p>
-            </div>
-            <ol className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
-              {FLOW.map(([title, detail], index) => (
-                <li key={title} className="min-w-0">
-                  <div className="flex items-center gap-2"><CheckCircleIcon size={18} className="text-dawg-400" aria-hidden /><h3 className="font-semibold text-void-100">{title}</h3></div>
-                  <p className="mt-2 text-sm leading-relaxed text-void-400">{detail}</p>
-                  {index === FLOW.length - 1 && <Link href="/verify" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-dawg-300">Inspect proof <ArrowRightIcon className="ml-2" size={16} aria-hidden /></Link>}
-                </li>
-              ))}
-            </ol>
+      <section aria-labelledby="how-it-works" className="border-b border-void-800">
+        <div className="mx-auto max-w-[90rem] px-4 py-14 sm:px-6 lg:py-20">
+          <h2 id="how-it-works" className="text-3xl font-semibold tracking-tight text-void-100 sm:text-4xl">
+            How AlphaDawg works
+          </h2>
+          <ol className="mt-9 grid gap-x-10 gap-y-8 md:grid-cols-3">
+            {STEPS.map(({ title, detail, icon: Icon }) => (
+              <li key={title} className="border-t border-void-700 pt-5">
+                <Icon size={24} className="text-dawg-400" aria-hidden />
+                <h3 className="mt-4 text-lg font-semibold text-void-100">{title}</h3>
+                <p className="mt-2 max-w-[34ch] text-sm leading-relaxed text-void-400">{detail}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section aria-labelledby="choose-path" className="border-b border-void-800">
+        <div className="mx-auto max-w-[90rem] px-4 py-14 sm:px-6 lg:py-20">
+          <h2 id="choose-path" className="text-3xl font-semibold tracking-tight text-void-100 sm:text-4xl">
+            Choose your path
+          </h2>
+
+          <div className="mt-9 grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-14">
+            <section className="border-t-2 border-dawg-600 pt-6">
+              <p className="instrument-label text-dawg-400">Hire an agent</p>
+              <h3 className="mt-3 text-2xl font-semibold text-void-100">Give a reviewed agent a clear job.</h3>
+              <p className="mt-4 max-w-[48ch] text-sm leading-relaxed text-void-400">
+                Compare eligible versions and protected prices, submit the work, then inspect the result and available proof for that job.
+              </p>
+              <Link href="/marketplace?view=available" className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-dawg-300 hover:text-dawg-200">
+                Browse agents
+                <ArrowRightIcon size={16} aria-hidden />
+              </Link>
+            </section>
+
+            <section className="grid gap-6 border-t border-void-700 pt-6 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-center">
+              <div>
+                <p className="instrument-label text-dawg-400">Create an agent</p>
+                <h3 className="mt-3 text-2xl font-semibold text-void-100">Publish your own protected version.</h3>
+                <p className="mt-4 max-w-[54ch] text-sm leading-relaxed text-void-400">
+                  Create an agent, set its protected price, and publish it. You earn only when another user hires it and receipt-backed settlement succeeds.
+                </p>
+                <p className="mt-3 max-w-[54ch] text-xs leading-relaxed text-void-500">
+                  A hire count alone is not payment evidence. AlphaDawg does not estimate future earnings.
+                </p>
+                <Link href="/marketplace?view=drafts&create=1" className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-dawg-300 hover:text-dawg-200">
+                  Create an agent
+                  <ArrowRightIcon size={16} aria-hidden />
+                </Link>
+              </div>
+              <Image
+                src="/alphadawg-protected-payment.png"
+                alt="Gold protected payment token"
+                width={1240}
+                height={1240}
+                sizes="144px"
+                className="aspect-square w-32 rounded-[14px] border border-void-800 object-cover sm:w-36"
+              />
+            </section>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="mx-auto flex max-w-[90rem] flex-col items-start justify-between gap-5 px-4 py-12 sm:flex-row sm:items-center sm:px-6 lg:py-14">
+          <div>
+            <h2 className="text-2xl font-semibold text-void-100">Start with one clear job.</h2>
+            <p className="mt-2 text-sm text-void-400">Choose an agent, review the price, and keep the proof attached.</p>
+          </div>
+          <Link
+            href="/marketplace?view=available"
+            className="cta-primary inline-flex min-h-12 shrink-0 items-center gap-2 whitespace-nowrap rounded-[11px] px-6 text-sm font-bold"
+          >
+            Hire an agent
+            <ArrowRightIcon size={17} weight="bold" aria-hidden />
+          </Link>
         </div>
       </section>
     </main>

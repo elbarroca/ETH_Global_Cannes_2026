@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardBody } from "@/components/ui/card";
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  ArrowRightIcon,
+  ArrowLeftIcon,
+  SpinnerGapIcon,
+} from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 
 interface ExecuteTradeModalProps {
@@ -40,56 +46,58 @@ export function ExecuteTradeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-void-950/80 backdrop-blur-sm">
-      <Card className="w-full max-w-md mx-4">
-        <CardBody className="space-y-5">
+    <div className="dialog-backdrop">
+      <div className="dialog-panel max-w-md">
+        <div className="px-6 py-7">
           {!result ? (
-            <>
-              <div className="text-center space-y-2">
-                <p className="text-xs text-void-500 uppercase tracking-wider">
-                  Confirm Trade
-                </p>
-                <p className={`text-2xl font-bold ${isBuy ? "text-green-400" : "text-blood-400"}`}>
+            <div className="space-y-5">
+              <div className="space-y-2 text-center">
+                <p className="instrument-label">Confirm trade</p>
+                <p className={`tnums text-2xl font-bold ${isBuy ? "text-emerald-400" : "text-blood-300"}`}>
                   {action} {percentage}% {asset}
                 </p>
-                <p className="text-sm text-void-400">
-                  ${usdcAmount} USDC {isBuy ? "→" : "←"} {asset}
+                <p className="flex items-center justify-center gap-2 text-sm text-void-400">
+                  <span className="tnums font-mono">${usdcAmount} USDC</span>
+                  {isBuy ? (
+                    <ArrowRightIcon size={15} className="text-void-500" aria-hidden />
+                  ) : (
+                    <ArrowLeftIcon size={15} className="text-void-500" aria-hidden />
+                  )}
+                  <span>{asset}</span>
                 </p>
               </div>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-void-500">
-                  <span>Amount</span>
-                  <span className="text-void-200">${usdcAmount} USDC</span>
+              <dl className="space-y-2.5 rounded-[12px] border border-void-800 bg-void-950 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <dt className="text-void-500">Amount</dt>
+                  <dd className="tnums font-mono text-void-200">${usdcAmount} USDC</dd>
                 </div>
-                <div className="flex justify-between text-void-500">
-                  <span>Slippage</span>
-                  <span className="text-void-200">0.5%</span>
+                <div className="flex items-center justify-between">
+                  <dt className="text-void-500">Slippage</dt>
+                  <dd className="tnums font-mono text-void-200">0.5%</dd>
                 </div>
-                <div className="flex justify-between text-void-500">
-                  <span>Network</span>
-                  <Badge variant="blue">Arc Testnet</Badge>
+                <div className="flex items-center justify-between">
+                  <dt className="text-void-500">Network</dt>
+                  <dd><Badge variant="blue">Arc Testnet</Badge></dd>
                 </div>
-                <div className="flex justify-between text-void-500">
-                  <span>Wallet</span>
-                  <Badge variant="gray">Circle MPC</Badge>
+                <div className="flex items-center justify-between">
+                  <dt className="text-void-500">Wallet</dt>
+                  <dd><Badge variant="gray">Circle MPC</Badge></dd>
                 </div>
-              </div>
+              </dl>
 
               <div className="flex gap-3">
                 <button
                   onClick={handleConfirm}
                   disabled={executing}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-white text-sm font-bold rounded-xl transition-colors ${
-                    isBuy
-                      ? "bg-emerald-600 hover:bg-emerald-700"
-                      : "bg-blood-600 hover:bg-blood-700"
-                  } disabled:opacity-60`}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-[11px] px-4 py-3 text-sm font-bold text-white transition-colors disabled:opacity-60 ${
+                    isBuy ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blood-600 hover:bg-blood-700"
+                  }`}
                 >
                   {executing ? (
                     <>
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Executing...
+                      <SpinnerGapIcon size={16} className="animate-spin" aria-hidden />
+                      Executing
                     </>
                   ) : (
                     `Confirm ${action}`
@@ -98,41 +106,39 @@ export function ExecuteTradeModal({
                 <button
                   onClick={onClose}
                   disabled={executing}
-                  className="flex-1 px-4 py-3 bg-void-800 hover:bg-void-700 disabled:opacity-60 text-void-300 text-sm font-bold rounded-xl transition-colors border border-void-700"
+                  className="flex-1 rounded-[11px] border border-void-700 bg-void-800 px-4 py-3 text-sm font-semibold text-void-300 transition-colors hover:bg-void-700 hover:text-void-100 disabled:opacity-60"
                 >
                   Cancel
                 </button>
               </div>
-            </>
+            </div>
           ) : result.txId ? (
-            <div className="text-center space-y-3 py-4">
-              <p className="text-3xl">✅</p>
-              <p className="text-lg font-bold text-green-400">Trade Executed</p>
-              <p className="text-xs font-mono text-void-500 break-all">
-                Tx: {result.txId}
-              </p>
+            <div className="space-y-3 py-4 text-center">
+              <CheckCircleIcon size={44} weight="fill" className="mx-auto text-emerald-400" aria-hidden />
+              <p className="text-lg font-bold text-emerald-400">Trade executed</p>
+              <p className="identifier-value font-mono text-xs text-void-500">Tx: {result.txId}</p>
               <button
                 onClick={onClose}
-                className="px-6 py-2 bg-void-800 hover:bg-void-700 text-void-300 text-sm rounded-xl border border-void-700 transition-colors"
+                className="rounded-[11px] border border-void-700 bg-void-800 px-6 py-2.5 text-sm font-semibold text-void-300 transition-colors hover:bg-void-700 hover:text-void-100"
               >
                 Close
               </button>
             </div>
           ) : (
-            <div className="text-center space-y-3 py-4">
-              <p className="text-3xl">❌</p>
-              <p className="text-lg font-bold text-blood-400">Trade Failed</p>
-              <p className="text-sm text-void-500">{result.error}</p>
+            <div className="space-y-3 py-4 text-center">
+              <XCircleIcon size={44} weight="fill" className="mx-auto text-blood-400" aria-hidden />
+              <p className="text-lg font-bold text-blood-300">Trade failed</p>
+              <p className="text-sm text-void-500 text-pretty">{result.error}</p>
               <button
                 onClick={onClose}
-                className="px-6 py-2 bg-void-800 hover:bg-void-700 text-void-300 text-sm rounded-xl border border-void-700 transition-colors"
+                className="rounded-[11px] border border-void-700 bg-void-800 px-6 py-2.5 text-sm font-semibold text-void-300 transition-colors hover:bg-void-700 hover:text-void-100"
               >
                 Close
               </button>
             </div>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

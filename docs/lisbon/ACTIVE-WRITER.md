@@ -3,6 +3,36 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: 0G Integrator /root/og_langchain_runtime_v5
+task_id: OG-LANGCHAIN-RUNTIME-V5-W2
+task_instance_id: OG-LANGCHAIN-RUNTIME-V5-W2:W2:B2EB3D0
+generation: 1
+sprint: Add the strict production 0G LangChain V5 runtime
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: b2eb3d074857f059aefa51bda5031c3cac060a6b
+control_sha: b2eb3d074857f059aefa51bda5031c3cac060a6b
+token: OG-LANGCHAIN-RUNTIME-V5-W2-B2EB3D0-20260725T211444Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T21:14:44Z
+expires_at: 2026-07-26T01:14:44Z
+allowed_paths:
+  - package.json
+  - package-lock.json
+  - src/og/**
+  - src/config/og-compute.ts
+  - src/config/og-storage.ts
+  - tools/0g-storage-verifier/**
+  - tests/a3/**
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T21:14:44Z
+deadline: 2026-07-26T01:14:44Z
+expected_exit: strict production 0G LangChain V5 runtime with release-bound budget fencing and deterministic local evidence
+external_effect_authority: local files exact dependency installation offline fixtures deterministic tests and one atomic local commit only; no environment mutation live network wallet signature upload spend managed migration deployment push claim or public proof
+status: active
+```
+
+```yaml
 owner: Kernel Integrator /root/marketplace_kernel_v5
 task_id: MARKETPLACE-LANGCHAIN-KERNEL-V5-W1
 task_instance_id: MARKETPLACE-LANGCHAIN-KERNEL-V5-W1:W1:061832A

@@ -25,6 +25,7 @@ import {
 
 const POLICY_VERSION = "strict-0g-v1";
 const REQUEST_DEADLINE_MS = 5 * 60 * 1_000;
+const MAX_OUTPUT_TOKENS = 768;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
 const ROOT_PATTERN = /^0x[0-9a-f]{64}$/;
 const ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
@@ -55,6 +56,13 @@ export interface StrictComputeResponse {
   model: string;
   requestId: string | null;
   body: unknown;
+}
+
+export interface StrictComputeUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  actualCostAtomic: string;
 }
 
 export interface StrictComputeSignature {
@@ -119,10 +127,29 @@ export interface StrictA3AdapterOptions {
       request: StorageVerificationRequest,
       signal: AbortSignal,
     ) => Promise<StorageVerificationResult>;
+    chatModel?: StrictA3ChatModel;
+  };
+  productionRuntime?: NonNullable<StrictA3AdapterOptions["fixture"]> & {
+    effectId: string;
+    budgetExpiresAt: Date;
   };
   hooks?: StrictA3Hooks;
   environment?: Record<string, string | undefined>;
   authority?: EnsAuthorityRuntime;
+}
+
+export interface StrictA3ChatModelResult {
+  service: StrictComputeService & { expectedSigner: string };
+  response: { content: string; requestId: string; usage: StrictComputeUsage };
+  signature: StrictComputeSignature;
+}
+
+export interface StrictA3ChatModel {
+  invokeStrict(
+    requestBytes: string,
+    signal: AbortSignal,
+    beforeEffect: (operation: EnsAuthorityOperation) => Promise<void>,
+  ): Promise<StrictA3ChatModelResult>;
 }
 
 interface A3JournalRow {
@@ -150,6 +177,7 @@ interface A3JournalRow {
   request_bytes: string;
   request_hash: string;
   request_id: string | null;
+  request_signature: string | null;
   signer_address: string | null;
   response_content: string | null;
   response_hash: string | null;
@@ -166,6 +194,10 @@ interface A3JournalRow {
   result: unknown;
   proof_hash: string | null;
   error_code: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  actual_cost_atomic: string | null;
 }
 
 interface LineageRow {
@@ -185,7 +217,7 @@ interface ValidatedService extends StrictComputeService {
   expectedSigner: string;
 }
 
-class A3TerminalError extends Error {
+export class A3TerminalError extends Error {
   readonly code: string;
 
   constructor(code: string) {
@@ -343,7 +375,7 @@ function claimFromRequest(request: AdapterExecutionRequest): ClaimedJob {
   };
 }
 
-function validateService(
+export function validateStrictComputeService(
   service: StrictComputeService,
   provider: string,
   model: string,
@@ -403,11 +435,11 @@ function validateService(
   return { ...service, expectedSigner: targetAddress };
 }
 
-function validateComputeResponse(
+export function validateStrictComputeResponse(
   response: StrictComputeResponse,
   provider: string,
   model: string,
-): { content: string; requestId: string } {
+): { content: string; requestId: string; usage: StrictComputeUsage | null } {
   if (response.status !== 200) throw new A3TerminalError("A3_COMPUTE_HTTP_STATUS");
   if (response.provider !== provider || response.model !== model) {
     throw new A3TerminalError("A3_COMPUTE_RESPONSE_IDENTITY_MISMATCH");
@@ -434,10 +466,34 @@ function validateComputeResponse(
   ) {
     throw new A3TerminalError("A3_COMPUTE_RESPONSE_MALFORMED");
   }
-  return { content, requestId: response.requestId };
+  const usage = plainRecord(body.usage);
+  let validatedUsage: StrictComputeUsage | null = null;
+  if (usage) {
+    const promptTokens = usage.prompt_tokens;
+    const completionTokens = usage.completion_tokens;
+    const totalTokens = usage.total_tokens;
+    const actualCostAtomic = usage.actual_cost_atomic;
+    if (
+      !exactKeys(usage, ["actual_cost_atomic", "completion_tokens", "prompt_tokens", "total_tokens"]) ||
+      !Number.isSafeInteger(promptTokens) || Number(promptTokens) < 0 ||
+      !Number.isSafeInteger(completionTokens) || Number(completionTokens) < 0 ||
+      Number(completionTokens) > MAX_OUTPUT_TOKENS ||
+      !Number.isSafeInteger(totalTokens) || totalTokens !== Number(promptTokens) + Number(completionTokens) ||
+      typeof actualCostAtomic !== "string" || !/^(0|[1-9][0-9]*)$/.test(actualCostAtomic)
+    ) {
+      throw new A3TerminalError("A3_COMPUTE_USAGE_MALFORMED");
+    }
+    validatedUsage = {
+      promptTokens: Number(promptTokens),
+      completionTokens: Number(completionTokens),
+      totalTokens: Number(totalTokens),
+      actualCostAtomic,
+    };
+  }
+  return { content, requestId: response.requestId, usage: validatedUsage };
 }
 
-function validateSignature(value: unknown): StrictComputeSignature {
+export function validateStrictComputeSignature(value: unknown): StrictComputeSignature {
   const signature = plainRecord(value);
   if (
     !signature ||
@@ -500,7 +556,7 @@ function buildRequestBytes(input: {
     provider: input.provider,
   };
   return canonicalJson({
-    max_tokens: 512,
+    max_tokens: MAX_OUTPUT_TOKENS,
     messages: [
       { content: input.instructions, role: "system" },
       { content: `ALPHADAWG_STRICT_BINDING ${canonicalJson(binding)}`, role: "system" },
@@ -563,6 +619,9 @@ export class StrictA3Adapter implements KernelAdapter {
       request: StorageVerificationRequest,
       signal: AbortSignal,
     ) => Promise<StorageVerificationResult>;
+    chatModel?: StrictA3ChatModel;
+    effectId?: string;
+    budgetExpiresAt?: Date;
   };
 
   constructor(options: StrictA3AdapterOptions = {}) {
@@ -577,8 +636,15 @@ export class StrictA3Adapter implements KernelAdapter {
     }
     this.hooks = options.hooks ?? {};
     this.authorityRuntime = options.authority ?? null;
+    if (options.fixture && options.productionRuntime) {
+      throw new Error("A3_RUNTIME_MODE_CONFLICT");
+    }
     if (options.fixture) {
       this.runtime = options.fixture;
+      return;
+    }
+    if (options.productionRuntime) {
+      this.runtime = options.productionRuntime;
       return;
     }
     // Production authority is intentionally absent. Only an explicit local
@@ -834,6 +900,8 @@ export class StrictA3Adapter implements KernelAdapter {
       responseHash: string;
       receiptBytes: string;
       receiptDigest: string;
+      signature: string;
+      usage: StrictComputeUsage | null;
     },
   ): Promise<A3JournalRow> {
     return this.withCurrentClaim(job, async (tx) => {
@@ -841,9 +909,15 @@ export class StrictA3Adapter implements KernelAdapter {
         UPDATE a3_execution_journals
         SET stage = 'RESPONSE_VERIFIED', version = version + 1,
             request_id = ${values.requestId}, signer_address = ${values.signerAddress},
+            request_signature = ${values.signature},
             response_content = ${values.content}, response_hash = ${values.responseHash},
             compute_receipt_bytes = ${values.receiptBytes},
-            compute_receipt_digest = ${values.receiptDigest}, updated_at = ${this.clock()}
+            compute_receipt_digest = ${values.receiptDigest},
+            prompt_tokens = ${values.usage?.promptTokens ?? null},
+            completion_tokens = ${values.usage?.completionTokens ?? null},
+            total_tokens = ${values.usage?.totalTokens ?? null},
+            actual_cost_atomic = ${values.usage?.actualCostAtomic ?? null}::bigint,
+            updated_at = ${this.clock()}
         WHERE effect_id = ${job.effectId}
           AND stage = 'REQUEST_SENT'
           AND version = ${journal.version}
@@ -953,7 +1027,28 @@ export class StrictA3Adapter implements KernelAdapter {
       journal.stage === "READBACK_VERIFIED",
     );
     if (!payload.ok) throw new A3TerminalError(payload.errorCode);
-    return payload;
+    if (!journal.request_signature || journal.prompt_tokens === null ||
+      journal.completion_tokens === null || journal.total_tokens === null ||
+      journal.actual_cost_atomic === null) return payload;
+    return {
+      ...payload,
+      result: {
+        ...(payload.result as Record<string, CanonicalValue>),
+        compute: {
+          actualCostAtomic: journal.actual_cost_atomic,
+          completionTokens: journal.completion_tokens,
+          inputTokens: journal.prompt_tokens,
+          teeSignature: journal.request_signature,
+          totalTokens: journal.total_tokens,
+        },
+        readback: {
+          digest: journal.readback_digest ?? "",
+          root: journal.readback_root ?? "",
+          size: journal.readback_size ?? -1,
+          verified: journal.stage === "READBACK_VERIFIED",
+        },
+      },
+    };
   }
 
   private validateVerifierResult(
@@ -993,6 +1088,13 @@ export class StrictA3Adapter implements KernelAdapter {
     if (!runtime) {
       return { ok: false, errorCode: "A3_LIVE_BLOCKED", retryable: false };
     }
+    if (
+      runtime.effectId &&
+      (request.effectId !== runtime.effectId || !runtime.budgetExpiresAt ||
+        runtime.budgetExpiresAt.getTime() <= this.clock().getTime())
+    ) {
+      return { ok: false, errorCode: "A3_BUDGET_NOT_ADMITTED", retryable: false };
+    }
     const job = claimFromRequest(request);
     let journal: A3JournalRow | null = null;
     let deadline: ExecutionDeadline | null = null;
@@ -1027,9 +1129,29 @@ export class StrictA3Adapter implements KernelAdapter {
         await this.hooks.afterPrepared?.();
         checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
-        await this.assertFreshAuthority(job, "COMPUTE_SERVICE", activeDeadline.signal);
         const preparedJournal = journal;
-        const service = validateService(
+        let service: ValidatedService;
+        let response: { content: string; requestId: string; usage: StrictComputeUsage | null } | null = null;
+        let signature: StrictComputeSignature | null = null;
+        if (runtime.chatModel) {
+          journal = await this.markRequestSent(job, journal);
+          const modelResult = await awaitWithSignal(
+            () => runtime.chatModel!.invokeStrict(
+              preparedJournal.request_bytes,
+              activeDeadline.signal,
+              async (operation) => {
+                await this.assertCurrentClaim(job);
+                await this.assertFreshAuthority(job, operation, activeDeadline.signal);
+              },
+            ),
+            activeDeadline.signal,
+          );
+          service = modelResult.service;
+          response = modelResult.response;
+          signature = modelResult.signature;
+        } else {
+          await this.assertFreshAuthority(job, "COMPUTE_SERVICE", activeDeadline.signal);
+          service = validateStrictComputeService(
           await awaitWithSignal(
             () => runtime.compute.resolveService(
               preparedJournal.provider,
@@ -1040,49 +1162,39 @@ export class StrictA3Adapter implements KernelAdapter {
           ),
           journal.provider,
           journal.model,
-        );
-        checkExecutionAbort(request.signal, activeDeadline);
-        await this.assertCurrentClaim(job);
-        journal = await this.markRequestSent(job, journal);
+          );
+          checkExecutionAbort(request.signal, activeDeadline);
+          await this.assertCurrentClaim(job);
+          journal = await this.markRequestSent(job, journal);
+        }
 
-        await this.assertCurrentClaim(job);
-        await this.assertFreshAuthority(job, "COMPUTE_HEADERS", activeDeadline.signal);
-        const sentJournal = journal;
-        const headers = await awaitWithSignal(
-          () => runtime.compute.getRequestHeaders(
-            service,
-            sentJournal.request_bytes,
+        if (!runtime.chatModel) {
+          await this.assertCurrentClaim(job);
+          await this.assertFreshAuthority(job, "COMPUTE_HEADERS", activeDeadline.signal);
+          const sentJournal = journal;
+          const headers = await awaitWithSignal(
+            () => runtime.compute.getRequestHeaders(service, sentJournal.request_bytes, activeDeadline.signal),
             activeDeadline.signal,
-          ),
-          activeDeadline.signal,
-        );
-        checkExecutionAbort(request.signal, activeDeadline);
-        await this.assertCurrentClaim(job);
-        await this.assertFreshAuthority(job, "COMPUTE_REQUEST", activeDeadline.signal);
-        const response = validateComputeResponse(
-          await awaitWithSignal(
-            () => runtime.compute.sendRequest(
-              service,
-              sentJournal.request_bytes,
-              headers,
+          );
+          checkExecutionAbort(request.signal, activeDeadline);
+          await this.assertCurrentClaim(job);
+          await this.assertFreshAuthority(job, "COMPUTE_REQUEST", activeDeadline.signal);
+          response = validateStrictComputeResponse(
+            await awaitWithSignal(
+              () => runtime.compute.sendRequest(service, sentJournal.request_bytes, headers, activeDeadline.signal),
               activeDeadline.signal,
-            ),
+            ), journal.provider, journal.model,
+          );
+          checkExecutionAbort(request.signal, activeDeadline);
+          await this.assertCurrentClaim(job);
+          await this.assertFreshAuthority(job, "COMPUTE_SIGNATURE", activeDeadline.signal);
+          const validatedResponse = response;
+          signature = validateStrictComputeSignature(await awaitWithSignal(
+            () => runtime.compute.fetchSignature(service, validatedResponse.requestId, activeDeadline.signal),
             activeDeadline.signal,
-          ),
-          journal.provider,
-          journal.model,
-        );
-        checkExecutionAbort(request.signal, activeDeadline);
-        await this.assertCurrentClaim(job);
-        await this.assertFreshAuthority(job, "COMPUTE_SIGNATURE", activeDeadline.signal);
-        const signature = validateSignature(await awaitWithSignal(
-          () => runtime.compute.fetchSignature(
-            service,
-            response.requestId,
-            activeDeadline.signal,
-          ),
-          activeDeadline.signal,
-        ));
+          ));
+        }
+        if (!response || !signature) throw new A3TerminalError("A3_COMPUTE_RESPONSE_MALFORMED");
         checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
         if (!Buffer.from(signature.text, "utf8").equals(Buffer.from(response.content, "utf8"))) {
@@ -1114,6 +1226,8 @@ export class StrictA3Adapter implements KernelAdapter {
           responseHash,
           receiptBytes: computeReceiptBytes,
           receiptDigest: sha256Hex(computeReceiptBytes),
+          signature: signature.signature,
+          usage: response.usage,
         });
         await this.hooks.afterResponseVerified?.();
       }

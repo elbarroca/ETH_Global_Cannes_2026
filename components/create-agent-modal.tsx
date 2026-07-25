@@ -28,6 +28,7 @@ import {
   type AgentLifecycleVersion,
 } from "@/lib/api";
 import { agentVersionToYaml } from "@/lib/manifest-yaml";
+import { formatUsdc, formatUsdcAtomic } from "@/lib/format-usdc";
 
 const STAGES = ["Identity", "Capability bundle", "ENS authority", "Publish and receipt"] as const;
 type Stage = 0 | 1 | 2 | 3;
@@ -68,10 +69,14 @@ function normalizeCreatorParent(value: string): string {
 
 function StageRail({ active }: { active: Stage }) {
   return (
-    <ol className="sticky top-0 z-10 -mx-4 grid grid-cols-2 gap-x-3 gap-y-2 bg-void-900 px-4 pb-4 sm:-mx-5 sm:grid-cols-4 sm:px-5" aria-label="Publication progress">
+    <ol className="sticky top-0 z-10 -mx-4 grid grid-cols-2 gap-x-4 gap-y-3 bg-void-900 px-4 pb-5 sm:-mx-5 sm:grid-cols-4 sm:px-5" aria-label="Publication progress">
       {STAGES.map((label, index) => (
-        <li key={label} aria-current={index === active ? "step" : undefined} className={`border-t-2 pt-2 text-xs font-semibold ${index <= active ? "border-dawg-500 text-void-100" : "border-void-700 text-void-500"}`}>
-          {label}
+        <li key={label} aria-current={index === active ? "step" : undefined} className="grid gap-2">
+          <span className={`h-0.5 rounded-full transition-colors duration-300 ${index < active ? "bg-dawg-500" : index === active ? "bg-dawg-400" : "bg-void-700"}`} />
+          <span className={`flex items-center gap-1.5 text-xs font-semibold transition-colors ${index <= active ? "text-void-100" : "text-void-500"}`}>
+            <span className={`font-mono text-[0.625rem] ${index < active ? "text-dawg-400" : index === active ? "text-dawg-300" : "text-void-600"}`}>{String(index + 1).padStart(2, "0")}</span>
+            {label}
+          </span>
         </li>
       ))}
     </ol>
@@ -79,7 +84,7 @@ function StageRail({ active }: { active: Stage }) {
 }
 
 function FieldCount({ current, maximum }: { current: number; maximum: number }) {
-  return <p className="text-right font-mono text-xs text-void-500">{current} / {maximum.toLocaleString()}</p>;
+  return <p className="mt-2 text-right font-mono text-xs text-void-500 tnums">{current} / {maximum.toLocaleString()}</p>;
 }
 
 function CatalogLoading() {
@@ -116,6 +121,28 @@ function TemplateSkills({ catalog, template }: { catalog: AgentCatalogProjection
   );
 }
 
+function ProviderReadiness({ catalog }: { catalog: AgentCatalogProjection }) {
+  return (
+    <ul className="mt-4 space-y-4">
+      {catalog.mcpProviders.map((provider) => (
+        <li key={provider.provider} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div>
+            <p className="text-sm font-semibold text-void-200">{humanize(provider.provider)}</p>
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {provider.capabilities.map((capability) => (
+                <li key={capability} className="rounded-[6px] bg-void-800 px-2 py-1 text-[0.6875rem] text-void-400">
+                  {humanize(capability)}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <EvidenceStatus state={provider.availability === "AVAILABLE" ? "verified" : "unavailable"} label={provider.availability} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function SelectionPreview({ catalog, template, name, description, fullSubname }: { catalog: AgentCatalogProjection | undefined; template: AgentCatalogTemplate | null; name: string; description: string; fullSubname: string }) {
   if (!catalog || !template) return <p className="mt-4 text-sm text-void-500">Select a server template to inspect its exact bundle.</p>;
   return (
@@ -125,7 +152,8 @@ function SelectionPreview({ catalog, template, name, description, fullSubname }:
       <PreviewRow label="Description" value={description.trim() || "Not set"} />
       <PreviewRow label="ENS subname" value={fullSubname} mono />
       <PreviewRow label="Capabilities" value={`${template.capabilities.length} included by template`} />
-      <PreviewRow label="Atomic price" value={template.priceAtomic} mono />
+      <PreviewRow label="Price per protected hire" value={formatUsdc(template.priceAtomic)} mono />
+      <PreviewRow label="Settled earnings" value="Unavailable until the protected owner projection lands" />
       <PreviewRow label="Skill snapshots" value={`${template.skillIds.length} locked by template`} />
       <PreviewRow label="MCP providers" value={`${catalog.mcpProviders.filter((provider) => provider.availability === "AVAILABLE").length} of ${catalog.mcpProviders.length} available`} />
     </dl>
@@ -230,25 +258,32 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
   }
 
   return (
-    <Dialog open title="Create a protected agent" description="Choose one reviewed server template, bind ENS authority, then publish the exact immutable version." onClose={publishedAgent ? finish : onClose} dismissible={!busy} className="max-w-6xl">
+    <Dialog open title="Create a protected agent" description="Choose one reviewed server template, bind ENS authority, then publish the exact immutable application version." onClose={publishedAgent ? finish : onClose} dismissible={!busy} className="max-w-5xl">
       <StageRail active={stage} />
-      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.75fr)]">
+      <div className="mt-4 grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
         <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={stage} ref={stageFocusRef} tabIndex={-1} initial={reduceMotion ? false : { opacity: 0, x: direction * 18 }} animate={{ opacity: 1, x: 0 }} exit={reduceMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: direction * -12 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className="min-w-0 pb-20 focus:outline-none">
-          {stage === 0 && <section aria-labelledby="agent-identity-title"><h3 id="agent-identity-title" className="text-2xl font-semibold text-void-100">Identity</h3><p className="mt-2 text-sm text-void-400">Name the bounded role. Instructions and capability policy remain server-owned.</p><div className="mt-6 space-y-5"><label className="block text-sm font-semibold text-void-200" htmlFor="agent-name">Agent name<input id="agent-name" value={name} onChange={(event) => { setName(event.target.value); setPreparedAgent(null); }} maxLength={80} className="goal-control" /><FieldCount current={name.length} maximum={80} /></label><label className="block text-sm font-semibold text-void-200" htmlFor="agent-description">Description<textarea id="agent-description" value={description} onChange={(event) => { setDescription(event.target.value); setPreparedAgent(null); }} maxLength={800} rows={5} className="goal-control min-h-32 resize-y py-3" /><FieldCount current={description.length} maximum={800} /></label></div></section>}
+        <motion.div data-testid="agent-stage" key={stage} ref={stageFocusRef} tabIndex={-1} initial={reduceMotion ? false : { opacity: 0, x: direction * 18 }} animate={{ opacity: 1, x: 0 }} exit={reduceMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: direction * -12 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className="min-w-0 pb-4 focus:outline-none">
+          {stage === 0 && <section aria-labelledby="agent-identity-title"><h3 id="agent-identity-title" className="text-2xl font-semibold tracking-tight text-void-100">Identity</h3><p className="mt-2.5 text-sm leading-relaxed text-void-400">Name the bounded role. Instructions and capability policy remain server-owned.</p><div className="mt-7 space-y-6"><label className="block text-sm font-semibold text-void-200" htmlFor="agent-name">Agent name<input id="agent-name" value={name} onChange={(event) => { setName(event.target.value); setPreparedAgent(null); }} maxLength={80} placeholder="Research analyst" className="goal-control" /><FieldCount current={name.length} maximum={80} /></label><label className="block text-sm font-semibold text-void-200" htmlFor="agent-description">Description<textarea id="agent-description" value={description} onChange={(event) => { setDescription(event.target.value); setPreparedAgent(null); }} maxLength={800} rows={4} placeholder="Describe the bounded role this agent performs." className="goal-control min-h-32 resize-y leading-relaxed" /><FieldCount current={description.length} maximum={800} /></label></div></section>}
 
           {stage === 1 && (
             <section aria-labelledby="capability-bundle-title">
               <h3 id="capability-bundle-title" className="text-2xl font-semibold text-void-100">Capability bundle</h3>
-              <p className="mt-2 text-sm text-void-400">Choose one immutable template from the authenticated founding catalog. Included skills and MCP bindings are server-owned and cannot be edited here.</p>
+              <p className="mt-2 text-sm text-void-400">Choose one immutable template from the authenticated founding catalog. Price, skills, and provider requirements are server-owned.</p>
               {catalog.isLoading && <div className="mt-6"><CatalogLoading /></div>}
               {catalog.error && <div role="alert" className="mt-6 border-l-2 border-blood-500 pl-3"><p className="break-words text-sm text-blood-300">{catalog.error.message}</p><button type="button" onClick={() => void catalog.refetch()} className="instrument-button instrument-button-secondary mt-4">Retry catalog</button></div>}
-              {catalog.data && <div className="mt-6 grid gap-2 sm:grid-cols-2">{catalog.data.templates.map((item) => {
+              {catalog.data && <div className="mt-6 grid gap-2.5 sm:grid-cols-2">{catalog.data.templates.map((item) => {
                 const selected = item.id === templateId;
-                return <button key={item.id} type="button" aria-pressed={selected} onClick={() => { setTemplateId(item.id); setPreparedAgent(null); }} className={`min-h-28 rounded-[10px] border p-3 text-left ${selected ? "border-dawg-500 bg-dawg-500/8" : "border-void-700 bg-void-950"}`}><span className="flex items-start justify-between gap-3 text-sm font-semibold text-void-100">{item.label}<CheckIcon size={16} className={selected ? "text-dawg-400" : "text-void-500"} aria-hidden /></span><CapabilityList capabilities={item.capabilities} /><span className="mt-3 block font-mono text-xs text-void-500">{item.priceAtomic} USDC_ATOMIC</span></button>;
+                return <button key={item.id} type="button" aria-pressed={selected} onClick={() => { setTemplateId(item.id); setPreparedAgent(null); }} className={`group flex min-h-28 flex-col rounded-[12px] border p-4 text-left transition-all duration-200 ${selected ? "border-dawg-500 bg-dawg-500/[0.07] shadow-[0_0_0_1px_rgba(244,197,66,0.25),0_8px_24px_-16px_rgba(244,197,66,0.4)]" : "border-void-800 bg-void-950 hover:border-void-600 hover:bg-void-900/50"}`}>
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-void-100">{item.label}</span>
+                    <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors ${selected ? "border-dawg-500 bg-dawg-500 text-void-950" : "border-void-600 text-transparent group-hover:border-void-500"}`}><CheckIcon size={12} weight="bold" aria-hidden /></span>
+                  </span>
+                  <span className="mt-3 flex flex-wrap gap-1.5">{item.capabilities.length ? item.capabilities.map((cap) => <span key={cap} className="rounded-full border border-void-800 bg-void-900/60 px-2 py-0.5 text-[0.6875rem] text-void-400">{humanize(cap)}</span>) : <span className="text-xs text-void-500">No direct capability claim</span>}</span>
+                  <span className="mt-auto pt-4 font-mono text-xs text-dawg-300 tnums">{formatUsdc(item.priceAtomic)}</span>
+                </button>;
               })}</div>}
-              {catalog.data && template && <TemplateSkills catalog={catalog.data} template={template} />}
-              {catalog.data && <section className="mt-6 border-t border-void-800 pt-4" aria-labelledby="mcp-availability"><h4 id="mcp-availability" className="text-sm font-semibold text-void-200">Catalog provider readiness</h4><p className="mt-1 text-xs leading-relaxed text-void-500">Separate from skills included by the template. An unavailable provider supplies no runtime evidence.</p><ul className="mt-4 space-y-4">{catalog.data.mcpProviders.map((provider) => <li key={provider.provider} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"><div><p className="text-sm font-semibold text-void-200">{humanize(provider.provider)}</p><ul className="mt-2 flex flex-wrap gap-1.5">{provider.capabilities.map((capability) => <li key={capability} className="rounded-[6px] bg-void-800 px-2 py-1 text-[0.6875rem] text-void-400">{humanize(capability)}</li>)}</ul></div><EvidenceStatus state={provider.availability === "AVAILABLE" ? "verified" : "unavailable"} label={provider.availability} /></li>)}</ul></section>}
+              {catalog.data && template && <details className="mt-6 border-y border-void-800"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-void-300">Inspect exact skills and constraints</summary><div className="border-t border-void-800 pb-5"><TemplateSkills catalog={catalog.data} template={template} /></div></details>}
+              {catalog.data && <details className="mt-4 border-y border-void-800"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-void-300">Inspect catalog provider readiness</summary><div className="border-t border-void-800 py-4"><p className="text-xs leading-relaxed text-void-500">Provider readiness is separate from the selected skills. Unavailable providers supply no runtime evidence.</p><ProviderReadiness catalog={catalog.data} /></div></details>}
             </section>
           )}
 
@@ -270,13 +305,13 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
             </section>
           )}
 
-          {stage === 3 && <section aria-labelledby="publish-receipt-title"><h3 id="publish-receipt-title" className="text-2xl font-semibold text-void-100">{publishedAgent ? "Publication receipt" : "Publish immutable version"}</h3>{publishedAgent ? <><div className="mt-4 flex flex-wrap items-start justify-between gap-3 border-y border-void-800 py-4"><div><p className="font-semibold text-void-100">{publishedAgent.name}</p><p className="mt-2 break-all font-mono text-sm text-dawg-300">{publishedAgent.fullSubname ?? "Canonical subname unavailable"}</p></div><EvidenceStatus state={publishedAgent.hireable && publishedAgent.canonicalState === "CANONICAL" ? "verified" : "unavailable"} label={publishedAgent.hireable ? "ELIGIBLE" : "REFUSED"} /></div><dl className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2"><CopyableIdentifier label="Agent ID" value={publishedAgent.agentId} /><CopyableIdentifier label="Version ID" value={publishedAgent.versionId} /><CopyableIdentifier label="Owner wallet" value={publishedAgent.ownerWallet} /><CopyableIdentifier label="Manifest hash" value={publishedAgent.manifestHash} /></dl><p className="mt-4 text-sm text-void-400">Registry eligibility only. Runtime, MCP, 0G, storage, receipt, delivery, and settlement remain per-job evidence.</p></> : <><p className="mt-2 text-sm text-void-400">Publish only the exact server-returned draft. Refusal and lost-response states remain visible.</p><button type="button" onClick={() => void publish()} disabled={!preparedAgent || busy || publicationUncertain} className="instrument-button instrument-button-primary mt-6"><ShieldCheckIcon size={16} aria-hidden />{publicationUncertain ? "Refresh registry before retry" : busy ? "Publishing version" : "Publish immutable version"}</button></>}</section>}
+          {stage === 3 && <section aria-labelledby="publish-receipt-title"><h3 id="publish-receipt-title" className="text-2xl font-semibold text-void-100">{publishedAgent ? "Publication receipt" : "Publish immutable version"}</h3>{publishedAgent ? <><div className="mt-4 flex flex-wrap items-start justify-between gap-3 border-y border-void-800 py-4"><div><p className="font-semibold text-void-100">{publishedAgent.name}</p><p className="mt-2 break-all font-mono text-sm text-dawg-300">{publishedAgent.fullSubname ?? "Canonical subname unavailable"}</p></div><EvidenceStatus state={publishedAgent.hireable && publishedAgent.canonicalState === "CANONICAL" ? "verified" : "unavailable"} label={publishedAgent.hireable ? "ELIGIBLE" : "REFUSED"} /></div><dl className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2"><CopyableIdentifier label="Agent ID" value={publishedAgent.agentId} /><CopyableIdentifier label="Version ID" value={publishedAgent.versionId} /><CopyableIdentifier label="Owner wallet" value={publishedAgent.ownerWallet} /><CopyableIdentifier label="Creator parent" value={publishedAgent.creatorParent ?? "Unavailable"} /><CopyableIdentifier label="Agent subname" value={publishedAgent.fullSubname ?? "Unavailable"} /><CopyableIdentifier label="Authority owner" value={publishedAgent.authorityOwner ?? "Unavailable"} /><CopyableIdentifier label="Delegate" value={publishedAgent.authorityDelegate ?? "Unavailable"} /><CopyableIdentifier label="Release SHA" value={publishedAgent.authorityReleaseSha ?? "Unavailable"} /><CopyableIdentifier label="Manifest hash" value={publishedAgent.manifestHash} /></dl><div className="mt-4 rounded-[10px] border border-void-800 bg-void-950 p-4"><p className="text-xs font-semibold text-void-500">Price per protected hire</p><p className="mt-2 font-mono text-sm text-void-200">{formatUsdcAtomic(publishedAgent.priceAtomic)}</p><p className="mt-3 text-xs leading-relaxed text-void-500">Settled earnings unavailable until the protected owner projection lands.</p></div><p className="mt-4 text-sm text-void-400">Published confirms registry eligibility only. Runtime, MCP, 0G, Storage, receipt, delivery, and settlement remain per-job evidence.</p></> : <><p className="mt-2 text-sm leading-relaxed text-void-400">Publishing activates this immutable application version and its runtime configuration. It is not a contract deployment or proof that the runtime or providers are online.</p><p className="mt-3 text-xs leading-relaxed text-void-500">Only the exact server-returned draft is published. Refusal and lost-response states remain visible.</p><button type="button" onClick={() => void publish()} disabled={!preparedAgent || busy || publicationUncertain} className="instrument-button instrument-button-primary mt-6"><ShieldCheckIcon size={16} aria-hidden />{publicationUncertain ? "Refresh registry before retry" : busy ? "Publishing version" : "Publish immutable version"}</button></>}</section>}
 
           {errorMessage && <div role="alert" className="mt-6 border-l-2 border-blood-500 pl-3 text-sm text-blood-300">{errorMessage}</div>}
         </motion.div>
         </AnimatePresence>
 
-        <aside className="min-w-0 self-start border-y border-void-800 py-4 lg:sticky lg:top-4" aria-label={preparedAgent ? "Immutable server preview" : "Catalog selection preview"}><div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-void-200">{preparedAgent ? `Manifest v${preparedAgent.manifestSchemaVersion}` : "Selection preview"}</h3><span className="font-mono text-xs text-void-500">{preparedAgent ? "Server returned" : "Catalog data"}</span></div>{preparedAgent ? <pre className="mt-4 max-h-[35rem] overflow-auto whitespace-pre-wrap break-words border-t border-void-800 pt-4 font-mono text-xs leading-relaxed text-void-400">{agentVersionToYaml(preparedAgent)}</pre> : <SelectionPreview catalog={catalog.data} template={template} name={name} description={description} fullSubname={fullSubnamePreview} />}</aside>
+        <aside className="min-w-0 self-start rounded-[14px] border border-void-800 bg-void-950/60 p-5 lg:sticky lg:top-4" aria-label={preparedAgent ? "Immutable server preview" : "Catalog selection preview"}><div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-void-200">{preparedAgent ? `Manifest v${preparedAgent.manifestSchemaVersion}` : "Selection preview"}</h3><span className="font-mono text-[0.6875rem] uppercase tracking-wider text-void-500">{preparedAgent ? "Server returned" : "Catalog data"}</span></div>{preparedAgent ? <pre className="mt-4 max-h-[35rem] overflow-auto whitespace-pre-wrap break-words border-t border-void-800 pt-4 font-mono text-xs leading-relaxed text-void-400">{agentVersionToYaml(preparedAgent)}</pre> : <SelectionPreview catalog={catalog.data} template={template} name={name} description={description} fullSubname={fullSubnamePreview} />}</aside>
       </div>
 
       <footer className="sticky bottom-0 -mx-4 -mb-5 mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-void-700 bg-void-900 px-4 py-4 sm:-mx-5 sm:px-5"><button type="button" onClick={() => stage === 0 ? onClose() : moveToStage((stage - 1) as Stage)} disabled={busy || Boolean(publishedAgent)} className="instrument-button instrument-button-secondary"><ArrowLeftIcon size={16} aria-hidden />{stage === 0 ? "Cancel" : "Back"}</button>{stage < 3 && <button type="button" onClick={() => moveToStage((stage + 1) as Stage)} disabled={busy || (stage === 0 && !identityValid) || (stage === 1 && !template) || (stage === 2 && !preparedAgent)} className="instrument-button instrument-button-primary">Continue <ArrowRightIcon size={16} aria-hidden /></button>}{stage === 3 && publishedAgent && <button type="button" onClick={finish} className="instrument-button instrument-button-primary">View my agents <ArrowRightIcon size={16} aria-hidden /></button>}</footer>

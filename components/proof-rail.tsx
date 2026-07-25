@@ -1,5 +1,6 @@
 import { EvidenceStatus } from "@/components/ui/evidence";
 import type { EvidenceState, KernelJobDetail, McpEvidenceV1 } from "@/src/kernel/types";
+import { formatUsdcAtomic } from "@/lib/format-usdc";
 
 interface ProofDimension {
   title: string;
@@ -43,7 +44,7 @@ export function ProofRail({ job }: { job: KernelJobDetail }) {
     {
       title: "Matched agent",
       state: job.agent.canonicalState === "CANONICAL" ? "verified" : "unavailable",
-      summary: `${job.agent.fullSubname ?? "Subname unavailable"}, version ${job.agent.version}, ${job.agent.priceAtomic} ${job.agent.asset}`,
+      summary: `${job.agent.fullSubname ?? "Subname unavailable"}, version ${job.agent.version}, ${formatUsdcAtomic(job.agent.priceAtomic)}`,
       details: [`Creator parent: ${job.agent.creatorParent ?? "Unavailable"}`, `Version ID: ${job.agentVersionId}`, `Owner: ${job.agent.ownerWallet}`, `Authority owner: ${job.agent.authorityOwner ?? "Unavailable"}`, `Delegate: ${job.agent.authorityDelegate ?? "Unavailable"}`, `Release SHA: ${job.agent.authorityReleaseSha ?? "Unavailable"}`],
     },
     {
@@ -93,7 +94,7 @@ export function ProofRail({ job }: { job: KernelJobDetail }) {
     {
       title: "Settlement or refund",
       state: financialState(job),
-      summary: financial.settlement ? `Settled ${financial.settlement.amountAtomic} ${financial.settlement.asset}` : financial.refund ? `Refunded ${financial.refund.amountAtomic} ${financial.refund.asset}` : "Unavailable",
+      summary: financial.settlement ? `Settled ${formatUsdcAtomic(financial.settlement.amountAtomic)}` : financial.refund ? `Refunded ${formatUsdcAtomic(financial.refund.amountAtomic)}` : "Unavailable",
       details: financial.refund ? [`Reason: ${financial.refund.reasonCode}`, `Recorded: ${financial.refund.createdAt}`] : financial.settlement ? [`Recorded: ${financial.settlement.createdAt}`] : [],
     },
   ];

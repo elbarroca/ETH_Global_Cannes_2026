@@ -83,7 +83,7 @@ body {
   color: var(--color-void-100);
 }
 
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+:where(a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
   outline: 2px solid var(--color-dawg-500) !important;
   outline-offset: 3px;
 }
@@ -128,12 +128,18 @@ body {
 }
 
 .instrument-button-primary {
-  background: var(--brand);
+  background: linear-gradient(180deg, #F8D766, #F4C542);
   color: var(--color-void-950);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 8px 24px -12px rgba(244, 197, 66, 0.5);
 }
 
 .instrument-button-primary:hover {
-  background: var(--brand-hover);
+  background: linear-gradient(180deg, #FBE083, #F8D766);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 12px 32px -12px rgba(244, 197, 66, 0.65);
 }
 
 .instrument-button-secondary {
@@ -156,18 +162,47 @@ body {
   display: block;
   width: 100%;
   min-height: 2.75rem;
-  margin-top: 0.5rem;
+  margin-top: 0.625rem;
   border: 1px solid var(--color-void-700);
-  border-radius: 10px;
-  background: var(--color-void-950);
-  padding-inline: 0.75rem;
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent),
+    var(--color-void-950);
+  padding: 0.6875rem 0.875rem;
   color: var(--color-void-100);
   font-family: var(--font-geist), 'Geist', system-ui, sans-serif;
   font-size: 0.875rem;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.goal-control::placeholder {
+  color: var(--color-void-500);
+}
+
+.goal-control:hover:not(:focus) {
+  border-color: var(--color-void-600);
+}
+
+.goal-control:focus {
+  outline: none;
+  border-color: var(--color-dawg-500);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.35),
+    0 0 0 3px rgba(244, 197, 66, 0.18);
 }
 
 summary {
   overflow-wrap: anywhere;
+}
+
+@keyframes dialogBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes dialogPanelIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .dialog-backdrop {
@@ -184,19 +219,37 @@ summary {
     max(1rem, env(safe-area-inset-right))
     max(1rem, env(safe-area-inset-bottom))
     max(1rem, env(safe-area-inset-left));
-  background: rgba(0, 0, 0, 0.82);
-  backdrop-filter: blur(8px);
+  background:
+    radial-gradient(60rem 40rem at 50% 0%, rgba(244, 197, 66, 0.05), transparent 60%),
+    rgba(7, 7, 6, 0.78);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  animation: dialogBackdropIn 220ms ease-out;
 }
 
 .dialog-panel {
+  position: relative;
   width: 100%;
   max-height: calc(100dvh - 2rem);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--color-void-700);
-  border-radius: 12px;
-  background: var(--color-void-900);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--color-void-850), var(--color-void-900));
+  box-shadow:
+    var(--edge-gold),
+    0 32px 80px -32px rgba(0, 0, 0, 0.85);
+  animation: dialogPanelIn 320ms var(--ease-out-expo);
+}
+.dialog-panel::before {
+  content: "";
+  position: absolute;
+  inset-inline: 1.5rem;
+  top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(244, 197, 66, 0.5), transparent);
+  pointer-events: none;
 }
 
 .identifier-value {
@@ -705,6 +758,160 @@ details[open] .hunt-detail-card-enter {
   box-shadow:
     0 0 0 1px rgba(255, 199, 0, 0.08),
     0 12px 32px -12px rgba(0, 0, 0, 0.55);
+}
+
+/* ═════════ Premium foundation layer (landing + shared surfaces) ═════════
+ *
+ * Additive only. Elevates the existing cryptographic-instrument theme with
+ * depth, glass, gold edge-light and ambient atmosphere. Blood red stays a
+ * risk-semantic; gold (dawg) is the single hero accent. No new palette.
+ */
+
+:root {
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --edge-light: inset 0 1px 0 rgba(245, 241, 230, 0.06);
+  --edge-gold: inset 0 1px 0 rgba(244, 197, 66, 0.14);
+}
+
+/* Ambient hero backdrop — layered radial gold bloom + fixed-grain texture.
+ * Scoped so data-dense pages stay clean. pointer-events:none on overlays. */
+.ambient-hero {
+  position: relative;
+  isolation: isolate;
+}
+.ambient-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: radial-gradient(60rem 40rem at 78% -10%, rgba(244, 197, 66, 0.10), transparent 60%);
+}
+
+/* Faint hairline grid — organizes real content, low opacity, no crosshairs. */
+.void-grid {
+  background-image:
+    linear-gradient(to right, rgba(245, 241, 230, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(245, 241, 230, 0.025) 1px, transparent 1px);
+  background-size: 3.5rem 3.5rem;
+}
+
+/* Premium glass panel — frosted, edge-refracted, dark. */
+.glass {
+  border: 1px solid rgba(245, 241, 230, 0.08);
+  border-radius: 14px;
+  background: linear-gradient(
+    160deg,
+    rgba(28, 25, 23, 0.72),
+    rgba(13, 13, 11, 0.60)
+  );
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: var(--edge-light), 0 24px 60px -30px rgba(0, 0, 0, 0.8);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--color-void-900);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Gold edge-lit panel — the signature surface. Gradient hairline top border. */
+.panel-gold {
+  position: relative;
+  border: 1px solid var(--line-brand);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--edge-gold);
+}
+.panel-gold::before {
+  content: "";
+  position: absolute;
+  inset-inline: 1.25rem;
+  top: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(244, 197, 66, 0.55),
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* Cursor spotlight — --mx/--my set by a client leaf; degrades to nothing. */
+.spotlight {
+  position: relative;
+  overflow: hidden;
+}
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 240ms ease;
+  background: radial-gradient(
+    16rem 16rem at var(--mx, 50%) var(--my, 50%),
+    rgba(244, 197, 66, 0.10),
+    transparent 70%
+  );
+}
+.spotlight:hover::before {
+  opacity: 1;
+}
+.spotlight > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Display headline — heavy, tight, balanced wrapping. */
+.display-hero {
+  font-weight: 640;
+  letter-spacing: -0.045em;
+  line-height: 1.0;
+  text-wrap: balance;
+}
+.text-balance {
+  text-wrap: balance;
+}
+.text-pretty {
+  text-wrap: pretty;
+}
+
+/* Tabular figures for any data string. */
+.tnums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Gold gradient text — used once, on the hero accent word only. */
+.text-gold-sheen {
+  background: linear-gradient(180deg, #FDE9B0 0%, #F4C542 55%, #B59325 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Primary CTA elevation — gold fill with spring press + soft bloom. */
+.cta-primary {
+  position: relative;
+  background: linear-gradient(180deg, #F8D766, #F4C542);
+  color: var(--color-void-950);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 10px 30px -12px rgba(244, 197, 66, 0.5);
+  transition: transform 160ms var(--ease-spring), box-shadow 200ms ease;
+}
+.cta-primary:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 14px 40px -12px rgba(244, 197, 66, 0.65);
+}
+.cta-primary:active {
+  transform: translateY(1px) scale(0.985);
 }
 
 /* ───────── Reduced motion ───────── */

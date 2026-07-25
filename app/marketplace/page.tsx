@@ -14,6 +14,7 @@ import {
   type AgentLifecycleVersion,
   type ProtectedPublishedAgentRead,
 } from "@/lib/api";
+import { formatUsdcAtomic } from "@/lib/format-usdc";
 
 type AgentTab = "available" | "mine" | "drafts";
 const AGENT_VIEWS = [
@@ -139,7 +140,13 @@ function AgentRow({ agent, href }: { agent: ProtectedPublishedAgentRead; href: s
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-void-100">{agent.name}</h2><EvidenceStatus state={agent.hireable ? "verified" : "unavailable"} label={agent.hireable ? "ELIGIBLE" : "REFUSED"} /></div>
           <p className="mt-1 break-all font-mono text-sm text-dawg-300">{agent.fullSubname}</p>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-void-400"><span>{agent.capabilities.join(", ")}</span><span className="font-mono">Version {agent.version}</span><span className="font-mono">ID {agent.versionId.slice(0, 8)}</span><span className="font-mono">{agent.priceAtomic} {agent.asset}</span><span>{agent.verifiedExternalHires} verified external hires</span></div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-void-400"><span>{agent.capabilities.join(", ")}</span><span className="font-mono">Version {agent.version}</span><span className="font-mono">ID {agent.versionId.slice(0, 8)}</span></div>
+          <dl className="mt-4 grid gap-3 rounded-[12px] border border-void-800 bg-void-950 p-4 text-xs sm:grid-cols-3">
+            <div><dt className="font-semibold text-void-500">Price per protected hire</dt><dd className="mt-1 font-mono text-void-200">{formatUsdcAtomic(agent.priceAtomic)}</dd></div>
+            <div><dt className="font-semibold text-void-500">Verified external hires</dt><dd className="mt-1 text-void-200">{agent.verifiedExternalHires} receipt-backed job{agent.verifiedExternalHires === 1 ? "" : "s"}</dd></div>
+            <div><dt className="font-semibold text-void-500">Settled earnings</dt><dd className="mt-1 text-void-400">Unavailable until the protected owner projection lands</dd></div>
+          </dl>
+          <p className="mt-2 text-xs leading-relaxed text-void-500">Published eligibility is registry state. Runtime proof and financial outcome remain attached to each job.</p>
           <div className="mt-3 flex flex-wrap gap-2"><EvidenceStatus state={agent.mcpAvailability === "AVAILABLE" ? "verified" : "unavailable"} label={`MCP ${agent.mcpAvailability.toLowerCase()}`} />{agent.provenance && <EvidenceStatus state="verified" label="Provenance recorded" />}</div>
           {agent.refusalReason && <p className="mt-3 break-words font-mono text-sm text-blood-300">{agent.refusalReason}</p>}
         </div>
@@ -154,6 +161,7 @@ function AgentRow({ agent, href }: { agent: ProtectedPublishedAgentRead; href: s
           <Meta label="Authority owner" value={agent.authorityOwner} />
           <Meta label="Delegate" value={agent.authorityDelegate ?? "Unavailable"} />
           <Meta label="Version ID" value={agent.versionId} />
+          <Meta label="Price" value={formatUsdcAtomic(agent.priceAtomic)} />
           <Meta label="Manifest hash" value={agent.manifestHash} />
           <Meta label="Release SHA" value={agent.authorityReleaseSha} />
           <Meta label="Published at" value={agent.publishedAt} />

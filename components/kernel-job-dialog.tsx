@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { Dialog } from "@/components/ui/dialog";
 import { CopyableIdentifier, EvidenceStatus } from "@/components/ui/evidence";
 import {
@@ -10,6 +11,7 @@ import {
   type ProtectedPublishedAgent,
   type SubmittedJob,
 } from "@/lib/api";
+import { formatUsdcAtomic } from "@/lib/format-usdc";
 import type { EvidenceState } from "@/src/kernel/types";
 
 interface KernelJobDialogProps {
@@ -104,7 +106,7 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
             <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
               <div>
                 <dt className="font-semibold text-void-500">Price</dt>
-                <dd className="mt-1 font-mono text-void-200">{agent.priceAtomic} {agent.asset}</dd>
+                <dd className="mt-1 font-mono text-void-200">{formatUsdcAtomic(agent.priceAtomic)}</dd>
               </div>
               <div>
                 <dt className="font-semibold text-void-500">Proof policy</dt>
@@ -154,9 +156,9 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
               type="button"
               onClick={submit}
               disabled={submitting || !idempotencyKey || prompt.trim().length < 1 || agent.ownedByViewer || !agent.hireable || agent.canonicalState !== "CANONICAL"}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-dawg-500 px-5 text-sm font-bold text-black hover:bg-dawg-400 disabled:cursor-not-allowed disabled:opacity-45"
+              className="cta-primary inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" aria-hidden="true" />}
+              {submitting && <SpinnerGapIcon size={16} className="animate-spin" aria-hidden />}
               {agent.ownedByViewer ? "Self-hire refused" : submitting ? "Submitting safely…" : errorMessage ? "Retry same request" : "Submit protected job"}
             </button>
           </div>
@@ -185,7 +187,7 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
           <dl className="grid gap-3 border-y border-void-800 py-3 text-xs sm:grid-cols-2">
             <div>
               <dt className="font-semibold text-void-500">Quoted amount</dt>
-              <dd className="mt-1 font-mono text-void-200">{submittedJob.amountAtomic} {submittedJob.asset}</dd>
+              <dd className="mt-1 font-mono text-void-200">{formatUsdcAtomic(submittedJob.amountAtomic)}</dd>
             </div>
             <div>
               <dt className="font-semibold text-void-500">State</dt>
@@ -201,7 +203,7 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2">
-            <Link href={`/dashboard/compute/${submittedJob.jobId}`} className="inline-flex min-h-11 items-center justify-center rounded-[10px] bg-dawg-500 px-4 text-sm font-bold text-black hover:bg-dawg-400">
+            <Link href={`/dashboard/compute/${submittedJob.jobId}`} className="cta-primary inline-flex min-h-11 items-center justify-center rounded-[10px] px-4 text-sm font-bold">
               Open job evidence
             </Link>
             <Link href={`/verify?jobId=${encodeURIComponent(submittedJob.jobId)}`} className="inline-flex min-h-11 items-center justify-center rounded-[10px] border border-void-700 px-4 text-sm font-semibold text-void-200 hover:bg-void-800">

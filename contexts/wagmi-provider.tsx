@@ -5,7 +5,6 @@ import { type ReactNode } from "react";
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { AuthGuard } from "@/components/auth-guard";
-import { RouteTransitionLoader } from "@/components/route-transition-loader";
 import { arcTestnet, ARC_TESTNET_RPC } from "@/lib/arc-chain";
 import { UserProvider } from "./user-context";
 
@@ -29,7 +28,6 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <UserProvider>
           <AuthGuard>{children}</AuthGuard>
-          <RouteTransitionLoader />
         </UserProvider>
       </QueryClientProvider>
     </WagmiProvider>
