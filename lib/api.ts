@@ -5,9 +5,12 @@ import type {
   KernelJobDetail,
   KernelJobListItem,
   JobSnapshot,
-  ProtectedPublishedAgent,
+  ProtectedPublishedAgentRead,
   PinnedAgentSkill,
   AgentNativeConnection,
+  GoalPolicy,
+  GoalRunSnapshot,
+  GoalSnapshot,
   SubmittedJob,
 } from "@/src/kernel/types";
 import type { TokenPick } from "@/src/types/index";
@@ -19,6 +22,12 @@ export type {
   KernelJobListItem,
   JobSnapshot,
   ProtectedPublishedAgent,
+  ProtectedPublishedAgentRead,
+  GoalPolicy,
+  GoalRunReportV1,
+  GoalRunSnapshot,
+  GoalSnapshot,
+  SwapProposalV1,
   SubmittedJob,
 } from "@/src/kernel/types";
 
@@ -55,6 +64,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText, code: null }));
         const payload = err as { error?: string; code?: string | null };
+        if (typeof window !== "undefined" && (res.status === 401 || res.status === 403)) {
+          window.dispatchEvent(new CustomEvent("alphadawg:auth-stale", {
+            detail: { status: res.status, code: payload.code ?? null },
+          }));
+        }
         throw new ApiError(payload.error ?? res.statusText, res.status, payload.code ?? null);
       }
       return res.json() as Promise<T>;
@@ -360,18 +374,99 @@ export async function getAgentRecommendations(
   });
 }
 
-export async function getPublishedAgents(signal?: AbortSignal): Promise<ProtectedPublishedAgent[]> {
-  const response = await apiFetch<{ agents: ProtectedPublishedAgent[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
+export async function getPublishedAgents(signal?: AbortSignal): Promise<ProtectedPublishedAgentRead[]> {
+  const response = await apiFetch<{ agents: ProtectedPublishedAgentRead[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
     cache: "no-store",
     signal,
   });
   return response.agents;
 }
 
-export async function getAgentLifecycle(signal?: AbortSignal): Promise<{ agents: ProtectedPublishedAgent[]; drafts: AgentLifecycleVersion[] }> {
-  return apiFetch<{ agents: ProtectedPublishedAgent[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
+export async function getAgentLifecycle(signal?: AbortSignal): Promise<{ agents: ProtectedPublishedAgentRead[]; drafts: AgentLifecycleVersion[] }> {
+  return apiFetch<{ agents: ProtectedPublishedAgentRead[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
     cache: "no-store",
     signal,
+  });
+}
+
+export async function getProtectedGoals(
+  limit = 50,
+  signal?: AbortSignal,
+): Promise<GoalSnapshot[]> {
+  const response = await apiFetch<{ goals: GoalSnapshot[] }>(
+    `/api/kernel/goals?limit=${encodeURIComponent(String(limit))}`,
+    { cache: "no-store", signal },
+  );
+  return response.goals;
+}
+
+export async function createProtectedGoal(
+  input: Pick<GoalSnapshot, "objective" | "requiredCapabilities" | "policy"> & {
+    state: "DRAFT" | "ACTIVE";
+  },
+  idempotencyKey: string,
+): Promise<{ goal: GoalSnapshot; replayed: boolean }> {
+  return apiFetch("/api/kernel/goals", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getProtectedGoal(
+  goalId: string,
+  signal?: AbortSignal,
+): Promise<GoalSnapshot> {
+  const response = await apiFetch<{ goal: GoalSnapshot }>(
+    `/api/kernel/goals/${encodeURIComponent(goalId)}`,
+    { cache: "no-store", signal },
+  );
+  return response.goal;
+}
+
+export async function updateProtectedGoal(
+  goalId: string,
+  input:
+    | { action: "ACTIVATE" | "PAUSE" | "RESUME" }
+    | {
+        action: "UPDATE";
+        objective?: string;
+        requiredCapabilities?: readonly string[];
+        policy?: GoalPolicy;
+      },
+  idempotencyKey: string,
+): Promise<GoalSnapshot> {
+  const response = await apiFetch<{ goal: GoalSnapshot }>(
+    `/api/kernel/goals/${encodeURIComponent(goalId)}`,
+    {
+      method: "PATCH",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(input),
+    },
+  );
+  return response.goal;
+}
+
+export async function getProtectedGoalRuns(
+  goalId: string,
+  limit = 50,
+  signal?: AbortSignal,
+): Promise<GoalRunSnapshot[]> {
+  const response = await apiFetch<{ runs: GoalRunSnapshot[] }>(
+    `/api/kernel/goals/${encodeURIComponent(goalId)}/runs?limit=${encodeURIComponent(String(limit))}`,
+    { cache: "no-store", signal },
+  );
+  return response.runs;
+}
+
+export async function createProtectedGoalRun(
+  goalId: string,
+  idempotencyKey: string,
+): Promise<{ run: GoalRunSnapshot; replayed: boolean }> {
+  return apiFetch(`/api/kernel/goals/${encodeURIComponent(goalId)}/runs`, {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: "{}",
   });
 }
 

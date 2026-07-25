@@ -6,14 +6,20 @@ import {
   useConnectors,
   useDisconnect,
 } from "wagmi";
+import { useSyncExternalStore } from "react";
 import { PlugsConnectedIcon, SignOutIcon } from "@phosphor-icons/react";
-import { arcTestnet } from "@/lib/arc-chain";
 
 export function WalletConnectButton() {
-  const { isConnected } = useConnection();
+  const connection = useConnection();
   const [connector] = useConnectors();
   const connect = useConnect();
   const disconnect = useDisconnect();
+  const hydrated = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+  const isConnected = hydrated && connection.isConnected;
 
   if (!isConnected) {
     const label = !connector
@@ -33,7 +39,7 @@ export function WalletConnectButton() {
           onClick={() => {
             if (!connector) return;
             connect.reset();
-            connect.mutate({ connector, chainId: arcTestnet.id });
+            connect.mutate({ connector });
           }}
           className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl bg-dawg-500 px-4 py-2 text-sm font-bold text-void-950 transition-[background-color,transform] hover:bg-dawg-400 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
         >

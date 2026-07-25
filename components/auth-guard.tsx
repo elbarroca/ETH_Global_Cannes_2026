@@ -1,49 +1,58 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { useUser } from "@/contexts/user-context";
-import { DawgLoader } from "./dawg-loader";
-
-const AUTH_MESSAGES = [
-  "Verifying wallet…",
-  "Checking pack membership…",
-  "Unlocking dashboard…",
-];
-
-const subscribeToHydration = () => () => undefined;
-const getClientSnapshot = () => true;
-const getServerSnapshot = () => false;
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isConnected, user } = useUser();
-  const mounted = useSyncExternalStore(
-    subscribeToHydration,
-    getClientSnapshot,
-    getServerSnapshot,
-  );
-  const [hasShownLoader, setHasShownLoader] = useState(false);
-  const [blastDone, setBlastDone] = useState(false);
+  const pathname = usePathname();
+  const { authState, authError, reauthenticate } = useUser();
+  const isEntry = pathname === "/";
 
-  const stillLoading = mounted && isConnected && !user;
+  if (authState === "ready" || authState === "disconnected" || isEntry) {
+    return <>{children}</>;
+  }
 
-  // Latch: once we've ever shown the loader, keep it mounted through the blast.
-  if (stillLoading && !hasShownLoader) setHasShownLoader(true);
+  if (authState === "onboarding" && authError) {
+    return (
+      <main className="grid min-h-[calc(100dvh-4rem)] place-items-center px-4">
+        <div role="alert" className="w-full max-w-md border-y border-void-800 py-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-wider text-dawg-400">Onboarding required</p>
+          <h1 className="mt-3 text-2xl font-semibold text-void-100">Complete protected onboarding</h1>
+          <p className="mt-2 break-words text-sm text-void-400">{authError}</p>
+          <button type="button" onClick={() => void reauthenticate()} className="instrument-button instrument-button-primary mt-6">Retry SIWE</button>
+        </div>
+      </main>
+    );
+  }
 
-  if (!mounted) return <>{children}</>;
+  if (authState === "signing" || authState === "onboarding") {
+    return (
+      <main className="grid min-h-[calc(100dvh-4rem)] place-items-center px-4">
+        <div role="status" className="w-full max-w-md border-y border-void-800 py-8 text-center">
+          <span className="mx-auto block h-5 w-5 animate-spin rounded-full border-2 border-dawg-500 border-t-transparent" aria-hidden />
+          <h1 className="mt-4 text-xl font-semibold text-void-100">
+            {authState === "signing" ? "Confirm wallet signature" : "Preparing your workspace"}
+          </h1>
+          <p className="mt-2 text-sm text-void-400">
+            {authState === "signing" ? "Approve the SIWE message in your wallet." : "Binding this session to your protected account."}
+          </p>
+        </div>
+      </main>
+    );
+  }
 
-  // Never triggered the loader (fast load / not connected) → just render.
-  if (!hasShownLoader) return <>{children}</>;
-
-  // Loader was shown and blast has completed → reveal content.
-  if (blastDone) return <>{children}</>;
-
-  // Loader is active (spinning or blasting). When `stillLoading` flips false,
-  // DawgLoader internally transitions to 'blasting' and fires onComplete.
   return (
-    <DawgLoader
-      isLoading={stillLoading}
-      messages={AUTH_MESSAGES}
-      onComplete={() => setBlastDone(true)}
-    />
+    <main className="grid min-h-[calc(100dvh-4rem)] place-items-center px-4">
+      <div role="alert" className="w-full max-w-md border-y border-void-800 py-8 text-center">
+        <p className="text-xs font-semibold uppercase tracking-wider text-dawg-400">
+          {authState === "stale" ? "Authorization expired" : "Authentication failed"}
+        </p>
+        <h1 className="mt-3 text-2xl font-semibold text-void-100">Sign in again to continue</h1>
+        <p className="mt-2 break-words text-sm text-void-400">{authError ?? "A fresh wallet signature is required."}</p>
+        <button type="button" onClick={() => void reauthenticate()} className="instrument-button instrument-button-primary mt-6">
+          Retry SIWE
+        </button>
+      </div>
+    </main>
   );
 }
