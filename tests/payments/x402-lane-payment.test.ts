@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import type { Address, Hex } from "viem";
+import { getOwnerEarnings } from "../../src/kernel/earnings";
 import {
   LanePaymentError,
   finalizeLanePayment,
@@ -30,6 +31,7 @@ let authorityCheckId = 10_000;
 interface LaneFixture {
   buyerUserId: string;
   creatorUserId: string;
+  agentId: string;
   agentVersionId: string;
   quoteId: string;
   jobId: string;
@@ -74,7 +76,8 @@ async function seedLane(
       INSERT INTO agent_versions (
         id, agent_id, version, manifest, manifest_hash, prompt_hash, config_hash,
         capabilities, adapter_key, owner_wallet, payout_address, price_atomic,
-        asset, proof_policy, lifecycle_state, canonical_state, published
+        asset, proof_policy, lifecycle_state, canonical_state, creator_parent,
+        agent_label, full_subname, published
       ) VALUES (
         ${fixture.agentVersionId}::uuid, ${fixture.agentId}::uuid, 1,
         ${sql.json({
@@ -95,7 +98,9 @@ async function seedLane(
         })},
         ${"1".repeat(64)}, ${"2".repeat(64)}, ${"3".repeat(64)},
         ARRAY['research'], 'protected-a3', ${CREATOR}, ${CREATOR}, 1000,
-        'USDC_ATOMIC', 'verified-receipt-required', 'DRAFT', 'UNVERIFIED', false
+        'USDC_ATOMIC', 'verified-receipt-required', 'DRAFT', 'UNVERIFIED',
+        'creator.eth', ${`paid-${fixture.agentId.slice(0, 8)}`},
+        ${`paid-${fixture.agentId.slice(0, 8)}.creator.eth`}, false
       )
     `;
     await sql`
@@ -431,6 +436,24 @@ test("protected x402 lane journal is fail-closed, replay-safe, and atomic", asyn
         settlement_amount: "1000",
         commission_amount: "1000",
       });
+      assert.deepEqual(await getOwnerEarnings(main.creatorUserId, { sql: database.sql }), {
+        asset: "USDC_ATOMIC",
+        decimals: 6,
+        grossSettledAtomic: "1000",
+        ownerEarningsAtomic: "1000",
+        platformFeeAtomic: "0",
+        settledHireCount: 1,
+        lastSettledAt: new Date(now.getTime() + 1_000).toISOString(),
+        agents: [{
+          agentVersionId: main.agentVersionId,
+          name: `Paid lane ${main.agentId}`,
+          fullSubname: `paid-${main.agentId.slice(0, 8)}.creator.eth`,
+          ownerEarningsAtomic: "1000",
+          settledHireCount: 1,
+          lastSettledAt: new Date(now.getTime() + 1_000).toISOString(),
+        }],
+      });
+      assert.equal((await getOwnerEarnings(main.buyerUserId, { sql: database.sql })).settledHireCount, 0);
     });
 
     await t.test("definitive refusal records FAILED without an economic receipt", async () => {

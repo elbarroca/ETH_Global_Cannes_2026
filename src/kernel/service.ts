@@ -2,11 +2,7 @@ import { getDb } from "../config/database";
 import { deriveManifestHashes } from "./agent-catalog";
 import { canonicalJson, domainHash, type CanonicalValue } from "./canonical";
 import { KernelError } from "./errors";
-import {
-  KERNEL_BPS_DENOMINATOR,
-  KERNEL_COMMISSION_BPS,
-  KERNEL_QUOTE_TTL_MS,
-} from "./policy";
+import { KERNEL_QUOTE_TTL_MS } from "./policy";
 import type {
   AgentManifest,
   AgentManifestV3,
@@ -1091,11 +1087,6 @@ export async function cancelBuyerJob(
     if (!refreshed) throw new Error("KERNEL_JOB_READBACK_FAILED");
     return refreshed;
   });
-}
-
-export function commissionAmount(amountAtomic: bigint): bigint {
-  if (amountAtomic < 0n) throw new Error("KERNEL_NEGATIVE_AMOUNT");
-  return (amountAtomic * KERNEL_COMMISSION_BPS) / KERNEL_BPS_DENOMINATOR;
 }
 
 export function serializeManifest(manifest: AgentManifest): string {

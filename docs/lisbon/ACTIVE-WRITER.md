@@ -3,6 +3,47 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Release Integrator /root
+task_id: OWNER-EARNINGS-R5
+task_instance_id: OWNER-EARNINGS-R5:R5:8651EF3
+generation: 1
+sprint: Add authenticated settled-only creator earnings and retire legacy projection
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 8651ef376b45dec7f70ef9478503347ca2317048
+control_sha: 8651ef376b45dec7f70ef9478503347ca2317048
+token: OWNER-EARNINGS-R5-8651EF3-20260725T220905Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T22:16:01Z
+expires_at: 2026-07-26T01:09:05Z
+allowed_paths:
+  - src/kernel/earnings.ts
+  - src/kernel/policy.ts
+  - src/kernel/service.ts
+  - app/api/kernel/earnings/route.ts
+  - app/api/marketplace/earnings/route.ts
+  - lib/types.ts
+  - tests/kernel/earnings.test.ts
+  - tests/payments/x402-lane-payment.test.ts
+  - tests/a5/**
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T22:09:05Z
+deadline: 2026-07-26T01:09:05Z
+expected_exit: exact USDC atomic owner-only finalized earnings with zero platform fee
+external_effect_authority: local files deterministic tests disposable loopback PostgreSQL and one atomic local commit only; no managed migration network push deploy sponsor call signature transaction spend claim or public proof
+external_effects_attempted: none
+claim_changes: none
+path_amendment: existing x402 finalization integration test extended to prove the owner-only settled projection
+completed_at: 2026-07-25T22:16:01Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+evidence: focused earnings 2/2, x402 payment 12/12, kernel 55/55, auth 9/9, base 10/10, redaction 3/3, typecheck, scoped lint, full lint, build, secret scan, and diff check passed; A5 8/9 with inherited out-of-scope min-h-32 static UI assertion
+remaining_block: inherited A5 static UI assertion in components/create-agent-modal.tsx is outside this lease
+verdict: PASS_TO_AUDIT_WITH_INHERITED_A5_ASSERTION; LOCAL_ONLY
+lock_release: release only exact token OWNER-EARNINGS-R5-8651EF3-20260725T220905Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Frontend Builder /root/graph_ui_reconcile
 task_id: GRAPH-UI-PREFLIGHT-R1
 task_instance_id: GRAPH-UI-PREFLIGHT-R1:R2:9956BCD

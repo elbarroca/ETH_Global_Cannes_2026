@@ -203,7 +203,7 @@ export interface Agent {
 }
 
 // ── Swarm Observatory (Tier 1) ───────────────────────────────────────
-// Types returned by /api/swarm/* and /api/marketplace/earnings. Each maps
+// Types returned by /api/swarm/*. Each maps
 // 1:1 to a response shape — do not mutate without updating the routes.
 
 export type SwarmHealthState = "online" | "waking" | "offline" | "timeout";
@@ -268,18 +268,6 @@ export interface SwarmActivityRow {
 
 export interface SwarmActivityResponse {
   rows: SwarmActivityRow[];
-  generatedAt: string;
-}
-
-export interface AgentEarnings {
-  agentName: string;
-  totalUsd: number;
-  hires: number;
-  lastHireAt: string | null;
-}
-
-export interface MarketplaceEarningsResponse {
-  agents: Record<string, AgentEarnings>;
   generatedAt: string;
 }
 

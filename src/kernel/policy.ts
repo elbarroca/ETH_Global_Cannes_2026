@@ -315,6 +315,4 @@ export function parseIdempotencyKey(value: string | null): string {
   return value;
 }
 
-export const KERNEL_COMMISSION_BPS = 500n;
-export const KERNEL_BPS_DENOMINATOR = 10_000n;
 export const KERNEL_QUOTE_TTL_MS = 5 * 60 * 1_000;
