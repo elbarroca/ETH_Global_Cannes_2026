@@ -3,6 +3,70 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/protected_v3_ui
+task_id: A5-PROTECTED-V3-UI-W2
+task_instance_id: A5-PROTECTED-V3-UI-W2:W2:1D7F82B
+generation: 2
+sprint: Repair protected authorization and connect the catalog-derived V3 workspace
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 1d7f82b4a1df7beaedc1558c60d2b2ccd88f4051
+control_sha: 1d7f82b4a1df7beaedc1558c60d2b2ccd88f4051
+token: A5-PROTECTED-V3-UI-W2-1D7F82B-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T18:35:16Z
+expires_at: 2026-07-25T19:31:49Z
+allowed_paths:
+  - lib/api.ts
+  - lib/manifest-yaml.ts
+  - contexts/user-context.tsx
+  - contexts/wagmi-provider.tsx
+  - components/auth-guard.tsx
+  - components/wallet-connect.tsx
+  - app/page.tsx
+  - app/globals.css
+  - app/dashboard/page.tsx
+  - components/goal-workspace.tsx
+  - app/marketplace/page.tsx
+  - components/create-agent-modal.tsx
+  - components/nav.tsx
+  - app/verify/page.tsx
+  - components/kernel-job-detail.tsx
+  - components/kernel-job-dialog.tsx
+  - components/proof-rail.tsx
+  - components/evidence-index-item.tsx
+  - components/ui/evidence.tsx
+  - tests/a5/**
+  - tests/playwright/a5-ui.spec.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+started_at: 2026-07-25T18:01:49Z
+deadline: 2026-07-25T19:31:49Z
+expected_exit: explicit protected workspace authorization, hydration-stable wallet boundary, catalog-derived V3 creation, and authoritative goal and proof UI
+external_effect_authority: local files existing dependencies local tests loopback browser evidence and one local commit only; no push deploy managed migration provider call ENS write signature transaction funding spend release or claim
+completed_at: 2026-07-25T18:35:16Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - two-stage SIWE performs explicit onboarding then waits for explicit workspace authorization; public auth remains exactly disconnected signing onboarding ready stale and error
+  - nested wallet denial 401 expired session AUTH_ACTION_REQUIRED AUTH_USER_REQUIRED and genuine forbidden states remain distinct retryable and fail closed without automatic second prompts
+  - authenticated catalog GET drives eight immutable V3 templates skill categories reviewed sources and MCP availability; catalog draft POST sends only action templateId name description and optional agentId
+  - creator flow shows exact returned manifest version ENS subname owner delegate immutable price eligibility and publication receipt with focus trap focus return sticky progress and reduced-motion-safe active transitions
+  - goal workspace uses asymmetric goal-to-parallel-lanes-to-converged-report orchestration and renders terminal report evidence statically at full contrast
+  - proof spine includes MCP provider capability terminal state request response and context hashes release SHA 0G Storage receipt delivery and settlement while failed jobs promote no dimension as verified
+  - npm run lint PASS with zero errors and 23 inherited warnings; npm run typecheck PASS; npm test PASS 10 of 10; npm run test:a5 PASS 5 of 5
+  - CI=1 npm run test:playwright PASS production build with 35 pages and 17 of 17 Chromium tests at 375 768 and 1440 CSS pixels
+  - npm run scan:secrets PASS; git diff --check PASS
+remaining_blocks:
+  - screenshots are local UI evidence only until the same-SHA live journey passes
+  - release deploy managed migration live provider calls wallet signatures transactions funding spend push and public claims remain unauthorized
+external_effects_attempted: none
+claim_changes: none
+verdict: PASS_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token A5-PROTECTED-V3-UI-W2-1D7F82B-20260725 after the containing local commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/goal_loop_kernel
 task_id: A5-FOUNDING-MCP-KERNEL-W1
 task_instance_id: A5-FOUNDING-MCP-KERNEL-W1:W1:61142FA

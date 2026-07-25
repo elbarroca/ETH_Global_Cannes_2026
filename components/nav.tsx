@@ -12,7 +12,6 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import { WalletConnectButton } from "./wallet-connect";
-import { DawgLogo } from "./dawg-logo";
 import { useUser } from "@/contexts/user-context";
 
 const PRIMARY = [
@@ -52,8 +51,7 @@ export function Nav() {
       <header className="sticky top-0 z-50 border-b border-void-800 bg-void-950/95 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-[90rem] items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex min-h-11 items-center gap-2 text-sm font-bold tracking-[0.08em] text-dawg-400" aria-label="AlphaDawg home">
-            <DawgLogo animated className="h-8 w-8" />
-            <span className="hidden sm:inline">AlphaDawg</span>
+            <span>AlphaDawg</span>
           </Link>
 
           <nav aria-label="Primary" className="hidden items-center gap-1 md:flex">

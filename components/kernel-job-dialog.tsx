@@ -22,9 +22,10 @@ function submissionError(error: unknown): string {
   if (!(error instanceof ApiError)) {
     return error instanceof Error ? error.message : "The protected job could not be submitted.";
   }
-  if (error.status === 401 || error.status === 403) {
-    return "Connect and onboard the publishing wallet before submitting a protected job.";
-  }
+  if (error.status === 401) return "Wallet authorization expired. Authorize the workspace before submitting this job.";
+  if (error.code === "AUTH_USER_REQUIRED") return "Complete onboarding before submitting a protected job.";
+  if (error.code === "AUTH_ACTION_REQUIRED") return "Fresh authenticate authorization is required before submitting this job.";
+  if (error.status === 403) return `Forbidden: ${error.message}`;
   if (error.code === "KERNEL_NOT_FOUND") {
     return "This immutable agent version is no longer available to the protected kernel.";
   }
@@ -92,7 +93,7 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
     >
       {!submittedJob ? (
         <div className="space-y-5">
-          <div className="rounded-xl border border-void-800 bg-void-950/55 p-3">
+          <div className="border-y border-void-800 py-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-semibold text-void-100">{agent.name}</p>
@@ -100,19 +101,24 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
               </div>
               <EvidenceStatus state="verified" label="Published" />
             </div>
-            <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+            <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
               <div>
-                <dt className="uppercase tracking-wider text-void-600">Price</dt>
+                <dt className="font-semibold text-void-500">Price</dt>
                 <dd className="mt-1 font-mono text-void-200">{agent.priceAtomic} {agent.asset}</dd>
               </div>
               <div>
-                <dt className="uppercase tracking-wider text-void-600">Proof policy</dt>
+                <dt className="font-semibold text-void-500">Proof policy</dt>
                 <dd className="mt-1 font-mono text-void-200">{agent.proofPolicy}</dd>
               </div>
+              <div><dt className="font-semibold text-void-500">Owner</dt><dd className="mt-1 break-all font-mono text-void-200">{agent.ownerWallet}</dd></div>
+              <div><dt className="font-semibold text-void-500">Delegate</dt><dd className="mt-1 break-all font-mono text-void-200">{agent.authorityDelegate ?? "Unavailable"}</dd></div>
+              <div><dt className="font-semibold text-void-500">Release SHA</dt><dd className="mt-1 break-all font-mono text-void-200">{agent.authorityReleaseSha}</dd></div>
+              <div><dt className="font-semibold text-void-500">MCP availability</dt><dd className="mt-1 font-mono text-void-200">{agent.mcpAvailability}</dd></div>
             </dl>
+            <p className="mt-3 break-words text-xs text-void-400">{agent.mcpSummary?.map((binding) => `${binding.provider}: ${binding.capability}`).join(", ") || "No MCP binding is available for this immutable version."}</p>
           </div>
 
-          <div className="rounded-xl border border-dawg-500/20 bg-dawg-500/5 p-3 text-xs leading-relaxed text-void-400">
+          <div className="border-l-2 border-dawg-700 pl-3 text-xs leading-relaxed text-void-400">
             Published does not mean the execution runtime is available. The job can report unavailable or failed, and compute, storage, ENS, receipt, and financial evidence will be evaluated per job.
           </div>
 
@@ -128,27 +134,27 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
               rows={7}
               disabled={submitting}
               placeholder="Describe the analysis you need and the evidence the agent should consider."
-              className="w-full resize-y rounded-xl border border-void-800 bg-void-950 px-3 py-2.5 text-sm leading-relaxed text-void-100 placeholder:text-void-600 focus:border-dawg-500 focus:outline-none"
+              className="w-full resize-y rounded-[10px] border border-void-700 bg-void-950 px-3 py-2.5 text-sm leading-relaxed text-void-100 placeholder:text-void-500 focus:border-dawg-500 focus:outline-none"
             />
-            <p className="text-right font-mono text-[10px] text-void-600">{prompt.length} / 2,000</p>
+            <p className="text-right font-mono text-xs text-void-500">{prompt.length} / 2,000</p>
           </div>
 
           {errorMessage && (
-            <div role="alert" className="rounded-xl border border-blood-500/30 bg-blood-900/25 p-3">
+            <div role="alert" className="border-l-2 border-blood-500 pl-3">
               <p className="text-sm text-blood-300">{errorMessage}</p>
               <p className="mt-1 text-xs text-void-500">A retry from this dialog reuses the same request key.</p>
             </div>
           )}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" onClick={onClose} disabled={submitting} className="min-h-11 rounded-xl border border-void-700 px-4 text-sm font-semibold text-void-300 hover:bg-void-800 disabled:opacity-50">
+            <button type="button" onClick={onClose} disabled={submitting} className="min-h-11 rounded-[10px] border border-void-700 px-4 text-sm font-semibold text-void-300 hover:bg-void-800 disabled:opacity-50">
               Cancel
             </button>
             <button
               type="button"
               onClick={submit}
               disabled={submitting || !idempotencyKey || prompt.trim().length < 1 || agent.ownedByViewer || !agent.hireable || agent.canonicalState !== "CANONICAL"}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-dawg-500 px-5 text-sm font-bold text-black hover:bg-dawg-400 disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-dawg-500 px-5 text-sm font-bold text-black hover:bg-dawg-400 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" aria-hidden="true" />}
               {agent.ownedByViewer ? "Self-hire refused" : submitting ? "Submitting safely…" : errorMessage ? "Retry same request" : "Submit protected job"}
@@ -157,7 +163,7 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4">
+          <div className="border-y border-emerald-500/30 py-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-base font-bold text-void-100">
@@ -176,13 +182,13 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
             </div>
           </div>
 
-          <dl className="grid gap-2 rounded-xl border border-void-800 bg-void-950/45 p-3 text-xs sm:grid-cols-2">
+          <dl className="grid gap-3 border-y border-void-800 py-3 text-xs sm:grid-cols-2">
             <div>
-              <dt className="uppercase tracking-wider text-void-600">Quoted amount</dt>
+              <dt className="font-semibold text-void-500">Quoted amount</dt>
               <dd className="mt-1 font-mono text-void-200">{submittedJob.amountAtomic} {submittedJob.asset}</dd>
             </div>
             <div>
-              <dt className="uppercase tracking-wider text-void-600">State</dt>
+              <dt className="font-semibold text-void-500">State</dt>
               <dd className="mt-1 font-mono text-void-200">{submittedJob.state}</dd>
             </div>
           </dl>
@@ -195,10 +201,10 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2">
-            <Link href={`/dashboard/compute/${submittedJob.jobId}`} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-dawg-500 px-4 text-sm font-bold text-black hover:bg-dawg-400">
+            <Link href={`/dashboard/compute/${submittedJob.jobId}`} className="inline-flex min-h-11 items-center justify-center rounded-[10px] bg-dawg-500 px-4 text-sm font-bold text-black hover:bg-dawg-400">
               Open job evidence
             </Link>
-            <Link href={`/verify?jobId=${encodeURIComponent(submittedJob.jobId)}`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-void-700 px-4 text-sm font-semibold text-void-200 hover:bg-void-800">
+            <Link href={`/verify?jobId=${encodeURIComponent(submittedJob.jobId)}`} className="inline-flex min-h-11 items-center justify-center rounded-[10px] border border-void-700 px-4 text-sm font-semibold text-void-200 hover:bg-void-800">
               Open verifier
             </Link>
           </div>

@@ -47,6 +47,11 @@ const OWNER_AGENT = {
   authorityReleaseSha: "f".repeat(40),
   publicationDecisionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   publishedAt: "2026-07-25T10:00:00.000Z",
+  manifestSchemaVersion: 3,
+  reviewedSources: [{ repository: "coingecko/skills", revision: "0a15620", use: "integration" }],
+  skillSummary: [{ id: "persona.researcher", category: "PERSONA" }, { id: "data.coingecko.market", category: "DATA" }],
+  mcpSummary: [{ bindingId: "mcp.coingecko.spot-price", provider: "coingecko", capability: "spot-price" }],
+  mcpAvailability: "UNAVAILABLE",
   verifiedExternalHires: 3,
   provenance: null,
 } as const;
@@ -60,6 +65,36 @@ const AVAILABLE_AGENT = {
   fullSubname: "risk-boundary.maker.eth",
   ownedByViewer: false,
   verifiedExternalHires: 8,
+  provenance: { protocol: "INFT", chainId: 11155111, contractAddress: "0x5555555555555555555555555555555555555555", tokenId: "42", metadataUri: null, evidenceHash: "9".repeat(64), observedAt: "2026-07-25T09:00:00.000Z" },
+} as const;
+
+const CATALOG = {
+  categories: ["PERSONA", "DATA", "ACTION", "CONNECTION"],
+  skills: [
+    { id: "persona.researcher", category: "PERSONA", capabilities: ["research"], constraints: [], providerAvailability: "NOT_REQUIRED" },
+    { id: "persona.market-analyst", category: "PERSONA", capabilities: ["market-analysis"], constraints: [], providerAvailability: "NOT_REQUIRED" },
+    { id: "persona.risk-analyst", category: "PERSONA", capabilities: ["risk-analysis"], constraints: [], providerAvailability: "NOT_REQUIRED" },
+    { id: "persona.synthesizer", category: "PERSONA", capabilities: ["research", "market-analysis", "risk-analysis"], constraints: [], providerAvailability: "NOT_REQUIRED" },
+    { id: "data.the-graph.read", category: "DATA", capabilities: [], constraints: ["read-only"], providerAvailability: "UNAVAILABLE" },
+    { id: "data.coingecko.market", category: "DATA", capabilities: [], constraints: ["read-only"], providerAvailability: "UNAVAILABLE" },
+    { id: "action.uniswap.propose-swap", category: "ACTION", capabilities: ["uniswap-swap"], constraints: ["broadcasting-forbidden", "network:unichain-sepolia", "proposal-only", "signing-forbidden", "wallet-approval-required"], providerAvailability: "NOT_REQUIRED" },
+    { id: "connection.0g.compute", category: "CONNECTION", capabilities: [], constraints: ["protected-a3-required"], providerAvailability: "NOT_REQUIRED" },
+    { id: "connection.0g.storage", category: "CONNECTION", capabilities: [], constraints: ["protected-a3-required"], providerAvailability: "NOT_REQUIRED" },
+  ],
+  templates: [
+    { id: "alpha-researcher", label: "Alpha Researcher", capabilities: ["research"], skillIds: ["persona.researcher", "data.the-graph.read", "data.coingecko.market", "connection.0g.compute", "connection.0g.storage"], priceAtomic: "1000" },
+    { id: "market-pulse", label: "Market Pulse", capabilities: ["market-analysis"], skillIds: ["persona.market-analyst", "data.coingecko.market", "connection.0g.compute", "connection.0g.storage"], priceAtomic: "1000" },
+    { id: "liquidity-scout", label: "Liquidity Scout", capabilities: ["research", "market-analysis"], skillIds: ["persona.researcher", "persona.market-analyst", "data.the-graph.read", "connection.0g.compute", "connection.0g.storage"], priceAtomic: "1000" },
+    { id: "onchain-forensics", label: "Onchain Forensics", capabilities: ["research", "risk-analysis"], skillIds: ["persona.researcher", "persona.risk-analyst", "data.the-graph.read", "connection.0g.compute", "connection.0g.storage"], priceAtomic: "1000" },
+    { id: "defi-risk-sentinel", label: "DeFi Risk Sentinel", capabilities: ["research", "risk-analysis"], skillIds: ["persona.researcher", "persona.risk-analyst", "data.the-graph.read", "data.coingecko.market", "connection.0g.compute", "connection.0g.storage"], priceAtomic: "1000" },
+    { id: "volume-anomaly", label: "Volume Anomaly", capabilities: ["market-analysis", "risk-analysis"], skillIds: ["persona.market-analyst", "persona.risk-analyst", "data.the-graph.read", "data.coingecko.market", "connection.0g.compute", "connection.0g.storage"], priceAtomic: "1000" },
+    { id: "thesis-synthesizer", label: "Thesis Synthesizer", capabilities: ["research", "market-analysis", "risk-analysis"], skillIds: ["persona.synthesizer", "data.the-graph.read", "data.coingecko.market", "connection.0g.compute", "connection.0g.storage"], priceAtomic: "1000" },
+    { id: "swap-strategist", label: "Swap Strategist", capabilities: ["market-analysis", "risk-analysis", "uniswap-swap"], skillIds: ["persona.market-analyst", "persona.risk-analyst", "data.the-graph.read", "data.coingecko.market", "action.uniswap.propose-swap", "connection.0g.compute", "connection.0g.storage"], priceAtomic: "1000" },
+  ],
+  mcpProviders: [
+    { provider: "coingecko", availability: "UNAVAILABLE", capabilities: ["search", "spot-price", "market-snapshot", "trending", "token-by-address", "pool-snapshot", "ohlcv"] },
+    { provider: "the-graph", availability: "UNAVAILABLE", capabilities: ["pinned-deployment-lookup", "schema-read", "bounded-query", "liquidity-volume-snapshot"] },
+  ],
 } as const;
 
 const POLICY = {
@@ -153,6 +188,7 @@ const JOB_DETAIL = {
     receipt: null,
     delivery: null,
     financial: { settlement: null, refund: { amountAtomic: "1000", asset: "USDC_ATOMIC", reasonCode: "STORAGE_READBACK_MISMATCH", createdAt: JOB_LIST_ITEM.updatedAt } },
+    mcpInvocations: [{ schemaVersion: 1, invocationId: "98989898-9898-4989-8989-989898989898", bindingId: "mcp.coingecko.spot-price", provider: "coingecko", capability: "spot-price", state: "SUCCEEDED", requestHash: "8".repeat(64), responseHash: "7".repeat(64), contextHash: "6".repeat(64), responseBytes: 512, errorCode: null, releaseSha: "f".repeat(40), completedAt: JOB_LIST_ITEM.updatedAt }],
     errorCode: "STORAGE_READBACK_MISMATCH",
   },
 } as const;
@@ -161,7 +197,14 @@ interface MockOptions {
   goals?: readonly unknown[];
   runs?: readonly unknown[];
   sessionExpired?: boolean;
+  sessionMissing?: boolean;
+  actionRequiredOnce?: boolean;
+  noAgents?: boolean;
+  catalog?: unknown;
   onGoalCreate?: (body: Record<string, unknown>) => void;
+  onGoalAction?: (body: Record<string, unknown>) => void;
+  onAgentCreate?: (body: Record<string, unknown>) => void;
+  onChallenge?: (body: Record<string, unknown>) => void;
   onProtectedRequest?: (path: string) => void;
 }
 
@@ -172,19 +215,41 @@ async function json(route: Route, body: unknown, status = 200): Promise<void> {
 async function installApiMocks(page: Page, options: MockOptions = {}): Promise<void> {
   let goals = [...(options.goals ?? [GOAL])];
   const runs = [...(options.runs ?? [RUN])];
+  let sessionAction: "missing" | "onboard" | "authenticate" = options.sessionMissing ? "missing" : "authenticate";
+  let challengeAction: "onboard" | "authenticate" = "onboard";
+  let userCreated = !options.sessionMissing;
+  let actionRequiredRemaining = options.actionRequiredOnce === true;
+  let drafts: unknown[] = [];
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === "/api/auth/session") {
       if (options.sessionExpired) return json(route, { error: "Expired", code: "AUTH_SESSION_EXPIRED" }, 401);
-      return json(route, { authenticated: true, walletAddress: TEST_WALLET, userId: USER.id, expiresAt: "2026-07-25T20:00:00.000Z" });
+      if (sessionAction === "missing") return json(route, { error: "Authentication required", code: "AUTH_REQUIRED" }, 401);
+      return json(route, { authenticated: true, walletAddress: TEST_WALLET, userId: userCreated ? USER.id : null, expiresAt: "2026-07-25T20:00:00.000Z" });
     }
-    if (path === "/api/auth/siwe/challenge") return json(route, { challengeId: "challenge-1", message: "localhost wants you to sign in", expiresAt: "2026-07-25T20:00:00.000Z" }, 201);
-    if (path === "/api/auth/siwe/verify") return json(route, { authenticated: true, walletAddress: TEST_WALLET, userId: USER.id, expiresAt: "2026-07-25T20:00:00.000Z" });
-    if (path === "/api/onboard") return json(route, { userId: USER.id, walletAddress: TEST_WALLET, proxyWalletAddress: null, telegramLinkCode: "A5LINK42", inftTokenId: null, existing: true });
+    if (path === "/api/auth/siwe/challenge") {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      options.onChallenge?.(body);
+      challengeAction = body.action === "authenticate" ? "authenticate" : "onboard";
+      return json(route, { challengeId: "challenge-1", message: `localhost wants you to ${challengeAction}`, expiresAt: "2026-07-25T20:00:00.000Z" }, 201);
+    }
+    if (path === "/api/auth/siwe/verify") {
+      sessionAction = challengeAction;
+      return json(route, { authenticated: true, walletAddress: TEST_WALLET, userId: userCreated ? USER.id : null, expiresAt: "2026-07-25T20:00:00.000Z" });
+    }
+    if (path === "/api/onboard") {
+      userCreated = true;
+      return json(route, { userId: USER.id, walletAddress: TEST_WALLET, proxyWalletAddress: null, telegramLinkCode: "A5LINK42", inftTokenId: null, existing: false });
+    }
     if (path.startsWith("/api/user/")) return json(route, USER);
 
     if (path.startsWith("/api/kernel/")) options.onProtectedRequest?.(path);
+    if (path.startsWith("/api/kernel/") && (sessionAction !== "authenticate" || actionRequiredRemaining)) {
+      actionRequiredRemaining = false;
+      sessionAction = "onboard";
+      return json(route, { error: "Fresh authorization is required for this action", code: "AUTH_ACTION_REQUIRED" }, 403);
+    }
     if (path === "/api/kernel/goals") {
       if (request.method() === "POST") {
         const body = request.postDataJSON() as Record<string, unknown>;
@@ -199,12 +264,42 @@ async function installApiMocks(page: Page, options: MockOptions = {}): Promise<v
       if (request.method() === "POST") return json(route, { run: RUN, replayed: false }, 201);
       return json(route, { runs });
     }
-    if (path === `/api/kernel/goals/${GOAL_ID}`) return json(route, { goal: GOAL });
-    if (path === "/api/kernel/agents") {
-      if (request.method() === "POST") return json(route, { action: "CREATE_DRAFT", version: OWNER_AGENT, planHash: OWNER_AGENT.writePlanHash }, 201);
-      return json(route, { agents: [OWNER_AGENT, AVAILABLE_AGENT], drafts: [] });
+    if (path === `/api/kernel/goals/${GOAL_ID}`) {
+      if (request.method() === "PATCH") {
+        const body = request.postDataJSON() as Record<string, unknown>;
+        options.onGoalAction?.(body);
+        const state = body.action === "PAUSE" ? "PAUSED" : body.action === "ACTIVATE" || body.action === "RESUME" ? "ACTIVE" : GOAL.state;
+        goals = [{ ...GOAL, state }];
+        return json(route, { goal: goals[0] });
+      }
+      return json(route, { goal: goals[0] ?? GOAL });
     }
-    if (path === "/api/kernel/agent-recommendations") return json(route, { reviewedPromptDraft: "## Role\nProtected agent", pinnedSkills: [{ id: "research", source: "kernel://skills/research@1", reviewedHash: "a".repeat(64), policy: "metadata-only-never-execute" }], nativeConnections: [{ id: "zero-g-compute", required: true }, { id: "zero-g-storage", required: true }], mcp: [], readiness: "READY", reasons: [] });
+    if (path === "/api/kernel/agents") {
+      if (request.method() === "POST") {
+        const body = request.postDataJSON() as Record<string, unknown>;
+        if (body.action === "CREATE_DRAFT") {
+          options.onAgentCreate?.(body);
+          const draft = { ...OWNER_AGENT, name: body.name, description: body.description, lifecycleState: "DRAFT", hireable: false, fullSubname: null, creatorParent: null, agentLabel: null, canonicalState: "UNVERIFIED", authorityOwner: null, authorityReleaseSha: null, publicationDecisionId: null, publishedAt: null };
+          drafts = [draft];
+          return json(route, { action: "CREATE_DRAFT", version: draft }, 201);
+        }
+        if (body.action === "BIND_NAME") {
+          const bound = { ...(drafts[0] as typeof OWNER_AGENT), lifecycleState: "NAME_BOUND", creatorParent: body.creatorParent, agentLabel: body.agentLabel, fullSubname: `${body.agentLabel}.${String(body.creatorParent).replace(/\.eth$/, "")}.eth` };
+          drafts = [bound];
+          return json(route, { action: "BIND_NAME", version: bound });
+        }
+        if (body.action === "PREPARE_ENS_WRITE") {
+          const prepared = { ...(drafts[0] as typeof OWNER_AGENT), lifecycleState: "WRITE_PREPARED" };
+          drafts = [prepared];
+          return json(route, { action: "PREPARE_ENS_WRITE", version: prepared, plan: { kind: "LOCAL_ONLY_UNAUTHORIZED" }, planHash: OWNER_AGENT.writePlanHash });
+        }
+        const published = { ...(drafts[0] as typeof OWNER_AGENT), lifecycleState: "PUBLISHED", hireable: true, canonicalState: "CANONICAL", authorityOwner: TEST_WALLET, authorityReleaseSha: "f".repeat(40), publicationDecisionId: OWNER_AGENT.publicationDecisionId, publishedAt: OWNER_AGENT.publishedAt };
+        drafts = [];
+        return json(route, { action: "PUBLISH_VERSION", version: published });
+      }
+      return json(route, { agents: options.noAgents ? [] : [OWNER_AGENT, AVAILABLE_AGENT], drafts });
+    }
+    if (path === "/api/kernel/agent-recommendations") return json(route, options.catalog ?? CATALOG);
     if (path === "/api/kernel/jobs") {
       if (request.method() === "POST") return json(route, { job: { quoteId: "66666666-6666-4666-8666-666666666666", intentId: "77777777-7777-4777-8777-777777777777", orderId: "88888888-8888-4888-8888-888888888888", jobId: JOB_ID, effectId: "d".repeat(64), state: "QUEUED", version: 0, amountAtomic: "1000", asset: "USDC_ATOMIC", replayed: false } }, 201);
       return json(route, new URL(request.url()).searchParams.has("jobId") ? { job: JOB_DETAIL } : { jobs: [JOB_LIST_ITEM] });
@@ -222,6 +317,8 @@ async function installWallet(page: Page, rejectSignature = false): Promise<void>
         if (method === "eth_accounts") return connected ? [address] : [];
         if (method === "eth_chainId") return "0x4cef52";
         if (method === "personal_sign") {
+          const count = Number(window.sessionStorage.getItem("a5-sign-count") ?? "0") + 1;
+          window.sessionStorage.setItem("a5-sign-count", String(count));
           if (reject) throw { cause: { cause: { code: 4001 } } };
           return `0x${"1".repeat(130)}`;
         }
@@ -260,9 +357,9 @@ test("landing communicates the protected recurring loop at 375, 768, and 1440", 
     await page.setViewportSize({ width, height: width === 375 ? 812 : 950 });
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "One goal. A verified agent loop." })).toBeVisible();
-    await expect(page.getByAltText("AlphaDawg").first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "AlphaDawg home" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Enter workspace/ })).toBeVisible();
-    await expect(page.getByText("Publish · Hire · Prove")).toBeVisible();
+    await expect(page.getByText("Publish, hire, prove")).toBeVisible();
     await expectNoOverflow(page);
     await page.screenshot({ path: `test-results/visual/a5-landing-${width}.png`, fullPage: true });
   }
@@ -272,14 +369,56 @@ test("landing communicates the protected recurring loop at 375, 768, and 1440", 
 test("does not request protected data before ready and normalizes nested signature rejection", async ({ page }) => {
   const protectedRequests: string[] = [];
   await page.unroute("**/api/**");
-  await installApiMocks(page, { sessionExpired: true, onProtectedRequest: (path) => protectedRequests.push(path) });
+  await installApiMocks(page, { sessionMissing: true, onProtectedRequest: (path) => protectedRequests.push(path) });
   await installWallet(page, true);
   await page.goto("/dashboard");
   expect(protectedRequests).toEqual([]);
   await page.getByRole("button", { name: "Connect Wallet" }).click();
-  await expect(page.getByText("WALLET_SIGNATURE_REJECTED: Signature canceled. Retry when ready.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Retry SIWE" })).toHaveCount(1);
+  await expect(page.getByText("WALLET_SIGNATURE_REJECTED: Signature canceled. No authorization was granted.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry signature" })).toHaveCount(1);
   expect(protectedRequests).toEqual([]);
+});
+
+test("onboards once and waits for explicit authenticate authorization", async ({ page }) => {
+  const actions: unknown[] = [];
+  const protectedRequests: string[] = [];
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { sessionMissing: true, onChallenge: (body) => actions.push(body.action), onProtectedRequest: (path) => protectedRequests.push(path) });
+  await installWallet(page);
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Connect Wallet" }).click();
+  await expect(page.getByRole("heading", { name: "Workspace authorization required" })).toBeVisible();
+  expect(actions).toEqual(["onboard"]);
+  expect(await page.evaluate(() => window.sessionStorage.getItem("a5-sign-count"))).toBe("1");
+  expect(protectedRequests).toEqual([]);
+  await page.getByRole("button", { name: "Authorize workspace" }).click();
+  await expect(page.getByRole("heading", { name: GOAL.objective })).toBeVisible();
+  expect(actions).toEqual(["onboard", "authenticate"]);
+  expect(await page.evaluate(() => window.sessionStorage.getItem("a5-sign-count"))).toBe("2");
+  expect(protectedRequests.length).toBeGreaterThan(0);
+});
+
+test("recovers AUTH_ACTION_REQUIRED without treating every 403 as stale", async ({ page }) => {
+  const actions: unknown[] = [];
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { actionRequiredOnce: true, onChallenge: (body) => actions.push(body.action) });
+  await installWallet(page);
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Connect Wallet" }).click();
+  await expect(page.getByRole("heading", { name: "Workspace authorization required" })).toBeVisible();
+  await page.getByRole("button", { name: "Authorize workspace" }).click();
+  await expect(page.getByRole("heading", { name: GOAL.objective })).toBeVisible();
+  expect(actions).toEqual(["authenticate"]);
+});
+
+test("shows expired authorization without opening a signature prompt", async ({ page }) => {
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { sessionExpired: true });
+  await installWallet(page);
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Connect Wallet" }).click();
+  await expect(page.getByRole("heading", { name: "Authorization expired" })).toBeVisible();
+  expect(await page.evaluate(() => window.sessionStorage.getItem("a5-sign-count"))).toBeNull();
 });
 
 test("creates a recurring protected goal with explicit demo boundaries", async ({ page }) => {
@@ -304,43 +443,133 @@ test("workspace demonstrates agents, terminal report, proof links, and blocked A
   await connectReady(page, "/dashboard");
   await expect(page.getByRole("heading", { name: GOAL.objective })).toBeVisible();
   await expect(page.getByText("3000 / run")).toBeVisible();
-  await expect(page.getByText("SCHEDULED", { exact: true })).toBeVisible();
-  await expect(page.getByText("SYNTHESIZING", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Goal to converged evidence" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Parallel selected-agent lanes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Converged report" })).toBeVisible();
   await expect(page.getByText("READY", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(AVAILABLE_AGENT.fullSubname).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Liquidity evidence is sufficient for research, not live execution." })).toBeVisible();
+  await expect(page.getByLabel("Converged report").getByText("Liquidity evidence is sufficient for research, not live execution.")).toBeVisible();
   await expect(page.getByText("A6_BLOCKED_LIVE")).toBeVisible();
   await expect(page.getByRole("button", { name: "Wallet execution unavailable" })).toBeDisabled();
-  await expectNoOverflow(page);
-  await page.screenshot({ path: "test-results/visual/a5-dashboard-1440.png", fullPage: true });
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectNoOverflow(page);
+    await page.screenshot({ path: `test-results/visual/a5-dashboard-${width}.png`, fullPage: true });
+  }
   expect(errors).toEqual([]);
+});
+
+test("workspace can run now and pause through the protected goal controls", async ({ page }) => {
+  const actions: unknown[] = [];
+  const protectedRequests: string[] = [];
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { onGoalAction: (body) => actions.push(body.action), onProtectedRequest: (path) => protectedRequests.push(path) });
+  await connectReady(page, "/dashboard");
+  await page.getByRole("button", { name: "Run now" }).click();
+  await expect.poll(() => protectedRequests.filter((path) => path.endsWith("/runs")).length).toBeGreaterThan(1);
+  await page.getByRole("button", { name: "Pause" }).click();
+  await expect.poll(() => actions).toContain("PAUSE");
+});
+
+test("workspace renders partial output without promoting it to verified", async ({ page }) => {
+  const partial = { ...RUN, state: "PARTIAL", report: { ...RUN.report, status: "PARTIAL", swapProposal: null } };
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { runs: [partial] });
+  await connectReady(page, "/dashboard");
+  await expect(page.getByText("PARTIAL", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("A6_BLOCKED_LIVE")).toHaveCount(0);
 });
 
 test("marketplace preserves URL tabs, dense authority rows, and external hire", async ({ page }) => {
   await connectReady(page, "/marketplace?view=available");
-  await expect(page.getByRole("tab", { name: "available" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("link", { name: "Available" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText(AVAILABLE_AGENT.fullSubname).first()).toBeVisible();
-  await expect(page.getByText(/v1 · 44444444/)).toBeVisible();
+  await expect(page.getByText("Version 1").first()).toBeVisible();
+  await expect(page.getByText("ID 44444444")).toBeVisible();
   await expect(page.getByText("1000 USDC_ATOMIC").first()).toBeVisible();
+  await expect(page.getByText("Provenance recorded")).toBeVisible();
   await page.getByRole("link", { name: "Hire agent" }).click();
   await expect(page).toHaveURL(new RegExp(`agentId=${AVAILABLE_AGENT.versionId}`));
   await expect(page.getByRole("dialog", { name: `Run ${AVAILABLE_AGENT.name}` })).toBeVisible();
   await page.getByRole("button", { name: "Close dialog" }).click();
   await expect(page).not.toHaveURL(/agentId=/);
-  await page.getByRole("tab", { name: "mine" }).click();
+  await page.getByRole("link", { name: "Mine" }).click();
   await expect(page).toHaveURL(/view=mine/);
   await page.reload();
-  await expect(page.getByRole("tab", { name: "mine" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("link", { name: "Mine" })).toHaveAttribute("aria-current", "page");
+  await page.getByText("Identity, authority, and provenance").click();
+  await expect(page.getByText("Provenance", { exact: true })).toBeVisible();
+  await expect(page.getByText("Unavailable", { exact: true }).first()).toBeVisible();
 });
 
-test("verify deep link shows six honest proof dimensions and exact refusal", async ({ page }) => {
+test("catalog V3 creation sends only template identity fields and publishes the returned version", async ({ page }) => {
+  let createBody: Record<string, unknown> | null = null;
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { onAgentCreate: (body) => { createBody = body; } });
+  await connectReady(page, "/marketplace?view=mine");
+  const open = page.getByRole("link", { name: "Create agent" });
+  await open.click();
+  await expect(page.getByRole("dialog", { name: "Create a protected agent" })).toBeVisible();
+  await page.getByLabel("Agent name").fill("Bounded Market Researcher");
+  await page.getByLabel("Description").fill("Researches bounded market evidence with explicit source and execution limits.");
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await expect(page.getByRole("button", { name: /Alpha Researcher/ })).toBeVisible();
+  await page.getByRole("button", { name: /Alpha Researcher/ }).click();
+  await expect(page.getByRole("heading", { name: "MCP availability" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "MCP availability" }).locator("..").getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await page.getByLabel("Creator ENS parent").fill("maker.eth");
+  await page.getByRole("button", { name: "Prepare immutable draft" }).click();
+  await expect(page.getByLabel("Immutable server preview")).toBeVisible();
+  expect(Object.keys(createBody ?? {}).sort()).toEqual(["action", "description", "name", "templateId"]);
+  expect(createBody).toMatchObject({ action: "CREATE_DRAFT", templateId: "alpha-researcher", name: "Bounded Market Researcher" });
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await page.getByRole("button", { name: "Publish immutable version" }).click();
+  await expect(page.getByRole("heading", { name: "Publication receipt" })).toBeVisible();
+  await expect(page.getByLabel("Publication receipt").getByText("ELIGIBLE", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /View my agents/ }).click();
+  await expect(page).toHaveURL(/view=mine/);
+});
+
+test("agent catalog empty state and provider availability remain explicit", async ({ page }) => {
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { noAgents: true, catalog: { ...CATALOG, mcpProviders: [{ ...CATALOG.mcpProviders[0], availability: "AVAILABLE" }, CATALOG.mcpProviders[1]] } });
+  await connectReady(page, "/marketplace?view=available");
+  await expect(page.getByText("No external canonical versions are available.")).toBeVisible();
+  await page.getByRole("link", { name: "Create agent" }).click();
+  await page.getByLabel("Agent name").fill("Provider Availability Agent");
+  await page.getByLabel("Description").fill("Shows exact provider availability from the authenticated catalog response.");
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await page.getByRole("button", { name: /Alpha Researcher/ }).click();
+  const availability = page.getByRole("heading", { name: "MCP availability" }).locator("..");
+  await expect(availability.getByText("AVAILABLE", { exact: true }).first()).toBeVisible();
+  await expect(availability.getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
+});
+
+test("creation dialog traps focus, returns focus, and contains no legacy manual flow", async ({ page }) => {
+  await connectReady(page, "/marketplace?view=available");
+  const open = page.getByRole("link", { name: "Create agent" });
+  await open.focus();
+  await open.click();
+  await expect(page.getByRole("button", { name: "Close dialog" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await expect(page.getByText("Markdown instructions")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(open).toBeFocused();
+});
+
+test("verify deep link shows authoritative MCP and proof failure precedence", async ({ page }) => {
   await connectReady(page, `/verify?jobId=${JOB_ID}`);
-  for (const title of ["Agent identity", "ENS authority", "0G Compute", "Storage readback", "Canonical receipt", "Settlement or refund"]) {
+  for (const title of ["Matched agent", "Hire and ENS authority", "MCP query context", "0G reasoning", "Storage readback", "Canonical receipt", "Delivered result", "Settlement or refund"]) {
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
   }
+  await page.getByRole("heading", { name: "MCP query context" }).locator("..").getByText("Exact evidence tuple").click();
+  await expect(page.getByText("coingecko: spot-price")).toBeVisible();
+  await expect(page.getByText(`Request hash: ${"8".repeat(64)}`)).toBeVisible();
   await expect(page.getByText("STORAGE_READBACK_MISMATCH").first()).toBeVisible();
   await expect(page.getByText("Readback mismatch")).toBeVisible();
-  await expect(page.getByText("Unavailable", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Verified", { exact: true })).toHaveCount(0);
   await expectNoOverflow(page);
   await page.screenshot({ path: "test-results/visual/a5-proof-1440.png", fullPage: true });
 });
@@ -355,7 +584,7 @@ test("all primary routes remain usable and overflow-free at mobile, tablet, and 
       if (await connect.isVisible()) await connect.click();
       await expect(page.locator("main").first()).toBeVisible();
       await expectNoOverflow(page);
-      await page.screenshot({ path: `test-results/visual/a5-${path.split("?")[0].slice(1)}-${width}.png`, fullPage: true });
+      await page.screenshot({ path: `test-results/visual/a5-route-${path.split("?")[0].slice(1)}-${width}.png`, fullPage: true });
     }
   }
 });

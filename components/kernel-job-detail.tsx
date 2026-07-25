@@ -8,12 +8,14 @@ import type { EvidenceState, KernelJobDetail as KernelJobDetailRecord } from "@/
 
 const POLL_MS = 2_000;
 
-export type KernelUiErrorKind = "auth" | "authorization" | "not-found" | "conflict" | "not-configured" | "error";
+export type KernelUiErrorKind = "auth" | "onboarding" | "authorization" | "forbidden" | "not-found" | "conflict" | "not-configured" | "error";
 
 export function classifyKernelError(error: unknown): { kind: KernelUiErrorKind; message: string } {
   if (!(error instanceof ApiError)) return { kind: "error", message: error instanceof Error ? error.message : "The protected kernel request failed." };
   if (error.status === 401) return { kind: "auth", message: "Reconnect your wallet to read protected jobs." };
-  if (error.status === 403) return { kind: "authorization", message: error.code === "AUTH_USER_REQUIRED" ? "Complete onboarding before reading protected jobs." : "Fresh wallet authorization is required." };
+  if (error.status === 403 && error.code === "AUTH_USER_REQUIRED") return { kind: "onboarding", message: "Complete onboarding before reading protected jobs." };
+  if (error.status === 403 && error.code === "AUTH_ACTION_REQUIRED") return { kind: "authorization", message: "Fresh wallet authorization is required." };
+  if (error.status === 403) return { kind: "forbidden", message: error.message || "This authenticated wallet cannot read the requested job." };
   if (error.status === 404) return { kind: "not-found", message: "This job was not found for the authenticated buyer." };
   if (error.status === 409) return { kind: "conflict", message: "The kernel reported a conflict. Refresh before another action." };
   if (error.status === 503 || error.code === "A3_NOT_CONFIGURED") return { kind: "not-configured", message: "Protected execution is not configured. Runtime evidence is unavailable." };
@@ -32,7 +34,7 @@ function stateEvidence(job: Pick<KernelJobDetailRecord, "state" | "evidence">): 
 }
 
 export function KernelErrorNotice({ error, onRetry }: { error: { kind: KernelUiErrorKind; message: string }; onRetry?: () => void }) {
-  const title: Record<KernelUiErrorKind, string> = { auth: "Wallet required", authorization: "Authorization required", "not-found": "Job not found", conflict: "Kernel conflict", "not-configured": "Runtime unavailable", error: "Job request failed" };
+  const title: Record<KernelUiErrorKind, string> = { auth: "Wallet required", onboarding: "Onboarding required", authorization: "Authorization required", forbidden: "Access forbidden", "not-found": "Job not found", conflict: "Kernel conflict", "not-configured": "Runtime unavailable", error: "Job request failed" };
   return <div role="alert" className="border-l-2 border-blood-500 py-1 pl-3"><p className="font-semibold text-blood-200">{title[error.kind]}</p><p className="mt-1 break-words text-sm text-void-400">{error.message}</p>{onRetry && error.kind !== "not-found" && <button type="button" onClick={onRetry} className="instrument-button instrument-button-secondary mt-4">Retry</button>}</div>;
 }
 
@@ -54,7 +56,7 @@ export function KernelJobDetailView({ job, mode = "detail", canceling = false, o
 
       <ProofRail job={job} />
 
-      <section aria-label="Canonical delivery" className="border-y border-void-800 py-4"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-void-100">Canonical delivery</h2><EvidenceStatus state={job.evidence.receipt} /></div><p className="mt-3 text-sm text-void-400">{delivery ? `Delivery recorded at ${delivery.terminalAt}.` : "No canonical delivery output is available."}</p>{delivery && <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm text-void-300">Inspect delivery result</summary><pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words border-t border-void-800 py-4 font-mono text-xs text-void-400">{JSON.stringify(delivery.result, null, 2)}</pre></details>}</section>
+      <section aria-label="Canonical delivery" className="border-y border-void-800 py-4"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-void-100">Canonical delivery</h2><EvidenceStatus state={job.state === "SUCCEEDED" && delivery ? "verified" : job.state === "FAILED" ? "failed" : delivery ? "pending" : "unavailable"} /></div><p className="mt-3 text-sm text-void-400">{delivery ? `Delivery recorded at ${delivery.terminalAt}.` : "No canonical delivery output is available."}</p>{delivery && <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm text-void-300">Inspect delivery result</summary><pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words border-t border-void-800 py-4 font-mono text-xs text-void-400">{JSON.stringify(delivery.result, null, 2)}</pre></details>}</section>
 
       <details className="border-y border-void-800 py-1"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-void-300">Job identity and timeline</summary><div className="grid gap-5 border-t border-void-800 py-4 lg:grid-cols-2"><dl className="space-y-3 text-xs"><Meta label="Job ID" value={job.jobId} /><Meta label="Effect ID" value={job.effectId} /><Meta label="Version ID" value={job.agentVersionId} /><Meta label="Creator parent" value={job.agent.creatorParent ?? "Unavailable"} /><Meta label="Owner" value={job.agent.ownerWallet} /><Meta label="Delegate" value={job.agent.authorityDelegate ?? "Unavailable"} /><Meta label="Release SHA" value={job.agent.authorityReleaseSha ?? "Unavailable"} /></dl><ol className="divide-y divide-void-800">{job.evidenceDetail.timeline.map((item) => <li key={item.version} className="py-2 text-xs text-void-400"><span className="font-mono text-void-500">{item.createdAt}</span><span className="ml-3">{item.eventType}: {item.fromState ?? "START"} to {item.toState}</span></li>)}</ol></div></details>
 

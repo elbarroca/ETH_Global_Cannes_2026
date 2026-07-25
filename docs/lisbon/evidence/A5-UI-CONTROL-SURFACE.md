@@ -1,5 +1,75 @@
 # A5 Whole-Product UI and Protected Control Surface Evidence
 
+## Protected V3 catalog workspace repair on 2026-07-25
+
+Frontend task `A5-PROTECTED-V3-UI-W2:W2:1D7F82B` repairs the protected
+authorization boundary and consumes the immutable catalog and MCP evidence
+added at the exact start/control SHA
+`1d7f82b4a1df7beaedc1558c60d2b2ccd88f4051`. It changes no protected API,
+kernel, database, payment, ENS, 0G, or worker implementation.
+
+The wallet boundary now performs onboarding and workspace authorization as two
+explicit SIWE actions. A missing session can request `onboard`, call the
+existing onboarding endpoint, and then stop at an explicit Authorize workspace
+action; only that click requests `authenticate`. The public UI contract remains
+exactly disconnected, signing, onboarding, ready, stale, and error. Internal
+checking, authorization-required, signature-rejected, 401, genuine forbidden,
+and EIP-1193 `4001` reasons map into those six states without automatic second
+signatures or unhandled rejections. A server 403 is stale only for explicit
+`AUTH_ACTION_REQUIRED`; arbitrary forbidden responses are not converted into a
+reauthentication loop. The wallet control is hydration-stable across the server
+and first client render.
+
+Agent creation consumes the authenticated V3 recommendation catalog. The four
+stages are Identity, Capability bundle, ENS authority, and Publish and receipt.
+The UI shows all eight server-owned templates, Persona/Data/Action/Connection
+skill summaries, reviewed sources, MCP capability availability, exact returned
+manifest/version preview, deterministic ENS subname, immutable price and owner,
+then publishes through the existing protected lifecycle. Draft creation sends
+only action, template ID, name, description, and an optional draft agent ID;
+there is no client-authored Markdown, capability, source, repository, tool,
+endpoint, credential, or manual manifest surface.
+
+The workspace presents a goal trigger, parallel immutable selected-agent lanes,
+and a visually dominant converged report instead of an equal-card status strip.
+Terminal report content is static and fully readable; transform/opacity motion
+is limited to an active convergence and is suppressed for reduced motion. The
+catalog uses URL-backed Available, Mine, and Drafts views with dense authority
+rows. The proof spine is Matched agent, Hire and ENS authority, MCP query
+context, 0G reasoning, Storage readback, Canonical receipt, Delivered result,
+and Settlement or refund. Failed jobs never retain a Verified label from an
+earlier dimension. Exact refusals, release SHA, provider/capability, hashes,
+owner/delegate, version, price, eligibility, receipt, and missing evidence stay
+explicit and fail closed.
+
+### Local verification
+
+| Check | Result |
+|---|---|
+| `npm run lint` | PASS: zero errors; 23 inherited warnings outside this frontend change |
+| `npm run typecheck` | PASS |
+| `npm test` | PASS: 10/10 |
+| `npm run test:a5` | PASS: 5/5 |
+| `CI=1 npm run test:playwright` | PASS: production build plus 17/17 Chromium tests |
+| `npm run build` | PASS through the Playwright production-build lane: Next.js 16.2.11, 35 pages |
+| `npm run scan:secrets` | PASS |
+| `git diff --check` | PASS |
+
+Playwright covers onboarding then explicit authorization, denial, stale and
+expired recovery, no premature protected query, goal creation and controls,
+partial output, catalog availability and V3 publication payload, URL views,
+keyboard focus trap and return, failed-proof precedence with MCP context,
+malformed proof refusal, reduced motion, and overflow at 375, 768, and 1440 CSS
+pixels. Connected workspace captures are
+`test-results/visual/a5-dashboard-375.png`,
+`test-results/visual/a5-dashboard-768.png`, and
+`test-results/visual/a5-dashboard-1440.png`.
+
+Verdict: `PASS_TO_AUDIT; LOCAL_ONLY`. Screenshots are UI evidence only. No live
+API or MCP provider call, sponsor action, managed migration, wallet signature,
+transaction, upload, deployment, push, release, spend, or public claim was
+authorized or performed. Release and same-SHA live-journey gates remain closed.
+
 ## Protected recurring-goal UI redesign on 2026-07-25
 
 Frontend task `A5-PROTECTED-GOAL-UI-REDESIGN-20260725:W1:B097DBD`

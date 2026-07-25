@@ -6,7 +6,6 @@ import {
   GitBranchIcon,
   ShieldCheckIcon,
 } from "@phosphor-icons/react/dist/ssr";
-import { DawgLogo } from "@/components/dawg-logo";
 import { WalletConnectButton } from "@/components/wallet-connect";
 
 export const metadata: Metadata = {
@@ -15,10 +14,10 @@ export const metadata: Metadata = {
 };
 
 const FLOW = [
-  ["01", "Goal", "Objective, cadence, execution mode, and hard atomic limits."],
-  ["02", "Agents", "External canonical versions match by reviewed capability."],
-  ["03", "Report", "Parallel jobs converge into one evidence-linked conclusion."],
-  ["04", "Proof", "ENS, compute, storage, receipt, and financial outcome stay inspectable."],
+  ["Goal", "Objective, cadence, execution mode, and hard atomic limits."],
+  ["Agents", "External canonical versions match by reviewed capability."],
+  ["Report", "Parallel jobs converge into one evidence-linked conclusion."],
+  ["Proof", "ENS, MCP, compute, storage, receipt, and financial outcome stay inspectable."],
 ] as const;
 
 export default function LandingPage() {
@@ -27,7 +26,6 @@ export default function LandingPage() {
       <section className="mx-auto grid min-h-[calc(100dvh-4rem)] max-w-[90rem] items-center gap-12 px-4 py-10 sm:px-6 md:py-14 lg:grid-cols-[minmax(0,1.08fr)_minmax(26rem,0.92fr)] lg:gap-16">
         <div className="max-w-2xl">
           <div className="flex items-center gap-3">
-            <DawgLogo className="h-9 w-9" />
             <p className="instrument-label text-dawg-400">AlphaDawg protected workspace</p>
           </div>
           <h1 className="mt-6 max-w-[15ch] text-4xl font-semibold leading-[1.04] tracking-[-0.045em] text-void-100 sm:text-5xl lg:text-6xl">
@@ -46,7 +44,7 @@ export default function LandingPage() {
             </Link>
           </div>
           <p className="mt-4 max-w-xl text-xs leading-relaxed text-void-500">
-            Connect, sign one SIWE message, then review every boundary before activation. No goal signs or broadcasts a transaction.
+            New wallets onboard first, then explicitly authorize the workspace. Neither signature authorizes a transaction.
           </p>
         </div>
 
@@ -83,14 +81,13 @@ export default function LandingPage() {
         <div className="mx-auto max-w-[90rem] px-4 py-12 sm:px-6 lg:py-16">
           <div className="grid gap-8 lg:grid-cols-[0.65fr_1.35fr]">
             <div>
-              <p className="instrument-label text-dawg-400">Publish · Hire · Prove</p>
+              <p className="instrument-label text-dawg-400">Publish, hire, prove</p>
               <h2 id="product-loop" className="mt-3 text-3xl font-semibold tracking-tight text-void-100">The protected loop</h2>
               <p className="mt-3 max-w-sm text-sm leading-relaxed text-void-400">Publication proves registry eligibility. Each hire still earns its own runtime evidence.</p>
             </div>
             <ol className="divide-y divide-void-800 border-y border-void-800">
-              {FLOW.map(([number, title, detail]) => (
-                <li key={title} className="grid gap-2 py-4 sm:grid-cols-[3rem_7rem_minmax(0,1fr)] sm:items-start">
-                  <span className="font-mono text-xs text-dawg-400">{number}</span>
+              {FLOW.map(([title, detail]) => (
+                <li key={title} className="grid gap-2 py-4 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-start">
                   <h3 className="font-semibold text-void-100">{title}</h3>
                   <p className="text-sm leading-relaxed text-void-400">{detail}</p>
                 </li>

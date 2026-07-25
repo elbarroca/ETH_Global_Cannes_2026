@@ -20,11 +20,14 @@ export function WalletConnectButton() {
     () => false,
   );
   const isConnected = hydrated && connection.isConnected;
+  const readyConnector = hydrated ? connector : undefined;
 
   if (!isConnected) {
-    const label = !connector
-      ? "Wallet unavailable"
-      : connect.isPending
+    const label = !hydrated
+      ? "Connect Wallet"
+      : !readyConnector
+        ? "Wallet unavailable"
+        : connect.isPending
         ? "Connecting…"
         : connect.error
           ? "Retry Wallet"
@@ -34,12 +37,12 @@ export function WalletConnectButton() {
       <div className="relative flex items-center">
         <button
           type="button"
-          disabled={!connector || connect.isPending}
-          aria-busy={connect.isPending}
+          disabled={!hydrated || !readyConnector || connect.isPending}
+          aria-busy={hydrated && connect.isPending}
           onClick={() => {
-            if (!connector) return;
+            if (!readyConnector) return;
             connect.reset();
-            connect.mutate({ connector });
+            connect.mutate({ connector: readyConnector });
           }}
           className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl bg-dawg-500 px-4 py-2 text-sm font-bold text-void-950 transition-[background-color,transform] hover:bg-dawg-400 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
         >

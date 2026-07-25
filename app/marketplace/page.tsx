@@ -16,6 +16,11 @@ import {
 } from "@/lib/api";
 
 type AgentTab = "available" | "mine" | "drafts";
+const AGENT_VIEWS = [
+  { value: "available", label: "Available" },
+  { value: "mine", label: "Mine" },
+  { value: "drafts", label: "Drafts" },
+] as const;
 
 export default function MarketplacePage() {
   return <Suspense fallback={<MarketplaceLoading />}><MarketplaceContent /></Suspense>;
@@ -85,22 +90,22 @@ function MarketplaceContent() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-void-100">Immutable agent versions</h1>
           <p className="mt-2 text-sm text-void-400">Publication proves registry eligibility. Runtime proof remains per job.</p>
         </div>
-        <Link href={queryHref({ create: "1" })} scroll={false} className="instrument-button instrument-button-primary"><PlusIcon size={17} aria-hidden />Publish agent</Link>
+        <Link href={queryHref({ create: "1" })} scroll={false} className="instrument-button instrument-button-primary"><PlusIcon size={17} aria-hidden />Create agent</Link>
       </header>
 
-      <div role="tablist" aria-label="Protected agent catalog" className="mt-5 flex gap-1 border-b border-void-800">
-        {(["available", "mine", "drafts"] as const).map((value) => (
-          <Link key={value} href={queryHref({ view: value, agentId: null })} scroll={false} role="tab" aria-selected={tab === value} className={`inline-flex min-h-11 items-center rounded-t-[10px] px-4 text-sm font-semibold capitalize ${tab === value ? "border-b-2 border-dawg-500 text-dawg-300" : "text-void-400"}`}>
-            {value}
+      <nav aria-label="Agent views" className="mt-5 flex gap-1 border-b border-void-800">
+        {AGENT_VIEWS.map(({ value, label }) => (
+          <Link key={value} href={queryHref({ view: value, agentId: null })} scroll={false} aria-current={tab === value ? "page" : undefined} className={`inline-flex min-h-11 items-center px-4 text-sm font-semibold ${tab === value ? "border-b-2 border-dawg-500 text-dawg-300" : "text-void-400 hover:text-void-100"}`}>
+            {label}
           </Link>
         ))}
-      </div>
+      </nav>
 
       {lifecycle.isLoading && <MarketplaceLoading />}
       {lifecycle.error && <div role="alert" className="mt-6 flex items-start justify-between gap-4 border-l-2 border-blood-500 pl-3"><p className="break-words text-sm text-blood-300">{lifecycle.error.message}</p><button type="button" onClick={() => void lifecycle.refetch()} className="text-sm font-semibold text-void-200">Retry</button></div>}
       {lifecycle.data && (
         <section className="mt-5" aria-live="polite">
-          <p className="mb-3 text-xs text-void-500">Catalog refreshed {new Date(lifecycle.dataUpdatedAt).toLocaleTimeString()}</p>
+          <p className="mb-3 text-xs text-void-500">Authenticated protected catalog</p>
           {tab === "available" && <AgentList agents={available} empty="No external canonical versions are available." agentHref={agentHref} />}
           {tab === "mine" && <AgentList agents={mine} empty="You have not published a canonical version." agentHref={agentHref} />}
           {tab === "drafts" && <DraftList drafts={drafts} />}
@@ -129,7 +134,8 @@ function AgentRow({ agent, href }: { agent: ProtectedPublishedAgentRead; href: s
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-void-100">{agent.name}</h2><EvidenceStatus state={agent.hireable ? "verified" : "unavailable"} label={agent.hireable ? "ELIGIBLE" : "REFUSED"} /></div>
           <p className="mt-1 break-all font-mono text-sm text-dawg-300">{agent.fullSubname}</p>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-void-400"><span>{agent.capabilities.join(" · ")}</span><span className="font-mono">v{agent.version} · {agent.versionId.slice(0, 8)}</span><span className="font-mono">{agent.priceAtomic} {agent.asset}</span><span>{agent.verifiedExternalHires} verified external hires</span></div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-void-400"><span>{agent.capabilities.join(", ")}</span><span className="font-mono">Version {agent.version}</span><span className="font-mono">ID {agent.versionId.slice(0, 8)}</span><span className="font-mono">{agent.priceAtomic} {agent.asset}</span><span>{agent.verifiedExternalHires} verified external hires</span></div>
+          <div className="mt-3 flex flex-wrap gap-2"><EvidenceStatus state={agent.mcpAvailability === "AVAILABLE" ? "verified" : "unavailable"} label={`MCP ${agent.mcpAvailability.toLowerCase()}`} />{agent.provenance && <EvidenceStatus state="verified" label="Provenance recorded" />}</div>
           {agent.refusalReason && <p className="mt-3 break-words font-mono text-sm text-blood-300">{agent.refusalReason}</p>}
         </div>
         {agent.ownedByViewer || !agent.hireable ? <button type="button" disabled className="instrument-button instrument-button-primary lg:min-w-36">{agent.ownedByViewer ? "Published by you" : "Hire refused"}</button> : <Link href={href} scroll={false} className="instrument-button instrument-button-primary lg:min-w-36">Hire agent</Link>}
@@ -145,7 +151,13 @@ function AgentRow({ agent, href }: { agent: ProtectedPublishedAgentRead; href: s
           <Meta label="Version ID" value={agent.versionId} />
           <Meta label="Manifest hash" value={agent.manifestHash} />
           <Meta label="Release SHA" value={agent.authorityReleaseSha} />
+          <Meta label="Published at" value={agent.publishedAt} />
           <Meta label="Capabilities" value={agent.capabilities.join(", ")} />
+          <Meta label="Manifest schema" value={String(agent.manifestSchemaVersion)} />
+          <Meta label="Skill categories" value={agent.skillSummary?.map((skill) => `${skill.category}: ${skill.id}`).join(", ") || "Unavailable"} />
+          <Meta label="Reviewed sources" value={agent.reviewedSources?.map((source) => `${source.repository} ${source.revision} (${source.use})`).join(", ") || "Unavailable"} />
+          <Meta label="MCP availability" value={agent.mcpAvailability} />
+          <Meta label="MCP bindings" value={agent.mcpSummary?.map((binding) => `${binding.provider}: ${binding.capability}`).join(", ") || "Unavailable"} />
           {agent.provenance ? <><Meta label="Provenance" value={`${agent.provenance.protocol} token ${agent.provenance.tokenId}`} /><Meta label="Provenance evidence" value={agent.provenance.evidenceHash} /><Meta label="Observed" value={agent.provenance.observedAt} /></> : <Meta label="Provenance" value="Unavailable" />}
         </dl>
       </details>
@@ -155,7 +167,7 @@ function AgentRow({ agent, href }: { agent: ProtectedPublishedAgentRead; href: s
 
 function DraftList({ drafts }: { drafts: AgentLifecycleVersion[] }) {
   if (!drafts.length) return <p className="border-y border-void-800 py-10 text-center text-sm text-void-500">No persisted drafts.</p>;
-  return <ul className="divide-y divide-void-800 border-y border-void-800">{drafts.map((draft) => <li key={draft.versionId} className="py-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-void-100">{draft.name}</h2><p className="mt-1 text-sm text-void-400">Draft v{draft.version}. Not published or hireable.</p>{draft.refusalReason && <p className="mt-2 break-words font-mono text-sm text-blood-300">{draft.refusalReason}</p>}</div><EvidenceStatus state="unavailable" label={draft.lifecycleState} /></div><details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm text-void-400">Draft identifiers</summary><dl className="grid gap-3 border-t border-void-800 py-4 text-xs sm:grid-cols-2"><Meta label="Version ID" value={draft.versionId} /><Meta label="Manifest hash" value={draft.manifestHash} /></dl></details></li>)}</ul>;
+  return <ul className="divide-y divide-void-800 border-y border-void-800">{drafts.map((draft) => <li key={draft.versionId} className="py-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-void-100">{draft.name}</h2><p className="mt-1 text-sm text-void-400">Draft version {draft.version}. Not published or hireable.</p>{draft.refusalReason && <p className="mt-2 break-words font-mono text-sm text-blood-300">{draft.refusalReason}</p>}</div><EvidenceStatus state="unavailable" label={draft.lifecycleState} /></div><details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm text-void-400">Draft identifiers and catalog snapshot</summary><dl className="grid gap-3 border-t border-void-800 py-4 text-xs sm:grid-cols-2"><Meta label="Version ID" value={draft.versionId} /><Meta label="Manifest hash" value={draft.manifestHash} /><Meta label="Manifest schema" value={String(draft.manifestSchemaVersion)} /><Meta label="MCP availability" value={draft.mcpAvailability} /><Meta label="Skills" value={draft.skillSummary?.map((skill) => `${skill.category}: ${skill.id}`).join(", ") || "Unavailable"} /><Meta label="Reviewed sources" value={draft.reviewedSources?.map((source) => `${source.repository} ${source.revision} (${source.use})`).join(", ") || "Unavailable"} /></dl></details></li>)}</ul>;
 }
 
 function Meta({ label, value }: { label: string; value: string }) { return <div className="min-w-0"><dt className="font-semibold uppercase tracking-wide text-void-500">{label}</dt><dd className="mt-1 break-all font-mono text-void-300">{value}</dd></div>; }

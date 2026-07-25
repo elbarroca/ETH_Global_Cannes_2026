@@ -64,7 +64,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText, code: null }));
         const payload = err as { error?: string; code?: string | null };
-        if (typeof window !== "undefined" && (res.status === 401 || res.status === 403)) {
+        const authEvent = res.status === 401 ||
+          payload.code === "AUTH_ACTION_REQUIRED" ||
+          payload.code === "AUTH_USER_REQUIRED";
+        if (typeof window !== "undefined" && authEvent) {
           window.dispatchEvent(new CustomEvent("alphadawg:auth-stale", {
             detail: { status: res.status, code: payload.code ?? null },
           }));
@@ -322,12 +325,15 @@ export interface PlatformStats {
   totalValueLocked: number;
 }
 
+export type SiweAction = "onboard" | "authenticate";
+
 export async function createSiweChallenge(
   walletAddress: string,
+  action: SiweAction,
 ): Promise<SiweChallengeResponse> {
   return apiFetch<SiweChallengeResponse>("/api/auth/siwe/challenge", {
     method: "POST",
-    body: JSON.stringify({ walletAddress, action: "onboard" }),
+    body: JSON.stringify({ walletAddress, action }),
   });
 }
 
@@ -342,18 +348,93 @@ export async function verifySiweChallenge(input: {
   });
 }
 
-export async function getAuthSession(): Promise<AuthSessionResponse | null> {
-  return apiFetch<AuthSessionResponse>("/api/auth/session", { cache: "no-store" }).catch(
-    () => null,
-  );
+export async function getAuthSession(): Promise<AuthSessionResponse> {
+  return apiFetch<AuthSessionResponse>("/api/auth/session", { cache: "no-store" });
 }
 
-export interface CreateAgentDraftInput {
+export interface LegacyCreateAgentDraftInput {
   name: string;
   description: string;
   instructions: string;
   capabilities: readonly string[];
   agentId?: string;
+}
+
+export interface CatalogCreateAgentDraftInput {
+  templateId: string;
+  name: string;
+  description: string;
+  agentId?: string;
+}
+
+export type CreateAgentDraftInput = LegacyCreateAgentDraftInput | CatalogCreateAgentDraftInput;
+
+export type AgentCatalogCategory = "PERSONA" | "DATA" | "ACTION" | "CONNECTION";
+export type AgentCatalogAvailability = "AVAILABLE" | "UNAVAILABLE" | "NOT_REQUIRED";
+
+export interface AgentCatalogSkill {
+  id: string;
+  category: AgentCatalogCategory;
+  capabilities: readonly string[];
+  constraints: readonly string[];
+  providerAvailability: AgentCatalogAvailability;
+}
+
+export interface AgentCatalogTemplate {
+  id: string;
+  label: string;
+  capabilities: readonly string[];
+  skillIds: readonly string[];
+  priceAtomic: string;
+}
+
+export interface AgentCatalogMcpProvider {
+  provider: string;
+  availability: AgentCatalogAvailability;
+  capabilities: readonly string[];
+}
+
+export interface AgentCatalogProjection {
+  categories: readonly AgentCatalogCategory[];
+  skills: readonly AgentCatalogSkill[];
+  templates: readonly AgentCatalogTemplate[];
+  mcpProviders: readonly AgentCatalogMcpProvider[];
+}
+
+const CATALOG_CATEGORIES = new Set<AgentCatalogCategory>(["PERSONA", "DATA", "ACTION", "CONNECTION"]);
+const CATALOG_AVAILABILITY = new Set<AgentCatalogAvailability>(["AVAILABLE", "UNAVAILABLE", "NOT_REQUIRED"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function parseAgentCatalog(value: unknown): AgentCatalogProjection {
+  if (!isRecord(value) || !Array.isArray(value.categories) || !Array.isArray(value.skills) ||
+      !Array.isArray(value.templates) || !Array.isArray(value.mcpProviders)) {
+    throw new ApiError("Protected agent catalog is malformed.", 502, "CATALOG_INVALID_RESPONSE");
+  }
+  const categories = value.categories;
+  const skills = value.skills;
+  const templates = value.templates;
+  const providers = value.mcpProviders;
+  if (!categories.every((entry): entry is AgentCatalogCategory => typeof entry === "string" && CATALOG_CATEGORIES.has(entry as AgentCatalogCategory)) ||
+      !skills.every((entry): entry is AgentCatalogSkill => isRecord(entry) && typeof entry.id === "string" && typeof entry.category === "string" && CATALOG_CATEGORIES.has(entry.category as AgentCatalogCategory) && isStringArray(entry.capabilities) && isStringArray(entry.constraints) && typeof entry.providerAvailability === "string" && CATALOG_AVAILABILITY.has(entry.providerAvailability as AgentCatalogAvailability)) ||
+      !templates.every((entry): entry is AgentCatalogTemplate => isRecord(entry) && typeof entry.id === "string" && typeof entry.label === "string" && isStringArray(entry.capabilities) && isStringArray(entry.skillIds) && typeof entry.priceAtomic === "string") ||
+      !providers.every((entry): entry is AgentCatalogMcpProvider => isRecord(entry) && typeof entry.provider === "string" && typeof entry.availability === "string" && CATALOG_AVAILABILITY.has(entry.availability as AgentCatalogAvailability) && isStringArray(entry.capabilities))) {
+    throw new ApiError("Protected agent catalog is malformed.", 502, "CATALOG_INVALID_RESPONSE");
+  }
+  return { categories, skills, templates, mcpProviders: providers };
+}
+
+export async function getAgentCatalog(signal?: AbortSignal): Promise<AgentCatalogProjection> {
+  return parseAgentCatalog(await apiFetch<unknown>("/api/kernel/agent-recommendations", {
+    cache: "no-store",
+    signal,
+  }));
 }
 
 export interface AgentRecommendation {
@@ -481,14 +562,22 @@ export async function createAgentDraft(
   const response = await apiFetch<{ action: string; version: AgentLifecycleVersion }>("/api/kernel/agents", {
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey ?? kernelIdempotencyKey() },
-    body: JSON.stringify({
-      action: "CREATE_DRAFT",
-      name: input.name,
-      description: input.description,
-      instructions: input.instructions,
-      capabilities: input.capabilities,
-      ...(input.agentId ? { agentId: input.agentId } : {}),
-    }),
+    body: JSON.stringify("templateId" in input
+      ? {
+          action: "CREATE_DRAFT",
+          templateId: input.templateId,
+          name: input.name,
+          description: input.description,
+          ...(input.agentId ? { agentId: input.agentId } : {}),
+        }
+      : {
+          action: "CREATE_DRAFT",
+          name: input.name,
+          description: input.description,
+          instructions: input.instructions,
+          capabilities: input.capabilities,
+          ...(input.agentId ? { agentId: input.agentId } : {}),
+        }),
   });
   return response.version;
 }

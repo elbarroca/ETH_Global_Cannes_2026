@@ -5,27 +5,23 @@ import type { EvidenceState } from "@/src/kernel/types";
 
 const EVIDENCE_PRESENTATION: Record<
   EvidenceState,
-  { label: string; classes: string; dot: string }
+  { label: string; classes: string }
 > = {
   verified: {
     label: "Verified",
-    classes: "border-emerald-500/35 bg-emerald-950/25 text-emerald-300",
-    dot: "bg-emerald-400",
+    classes: "border-dawg-500/40 bg-dawg-900/25 text-dawg-300",
   },
   pending: {
     label: "Pending",
     classes: "border-dawg-500/35 bg-dawg-900/20 text-dawg-300",
-    dot: "bg-dawg-400",
   },
   unavailable: {
     label: "Unavailable",
     classes: "border-void-700 bg-void-950 text-void-400",
-    dot: "bg-void-600",
   },
   failed: {
     label: "Failed",
     classes: "border-blood-500/35 bg-blood-900/25 text-blood-300",
-    dot: "bg-blood-400",
   },
 };
 
@@ -41,9 +37,8 @@ export function EvidenceStatus({
   const presentation = EVIDENCE_PRESENTATION[state];
   return (
     <span
-      className={`inline-flex min-h-7 items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider ${presentation.classes} ${className}`}
+      className={`inline-flex min-h-7 items-center rounded-[10px] border px-2 py-1 font-mono text-xs font-semibold uppercase tracking-wide ${presentation.classes} ${className}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${presentation.dot}`} aria-hidden="true" />
       {label ?? presentation.label}
     </span>
   );
@@ -78,9 +73,9 @@ export function CopyableIdentifier({
   }
 
   return (
-    <div className={`min-w-0 rounded-lg border border-void-800 bg-void-950/70 p-2.5 ${className}`}>
+    <div className={`min-w-0 rounded-[10px] border border-void-800 bg-void-950/70 p-2.5 ${className}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-void-600">
+        <span className="text-xs font-semibold text-void-500">
           {label}
         </span>
         <div className="flex shrink-0 items-center gap-1">
@@ -89,7 +84,7 @@ export function CopyableIdentifier({
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-md px-2 py-1 text-[10px] font-semibold text-dawg-400 transition-colors hover:bg-dawg-500/10 hover:text-dawg-300"
+              className="rounded-[10px] px-2 py-1 text-xs font-semibold text-dawg-400 transition-colors hover:bg-dawg-500/10 hover:text-dawg-300"
             >
               Explorer
               <span className="sr-only"> for {label}</span>
@@ -98,7 +93,7 @@ export function CopyableIdentifier({
           <button
             type="button"
             onClick={copyValue}
-            className="rounded-md px-2 py-1 text-[10px] font-semibold text-void-400 transition-colors hover:bg-void-800 hover:text-void-100"
+            className="rounded-[10px] px-2 py-1 text-xs font-semibold text-void-400 transition-colors hover:bg-void-800 hover:text-void-100"
             aria-label={`Copy ${label}`}
           >
             {copyState === "copied" ? "Copied" : copyState === "failed" ? "Retry" : "Copy"}

@@ -9,7 +9,7 @@ export function agentVersionToYaml(agent: AgentLifecycleVersion | ProtectedPubli
     `# AlphaDawg Agent Capability Manifest`,
     `# manifestHash: ${agent.manifestHash}`,
     ``,
-    `schema_version: 2`,
+    `schema_version: ${agent.manifestSchemaVersion}`,
     `name: ${yamlString(agent.name)}`,
     `version: ${agent.version}`,
     `adapter: ${agent.adapterKey}`,
@@ -50,14 +50,24 @@ export function agentVersionToYaml(agent: AgentLifecycleVersion | ProtectedPubli
   }
 
   lines.push(``);
-  lines.push(`reviewed_skills:`);
-  for (const cap of agent.capabilities) {
-    lines.push(`  - ${cap}`);
+  lines.push(`skill_snapshots:`);
+  for (const skill of agent.skillSummary ?? []) {
+    lines.push(`  - id: ${skill.id}`);
+    lines.push(`    category: ${skill.category}`);
   }
-  lines.push(`native_connections:`);
-  lines.push(`  - zero-g-compute`);
-  lines.push(`  - zero-g-storage`);
-  lines.push(`mcp: []`);
+  lines.push(`reviewed_sources:`);
+  for (const source of agent.reviewedSources ?? []) {
+    lines.push(`  - repository: ${source.repository}`);
+    lines.push(`    revision: ${source.revision}`);
+    lines.push(`    use: ${source.use}`);
+  }
+  lines.push(`mcp_availability: ${agent.mcpAvailability}`);
+  lines.push(`mcp:`);
+  for (const binding of agent.mcpSummary ?? []) {
+    lines.push(`  - provider: ${binding.provider}`);
+    lines.push(`    capability: ${binding.capability}`);
+  }
+  if (!agent.mcpSummary?.length) lines.push(`  []`);
 
   lines.push(``);
   lines.push(`commerce:`);
