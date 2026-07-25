@@ -41,6 +41,7 @@ const GOAL_LOOP_HARDENING_MIGRATION = "20260725173000_goal_loop_hardening";
 const AGENT_MANIFEST_V3_MCP_EVIDENCE_MIGRATION = "20260725190000_agent_manifest_v3_mcp_evidence";
 const TRI_RISK_AUGMENTED_LAYER_MIGRATION = "20260725203000_tri_risk_augmented_layer";
 const X402_LANE_PAYMENTS_MIGRATION = "20260725210000_x402_lane_payments";
+const AGENT_RUNTIME_V5_MIGRATION = "20260725220000_agent_runtime_v5";
 const GOAL_LOOP_PREDECESSOR_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -923,7 +924,7 @@ async function verifyPopulatedLegacyX402UpgradeLane(
       row.transaction_hash !== `0x${"b".repeat(64)}` ||
       row.payment_attempt_id !== null ||
       row.gateway_transaction_id !== null ||
-      row.migration_count !== 19
+      row.migration_count !== 20
     ) {
       throw new Error("populated legacy x402 receipt did not upgrade exactly");
     }
@@ -966,6 +967,9 @@ async function verifyDatabase(
       mcp_invocations: string | null;
       augmented_layer_policies: string | null;
       augmented_layer_policy_mutations: string | null;
+      hire_requests: string | null;
+      og_spend_budgets: string | null;
+      og_spend_reservations: string | null;
       cost_reserved_at: string | null;
       user_count: string;
       migration_count: string;
@@ -1021,6 +1025,7 @@ async function verifyDatabase(
       x402_lane_payments_count: string;
       x402_lane_constraint_count: string;
       x402_lane_trigger_count: string;
+      agent_runtime_v5_count: string;
       manifest_v4_function_count: string;
       mcp_v4_function_count: string;
       sequence_type: string;
@@ -1055,6 +1060,9 @@ async function verifyDatabase(
         to_regclass('public.mcp_invocations')::text AS mcp_invocations,
         to_regclass('public.augmented_layer_policies')::text AS augmented_layer_policies,
         to_regclass('public.augmented_layer_policy_mutations')::text AS augmented_layer_policy_mutations,
+        to_regclass('public.hire_requests')::text AS hire_requests,
+        to_regclass('public.og_spend_budgets')::text AS og_spend_budgets,
+        to_regclass('public.og_spend_reservations')::text AS og_spend_reservations,
         (
           SELECT is_nullable FROM information_schema.columns
           WHERE table_schema = 'public' AND table_name = 'goal_runs'
@@ -1513,16 +1521,21 @@ async function verifyDatabase(
           )
         ) AS x402_lane_trigger_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${AGENT_RUNTIME_V5_MIGRATION} AND finished_at IS NOT NULL
+        ) AS agent_runtime_v5_count,
+        (
           SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname = 'enforce_manifest_v2_publication'
-            AND position($needle$NEW.manifest->>'schemaVersion' IN ('3', '4')$needle$ in p.prosrc) > 0
+            AND position($needle$NEW.manifest->>'schemaVersion' IN ('3', '4', '5')$needle$ in p.prosrc) > 0
             AND position($needle$jsonb_build_object('riskTiers', NEW.manifest->'riskTiers')$needle$ in p.prosrc) > 0
-            AND position($needle$NOT IN ('2', '3', '4')$needle$ in p.prosrc) > 0
+            AND position($needle$jsonb_build_object('runtimePolicy', NEW.manifest->'runtimePolicy')$needle$ in p.prosrc) > 0
+            AND position($needle$NOT IN ('2', '3', '4', '5')$needle$ in p.prosrc) > 0
         ) AS manifest_v4_function_count,
         (
           SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname = 'enforce_mcp_invocation_lineage'
-            AND position($needle$NOT IN ('3', '4')$needle$ in p.prosrc) > 0
+            AND position($needle$NOT IN ('3','4','5')$needle$ in p.prosrc) > 0
         ) AS mcp_v4_function_count,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
@@ -1559,10 +1572,13 @@ async function verifyDatabase(
       result.mcp_invocations !== "mcp_invocations" ||
       result.augmented_layer_policies !== "augmented_layer_policies" ||
       result.augmented_layer_policy_mutations !== "augmented_layer_policy_mutations" ||
+      result.hire_requests !== "hire_requests" ||
+      result.og_spend_budgets !== "og_spend_budgets" ||
+      result.og_spend_reservations !== "og_spend_reservations" ||
       result.x402_payment_attempts !== "x402_payment_attempts" ||
       result.cost_reserved_at !== "YES" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 19 ||
+      Number(result.migration_count) !== 20 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1612,6 +1628,7 @@ async function verifyDatabase(
       Number(result.x402_lane_payments_count) !== 1 ||
       Number(result.x402_lane_constraint_count) !== 4 ||
       Number(result.x402_lane_trigger_count) !== 3 ||
+      Number(result.agent_runtime_v5_count) !== 1 ||
       Number(result.manifest_v4_function_count) !== 1 ||
       Number(result.mcp_v4_function_count) !== 1 ||
       result.receipt_authority_nullable !== "NO" ||

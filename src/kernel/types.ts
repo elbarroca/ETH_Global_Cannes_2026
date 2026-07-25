@@ -140,7 +140,36 @@ export interface AgentManifestV4 extends AgentManifestBase {
   riskTiers: readonly RiskLane[];
 }
 
-export type AgentManifest = AgentManifestV1 | AgentManifestV2 | AgentManifestV3 | AgentManifestV4;
+export interface AgentRuntimePolicyV1 extends Record<string, CanonicalValue> {
+  framework: "langchain-v1";
+  modelCalls: 1;
+  maxMcpCalls: 4;
+  maxOutputTokens: 768;
+  deadlineMs: 300000;
+}
+
+export interface AgentManifestV5 extends AgentManifestBase {
+  schemaVersion: 5;
+  catalogTemplateId: string;
+  catalogSelectionHash: string;
+  reviewedPromptHash: string;
+  reviewedConfigHash: string;
+  skills: readonly AgentSkillSnapshotV1[];
+  reviewedSources: readonly ReviewedSourceV1[];
+  nativeConnections: readonly AgentNativeConnection[];
+  mcp: readonly McpBindingV1[];
+  payoutAddress: string;
+  ensBindingHash: string | null;
+  riskTiers: readonly RiskLane[];
+  runtimePolicy: AgentRuntimePolicyV1;
+}
+
+export type AgentManifest =
+  | AgentManifestV1
+  | AgentManifestV2
+  | AgentManifestV3
+  | AgentManifestV4
+  | AgentManifestV5;
 
 export interface AgentReviewedSourceSummary {
   repository: string;
@@ -221,7 +250,7 @@ export interface AgentLifecycleVersion {
   authorityReleaseSha: string | null;
   publicationDecisionId: string | null;
   publishedAt: string | null;
-  manifestSchemaVersion: 1 | 2 | 3 | 4;
+  manifestSchemaVersion: 1 | 2 | 3 | 4 | 5;
   riskTiers: readonly RiskLane[] | null;
   reviewedSources: readonly AgentReviewedSourceSummary[] | null;
   skillSummary: readonly AgentSkillSummary[] | null;
@@ -257,6 +286,30 @@ export interface AgentVersionProvenance {
 export interface ProtectedPublishedAgentRead extends ProtectedPublishedAgent {
   verifiedExternalHires: number;
   provenance: AgentVersionProvenance | null;
+}
+
+export const HIRE_REQUEST_STATES = [
+  "PENDING_CONTEXT",
+  "CONTEXT_RUNNING",
+  "JOB_QUEUED",
+  "BLOCKED",
+  "FAILED",
+] as const;
+
+export type HireRequestState = (typeof HIRE_REQUEST_STATES)[number];
+
+export interface HireRequestSnapshot extends Record<string, CanonicalValue> {
+  hireRequestId: string;
+  agentVersionId: string;
+  promptHash: string;
+  state: HireRequestState;
+  version: number;
+  jobId: string | null;
+  contextHash: string | null;
+  errorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+  replayed: boolean;
 }
 
 export const GOAL_STATES = ["DRAFT", "ACTIVE", "PAUSED", "COMPLETED"] as const;

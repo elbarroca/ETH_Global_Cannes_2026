@@ -6,13 +6,14 @@ import type {
   KernelJobInput,
 } from "./types";
 import {
-  buildManifestV3,
-  buildManifestV4,
+  buildManifestV5,
   buildManifestV2,
   isSupportedAgentSkill,
+  isFoundingSkillId,
   parseRiskTiers,
   type SupportedAgentSkill,
 } from "./agent-catalog";
+import type { McpProviderId, RiskLane } from "./types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -113,15 +114,13 @@ export function parseCatalogAgentInput(
   const description = boundedString(input.description, "description", 10, 800);
   return {
     name,
-    manifest: input.riskTiers === undefined
-      ? buildManifestV3({ templateId, name, description, ownerWallet })
-      : buildManifestV4({
-          templateId,
-          name,
-          description,
-          ownerWallet,
-          riskTiers: parseRiskTiers(input.riskTiers),
-        }),
+    manifest: buildManifestV5({
+      templateId,
+      name,
+      description,
+      ownerWallet,
+      riskTiers: input.riskTiers === undefined ? undefined : parseRiskTiers(input.riskTiers),
+    }),
   };
 }
 
@@ -221,6 +220,87 @@ export function parseJobSubmission(value: unknown): {
   return {
     agentVersionId: body.agentVersionId,
     input: { prompt: boundedString(rawInput.prompt, "input.prompt", 1, 2_000) },
+  };
+}
+
+export function parseHireRequestInput(value: unknown): {
+  agentVersionId: string;
+  prompt: string;
+} {
+  const body = objectRecord(value);
+  rejectUnexpectedKeys(body, ["agentVersionId", "prompt"]);
+  if (!isKernelUuid(body.agentVersionId)) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "agentVersionId must be a UUID", 400);
+  }
+  return {
+    agentVersionId: body.agentVersionId,
+    prompt: boundedString(body.prompt, "prompt", 1, 2_000),
+  };
+}
+
+export interface AgentListFilters {
+  capability: SupportedAgentSkill | null;
+  skill: string | null;
+  mcpProvider: McpProviderId | null;
+  riskTier: RiskLane | null;
+  cursor: { publishedAt: Date; versionId: string } | null;
+  limit: number;
+  active: boolean;
+}
+
+export function parseAgentListFilters(url: URL): AgentListFilters {
+  const allowed = new Set(["capability", "skill", "mcpProvider", "riskTier", "cursor", "limit"]);
+  for (const key of url.searchParams.keys()) {
+    if (!allowed.has(key) || url.searchParams.getAll(key).length !== 1) {
+      throw new KernelError("KERNEL_INVALID_REQUEST", "Invalid agent listing filter", 400);
+    }
+  }
+  const capability = url.searchParams.get("capability");
+  if (capability !== null && !isSupportedAgentSkill(capability)) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "Unsupported capability filter", 400);
+  }
+  const skill = url.searchParams.get("skill");
+  if (skill !== null && !isFoundingSkillId(skill)) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "Unsupported skill filter", 400);
+  }
+  const mcpProvider = url.searchParams.get("mcpProvider");
+  if (mcpProvider !== null && mcpProvider !== "coingecko" && mcpProvider !== "the-graph") {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "Unsupported MCP provider filter", 400);
+  }
+  const riskTier = url.searchParams.get("riskTier");
+  if (riskTier !== null && !["LOW", "MID", "HIGH"].includes(riskTier)) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "Unsupported risk tier filter", 400);
+  }
+  const rawLimit = url.searchParams.get("limit");
+  const limit = rawLimit === null ? 50 : Number(rawLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "limit must be an integer from 1 to 100", 400);
+  }
+  const rawCursor = url.searchParams.get("cursor");
+  let cursor: AgentListFilters["cursor"] = null;
+  if (rawCursor !== null) {
+    try {
+      const decoded = Buffer.from(rawCursor, "base64url").toString("utf8");
+      const separator = decoded.lastIndexOf("|");
+      const publishedAt = new Date(decoded.slice(0, separator));
+      const versionId = decoded.slice(separator + 1);
+      if (
+        Buffer.from(decoded, "utf8").toString("base64url") !== rawCursor ||
+        separator < 1 || Number.isNaN(publishedAt.getTime()) || !isKernelUuid(versionId)
+      ) throw new Error();
+      cursor = { publishedAt, versionId };
+    } catch {
+      throw new KernelError("KERNEL_INVALID_REQUEST", "Invalid agent listing cursor", 400);
+    }
+  }
+  return {
+    capability: capability as SupportedAgentSkill | null,
+    skill,
+    mcpProvider: mcpProvider as McpProviderId | null,
+    riskTier: riskTier as RiskLane | null,
+    cursor,
+    limit,
+    active: url.search.length > 0,
   };
 }
 

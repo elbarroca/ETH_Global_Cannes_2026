@@ -31,6 +31,7 @@ model User {
   goalMutations      GoalMutation[]          @relation("GoalMutationOwner")
   augmentedLayerPolicy AugmentedLayerPolicy? @relation("AugmentedLayerPolicyOwner")
   augmentedLayerPolicyMutations AugmentedLayerPolicyMutation[] @relation("AugmentedLayerPolicyMutationOwner")
+  hireRequests       HireRequest[] @relation("HireRequestBuyer")
 
   @@index([walletAddress], map: "idx_users_wallet")
   @@map("users")
@@ -416,6 +417,7 @@ model AgentVersion {
   provenance     AgentVersionProvenance?
   goalRunJobs    GoalRunJob[]
   mcpInvocations McpInvocation[]
+  hireRequests   HireRequest[]
 
   @@unique([agentId, version], map: "uniq_agent_versions_agent_version")
   @@index([published, createdAt], map: "idx_agent_versions_published_created")
@@ -535,6 +537,7 @@ model Job {
   x402PaymentAttempt X402PaymentAttempt?
   uniswapToolReceipts UniswapToolReceipt[]
   goalRunJob        GoalRunJob?
+  hireRequest       HireRequest?
 
   @@index([state, availableAt], map: "idx_jobs_state_available")
   @@index([buyerUserId, createdAt], map: "idx_jobs_buyer_created")
@@ -694,7 +697,12 @@ model AgentVersionProvenance {
 
 model McpInvocation {
   id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  goalRunJobId       String       @map("goal_run_job_id") @db.Uuid
+  goalRunJobId       String?      @map("goal_run_job_id") @db.Uuid
+  hireRequestId      String?      @map("hire_request_id") @db.Uuid
+  hireClaimOwner     String?      @map("hire_claim_owner")
+  hireClaimEpoch     BigInt?      @map("hire_claim_epoch")
+  hireClaimVersion   Int?         @map("hire_claim_version")
+  hireClaimExpiresAt DateTime?    @map("hire_claim_expires_at") @db.Timestamptz(6)
   agentVersionId     String       @map("agent_version_id") @db.Uuid
   manifestHash       String       @map("manifest_hash")
   bindingId          String       @map("binding_id")
@@ -712,12 +720,72 @@ model McpInvocation {
   startedAt          DateTime     @map("started_at") @db.Timestamptz(6)
   completedAt        DateTime     @map("completed_at") @db.Timestamptz(6)
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  goalRunJob         GoalRunJob   @relation(fields: [goalRunJobId], references: [id], onDelete: Restrict)
+  goalRunJob         GoalRunJob?  @relation(fields: [goalRunJobId], references: [id], onDelete: Restrict)
+  hireRequest        HireRequest? @relation(fields: [hireRequestId], references: [id], onDelete: Restrict)
   agentVersion       AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
 
   @@unique([goalRunJobId, bindingId], map: "uniq_mcp_invocations_run_job_binding")
+  @@unique([hireRequestId, bindingId], map: "uniq_mcp_invocations_hire_binding")
   @@index([agentVersionId, createdAt], map: "idx_mcp_invocations_version_created")
   @@map("mcp_invocations")
+}
+
+model HireRequest {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  buyerUserId        String       @map("buyer_user_id")
+  agentVersionId     String       @map("agent_version_id") @db.Uuid
+  idempotencyKey     String       @map("idempotency_key")
+  prompt             String       @db.Text
+  promptHash         String       @map("prompt_hash")
+  manifestHash       String       @map("manifest_hash")
+  state              String
+  version            Int          @default(0)
+  claimOwner         String?      @map("claim_owner")
+  claimEpoch         BigInt?      @map("claim_epoch")
+  claimVersion       Int          @default(0) @map("claim_version")
+  claimExpiresAt     DateTime?    @map("claim_expires_at") @db.Timestamptz(6)
+  contextHash        String?      @map("context_hash")
+  jobId              String?      @unique @map("job_id") @db.Uuid
+  errorCode          String?      @map("error_code")
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime     @default(now()) @map("updated_at") @db.Timestamptz(6)
+  buyer              User         @relation("HireRequestBuyer", fields: [buyerUserId], references: [id], onDelete: Restrict)
+  agentVersion       AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  job                Job?         @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  mcpInvocations     McpInvocation[]
+
+  @@unique([buyerUserId, idempotencyKey], map: "uniq_hire_requests_buyer_key")
+  @@index([buyerUserId, createdAt], map: "idx_hire_requests_buyer_created")
+  @@index([state, createdAt], map: "idx_hire_requests_state_created")
+  @@map("hire_requests")
+}
+
+model OgSpendBudget {
+  releaseSha       String               @id @map("release_sha")
+  chainId          Int                  @map("chain_id")
+  asset            String
+  limitAtomic      BigInt               @map("limit_atomic")
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  reservations     OgSpendReservation[]
+
+  @@map("og_spend_budgets")
+}
+
+model OgSpendReservation {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  releaseSha       String        @map("release_sha")
+  effectIdentity   String        @unique @map("effect_identity")
+  amountAtomic     BigInt        @map("amount_atomic")
+  state            String        @default("RESERVED")
+  requestId        String?       @unique @map("request_id")
+  transactionHash  String?       @unique @map("transaction_hash")
+  errorCode        String?       @map("error_code")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @default(now()) @map("updated_at") @db.Timestamptz(6)
+  budget           OgSpendBudget @relation(fields: [releaseSha], references: [releaseSha], onDelete: Restrict)
+
+  @@index([releaseSha, state], map: "idx_og_spend_reservations_release_state")
+  @@map("og_spend_reservations")
 }
 
 model JobEvent {
@@ -841,7 +909,12 @@ model A3ExecutionJournal {
   requestBytes          String    @map("request_bytes")
   requestHash           String    @map("request_hash")
   requestId             String?   @map("request_id")
+  requestSignature      String?   @map("request_signature")
   signerAddress         String?   @map("signer_address")
+  promptTokens          Int?      @map("prompt_tokens")
+  completionTokens      Int?      @map("completion_tokens")
+  totalTokens           Int?      @map("total_tokens")
+  actualCostAtomic      BigInt?   @map("actual_cost_atomic")
   responseContent       String?   @map("response_content")
   responseHash          String?   @map("response_hash")
   computeReceiptBytes   String?   @map("compute_receipt_bytes")

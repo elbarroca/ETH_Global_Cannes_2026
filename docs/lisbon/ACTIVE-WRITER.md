@@ -3,6 +3,62 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/marketplace_kernel_v5
+task_id: MARKETPLACE-LANGCHAIN-KERNEL-V5-W1
+task_instance_id: MARKETPLACE-LANGCHAIN-KERNEL-V5-W1:W1:061832A
+generation: 1
+sprint: Add the protected LangChain V5 marketplace and asynchronous hire ledger
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 061832a380b2d5c7657315cc4ca4888c9278d4ec
+control_sha: 061832a380b2d5c7657315cc4ca4888c9278d4ec
+token: MARKETPLACE-LANGCHAIN-KERNEL-V5-W1-061832A-20260725T205450Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T21:12:24Z
+expires_at: 2026-07-26T00:54:50Z
+allowed_paths:
+  - prisma/schema.prisma
+  - prisma/migrations/20260725220000_agent_runtime_v5/**
+  - scripts/test-migrations.ts
+  - src/kernel/types.ts
+  - src/kernel/agent-catalog.ts
+  - src/kernel/policy.ts
+  - src/kernel/service.ts
+  - src/kernel/lifecycle.ts
+  - src/kernel/mcp-context.ts
+  - src/kernel/hire-requests.ts
+  - app/api/kernel/agents/route.ts
+  - app/api/kernel/hire-requests/**
+  - tests/kernel/**
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T20:54:50Z
+deadline: 2026-07-26T00:54:50Z
+expected_exit: immutable V5 LangChain manifests indexed canonical marketplace reads durable fenced hire requests exclusive MCP parents and release-bound 0G spend persistence
+external_effect_authority: local files existing dependencies local deterministic tests disposable loopback PostgreSQL and one atomic local commit only; no environment read managed migration network sponsor call signature transaction deployment push spend claim or public claim
+completed_at: 2026-07-25T21:12:24Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - manifest V5 is server-built from the reviewed founding catalog and fixes langchain-v1 one model call four MCP calls 768 output tokens and a 300000ms deadline while V1 through V4 hashes remain readable
+  - authenticated canonical listing filters validate capability skill MCP provider risk tier cursor and limit and are backed by partial GIN JSONB-containment and price-publication-created indexes
+  - durable tenant-scoped HireRequest replay self-hire refusal cross-user isolation legal transitions and owner-epoch-claim-version-expiry fencing pass with exact MCP parent and binding uniqueness
+  - release-bound Galileo 16602 A0GI budget reservations serialize over-budget concurrency and preserve ambiguous reservations
+  - strict A3 journal usage signature and actual atomic cost fields are nullable additive and append-only once observed while existing provider model request Storage and readback evidence remains intact
+  - Prisma validate and generate PASS typecheck PASS lint PASS with 23 inherited warnings and production build PASS
+  - disposable migration replay PASS fresh Cannes populated goal-loop legacy x402 and canonical/noncanonical W6 lanes across 20 ordered migrations
+  - test kernel PASS 53 of 53 test auth PASS 9 of 9 npm test PASS 10 of 10 test e2e PASS 5 of 5 test redaction PASS 3 of 3 test boot PASS and secret scan plus diff check PASS
+remaining_blocks:
+  - aggregate integration is PARTIAL with 32 passing and 11 inherited strict-A3 hook failures because the host Go fixture build returns undefined; the worker-fencing integration cases themselves pass
+  - managed Neon currently returns KERNEL_SCHEMA_NOT_READY because migrations 20260725203000 20260725210000 and 20260725220000 are pending; ordered local replay passes and managed migration remains unauthorized
+  - protected src/og strict-A3 runtime admission for schema V5 is a separate 0G-owner change outside this lease; this local Kernel slice creates no sponsor transport or live effect
+  - deployment push managed migration sponsor calls signatures transactions spend and public claims remain closed
+external_effects_attempted: local deterministic tests Prisma generation disposable loopback PostgreSQL and local production build only; no managed migration network sponsor call signature transaction deployment push spend or public claim
+claim_changes: none
+verdict: PASS_TO_AUDIT_WITH_INHERITED_HOST_GO_AND_MANAGED_SCHEMA_VERSION_SKEW; LOCAL_ONLY
+lock_release: release only exact token MARKETPLACE-LANGCHAIN-KERNEL-V5-W1-061832A-20260725T205450Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Payments Integrator /root/tri_risk_payments_w1
 task_id: TRI-RISK-X402-LANE-W1
 task_instance_id: TRI-RISK-X402-LANE-W1:W1:4933340

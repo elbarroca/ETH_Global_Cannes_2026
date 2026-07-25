@@ -8,7 +8,7 @@ import {
   prepareAgentEnsWrite,
   publishAgentVersion,
 } from "@/src/kernel/lifecycle";
-import { parseAgentAction, parseIdempotencyKey } from "@/src/kernel/policy";
+import { parseAgentAction, parseAgentListFilters, parseIdempotencyKey } from "@/src/kernel/policy";
 import { createProductionEnsPublicationAuthority } from "@/src/kernel/publication-authority";
 
 export const runtime = "nodejs";
@@ -21,7 +21,14 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (!userId) {
       return NextResponse.json({ error: "Onboarding required", code: "AUTH_USER_REQUIRED" }, { status: 403 });
     }
-    return NextResponse.json(await listAgentLifecycle(userId));
+    const filters = parseAgentListFilters(new URL(request.url));
+    const resultView = await listAgentLifecycle(userId, { filters });
+    if (!filters.active) return NextResponse.json(resultView);
+    const last = resultView.agents.at(-1);
+    const nextCursor = resultView.agents.length === filters.limit && last
+      ? Buffer.from(`${last.publishedAt}|${last.versionId}`, "utf8").toString("base64url")
+      : null;
+    return NextResponse.json({ ...resultView, nextCursor });
   } catch (error) {
     return kernelErrorResponse(error, "kernel.agents.list");
   }

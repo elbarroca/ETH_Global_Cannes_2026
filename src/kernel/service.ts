@@ -11,6 +11,7 @@ import type {
   AgentManifest,
   AgentManifestV3,
   AgentManifestV4,
+  AgentManifestV5,
   EvidenceState,
   KernelJobDetail,
   KernelJobEvidenceSummary,
@@ -586,7 +587,8 @@ export async function submitJob(
       throw new KernelError("KERNEL_FORBIDDEN", "Creators cannot hire their own agent version", 403);
     }
     if (
-      (agentVersion.manifest.schemaVersion === 3 || agentVersion.manifest.schemaVersion === 4) &&
+      (agentVersion.manifest.schemaVersion === 3 || agentVersion.manifest.schemaVersion === 4 ||
+        agentVersion.manifest.schemaVersion === 5) &&
       agentVersion.manifest.mcp.length > 0
     ) {
       const context = options.mcpContext;
@@ -622,7 +624,7 @@ export async function submitJob(
           AND invocation.normalized_response IS NOT NULL
       `;
       const byBinding = new Map(invocations.map((row) => [row.binding_id, row]));
-      const contextValue = (agentVersion.manifest as AgentManifestV3 | AgentManifestV4).mcp.map((binding) => {
+      const contextValue = (agentVersion.manifest as AgentManifestV3 | AgentManifestV4 | AgentManifestV5).mcp.map((binding) => {
         const invocation = byBinding.get(binding.id);
         if (!invocation || !context.invocationIds.includes(invocation.id)) {
           throw new KernelError(
@@ -1051,4 +1053,106 @@ export function commissionAmount(amountAtomic: bigint): bigint {
 
 export function serializeManifest(manifest: AgentManifest): string {
   return canonicalJson(manifest);
+}
+
+export interface OgSpendReservationSnapshot {
+  reservationId: string;
+  releaseSha: string;
+  effectIdentity: string;
+  amountAtomic: string;
+  state: "RESERVED" | "CONSUMED" | "AMBIGUOUS" | "RELEASED";
+  requestId: string | null;
+  transactionHash: string | null;
+  errorCode: string | null;
+}
+
+interface OgSpendReservationRow {
+  id: string;
+  release_sha: string;
+  effect_identity: string;
+  amount_atomic: string;
+  state: OgSpendReservationSnapshot["state"];
+  request_id: string | null;
+  transaction_hash: string | null;
+  error_code: string | null;
+}
+
+function mapOgReservation(row: OgSpendReservationRow): OgSpendReservationSnapshot {
+  return {
+    reservationId: row.id,
+    releaseSha: row.release_sha,
+    effectIdentity: row.effect_identity,
+    amountAtomic: row.amount_atomic,
+    state: row.state,
+    requestId: row.request_id,
+    transactionHash: row.transaction_hash,
+    errorCode: row.error_code,
+  };
+}
+
+export async function createOgSpendBudget(
+  releaseSha: string,
+  limitAtomic: bigint,
+  options: { sql?: DatabaseClient } = {},
+): Promise<void> {
+  if (!/^[0-9a-f]{40}$/.test(releaseSha) || limitAtomic <= 0n) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "Invalid 0G release budget", 400);
+  }
+  const sql = options.sql ?? getDb();
+  await sql`
+    INSERT INTO og_spend_budgets (release_sha, chain_id, asset, limit_atomic)
+    VALUES (${releaseSha}, 16602, 'A0GI', ${limitAtomic.toString()}::bigint)
+    ON CONFLICT (release_sha) DO UPDATE SET release_sha = EXCLUDED.release_sha
+    WHERE og_spend_budgets.chain_id = 16602 AND og_spend_budgets.asset = 'A0GI'
+      AND og_spend_budgets.limit_atomic = EXCLUDED.limit_atomic
+  `;
+  const rows = await sql<{ count: string }[]>`
+    SELECT count(*)::text AS count FROM og_spend_budgets
+    WHERE release_sha = ${releaseSha} AND chain_id = 16602 AND asset = 'A0GI'
+      AND limit_atomic = ${limitAtomic.toString()}::bigint
+  `;
+  if (rows[0]?.count !== "1") {
+    throw new KernelError("KERNEL_IDEMPOTENCY_MISMATCH", "0G release budget already differs", 409);
+  }
+}
+
+export async function reserveOgSpend(
+  input: { releaseSha: string; effectIdentity: string; amountAtomic: bigint },
+  options: { sql?: DatabaseClient } = {},
+): Promise<OgSpendReservationSnapshot> {
+  if (!/^[0-9a-f]{40}$/.test(input.releaseSha) || !/^[0-9a-f]{64}$/.test(input.effectIdentity) ||
+    input.amountAtomic <= 0n) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "Invalid 0G spend reservation", 400);
+  }
+  const sql = options.sql ?? getDb();
+  try {
+    return await sql.begin(async (transaction) => {
+      const tx = transaction as unknown as DatabaseClient;
+      const existing = await tx<OgSpendReservationRow[]>`
+        SELECT id::text, release_sha, effect_identity, amount_atomic::text, state,
+          request_id, transaction_hash, error_code
+        FROM og_spend_reservations WHERE effect_identity = ${input.effectIdentity}
+        FOR UPDATE
+      `;
+      if (existing[0]) {
+        if (existing[0].release_sha !== input.releaseSha || existing[0].amount_atomic !== input.amountAtomic.toString()) {
+          throw new KernelError("KERNEL_IDEMPOTENCY_MISMATCH", "0G spend identity already differs", 409);
+        }
+        return mapOgReservation(existing[0]);
+      }
+      const rows = await tx<OgSpendReservationRow[]>`
+        INSERT INTO og_spend_reservations (release_sha, effect_identity, amount_atomic, state)
+        VALUES (${input.releaseSha}, ${input.effectIdentity}, ${input.amountAtomic.toString()}::bigint, 'RESERVED')
+        RETURNING id::text, release_sha, effect_identity, amount_atomic::text, state,
+          request_id, transaction_hash, error_code
+      `;
+      if (!rows[0]) throw new Error("KERNEL_OG_RESERVATION_CREATE_FAILED");
+      return mapOgReservation(rows[0]);
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "23514") {
+      throw new KernelError("KERNEL_CONFLICT", "0G release spend budget exceeded", 409);
+    }
+    throw error;
+  }
 }

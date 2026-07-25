@@ -132,7 +132,14 @@ async function invokeBounded(
 
 async function invocationForBinding(input: {
   sql: DatabaseClient;
-  goalRunJobId: string;
+  goalRunJobId?: string;
+  hireRequestId?: string;
+  hireFence?: Readonly<{
+    workerId: string;
+    workerEpoch: bigint;
+    claimVersion: number;
+    claimExpiresAt: Date;
+  }>;
   agentVersionId: string;
   manifestHash: string;
   binding: McpBindingV1;
@@ -144,6 +151,12 @@ async function invocationForBinding(input: {
   signal?: AbortSignal;
   mutationGuard?: (sql: DatabaseClient, now: Date) => Promise<boolean>;
 }): Promise<{ evidence: McpEvidenceV1; response: CanonicalValue }> {
+  if ((input.goalRunJobId ? 1 : 0) + (input.hireRequestId ? 1 : 0) !== 1) {
+    throw new McpContextError("GOAL_MCP_PARENT_INVALID");
+  }
+  if ((input.hireRequestId !== undefined) !== (input.hireFence !== undefined)) {
+    throw new McpContextError("GOAL_MCP_PARENT_INVALID");
+  }
   if (!isMcpBindingAllowlisted(input.binding)) {
     throw new McpContextError("GOAL_MCP_BINDING_UNALLOWLISTED");
   }
@@ -160,7 +173,8 @@ async function invocationForBinding(input: {
     request,
   });
   const idempotencyKey = domainHash("mcp-invocation", {
-    goalRunJobId: input.goalRunJobId,
+    goalRunJobId: input.goalRunJobId ?? null,
+    hireRequestId: input.hireRequestId ?? null,
     bindingId: input.binding.id,
     manifestHash: input.manifestHash,
     requestHash,
@@ -231,12 +245,16 @@ async function invocationForBinding(input: {
     }
     const rows = await tx<InvocationRow[]>`
       INSERT INTO mcp_invocations (
-        goal_run_job_id, agent_version_id, manifest_hash, binding_id, provider,
+        goal_run_job_id, hire_request_id, hire_claim_owner, hire_claim_epoch,
+        hire_claim_version, hire_claim_expires_at, agent_version_id, manifest_hash, binding_id, provider,
         capability, idempotency_key, request_hash, response_hash, context_hash,
         normalized_response, response_bytes, state, error_code, release_sha,
         started_at, completed_at, created_at
       ) VALUES (
-        ${input.goalRunJobId}::uuid, ${input.agentVersionId}::uuid, ${input.manifestHash},
+        ${input.goalRunJobId ?? null}::uuid, ${input.hireRequestId ?? null}::uuid,
+        ${input.hireFence?.workerId ?? null}, ${input.hireFence?.workerEpoch.toString() ?? null}::bigint,
+        ${input.hireFence?.claimVersion ?? null}, ${input.hireFence?.claimExpiresAt ?? null},
+        ${input.agentVersionId}::uuid, ${input.manifestHash},
         ${input.binding.id}, ${input.binding.provider}, ${input.binding.capability},
         ${idempotencyKey}, ${requestHash}, ${responseHash}, ${contextHash},
         ${normalized === null ? null : tx.json(normalized)}, ${responseBytes},
@@ -260,7 +278,14 @@ async function invocationForBinding(input: {
 
 export async function collectMcpContext(input: {
   sql: DatabaseClient;
-  goalRunJobId: string;
+  goalRunJobId?: string;
+  hireRequestId?: string;
+  hireFence?: Readonly<{
+    workerId: string;
+    workerEpoch: bigint;
+    claimVersion: number;
+    claimExpiresAt: Date;
+  }>;
   agentVersionId: string;
   manifestHash: string;
   bindings: readonly McpBindingV1[];
@@ -272,6 +297,12 @@ export async function collectMcpContext(input: {
   signal?: AbortSignal;
   mutationGuard?: (sql: DatabaseClient, now: Date) => Promise<boolean>;
 }): Promise<{ context: string; contextHash: string; evidence: readonly McpEvidenceV1[] }> {
+  if ((input.goalRunJobId ? 1 : 0) + (input.hireRequestId ? 1 : 0) !== 1) {
+    throw new McpContextError("GOAL_MCP_PARENT_INVALID");
+  }
+  if ((input.hireRequestId !== undefined) !== (input.hireFence !== undefined)) {
+    throw new McpContextError("GOAL_MCP_PARENT_INVALID");
+  }
   if (input.bindings.length > MAX_MCP_CALLS_PER_JOB) {
     throw new McpContextError("GOAL_MCP_CALL_LIMIT_EXCEEDED");
   }

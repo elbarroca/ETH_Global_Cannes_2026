@@ -7,6 +7,7 @@ import type {
   AgentManifestV2,
   AgentManifestV3,
   AgentManifestV4,
+  AgentManifestV5,
   AgentNativeConnection,
   AgentSkillSnapshotV1,
   McpBindingV1,
@@ -26,6 +27,10 @@ export const SUPPORTED_AGENT_SKILLS = [
 ] as const;
 
 export type SupportedAgentSkill = (typeof SUPPORTED_AGENT_SKILLS)[number];
+
+export function isFoundingSkillId(value: string): boolean {
+  return Object.hasOwn(FOUNDING_PACK.skills, value);
+}
 
 const SKILL_CATALOG: Readonly<Record<SupportedAgentSkill, PinnedAgentSkill>> = {
   research: {
@@ -142,6 +147,13 @@ function manifestConfigV4(manifest: Omit<AgentManifestV4, "reviewedConfigHash">)
   };
 }
 
+function manifestConfigV5(manifest: Omit<AgentManifestV5, "reviewedConfigHash">): CanonicalValue {
+  return {
+    ...(manifestConfigV4(manifest) as Record<string, CanonicalValue>),
+    runtimePolicy: manifest.runtimePolicy,
+  };
+}
+
 function foundingTemplate(templateId: string) {
   const template = FOUNDING_PACK.templates.find((entry) => entry.id === templateId);
   if (!template) throw new KernelError("KERNEL_INVALID_REQUEST", "Unknown founding template", 400);
@@ -255,6 +267,18 @@ function withV4EnsBinding(manifest: AgentManifestV4, ensBinding: AgentEnsBinding
   };
 }
 
+function withV5EnsBinding(manifest: AgentManifestV5, ensBinding: AgentEnsBinding): AgentManifestV5 {
+  const updated = {
+    ...manifest,
+    ensBinding,
+    ensBindingHash: domainHash("agent-ens-binding", ensBinding),
+  };
+  return {
+    ...updated,
+    reviewedConfigHash: domainHash("agent-config", manifestConfigV5(updated)),
+  };
+}
+
 export function buildManifestV3(input: {
   templateId: string;
   name: string;
@@ -329,6 +353,34 @@ export function buildManifestV4(input: {
   return {
     ...manifest,
     reviewedConfigHash: domainHash("agent-config", manifestConfigV4(manifest)),
+  };
+}
+
+export function buildManifestV5(input: {
+  templateId: string;
+  name: string;
+  description: string;
+  ownerWallet: string;
+  riskTiers?: readonly RiskLane[];
+}): AgentManifestV5 {
+  const v4 = buildManifestV4({
+    ...input,
+    riskTiers: input.riskTiers ?? RISK_LANES,
+  });
+  const manifest = {
+    ...v4,
+    schemaVersion: 5,
+    runtimePolicy: {
+      framework: "langchain-v1",
+      modelCalls: 1,
+      maxMcpCalls: 4,
+      maxOutputTokens: 768,
+      deadlineMs: 300000,
+    },
+  } as const;
+  return {
+    ...manifest,
+    reviewedConfigHash: domainHash("agent-config", manifestConfigV5(manifest)),
   };
 }
 
@@ -414,6 +466,7 @@ export function bindManifestEns(manifest: AgentManifest, bindingValue: AgentEnsB
   if (manifest.schemaVersion === 1) return { ...manifest, ensBinding: bindingValue };
   if (manifest.schemaVersion === 3) return withV3EnsBinding(manifest, bindingValue);
   if (manifest.schemaVersion === 4) return withV4EnsBinding(manifest, bindingValue);
+  if (manifest.schemaVersion === 5) return withV5EnsBinding(manifest, bindingValue);
   const updated = {
     ...manifest,
     ensBinding: bindingValue,
@@ -452,6 +505,20 @@ function assertCatalogManifestV4(manifest: AgentManifestV4): void {
   }
 }
 
+function assertCatalogManifestV5(manifest: AgentManifestV5): void {
+  let expected = buildManifestV5({
+    templateId: manifest.catalogTemplateId,
+    name: manifest.name,
+    description: manifest.description,
+    ownerWallet: manifest.ownerWallet,
+    riskTiers: manifest.riskTiers,
+  });
+  if (manifest.ensBinding) expected = withV5EnsBinding(expected, manifest.ensBinding);
+  if (canonicalJson(manifest) !== canonicalJson(expected)) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "Catalog manifest does not match its reviewed template", 400);
+  }
+}
+
 export function deriveManifestHashes(manifest: AgentManifest): {
   manifestHash: string;
   promptHash: string;
@@ -472,7 +539,9 @@ export function deriveManifestHashes(manifest: AgentManifest): {
       ? domainHash("agent-config", manifestConfigV2(manifest))
       : manifest.schemaVersion === 3
         ? domainHash("agent-config", manifestConfigV3(manifest))
-        : domainHash("agent-config", manifestConfigV4(manifest));
+        : manifest.schemaVersion === 4
+          ? domainHash("agent-config", manifestConfigV4(manifest))
+          : domainHash("agent-config", manifestConfigV5(manifest));
   if (
     manifest.schemaVersion !== 1 &&
     (manifest.reviewedPromptHash !== promptHash || manifest.reviewedConfigHash !== configHash)
@@ -481,6 +550,7 @@ export function deriveManifestHashes(manifest: AgentManifest): {
   }
   if (manifest.schemaVersion === 3) assertCatalogManifestV3(manifest);
   if (manifest.schemaVersion === 4) assertCatalogManifestV4(manifest);
+  if (manifest.schemaVersion === 5) assertCatalogManifestV5(manifest);
   return {
     manifestHash: domainHash("agent-manifest", manifest),
     promptHash,

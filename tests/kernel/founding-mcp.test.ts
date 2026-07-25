@@ -4,6 +4,7 @@ import { FOUNDING_PACK } from "../../src/agents/founding-pack";
 import {
   buildManifestV3,
   buildManifestV4,
+  buildManifestV5,
   deriveManifestHashes,
   foundingCatalogProjection,
 } from "../../src/kernel/agent-catalog";
@@ -68,7 +69,7 @@ test("manifest v2 bytes remain stable and all founding templates derive determin
   }
 });
 
-test("manifest v4 adds only stable server-validated risk tiers", () => {
+test("manifest v4 remains stable and catalog drafts use fixed server-built v5", () => {
   const input = {
     templateId: "market-pulse",
     name: "Tri Risk Market Pulse",
@@ -100,7 +101,21 @@ test("manifest v4 adds only stable server-validated risk tiers", () => {
   if (action.action !== "CREATE_DRAFT") {
     throw new Error("Expected a CREATE_DRAFT action");
   }
-  assert.equal(action.manifest.schemaVersion, 4);
+  assert.equal(action.manifest.schemaVersion, 5);
+  if (action.manifest.schemaVersion !== 5) throw new Error("Expected manifest v5");
+  assert.deepEqual(action.manifest.runtimePolicy, {
+    framework: "langchain-v1",
+    modelCalls: 1,
+    maxMcpCalls: 4,
+    maxOutputTokens: 768,
+    deadlineMs: 300000,
+  });
+  const v5 = buildManifestV5({ ...input, riskTiers: ["LOW", "MID", "HIGH"] });
+  assert.deepEqual(deriveManifestHashes(v5), deriveManifestHashes(action.manifest));
+  assert.throws(() => deriveManifestHashes({
+    ...v5,
+    runtimePolicy: { ...v5.runtimePolicy, maxOutputTokens: 769 as 768 },
+  }), (error: unknown) => error instanceof KernelError && error.code === "KERNEL_INVALID_REQUEST");
   assert.throws(() => parseAgentAction({
     action: "CREATE_DRAFT",
     templateId: "market-pulse",
@@ -125,11 +140,12 @@ test("catalog draft admission rejects all client-owned manifest fields and catal
     description: "A bounded catalog-created market analysis agent.",
   }, CREATOR_WALLET);
   assert.equal(action.action, "CREATE_DRAFT");
-  assert.equal(action.manifest.schemaVersion, 3);
+  assert.equal(action.manifest.schemaVersion, 5);
 
   for (const extra of [
     "instructions", "capabilities", "url", "credentials", "code", "toolName",
     "endpoint", "reviewedPromptHash", "catalogSelectionHash", "reviewedSources", "mcp",
+    "runtimePolicy", "framework", "model", "tools",
   ]) {
     assert.throws(() => parseAgentAction({
       action: "CREATE_DRAFT",

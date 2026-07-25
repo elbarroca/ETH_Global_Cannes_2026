@@ -6,6 +6,7 @@ import { domainHash, type CanonicalValue } from "./canonical";
 import { bindManifestEns, deriveManifestHashes } from "./agent-catalog";
 import { KernelError } from "./errors";
 import type { DatabaseClient } from "./service";
+import type { AgentListFilters } from "./policy";
 import type {
   AgentEnsBinding,
   AgentEnsWritePlan,
@@ -214,13 +215,13 @@ function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
     };
   }
   if (
-    ![1, 2, 3, 4].includes(Number(row.manifestSchemaVersion)) ||
+    ![1, 2, 3, 4, 5].includes(Number(row.manifestSchemaVersion)) ||
     (row.riskTiers !== null && (
       !Array.isArray(row.riskTiers) || row.riskTiers.length < 1 || row.riskTiers.length > 3 ||
       row.riskTiers.some((tier) => !["LOW", "MID", "HIGH"].includes(String(tier))) ||
       new Set(row.riskTiers).size !== row.riskTiers.length
     )) ||
-    ((row.manifestSchemaVersion === 4) !== (row.riskTiers !== null)) ||
+    ((row.manifestSchemaVersion === 4 || row.manifestSchemaVersion === 5) !== (row.riskTiers !== null)) ||
     (row.reviewedSources !== null && !Array.isArray(row.reviewedSources)) ||
     (row.skillSummary !== null && !Array.isArray(row.skillSummary)) ||
     (row.mcpSummary !== null && !Array.isArray(row.mcpSummary)) ||
@@ -449,7 +450,8 @@ async function publicationActionClaim(
 }
 
 function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVersion {
-  const catalogManifest = row.manifest.schemaVersion === 3 || row.manifest.schemaVersion === 4
+  const catalogManifest = row.manifest.schemaVersion === 3 ||
+    row.manifest.schemaVersion === 4 || row.manifest.schemaVersion === 5
     ? row.manifest
     : null;
   const reviewedSources = catalogManifest
@@ -501,7 +503,9 @@ function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVe
     publicationDecisionId: row.publication_decision_id,
     publishedAt: row.published_at?.toISOString() ?? null,
     manifestSchemaVersion: row.manifest.schemaVersion,
-    riskTiers: row.manifest.schemaVersion === 4 ? row.manifest.riskTiers : null,
+    riskTiers: row.manifest.schemaVersion === 4 || row.manifest.schemaVersion === 5
+      ? row.manifest.riskTiers
+      : null,
     reviewedSources,
     skillSummary,
     mcpSummary,
@@ -1249,9 +1253,18 @@ export async function publishAgentVersion(
 
 export async function listAgentLifecycle(
   viewerUserId: string,
-  options: { sql?: DatabaseClient } = {},
+  options: { filters?: AgentListFilters; sql?: DatabaseClient } = {},
 ): Promise<{ agents: ProtectedPublishedAgentRead[]; drafts: AgentLifecycleVersion[] }> {
   const sql = options.sql ?? getDb();
+  const filters = options.filters ?? {
+    capability: null,
+    skill: null,
+    mcpProvider: null,
+    riskTier: null,
+    cursor: null,
+    limit: 100,
+    active: false,
+  };
   const rows = await sql<LifecycleReadRow[]>`
     SELECT
       a.id AS agent_id, v.id AS version_id, v.version, a.name,
@@ -1287,9 +1300,23 @@ export async function listAgentLifecycle(
         AND effect.result_hash = receipt.result_hash
         AND receipt.verified = true
     ) hires ON true
-    WHERE v.lifecycle_state = 'PUBLISHED'
-       OR (a.owner_user_id = ${viewerUserId} AND v.lifecycle_state IN ('DRAFT', 'NAME_BOUND', 'WRITE_PREPARED'))
-    ORDER BY v.created_at ASC, v.id ASC
+    WHERE (
+      v.lifecycle_state = 'PUBLISHED' AND v.canonical_state = 'CANONICAL'
+      AND (${filters.capability}::text IS NULL OR v.capabilities @> ARRAY[${filters.capability}]::text[])
+      AND (${filters.skill}::text IS NULL OR v.manifest->'skills' @> jsonb_build_array(jsonb_build_object('id', ${filters.skill}::text)))
+      AND (${filters.mcpProvider}::text IS NULL OR v.manifest->'mcp' @> jsonb_build_array(jsonb_build_object('provider', ${filters.mcpProvider}::text)))
+      AND (${filters.riskTier}::text IS NULL OR v.manifest->'riskTiers' @> to_jsonb(ARRAY[${filters.riskTier}]::text[]))
+      AND (${filters.cursor?.publishedAt ?? null}::timestamptz IS NULL OR
+        (v.published_at, v.id) < (${filters.cursor?.publishedAt ?? null}::timestamptz, ${filters.cursor?.versionId ?? null}::uuid))
+    ) OR (
+      ${filters.active} = false AND a.owner_user_id = ${viewerUserId}
+      AND v.lifecycle_state IN ('DRAFT', 'NAME_BOUND', 'WRITE_PREPARED')
+    )
+    ORDER BY
+      CASE WHEN ${filters.active} THEN v.published_at END DESC,
+      CASE WHEN ${filters.active} THEN v.id END DESC,
+      v.created_at ASC, v.id ASC
+    LIMIT ${filters.active ? filters.limit : null}
   `;
   const visible = rows.map((row) => ({ row, value: mapLifecycle(row, viewerUserId) }));
   return {
