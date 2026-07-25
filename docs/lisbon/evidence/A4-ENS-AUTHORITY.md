@@ -614,3 +614,74 @@ The smallest safe repair is a pre-replacement migration check that recomputes ca
 All non-Go independent lanes passed, including both nine-migration lanes, A4 22/22, restricted numeric probes, concurrency, lint/typecheck, foundation/auth/Kernel/A5, e2e/resilience/redaction, boot, secret/shell/diff, build 31 pages, and HTTP 200. The audit host lacked Go; W7 writer evidence records checksum-pinned Go/A3/aggregate integration passes. Cleanup completed and no external effect occurred.
 
 W7 is `AUDIT_FIX`. Until W8 and immutable re-audit pass, the sequential Kernel owner may not consume publication decisions. `A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor qualification, push, release, and public claims remain closed.
+
+## W8 publication upgrade preflight remediation
+
+- Task: `A4-ENS-PUBLICATION-UPGRADE-PREFLIGHT-20260725:W8:439EC3F`
+- Start/control SHA: `439ec3fe5ca5013abedb8b463a9e6d29dac0453a`
+- Migration: `20260725064000_a4_publication_upgrade_preflight`
+- Migration SHA-256: `2fd7b7b44a3afe8a11000c21646dffa3232612dcc07859a31e308fd0e1948931`
+- Result: `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`
+
+W8 adds one migration and does not change W4-W7, the Prisma schema, ENS
+runtime code, Kernel, worker, API, UI, 0G, Telegram, dependencies, or lockfiles.
+Its single `DO` statement runs as one PostgreSQL transaction. It first takes
+`ACCESS EXCLUSIVE` on `ens_publication_decisions`, transactionally revokes the
+runtime function grant, fixes the transaction timezone to UTC, and scans every
+durable decision before writing the exact readiness marker or restoring the
+grant.
+
+For every row, the preflight derives the exact W7 schema-version-3 key from the
+immutable agent version, binding hash, release SHA, decision/error, record hash,
+canonical `NUMERIC(20,0)` block string, UTC microsecond block/freshness times,
+and lowercase transaction hash. Invalid special, negative, fractional, or
+out-of-range stored blocks and any key mismatch raise bounded PostgreSQL
+`23514`: `ENS publication W8 preflight found noncanonical durable decision
+evidence; explicit owner adjudication required`. The migration never updates,
+deletes, truncates, or otherwise repairs an evidence row.
+
+The migration harness now exercises real pre-W7 durable state. It applies W1-W6
+to disposable PostgreSQL, records those exact migrations with Prisma, creates a
+real owner policy and restricted-login decision, and lets real `prisma migrate
+deploy` apply W7/W8. A canonical W6 `12345` decision upgrades, replays with
+`12345.0`, returns the original decision ID, and retains one byte-identical row.
+A W6 scale-sensitive `12345.0` decision lets W7 finish but causes W8 to fail
+before its marker/function-version readiness. The decision count and row hash
+remain unchanged, commerce counts remain zero, W7 stays installed, and Prisma
+records only an unfinished failed W8 bookkeeping row.
+
+The table lock prevents concurrent admission during the W8 transaction, but an
+additive W8 cannot close the application window between separately committed W7
+and W8 Prisma migrations. Therefore every upgrade from pre-W7 state has a
+mandatory stop-the-world prerequisite: stop application admission and workers
+before `prisma migrate deploy`, keep them stopped through both W7 and W8, and
+enable readiness only after W8 has a completed `_prisma_migrations` row, the
+exact `alphadawg:a4-publication-upgrade-preflight:v1` function comment, and the
+restricted ACL. If W8 fails, the application remains unavailable. Any evidence
+adjudication or data migration requires separate explicit owner authority and
+review.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| `npm run validate:env` / loopback-placeholder Prisma validate/generate | 0 | Offline environment passed; schema valid; Prisma Client `6.19.3` generated. |
+| `npx tsx scripts/test-migrations.ts` | 0 | Fresh empty and synthetic Cannes-shaped ten-migration lanes passed with sentinel SHA-256 `fb8aece1677586a330f0cfeb0850b71488849302324eb1d6a079673e35e3829e`; unsafe direct/nested W6 runtime parents remained rejected; canonical and noncanonical W6 upgrade lanes behaved exactly. |
+| `npm run lint` / `npm run typecheck` | 0 | Lint has zero errors and 23 inherited warnings; strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | Foundation 9/9, authentication 9/9, and Kernel 17/17 passed. |
+| checksum-pinned `npm run test:go` / `npm run test:a3` | 0 | Official Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`; A3 passed 12/12. |
+| `npm run test:a4` / checksum-pinned `npm run test:integration` | 0 | A4 passed 22/22; integration passed 39/39 plus all four migration lanes. The first aggregate attempt used the wrong Go path and failed only at the fixture build hook; the exact pinned binary rerun passed. |
+| `npm run test:a5` / `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 3/3, 4/4, 1/1, and 3/3 passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` / `git diff --check` | 0 | Protected boot, tracked secret scan, shell syntax, and diff hygiene passed. |
+| `npm run build` / loopback `next start` | 0 | Next `16.2.11` generated 31/31 pages and served `/` with HTTP `200` and 32,236 bytes. |
+
+The official Go archive matched SHA-256
+`25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`
+and reported exact `go1.23.10 darwin/arm64`. Its task-specific archive,
+toolchain, verifier binary, and HTTP artifact were deleted before closeout. No
+live ENS/0G/Uniswap/sponsor call, shared or managed database effect, managed
+migration deploy, wallet signature, transaction, push, deployment, form, funding, upload,
+spend, public identifier, live proof, or claim promotion was attempted.
+
+W8 returns only `PASS_TO_AUDIT_REMEDIATION`. Until immutable W8 audit passes,
+the sequential Kernel owner may not consume publication decisions.
+`A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor
+qualification, push, release, and public claims remain closed.

@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W8 publication upgrade preflight
+
+- Added only additive migration `20260725064000_a4_publication_upgrade_preflight`. Under one PostgreSQL transaction and an access-exclusive decision-table lock, it revokes runtime admission, recomputes the exact W7 key for every immutable decision, and refuses noncanonical evidence before installing its readiness marker or restoring admission.
+- Proved a canonical W6 `12345` decision upgrades through W7/W8 and replays with `12345.0` to the original ID with byte-identical evidence. A scale-sensitive W6 `12345.0` decision lets W7 finish but aborts W8 with its row/count unchanged, zero commerce rows, and no W8 marker.
+- Extended the migration harness to fresh empty, synthetic Cannes, canonical W6, and noncanonical W6 lanes. Fresh/Cannes now apply ten migrations with the sentinel hash unchanged; the W6 unsafe-role refusal and all W7/W6 controls remain green. Migration SHA-256 is `2fd7b7b44a3afe8a11000c21646dffa3232612dcc07859a31e308fd0e1948931`.
+- Documented the mandatory stop-the-world prerequisite across separate W7/W8 Prisma commits for pre-W7 upgrades. Any noncanonical evidence adjudication or data migration requires separate explicit owner authority; W8 never rewrites append-only evidence.
+- Passed the complete local floor: lint with zero errors and 23 inherited warnings, typecheck, foundation 9/9, auth 9/9, Kernel 17/17, checksum-pinned Go, A3 12/12, A4 22/22, A5 3/3, integration 39/39 plus four migration lanes, e2e 4/4, resilience 1/1, redaction 3/3, boot, secret/shell/diff checks, 31-page build, and loopback HTTP 200.
+- Returned only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. Immutable W8 audit, sequential Kernel consumption, `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS, sponsor, push, release, and public claims remain closed.
+
 ## 2026-07-25 - W7 normalization immutable audit
 
 - Reconciled independent verdict `FIX` for exact SHA `79c7a96b8f63607261325ef413d182239816e53b`, tree `052818e9f6346b7fb1d614536fd6997ac53ed4fc`, and range `045945e3b1c7ce0081c061a8b769d7b085687d9f..79c7a96b8f63607261325ef413d182239816e53b`.

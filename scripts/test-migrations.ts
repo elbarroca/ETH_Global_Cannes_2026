@@ -8,6 +8,17 @@ import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 import { resolvePipelineDisplayTimes } from "../components/hunt/hunt-pipeline-arrows";
 import { isLoopbackDatabaseUrl } from "../src/config/env";
+import {
+  createEnsPublicationAuthority,
+  createEnsPublicationPolicyDocument,
+} from "../src/ens/authority";
+import {
+  bindAgentName,
+  createAgentDraft,
+  prepareAgentEnsWrite,
+} from "../src/kernel/lifecycle";
+import { parseAgentInput, parseEnsBinding } from "../src/kernel/policy";
+import { createEnsPublicationAuthorityFixture } from "../tests/helpers/ens";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PRISMA = resolve(ROOT, "node_modules/.bin/prisma");
@@ -21,6 +32,7 @@ const A4_PUBLICATION_MIGRATION = "20260725042000_a4_publication_decision";
 const A4_PUBLICATION_AUTHORITY_MIGRATION = "20260725045500_a4_publication_decision_authority";
 const A4_PUBLICATION_HARDENING_MIGRATION = "20260725053000_a4_publication_authority_hardening";
 const A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION = "20260725062500_a4_publication_block_normalization";
+const A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION = "20260725064000_a4_publication_upgrade_preflight";
 const PRE_HARDENING_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -30,10 +42,16 @@ const PRE_HARDENING_MIGRATIONS = [
   A4_PUBLICATION_MIGRATION,
   A4_PUBLICATION_AUTHORITY_MIGRATION,
 ] as const;
+const PRE_W7_MIGRATIONS = [
+  ...PRE_HARDENING_MIGRATIONS,
+  A4_PUBLICATION_HARDENING_MIGRATION,
+] as const;
 const BASELINE_SQL = resolve(ROOT, "prisma/migrations", BASELINE_MIGRATION, "migration.sql");
 const SENTINEL_ID = "a1-cannes-sentinel";
 const SENTINEL_WALLET = "0xa1cannessentinel";
 const SENTINEL_TIMESTAMP = "2026-07-24T00:00:00.000Z";
+const UPGRADE_CREATOR_WALLET = "0x6666666666666666666666666666666666666666";
+const UPGRADE_RELEASE_SHA = "7".repeat(40);
 
 type DatabaseClient = ReturnType<typeof postgres>;
 
@@ -102,6 +120,36 @@ function verifyPipelineTimestampFallback(): void {
   }
 }
 
+async function verifyUpgradePreflightSqlOrdering(): Promise<void> {
+  const migrationSql = await readFile(
+    resolve(ROOT, "prisma/migrations", A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION, "migration.sql"),
+    "utf8",
+  );
+  const orderedTokens = [
+    "DO $upgrade$",
+    "EXECUTE 'LOCK TABLE public.ens_publication_decisions IN ACCESS EXCLUSIVE MODE'",
+    "EXECUTE 'REVOKE EXECUTE ON FUNCTION public.admit_ens_publication_decision(",
+    "expected_decision_key",
+    "EXECUTE 'COMMENT ON FUNCTION public.admit_ens_publication_decision(",
+    "EXECUTE 'GRANT EXECUTE ON FUNCTION public.admit_ens_publication_decision(",
+    "$upgrade$;",
+  ];
+  let previous = -1;
+  for (const token of orderedTokens) {
+    const index = migrationSql.indexOf(token);
+    if (index <= previous) {
+      throw new Error("W8 preflight lock, refusal, marker, and authority ordering is not exact");
+    }
+    previous = index;
+  }
+  if (
+    /(?:UPDATE|DELETE\s+FROM|TRUNCATE)\s+public\.ens_publication_decisions/i.test(migrationSql) ||
+    !migrationSql.includes("d.decision_key IS DISTINCT FROM canonical.expected_decision_key")
+  ) {
+    throw new Error("W8 preflight rewrites evidence or omits canonical-key refusal");
+  }
+}
+
 async function snapshotSentinel(sql: DatabaseClient): Promise<SentinelSnapshot> {
   const rows = await sql<SentinelRow[]>`
     SELECT
@@ -145,6 +193,27 @@ function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv = 
     throw new Error(`${command.split("/").at(-1)} exited ${result.status ?? "without status"}${output ? `: ${output}` : ""}`);
   }
   if (output) console.log(output);
+}
+
+function runExpectedFailure(
+  command: string,
+  args: readonly string[],
+  expected: RegExp,
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  const result = spawnSync(command, [...args], {
+    cwd: ROOT,
+    encoding: "utf8",
+    env,
+    timeout: 120_000,
+  });
+  const output = redactUrls(`${result.stdout ?? ""}${result.stderr ?? ""}`).trim();
+  if (result.status === 0 || !expected.test(output)) {
+    throw new Error(
+      `${command.split("/").at(-1)} did not produce the expected bounded failure` +
+      `${output ? `: ${output}` : ""}`,
+    );
+  }
 }
 
 function executable(name: string): string {
@@ -286,6 +355,283 @@ async function prepareCannesShape(url: string): Promise<SentinelSnapshot> {
   }
 }
 
+function jsonObject(value: unknown, label: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} is not a JSON object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+async function applyMigrationSql(sql: DatabaseClient, migration: string): Promise<void> {
+  const migrationSql = await readFile(
+    resolve(ROOT, "prisma/migrations", migration, "migration.sql"),
+    "utf8",
+  );
+  await sql.unsafe(migrationSql);
+}
+
+function markPreW7MigrationsApplied(url: string): void {
+  for (const migration of PRE_W7_MIGRATIONS) {
+    run(
+      PRISMA,
+      ["migrate", "resolve", "--applied", migration, "--schema", SCHEMA],
+      prismaEnv(url),
+    );
+  }
+}
+
+interface W6PublicationFixture {
+  decisionId: string;
+  versionId: string;
+  record: Record<string, unknown>;
+  blockTimestamp: string;
+  transactionHash: string;
+  runtimeSql: DatabaseClient;
+  close: () => Promise<void>;
+}
+
+async function seedW6PublicationDecision(
+  sql: DatabaseClient,
+  url: string,
+  lane: string,
+  blockNumber: string,
+): Promise<W6PublicationFixture> {
+  const now = new Date();
+  const creatorId = `a4-w6-upgrade-${lane}`;
+  const runtimeRole = `a4_up_${lane}_${process.pid}_${Date.now().toString(36)}`;
+  if (!/^[a-z][a-z0-9_]{1,62}$/.test(runtimeRole)) {
+    throw new Error("unsafe W6 upgrade runtime role");
+  }
+  await sql`INSERT INTO users (id, wallet_address) VALUES (${creatorId}, ${UPGRADE_CREATOR_WALLET})`;
+  const manifest = parseAgentInput({
+    name: "A4 Upgrade Agent",
+    description: "A deterministic pre-W7 durable publication decision.",
+    instructions: "## Task\n\nReturn a bounded upgrade fixture result.",
+    capabilities: ["research", "market-analysis"],
+  }, UPGRADE_CREATOR_WALLET).manifest;
+  const draft = await createAgentDraft(
+    { userId: creatorId, walletAddress: UPGRADE_CREATOR_WALLET },
+    manifest,
+    { now, sql },
+  );
+  const nameBinding = parseEnsBinding({ creatorParent: "creator.eth", agentLabel: "research" });
+  await bindAgentName(creatorId, draft.versionId, nameBinding, { now, sql });
+  await prepareAgentEnsWrite(creatorId, draft.versionId, { now, sql });
+  await sql`
+    INSERT INTO ens_publication_authority_releases (release_sha, not_before, expires_at)
+    VALUES (
+      ${UPGRADE_RELEASE_SHA},
+      ${new Date(now.getTime() - 60_000)},
+      ${new Date(now.getTime() + 8 * 60 * 60 * 1_000)}
+    )
+  `;
+
+  await sql.unsafe(
+    `CREATE ROLE "${runtimeRole}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE ` +
+    `NOREPLICATION NOBYPASSRLS INHERIT; GRANT alphadawg_runtime TO "${runtimeRole}"`,
+  );
+  const runtimeUrl = new URL(url);
+  runtimeUrl.username = runtimeRole;
+  runtimeUrl.password = "";
+  const runtimeSql = postgres(runtimeUrl.toString(), { max: 1, prepare: false });
+  const close = async (): Promise<void> => {
+    await runtimeSql.end({ timeout: 1 });
+    await sql.unsafe(`DROP ROLE IF EXISTS "${runtimeRole}"`);
+  };
+
+  try {
+    const fixture = createEnsPublicationAuthorityFixture({ now });
+    const authority = createEnsPublicationAuthority({ sql: runtimeSql, runtime: fixture.runtime, now });
+    const missingPolicy = await authority({ agentVersionId: draft.versionId });
+    if (
+      missingPolicy.allowed || missingPolicy.decisionId !== null ||
+      missingPolicy.errorCode !== "ENS_PUBLICATION_PERSIST_FAILED"
+    ) {
+      throw new Error("pre-W7 fixture admitted without an owner policy");
+    }
+    const request = fixture.resolver.calls.at(-1);
+    if (!request) throw new Error("pre-W7 fixture did not expose its derived binding");
+    const policy = createEnsPublicationPolicyDocument(request.binding);
+    await sql`
+      INSERT INTO ens_publication_authority_policies (
+        release_sha, agent_version_id, binding, binding_hash
+      ) VALUES (
+        ${UPGRADE_RELEASE_SHA}, ${draft.versionId}::uuid,
+        ${sql.json(JSON.parse(JSON.stringify(policy)))}, ${"0".repeat(64)}
+      )
+    `;
+
+    const response = jsonObject(
+      await fixture.resolver.resolvePublication(request, new AbortController().signal),
+      "pre-W7 resolver response",
+    );
+    const observation = jsonObject(response.observation, "pre-W7 resolver observation");
+    const record = jsonObject(response.record, "pre-W7 resolver record");
+    const blockTimestamp = observation.blockTimestamp;
+    const transactionHash = observation.transactionHash;
+    if (typeof blockTimestamp !== "string" || typeof transactionHash !== "string") {
+      throw new Error("pre-W7 resolver observation is incomplete");
+    }
+    const admitted = await runtimeSql<{ decision_id: string }[]>`
+      SELECT decision_id::text FROM public.admit_ens_publication_decision(
+        ${draft.versionId}::uuid,
+        ${runtimeSql.json(JSON.parse(JSON.stringify(record)))},
+        ${blockNumber}::numeric,
+        ${blockTimestamp}::timestamptz,
+        ${transactionHash},
+        NULL
+      )
+    `;
+    const decisionId = admitted[0]?.decision_id;
+    if (!decisionId) throw new Error("pre-W7 fixture did not admit one durable decision");
+    return {
+      decisionId,
+      versionId: draft.versionId,
+      record,
+      blockTimestamp,
+      transactionHash,
+      runtimeSql,
+      close,
+    };
+  } catch (error) {
+    await close().catch(() => undefined);
+    throw error;
+  }
+}
+
+interface PublicationUpgradeState {
+  decisions: number;
+  decisionId: string | null;
+  decisionHash: string | null;
+  jobs: number;
+  effects: number;
+  receipts: number;
+  functionHash: string;
+  marker: string | null;
+  runtimeExecute: boolean;
+}
+
+async function publicationUpgradeState(sql: DatabaseClient): Promise<PublicationUpgradeState> {
+  const rows = await sql<PublicationUpgradeState[]>`
+    SELECT
+      (SELECT count(*)::int FROM ens_publication_decisions) AS decisions,
+      (SELECT id::text FROM ens_publication_decisions ORDER BY id LIMIT 1) AS "decisionId",
+      (
+        SELECT encode(sha256(convert_to(to_jsonb(d)::text, 'UTF8')), 'hex')
+        FROM ens_publication_decisions d ORDER BY d.id LIMIT 1
+      ) AS "decisionHash",
+      (SELECT count(*)::int FROM jobs) AS jobs,
+      (SELECT count(*)::int FROM effects) AS effects,
+      (SELECT count(*)::int FROM receipts) AS receipts,
+      encode(sha256(convert_to(p.prosrc, 'UTF8')), 'hex') AS "functionHash",
+      obj_description(p.oid, 'pg_proc') AS marker,
+      has_function_privilege('alphadawg_runtime', p.oid, 'EXECUTE') AS "runtimeExecute"
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'admit_ens_publication_decision'
+      AND p.pronargs = 6
+  `;
+  const state = rows[0];
+  if (!state) throw new Error("publication admission function is missing from upgrade lane");
+  return state;
+}
+
+async function verifyPreW7UpgradeLane(
+  adminUrl: string,
+  database: string,
+  kind: "canonical" | "scale_alias",
+): Promise<void> {
+  await createDatabase(adminUrl, database);
+  const url = databaseUrl(adminUrl, database);
+  const sql = postgres(url, { max: 1, prepare: false });
+  let fixture: W6PublicationFixture | null = null;
+  try {
+    for (const migration of PRE_W7_MIGRATIONS) await applyMigrationSql(sql, migration);
+    markPreW7MigrationsApplied(url);
+    fixture = await seedW6PublicationDecision(
+      sql,
+      url,
+      kind === "canonical" ? "canon" : "alias",
+      kind === "canonical" ? "12345" : "12345.0",
+    );
+    const before = await publicationUpgradeState(sql);
+    if (
+      before.decisions !== 1 || before.decisionId !== fixture.decisionId ||
+      !before.decisionHash || before.jobs !== 0 || before.effects !== 0 ||
+      before.receipts !== 0 || before.marker !== null || !before.runtimeExecute
+    ) {
+      throw new Error("pre-W7 upgrade fixture state is not exact");
+    }
+
+    if (kind === "canonical") {
+      run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(url));
+      const replay = await fixture.runtimeSql<{ decision_id: string }[]>`
+        SELECT decision_id::text FROM public.admit_ens_publication_decision(
+          ${fixture.versionId}::uuid,
+          ${fixture.runtimeSql.json(JSON.parse(JSON.stringify(fixture.record)))},
+          ${"12345.0"}::numeric,
+          ${fixture.blockTimestamp}::timestamptz,
+          ${fixture.transactionHash},
+          NULL
+        )
+      `;
+      const after = await publicationUpgradeState(sql);
+      if (
+        replay[0]?.decision_id !== fixture.decisionId || after.decisions !== 1 ||
+        after.decisionId !== before.decisionId || after.decisionHash !== before.decisionHash ||
+        after.jobs !== 0 || after.effects !== 0 || after.receipts !== 0 ||
+        after.marker !== "alphadawg:a4-publication-upgrade-preflight:v1" ||
+        !after.runtimeExecute || after.functionHash === before.functionHash
+      ) {
+        throw new Error("canonical W6 decision did not upgrade and replay exactly");
+      }
+      console.log("Canonical W6 publication decision upgraded through W7/W8 and replayed exactly");
+      return;
+    }
+
+    runExpectedFailure(
+      PRISMA,
+      ["migrate", "deploy", "--schema", SCHEMA],
+      /noncanonical durable decision evidence/,
+      prismaEnv(url),
+    );
+    const after = await publicationUpgradeState(sql);
+    const migrationRows = await sql<{
+      w7_finished: number;
+      w8_finished: number;
+      w8_failed: number;
+    }[]>`
+      SELECT
+        count(*) FILTER (
+          WHERE migration_name = ${A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION}
+            AND finished_at IS NOT NULL
+        )::int AS w7_finished,
+        count(*) FILTER (
+          WHERE migration_name = ${A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION}
+            AND finished_at IS NOT NULL
+        )::int AS w8_finished,
+        count(*) FILTER (
+          WHERE migration_name = ${A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION}
+            AND finished_at IS NULL AND logs IS NOT NULL
+        )::int AS w8_failed
+      FROM "_prisma_migrations"
+    `;
+    if (
+      after.decisions !== 1 || after.decisionId !== before.decisionId ||
+      after.decisionHash !== before.decisionHash || after.jobs !== 0 ||
+      after.effects !== 0 || after.receipts !== 0 || after.marker !== null ||
+      !after.runtimeExecute || after.functionHash === before.functionHash ||
+      migrationRows[0]?.w7_finished !== 1 || migrationRows[0]?.w8_finished !== 0 ||
+      migrationRows[0]?.w8_failed !== 1
+    ) {
+      throw new Error("noncanonical W6 decision did not fail closed before W8 readiness");
+    }
+    console.log("Noncanonical W6 scale-alias decision blocked W8 with immutable evidence unchanged");
+  } finally {
+    await fixture?.close().catch(() => undefined);
+    await sql.end({ timeout: 1 });
+  }
+}
+
 async function verifyDatabase(
   url: string,
   expectedUsers: number,
@@ -321,6 +667,7 @@ async function verifyDatabase(
       a4_publication_authority_count: string;
       a4_publication_hardening_count: string;
       a4_publication_block_normalization_count: string;
+      a4_publication_upgrade_preflight_count: string;
       invariant_trigger_count: string;
       a4_constraint_count: string;
       a4_publication_constraint_count: string;
@@ -331,6 +678,7 @@ async function verifyDatabase(
       a4_publication_runtime_direct_privilege_count: string;
       a4_publication_hardening_constraint_count: string;
       a4_publication_block_function_count: string;
+      a4_publication_upgrade_marker_count: string;
       a4_publication_old_function_count: string;
       a5_constraint_count: string;
       receipt_authority_nullable: string;
@@ -400,6 +748,11 @@ async function verifyDatabase(
           WHERE migration_name = ${A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION}
             AND finished_at IS NOT NULL
         ) AS a4_publication_block_normalization_count,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION}
+            AND finished_at IS NOT NULL
+        ) AS a4_publication_upgrade_preflight_count,
         (
           SELECT count(*)::text FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN (
@@ -534,6 +887,14 @@ async function verifyDatabase(
           SELECT count(*)::text
           FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname = 'admit_ens_publication_decision'
+            AND p.pronargs = 6
+            AND obj_description(p.oid, 'pg_proc') =
+              'alphadawg:a4-publication-upgrade-preflight:v1'
+        ) AS a4_publication_upgrade_marker_count,
+        (
+          SELECT count(*)::text
+          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'admit_ens_publication_decision'
             AND p.pronargs = 8
         ) AS a4_publication_old_function_count,
         (
@@ -584,7 +945,7 @@ async function verifyDatabase(
       result.ens_publication_authority_policies !== "ens_publication_authority_policies" ||
       result.agent_version_events !== "agent_version_events" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 9 ||
+      Number(result.migration_count) !== 10 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -594,6 +955,7 @@ async function verifyDatabase(
       Number(result.a4_publication_authority_count) !== 1 ||
       Number(result.a4_publication_hardening_count) !== 1 ||
       Number(result.a4_publication_block_normalization_count) !== 1 ||
+      Number(result.a4_publication_upgrade_preflight_count) !== 1 ||
       Number(result.invariant_trigger_count) !== 18 ||
       Number(result.a4_constraint_count) !== 14 ||
       Number(result.a4_publication_constraint_count) !== 7 ||
@@ -604,6 +966,7 @@ async function verifyDatabase(
       Number(result.a4_publication_runtime_direct_privilege_count) !== 0 ||
       Number(result.a4_publication_hardening_constraint_count) !== 10 ||
       Number(result.a4_publication_block_function_count) !== 1 ||
+      Number(result.a4_publication_upgrade_marker_count) !== 1 ||
       Number(result.a4_publication_old_function_count) !== 0 ||
       Number(result.a5_constraint_count) !== 11 ||
       result.receipt_authority_nullable !== "NO" ||
@@ -684,6 +1047,7 @@ async function verifyInheritedRuntimeRoleBlocksHardening(
 
 async function main(): Promise<void> {
   verifyPipelineTimestampFallback();
+  await verifyUpgradePreflightSqlOrdering();
   const suppliedUrl = process.env.TEST_DATABASE_URL;
   const local = suppliedUrl ? null : await startLocalPostgres();
   const adminUrl = suppliedUrl ?? local?.adminUrl;
@@ -696,6 +1060,8 @@ async function main(): Promise<void> {
   const emptyDatabase = `alphadawg_a1_empty_${suffix}`;
   const cannesDatabase = `alphadawg_a1_cannes_${suffix}`;
   const unsafeRoleDatabase = `alphadawg_a4_unsafe_role_${suffix}`;
+  const canonicalUpgradeDatabase = `alphadawg_a4_w6_canonical_${suffix}`;
+  const noncanonicalUpgradeDatabase = `alphadawg_a4_w6_noncanonical_${suffix}`;
   const emptyUrl = databaseUrl(adminUrl, emptyDatabase);
   const cannesUrl = databaseUrl(adminUrl, cannesDatabase);
 
@@ -715,12 +1081,18 @@ async function main(): Promise<void> {
     run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(cannesUrl));
     await verifyDatabase(cannesUrl, 1, 43, sentinelBeforeResolution);
     await verifyInheritedRuntimeRoleBlocksHardening(adminUrl, unsafeRoleDatabase);
+    await verifyPreW7UpgradeLane(adminUrl, canonicalUpgradeDatabase, "canonical");
+    await verifyPreW7UpgradeLane(adminUrl, noncanonicalUpgradeDatabase, "scale_alias");
 
-    console.log("Migration replay passed: empty deploy and Cannes-shaped baseline resolution");
+    console.log(
+      "Migration replay passed: fresh/Cannes deploy plus canonical/noncanonical W6 upgrade lanes",
+    );
   } finally {
     await dropDatabase(adminUrl, emptyDatabase).catch(() => undefined);
     await dropDatabase(adminUrl, cannesDatabase).catch(() => undefined);
     await dropDatabase(adminUrl, unsafeRoleDatabase).catch(() => undefined);
+    await dropDatabase(adminUrl, canonicalUpgradeDatabase).catch(() => undefined);
+    await dropDatabase(adminUrl, noncanonicalUpgradeDatabase).catch(() => undefined);
     await local?.close();
   }
 }

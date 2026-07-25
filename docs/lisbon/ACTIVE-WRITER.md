@@ -3,6 +3,60 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: ENS Integrator /root/a4_ensv2_gap_inventory
+task_id: A4-ENS-PUBLICATION-UPGRADE-PREFLIGHT-20260725
+task_instance_id: A4-ENS-PUBLICATION-UPGRADE-PREFLIGHT-20260725:W8:439EC3F
+generation: 8
+sprint: A4_publication_upgrade_preflight
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 439ec3fe5ca5013abedb8b463a9e6d29dac0453a
+control_sha: 439ec3fe5ca5013abedb8b463a9e6d29dac0453a
+token: A4-ENS-PUB-UPGRADE-W8-439EC3F-2D5875B8-366A-4B45-8442-984EE20AF78F
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T06:21:00Z
+expires_at: 2026-07-25T08:05:27Z
+allowed_paths:
+  - tests/a4/**
+  - tests/helpers/ens.ts
+  - prisma/migrations/20260725064000_a4_publication_upgrade_preflight/**
+  - scripts/test-migrations.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T06:05:27Z
+deadline: 2026-07-25T08:05:27Z
+expected_exit: fail closed before W8 installation when durable pre-W7 publication decisions have noncanonical W7 keys
+acceptance_items:
+  - preflight recomputes the W7 canonical decision key from every immutable durable decision row
+  - canonical W6 decisions upgrade and replay while scale-alias W6 decisions abort W8 with bytes and counts unchanged
+  - locks and transactional ordering prevent application admission during preflight and replacement as far as additive migration permits
+  - fresh empty and Cannes lanes advance to ten migrations while unsafe-role and all W7/W6 controls remain green
+  - complete local floor one atomic commit clean matching-token release and immutable audit handoff
+external_effect_authority: safe local allowed files disposable loopback PostgreSQL and processes build output checksum-pinned temporary Go and one local commit only; no live ENS 0G Uniswap sponsor shared or managed database migration deploy push signature transaction faucet form funding upload spend public ID claim or mainnet effect
+completed_at: 2026-07-25T06:21:00Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - additive W8 migration recomputes the exact W7 key for every durable publication decision under an access-exclusive table lock without rewriting evidence
+  - canonical W6 decision upgraded and replayed exactly while scale-alias W6 decision aborted W8 before marker readiness with row bytes and counts unchanged
+  - fresh empty and synthetic Cannes lanes apply ten migrations with sentinel unchanged and unsafe W6 runtime parents still rejected
+  - full local floor passed including checksum-pinned Go A3 12 of 12 A4 22 of 22 integration 39 of 39 build 31 pages and loopback HTTP 200
+remaining_blocks:
+  - immutable W8 audit before sequential Kernel remediation or publication-decision consumption
+  - stop-the-world application admission across separate W7 and W8 Prisma migrations for any pre-W7 upgrade
+  - separate explicit owner adjudication and review for any noncanonical durable evidence; no automatic evidence rewrite
+  - A4_ACCEPTED A5 A6 live ENS sponsor push release and public claims
+external_effects_attempted: one authorized checksum-pinned temporary official Go download only; no live call shared or managed migration signature transaction push deployment form funding upload spend identifier or claim
+result: PASS_TO_AUDIT_REMEDIATION_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token A4-ENS-PUB-UPGRADE-W8-439EC3F-2D5875B8-366A-4B45-8442-984EE20AF78F after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-A4-W7-AUDIT-RECONCILIATION-20260725
 task_instance_id: C0-A4-W7-AUDIT-RECONCILIATION-20260725:79C7A96
