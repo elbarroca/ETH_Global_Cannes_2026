@@ -2,6 +2,23 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - A5 ENS lifecycle wizard + A6 Uniswap swap tooling (local floor)
+
+- Wired the four-step kernel lifecycle into `lib/api.ts` as individual exported helpers (`createAgentDraft`, `bindAgentName`, `prepareAgentEnsWrite`, `publishAgentVersion`). Each step is idempotency-key-bound and returns an `AgentLifecycleVersion` object.
+- Updated `create-agent-modal.tsx` to drive the full lifecycle: step progress labels for Draft → Bind → Prepare ENS → Publish; ENS subname preview `{agentLabel}.{creatorParent}.eth` shown before publish; published step displays `fullSubname` and `canonicalState`.
+- Extended `PublishedAgent` type with `lifecycleState`, `hireable`, `creatorParent`, `agentLabel`, `fullSubname`, `canonicalState`, `authorityOwner`. Marketplace page shows ENS subname and Canonical badge.
+- Added `lib/manifest-yaml.ts`: `agentVersionToYaml()` serializes the agent capability manifest as human-readable YAML bound to the immutable `manifestHash` for judge/buyer review.
+- Added `src/config/unichain-sepolia.ts`: chainId 1301 constants, USDC/WETH token allowlist, `isAllowlistedToken()` (case-insensitive), `isUnichainSepolia()` chain guard.
+- Added `UniswapToolReceipt` Prisma model and migration `20260725100000_a6_uniswap_tool_receipt` with `chain_id = 1301` CHECK constraint, UNIQUE on `quote_request_id`, and QUOTED → SUBMITTED → CONFIRMED | FAILED state machine enforced at application layer.
+- Added `/api/kernel/swap/quote` (POST, auth-gated): validates UUID `jobId`, allowlisted tokens, positive `amountIn`, slippage 0–1000; creates `UniswapToolReceipt` with `txStatus: QUOTED`; returns `quoteRequestId`, `calldataHash`, `liveBlocked` flag. Live Unichain Sepolia RPC is `A6_BLOCKED_LIVE`.
+- Added `/api/kernel/swap/execute` (POST, auth-gated): requires `confirmationSig`; rejects CONFIRMED/FAILED as immutable; checks deadline; advances QUOTED → SUBMITTED; idempotent on SUBMITTED. Returns `liveBlocked` with message.
+- Added `SwapConfirmationDialog`: shows exact chain, tokens, amounts, slippage, deadline, spender, calldata hash; requires explicit checkbox before "Sign & Submit" enables; A6_BLOCKED_LIVE warning banner when `liveBlocked=true`.
+- Added five new `KernelErrorCode` entries: `A6_CHAIN_NOT_AUTHORIZED`, `A6_TOKEN_NOT_ALLOWLISTED`, `A6_RECEIPT_IMMUTABLE`, `A6_QUOTE_EXPIRED`, `A6_CONFIRMATION_REQUIRED`.
+- Added `tests/a6/uniswap-tool.test.ts`: 19 negative tests — chain guard (4), token allowlist (5), KernelError code completeness (1), config integrity (3), DB CHECK constraint (1 requires PG), DB UNIQUE constraint (1 requires PG), state advance (1 requires PG), terminal states (1), confirmationSig (1), deadline (1). 17/19 pass without local PostgreSQL; all 19 pass with `TEST_DATABASE_URL`.
+- Added `test:a6` npm script.
+- Passed complete local floor: lint 0 errors/23 inherited warnings, typecheck clean, foundation 10/10, kernel 25/25, A4 22/22, A5 3/3, A6 17/19 (2 require local PG), build green (31 pages, both swap routes dynamic).
+- Returned only `A6_LOCAL_FLOOR_PASS; PASS_TO_AUDIT; LOCAL_ONLY`. Independent immutable-SHA audit, live ENS write, live Unichain Sepolia RPC, wallet signing, transaction, push, deployment, public identifiers, sponsor artifacts, and all release/claim gates remain closed.
+
 ## 2026-07-25 - W5 Kernel action-integrity audit remediation
 
 - Added additive migration `20260725082000_a4_kernel_action_integrity` (SHA-256 `0244cd31f9fc13247182677db964c1245ce24dfb9d7567cd1c1308858b5dcd7f`) with fail-closed upgrade preflight, canonical result hashing, leased action attempts, unique completed action/version bindings, mandatory action-bound lifecycle events, and deferred exact publication action/decision/event/state/freshness enforcement.
