@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - A5 protected recurring goal-loop Kernel
+
+- Added authenticated goal definitions and run APIs with cadence, bounded or continuous policies, explicit atomic-unit caps, pause/resume, manual runs, and server-derived tenant isolation.
+- Added additive migration `20260725163000_protected_goal_loop` (SHA-256 `06b03cd497863e37cb768424bec5e17e357abe92bcb7360c50802199c350770c`) for goals, immutable scheduled-run snapshots, frozen exact-version assignments, and optional append-only per-version provenance.
+- Added deterministic matching of externally owned canonical published agents, verified-hire ranking, pre-hire run/daily budget checks, one run per goal/slot, fenced durable claims, existing Kernel job reuse, verified-output-only reports, second-stage synthesis, and explicit ready/partial/blocked/failed/canceled outcomes. Partial reports cannot propose swaps; every valid proposal remains wallet-approval-required and creates no A6 receipt or transaction state.
+- Extended the protected agent read model with nullable validated provenance and receipt-derived verified external hires without inventing iNFT/token data.
+- Passed all fifteen-migration lanes, Kernel 33/33, focused goal-loop 7/7, A4 22/22, A5 3/3, A6 19/19, foundation/auth/e2e/redaction/boot, typecheck, lint, build, and focused integration. The aggregate integration lane remains blocked only by inherited A3 hooks because this host has no local Go toolchain.
+- Performed no managed migration, sponsor/live API call, wallet action, signature, transaction, push, deployment, funding, upload, form, spend, public identifier, or claim promotion.
+
 ## 2026-07-25 - A5/A6 Kernel manifest and delivery foundation
 
 - Added reviewed manifest-v2 recommendations and exact shared manifest/prompt/config hash persistence while preserving schema-v1 reads.

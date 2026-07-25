@@ -146,3 +146,34 @@ is in [`A4-ENS-AUTHORITY.md`](A4-ENS-AUTHORITY.md). This is only
 UI rewire or A5 acceptance. Live journey, mandatory A6 entry, deployment,
 sponsor, managed migration, signature, transaction, push, release, and claim
 gates remain closed.
+
+## Protected recurring goal-loop Kernel handoff on 2026-07-25
+
+Kernel task `A5-GOAL-LOOP-KERNEL-20260725:W1:C4E2536` adds the protected
+goal-loop backend without changing the A6 swap executor or primary UI. The
+authenticated APIs accept server-owned goals and exact idempotency keys; policy
+validation requires explicit per-run limits and a continuous daily cap.
+Scheduling claims one goal/slot transactionally, freezes externally owned
+canonical published versions, reuses existing Kernel jobs and commerce rows,
+and accepts only receipt-bound verified outputs. Owner, epoch, claim version,
+effect identity, and expiry are re-proved before each worker mutation.
+
+Run results distinguish `READY`, `PARTIAL`, `BLOCKED`, `FAILED`, and `CANCELED`.
+Multiple verified outputs require a research-capable synthesis job and strict
+`GoalRunReportV1` parsing. Missing or malformed synthesis remains partial and
+cannot propose a swap. Valid proposals are limited to the existing Unichain
+Sepolia token allowlist, state that wallet approval is required, and never sign,
+broadcast, or write a fake A6 submission. Agent-version provenance is nullable,
+append-only, version-bound evidence; absent data remains unavailable.
+
+Migration `20260725163000_protected_goal_loop` has SHA-256
+`06b03cd497863e37cb768424bec5e17e357abe92bcb7360c50802199c350770c`.
+All fifteen migrations pass fresh, synthetic Cannes, canonical W6, and
+noncanonical W6 lanes with the prior sentinel preserved. Goal-loop tests pass
+7/7, Kernel 33/33, A4 22/22, A5 3/3, A6 19/19, and the repaired worker-fencing
+plus goal-loop integration tests pass directly. The aggregate integration lane
+is blocked only by inherited A3 hooks because no local Go toolchain is
+available. Managed Neon migration, deployment, live APIs, signatures,
+transactions, push, release, and claim promotion were not authorized or run.
+
+Verdict: `PASS_TO_AUDIT; LOCAL_ONLY; MANAGED_MIGRATION_NOT_AUTHORIZED`.

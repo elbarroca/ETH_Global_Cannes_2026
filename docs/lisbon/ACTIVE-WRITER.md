@@ -3,6 +3,76 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/goal_loop_kernel
+task_id: A5-GOAL-LOOP-KERNEL-20260725
+task_instance_id: A5-GOAL-LOOP-KERNEL-20260725:W1:C4E2536
+generation: 1
+sprint: A5 protected goal data model, matching, run orchestration service, authenticated APIs, and read models
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: c4e25365ec1b99104fb26a6e87a8d6f6eefa71a8
+control_sha: c4e25365ec1b99104fb26a6e87a8d6f6eefa71a8
+token: A5-GOAL-LOOP-KERNEL-W1-C4E2536-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T13:47:58Z
+expires_at: 2026-07-25T18:30:00Z
+allowed_paths:
+  - prisma/schema.prisma
+  - prisma/migrations/20260725163000_protected_goal_loop/**
+  - src/kernel/**
+  - src/worker/** only if reusable run-once service belongs there
+  - app/api/kernel/goals/**
+  - app/api/kernel/agents/route.ts only for the extended read model
+  - tests/kernel/**
+  - tests/integration/protected-goal-loop.test.ts
+  - tests/integration/worker-fencing.test.ts only for DELIVERY_READY expectation reconciliation
+  - tests/helpers/** only for existing disposable database patterns
+  - scripts/test-migrations.ts only for migration 15 count and additive goal-loop schema assertions
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T13:47:58Z
+deadline: 2026-07-25T18:30:00Z
+expected_exit: protected authenticated goal definitions deterministic canonical agent matching frozen exact-version runs verified-output reports and optional evidence-only provenance
+external_effect_authority: local files existing dependencies disposable local PostgreSQL local tests and one local atomic commit only; no network download push deploy managed migration sponsor live API wallet signature transaction funding upload form spend or claim promotion
+path_amendment: C0 added exactly scripts/test-migrations.ts for migration 15 count and additive protected goal-loop schema assertions while preserving existing sentinels
+worker_fencing_path_amendment: C0 added exactly tests/integration/worker-fencing.test.ts to replace stale SUCCEEDED settlement-at-worker expectations with DELIVERY_READY and zero settlement or commission
+completed_at: 2026-07-25T14:22:41Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - migration 20260725163000_protected_goal_loop SHA-256 06b03cd497863e37cb768424bec5e17e357abe92bcb7360c50802199c350770c
+  - prisma validate and generate PASS against explicit loopback URLs
+  - tsx scripts/test-migrations.ts PASS all fifteen-migration fresh Cannes canonical W6 and noncanonical W6 lanes
+  - npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm test PASS 10 of 10
+  - npm run test:auth PASS 9 of 9
+  - npm run test:kernel PASS 33 of 33 including protected goal loop 7 of 7
+  - npm run test:a4 PASS 22 of 22
+  - npm run test:a5 PASS 3 of 3
+  - npm run test:a6 PASS 19 of 19
+  - focused worker-fencing and protected-goal-loop integration PASS 3 of 3
+  - npm run test:e2e PASS 4 of 4
+  - npm run test:resilience PASS 1 of 1
+  - npm run test:redaction PASS 3 of 3
+  - npm run test:boot PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+  - npm run build PASS 35 static pages and three protected goal API routes
+remaining_blocks:
+  - npm run test:integration PASS 31 of 41; ten inherited A3 tests hook-fail only because the host has no local Go toolchain
+  - immutable exact-SHA audit and bounded remediation remain required
+  - managed Neon migration deployment cycle runtime wiring frontend wiring live APIs signatures transactions push release and claims remain unauthorized or sequentially pending
+external_effects_attempted: none
+verdict: PASS_TO_AUDIT
+lock_release: release only exact token A5-GOAL-LOOP-KERNEL-W1-C4E2536-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: ENS Integrator /root/a4_delivery_ready_reconcile
 task_id: A4-DELIVERY-READY-RECONCILE-20260725
 task_instance_id: A4-DELIVERY-READY-RECONCILE-20260725:W1:8B8405A

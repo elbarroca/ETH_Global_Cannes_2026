@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import type { TestContext } from "node:test";
 import postgres from "postgres";
@@ -44,6 +44,27 @@ interface PublicationAuthorityFixture {
   close: () => Promise<void>;
 }
 
+function testRolePassword(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+async function executeRoleCommand(
+  database: DisposableDatabase,
+  format: string,
+  ...values: string[]
+): Promise<void> {
+  const rows = await database.sql<{ command: string }[]>`
+    SELECT format(
+      ${format}::text,
+      ${values[0] ?? null}::text,
+      ${values[1] ?? null}::text
+    ) AS command
+  `;
+  const command = rows[0]?.command;
+  if (!command) throw new Error("TEST_ROLE_COMMAND_INVALID");
+  await database.sql.unsafe(command);
+}
+
 async function publicationAuthority(
   database: DisposableDatabase,
   versionId: string,
@@ -51,13 +72,17 @@ async function publicationAuthority(
 ): Promise<PublicationAuthorityFixture> {
   const suffix = Math.random().toString(36).slice(2, 10);
   const role = `kernel_pub_${process.pid}_${suffix}`;
-  await database.sql.unsafe(
-    `CREATE ROLE "${role}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT; ` +
-    `GRANT alphadawg_runtime TO "${role}"`,
+  const password = testRolePassword();
+  await executeRoleCommand(
+    database,
+    "CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT",
+    role,
+    password,
   );
+  await executeRoleCommand(database, "GRANT alphadawg_runtime TO %I", role);
   const runtimeUrl = new URL(database.url);
   runtimeUrl.username = role;
-  runtimeUrl.password = "";
+  runtimeUrl.password = password;
   const runtimeSql = postgres(runtimeUrl.toString(), { max: 1, prepare: false });
   await verifyEnsPublicationDatabaseClient(runtimeSql, role);
   const now = new Date();
@@ -95,7 +120,7 @@ async function publicationAuthority(
     resolverCalls: () => fixture.resolver.calls.length,
     close: async () => {
       await runtimeSql.end({ timeout: 1 });
-      await database.sql.unsafe(`DROP ROLE "${role}"`);
+      await executeRoleCommand(database, "DROP ROLE %I", role);
     },
   };
 }
@@ -152,23 +177,32 @@ export async function runLifecycleCases(
     const safeRole = `kernel_attest_${suffix}`;
     const extraParent = `kernel_parent_${suffix}`;
     const unsafeRole = `kernel_unsafe_${suffix}`;
-    await database.sql.unsafe(
-      `CREATE ROLE "${safeRole}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE ` +
-      `NOREPLICATION NOBYPASSRLS INHERIT; GRANT alphadawg_runtime TO "${safeRole}"; ` +
-      `CREATE ROLE "${extraParent}" NOLOGIN; ` +
-      `CREATE ROLE "${unsafeRole}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE ` +
-      `NOREPLICATION NOBYPASSRLS INHERIT; ` +
-      `GRANT alphadawg_runtime, "${extraParent}" TO "${unsafeRole}"; ` +
-      `GRANT SELECT ON ens_publication_decisions TO "${unsafeRole}"`,
+    const safePassword = testRolePassword();
+    const unsafePassword = testRolePassword();
+    await executeRoleCommand(
+      database,
+      "CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT",
+      safeRole,
+      safePassword,
     );
-    const connectRole = (role: string) => {
+    await executeRoleCommand(database, "GRANT alphadawg_runtime TO %I", safeRole);
+    await executeRoleCommand(database, "CREATE ROLE %I NOLOGIN", extraParent);
+    await executeRoleCommand(
+      database,
+      "CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT",
+      unsafeRole,
+      unsafePassword,
+    );
+    await executeRoleCommand(database, "GRANT alphadawg_runtime, %I TO %I", extraParent, unsafeRole);
+    await executeRoleCommand(database, "GRANT SELECT ON ens_publication_decisions TO %I", unsafeRole);
+    const connectRole = (role: string, password: string) => {
       const url = new URL(database.url);
       url.username = role;
-      url.password = "";
+      url.password = password;
       return postgres(url.toString(), { max: 1, prepare: false });
     };
-    const safe = connectRole(safeRole);
-    const unsafe = connectRole(unsafeRole);
+    const safe = connectRole(safeRole, safePassword);
+    const unsafe = connectRole(unsafeRole, unsafePassword);
     try {
       await verifyEnsPublicationDatabaseClient(safe, safeRole);
       await assert.rejects(
@@ -188,10 +222,10 @@ export async function runLifecycleCases(
         safe.end({ timeout: 1 }),
         unsafe.end({ timeout: 1 }),
       ]);
-      await database.sql.unsafe(
-        `REVOKE SELECT ON ens_publication_decisions FROM "${unsafeRole}"; ` +
-        `DROP ROLE "${safeRole}"; DROP ROLE "${unsafeRole}"; DROP ROLE "${extraParent}"`,
-      );
+      await executeRoleCommand(database, "REVOKE SELECT ON ens_publication_decisions FROM %I", unsafeRole);
+      await executeRoleCommand(database, "DROP ROLE %I", safeRole);
+      await executeRoleCommand(database, "DROP ROLE %I", unsafeRole);
+      await executeRoleCommand(database, "DROP ROLE %I", extraParent);
     }
   });
   await t.test("agent lifecycle action parsing rejects authority fields and active Markdown", () => {

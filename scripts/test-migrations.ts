@@ -34,6 +34,7 @@ const A4_KERNEL_PUBLICATION_INTEGRITY_MIGRATION = "20260725072000_a4_kernel_publ
 const A4_KERNEL_ACTION_INTEGRITY_MIGRATION = "20260725082000_a4_kernel_action_integrity";
 const A6_UNISWAP_TOOL_RECEIPT_MIGRATION = "20260725100000_a6_uniswap_tool_receipt";
 const A5_A6_KERNEL_FOUNDATION_MIGRATION = "20260725113000_a5_a6_kernel_foundation";
+const PROTECTED_GOAL_LOOP_MIGRATION = "20260725163000_protected_goal_loop";
 const PRE_HARDENING_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -727,6 +728,10 @@ async function verifyDatabase(
       ens_publication_authority_policies: string | null;
       agent_version_events: string | null;
       agent_lifecycle_actions: string | null;
+      goals: string | null;
+      goal_runs: string | null;
+      goal_run_jobs: string | null;
+      agent_version_provenance: string | null;
       user_count: string;
       migration_count: string;
       baseline_count: string;
@@ -764,6 +769,9 @@ async function verifyDatabase(
       a6_uniswap_tool_receipt_count: string;
       a5_a6_kernel_foundation_count: string;
       a5_a6_kernel_constraint_count: string;
+      protected_goal_loop_count: string;
+      protected_goal_loop_constraint_count: string;
+      protected_goal_loop_trigger_count: string;
       sequence_type: string;
       sequence_start: string;
       sequence_min: string;
@@ -788,6 +796,10 @@ async function verifyDatabase(
         to_regclass('public.ens_publication_authority_policies')::text AS ens_publication_authority_policies,
         to_regclass('public.agent_version_events')::text AS agent_version_events,
         to_regclass('public.agent_lifecycle_actions')::text AS agent_lifecycle_actions,
+        to_regclass('public.goals')::text AS goals,
+        to_regclass('public.goal_runs')::text AS goal_runs,
+        to_regclass('public.goal_run_jobs')::text AS goal_run_jobs,
+        to_regclass('public.agent_version_provenance')::text AS agent_version_provenance,
         (SELECT count(*)::text FROM users) AS user_count,
         (
           SELECT count(*)::text
@@ -1101,6 +1113,37 @@ async function verifyDatabase(
             'uniswap_receipts_chain_is_unichain_sepolia'
           )
         ) AS a5_a6_kernel_constraint_count,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${PROTECTED_GOAL_LOOP_MIGRATION} AND finished_at IS NOT NULL
+        ) AS protected_goal_loop_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'goals_limits_check',
+            'goals_schedule_check',
+            'goal_runs_snapshot_check',
+            'goal_runs_report_check',
+            'goal_runs_terminal_check',
+            'goal_runs_claim_check',
+            'goal_run_jobs_role_check',
+            'goal_run_jobs_price_check',
+            'agent_version_provenance_protocol_check',
+            'agent_version_provenance_address_check',
+            'agent_version_provenance_uri_check',
+            'agent_version_provenance_hash_check'
+          )
+        ) AS protected_goal_loop_constraint_count,
+        (
+          SELECT count(*)::text FROM pg_trigger
+          WHERE NOT tgisinternal AND tgname IN (
+            'goals_legal_transition',
+            'goal_runs_legal_transition',
+            'goal_runs_snapshot_immutable',
+            'goal_run_jobs_immutable',
+            'agent_version_provenance_append_only'
+          )
+        ) AS protected_goal_loop_trigger_count,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
         seq.min_value::text AS sequence_min,
@@ -1128,8 +1171,12 @@ async function verifyDatabase(
       result.ens_publication_authority_policies !== "ens_publication_authority_policies" ||
       result.agent_version_events !== "agent_version_events" ||
       result.agent_lifecycle_actions !== "agent_lifecycle_actions" ||
+      result.goals !== "goals" ||
+      result.goal_runs !== "goal_runs" ||
+      result.goal_run_jobs !== "goal_run_jobs" ||
+      result.agent_version_provenance !== "agent_version_provenance" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 14 ||
+      Number(result.migration_count) !== 15 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1163,6 +1210,9 @@ async function verifyDatabase(
       Number(result.a6_uniswap_tool_receipt_count) !== 1 ||
       Number(result.a5_a6_kernel_foundation_count) !== 1 ||
       Number(result.a5_a6_kernel_constraint_count) !== 14 ||
+      Number(result.protected_goal_loop_count) !== 1 ||
+      Number(result.protected_goal_loop_constraint_count) !== 12 ||
+      Number(result.protected_goal_loop_trigger_count) !== 5 ||
       result.receipt_authority_nullable !== "NO" ||
       result.lifecycle_action_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||

@@ -171,7 +171,7 @@ test("reclaimed jobs reject every stale worker mutation and preserve one effect"
     assert.equal(await finalizePersistedEffect(claimB, {
       now: completionTime,
       sql: database.sql,
-    }), "SUCCEEDED");
+    }), "DELIVERY_READY");
     const completed = await database.sql<{
       state: string;
       effect_state: string;
@@ -194,12 +194,12 @@ test("reclaimed jobs reject every stale worker mutation and preserve one effect"
       WHERE j.id = ${submitted.jobId}::uuid
     `;
     assert.deepEqual(completed[0], {
-      state: "SUCCEEDED",
+      state: "DELIVERY_READY",
       effect_state: "SUCCEEDED",
       effects: 1,
       receipts: 1,
-      settlements: 1,
-      commissions: 1,
+      settlements: 0,
+      commissions: 0,
       refunds: 0,
     });
 

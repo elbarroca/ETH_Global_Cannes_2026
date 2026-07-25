@@ -470,7 +470,11 @@ async function loadSubmission(
 export async function submitJob(
   buyerUserId: string,
   input: { agentVersionId: string; idempotencyKey: string; task: KernelJobInput },
-  options: { now?: Date; sql?: DatabaseClient } = {},
+  options: {
+    now?: Date;
+    sql?: DatabaseClient;
+    mutationGuard?: (sql: DatabaseClient, now: Date) => Promise<boolean>;
+  } = {},
 ): Promise<SubmittedJob> {
   const sql = options.sql ?? getDb();
   const now = options.now ?? new Date();
@@ -484,6 +488,9 @@ export async function submitJob(
   return sql.begin(async (transaction) => {
     const tx = transaction as unknown as DatabaseClient;
     await tx`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+    if (options.mutationGuard && !(await options.mutationGuard(tx, now))) {
+      throw new KernelError("KERNEL_CONFLICT", "Mutation claim is no longer current", 409);
+    }
 
     const existing = await loadSubmission(tx, buyerUserId, input.idempotencyKey);
     if (existing) {

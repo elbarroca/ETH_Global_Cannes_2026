@@ -141,6 +141,121 @@ export interface ProtectedPublishedAgent extends AgentLifecycleVersion {
   publishedAt: string;
 }
 
+export interface AgentVersionProvenance {
+  protocol: "INFT";
+  chainId: number;
+  contractAddress: string;
+  tokenId: string;
+  metadataUri: string | null;
+  evidenceHash: string;
+  observedAt: string;
+}
+
+export interface ProtectedPublishedAgentRead extends ProtectedPublishedAgent {
+  verifiedExternalHires: number;
+  provenance: AgentVersionProvenance | null;
+}
+
+export const GOAL_STATES = ["DRAFT", "ACTIVE", "PAUSED", "COMPLETED"] as const;
+export type GoalState = (typeof GOAL_STATES)[number];
+
+export const GOAL_RUN_STATES = [
+  "SCHEDULED",
+  "SELECTING",
+  "RUNNING",
+  "SYNTHESIZING",
+  "READY",
+  "PARTIAL",
+  "BLOCKED",
+  "FAILED",
+  "CANCELED",
+] as const;
+export type GoalRunState = (typeof GOAL_RUN_STATES)[number];
+
+export interface GoalPolicy extends Record<string, CanonicalValue> {
+  cadenceMinutes: 5 | 15 | 30 | 60;
+  runMode: "BOUNDED" | "CONTINUOUS";
+  executionMode: "RESEARCH_ONLY" | "PROPOSE_SWAP";
+  runLimit: number | null;
+  maxAgents: number;
+  perRunCapAtomic: string;
+  dailyCapAtomic: string | null;
+}
+
+export interface SwapProposalV1 extends Record<string, CanonicalValue> {
+  schemaVersion: 1;
+  chainId: 1301;
+  tokenIn: string;
+  tokenOut: string;
+  amountInAtomic: string;
+  slippageBps: number;
+  rationale: string;
+  requiresWalletApproval: true;
+}
+
+export interface GoalRunEvidenceV1 extends Record<string, CanonicalValue> {
+  jobId: string;
+  agentVersionId: string;
+  resultHash: string;
+  receiptId: string;
+}
+
+export interface GoalRunReportV1 extends Record<string, CanonicalValue> {
+  schemaVersion: 1;
+  goalId: string;
+  runId: string;
+  status: "READY" | "PARTIAL";
+  objective: string;
+  summary: string;
+  conclusion: string;
+  evidence: readonly GoalRunEvidenceV1[];
+  swapProposal: SwapProposalV1 | null;
+}
+
+export interface GoalSnapshot {
+  goalId: string;
+  objective: string;
+  requiredCapabilities: readonly string[];
+  policy: GoalPolicy;
+  state: GoalState;
+  nextRunAt: string | null;
+  completedRuns: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GoalRunJobSnapshot {
+  agentVersionId: string;
+  jobId: string | null;
+  role: "ANALYSIS" | "SYNTHESIS";
+  selectionRank: number;
+  coveredCapabilities: readonly string[];
+  priceAtomic: string;
+  manifestHash: string;
+  fullSubname: string;
+}
+
+export interface GoalRunSnapshot {
+  runId: string;
+  goalId: string;
+  scheduledFor: string;
+  state: GoalRunState;
+  objective: string;
+  requiredCapabilities: readonly string[];
+  policy: GoalPolicy;
+  policyHash: string;
+  effectIdentity: string;
+  totalPriceAtomic: string;
+  report: GoalRunReportV1 | null;
+  reportHash: string | null;
+  errorCode: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  jobs: readonly GoalRunJobSnapshot[];
+}
+
 export interface PublishedAgent {
   agentId: string;
   versionId: string;

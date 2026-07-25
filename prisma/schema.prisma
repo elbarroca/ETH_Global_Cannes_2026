@@ -26,6 +26,8 @@ model User {
   pendingCycles      PendingCycle[]
   chatMessages       ChatMessage[]
   lifecycleActions   AgentLifecycleAction[]
+  goals              Goal[]                 @relation("GoalOwner")
+  goalRuns           GoalRun[]              @relation("GoalRunOwner")
 
   @@index([walletAddress], map: "idx_users_wallet")
   @@map("users")
@@ -407,6 +409,8 @@ model AgentVersion {
   publicationAction AgentLifecycleAction? @relation("PublishedByLifecycleAction", fields: [publicationActionId], references: [id], onDelete: Restrict)
   x402PaymentReceipts X402PaymentReceipt[]
   uniswapToolReceipts UniswapToolReceipt[]
+  provenance     AgentVersionProvenance?
+  goalRunJobs    GoalRunJob[]
 
   @@unique([agentId, version], map: "uniq_agent_versions_agent_version")
   @@index([published, createdAt], map: "idx_agent_versions_published_created")
@@ -522,10 +526,113 @@ model Job {
   updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
   x402PaymentReceipt X402PaymentReceipt?
   uniswapToolReceipts UniswapToolReceipt[]
+  goalRunJob        GoalRunJob?
 
   @@index([state, availableAt], map: "idx_jobs_state_available")
   @@index([buyerUserId, createdAt], map: "idx_jobs_buyer_created")
   @@map("jobs")
+}
+
+model Goal {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerUserId          String    @map("owner_user_id")
+  idempotencyKey       String    @map("idempotency_key")
+  definitionHash       String    @map("definition_hash")
+  lastMutationKey      String?   @map("last_mutation_key")
+  lastMutationHash     String?   @map("last_mutation_hash")
+  objective            String    @db.Text
+  requiredCapabilities String[]  @map("required_capabilities")
+  cadenceMinutes       Int       @map("cadence_minutes")
+  runMode              String    @map("run_mode")
+  executionMode        String    @map("execution_mode")
+  runLimit             Int?      @map("run_limit")
+  maxAgents            Int       @map("max_agents")
+  perRunCapAtomic      BigInt    @map("per_run_cap_atomic")
+  dailyCapAtomic       BigInt?   @map("daily_cap_atomic")
+  state                String    @default("DRAFT")
+  nextRunAt            DateTime? @map("next_run_at") @db.Timestamptz(6)
+  completedRuns        Int       @default(0) @map("completed_runs")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  owner                User      @relation("GoalOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  runs                 GoalRun[]
+
+  @@unique([ownerUserId, idempotencyKey], map: "uniq_goals_owner_idempotency")
+  @@index([ownerUserId, createdAt], map: "idx_goals_owner_created")
+  @@index([state, nextRunAt], map: "idx_goals_due")
+  @@map("goals")
+}
+
+model GoalRun {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  goalId                String    @map("goal_id") @db.Uuid
+  ownerUserId           String    @map("owner_user_id")
+  idempotencyKey        String    @map("idempotency_key")
+  scheduledFor          DateTime  @map("scheduled_for") @db.Timestamptz(6)
+  state                 String    @default("SCHEDULED")
+  objectiveSnapshot     String    @map("objective_snapshot") @db.Text
+  capabilitiesSnapshot  String[]  @map("capabilities_snapshot")
+  policySnapshot        Json      @map("policy_snapshot")
+  policyHash            String    @map("policy_hash")
+  effectIdentity        String    @unique @map("effect_identity")
+  totalPriceAtomic      BigInt    @default(0) @map("total_price_atomic")
+  report                Json?
+  reportHash            String?   @map("report_hash")
+  errorCode             String?   @map("error_code")
+  claimOwner            String?   @map("claim_owner")
+  claimEpoch            BigInt?   @map("claim_epoch")
+  claimVersion          Int       @default(0) @map("claim_version")
+  claimExpiresAt        DateTime? @map("claim_expires_at") @db.Timestamptz(6)
+  startedAt             DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt           DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  goal                  Goal      @relation(fields: [goalId], references: [id], onDelete: Restrict)
+  owner                 User      @relation("GoalRunOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  jobs                  GoalRunJob[]
+
+  @@unique([goalId, scheduledFor], map: "uniq_goal_runs_scheduled_slot")
+  @@unique([ownerUserId, idempotencyKey], map: "uniq_goal_runs_owner_idempotency")
+  @@index([ownerUserId, createdAt], map: "idx_goal_runs_owner_created")
+  @@index([state, scheduledFor], map: "idx_goal_runs_state_scheduled")
+  @@map("goal_runs")
+}
+
+model GoalRunJob {
+  id                    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  goalRunId             String       @map("goal_run_id") @db.Uuid
+  agentVersionId        String       @map("agent_version_id") @db.Uuid
+  jobId                 String?      @unique @map("job_id") @db.Uuid
+  role                  String
+  selectionRank         Int          @map("selection_rank")
+  coveredCapabilities   String[]     @map("covered_capabilities")
+  priceAtomicSnapshot   BigInt       @map("price_atomic_snapshot")
+  manifestHashSnapshot  String       @map("manifest_hash_snapshot")
+  fullSubnameSnapshot   String       @map("full_subname_snapshot")
+  createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  run                   GoalRun      @relation(fields: [goalRunId], references: [id], onDelete: Restrict)
+  agentVersion          AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  job                   Job?         @relation(fields: [jobId], references: [id], onDelete: Restrict)
+
+  @@unique([goalRunId, role, agentVersionId], map: "uniq_goal_run_jobs_role_version")
+  @@index([goalRunId, selectionRank], map: "idx_goal_run_jobs_rank")
+  @@map("goal_run_jobs")
+}
+
+model AgentVersionProvenance {
+  agentVersionId  String       @id @map("agent_version_id") @db.Uuid
+  protocol        String
+  chainId         Int          @map("chain_id")
+  contractAddress String       @map("contract_address")
+  tokenId         String       @map("token_id")
+  metadataUri     String?      @map("metadata_uri")
+  evidenceHash    String       @map("evidence_hash")
+  observedAt      DateTime     @map("observed_at") @db.Timestamptz(6)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  agentVersion    AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+
+  @@index([chainId, contractAddress, tokenId], map: "idx_agent_version_provenance_token")
+  @@map("agent_version_provenance")
 }
 
 model JobEvent {

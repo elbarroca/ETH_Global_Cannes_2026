@@ -12,7 +12,9 @@ import type {
   AgentLifecycleState,
   AgentLifecycleVersion,
   AgentManifest,
+  AgentVersionProvenance,
   ProtectedPublishedAgent,
+  ProtectedPublishedAgentRead,
 } from "./types";
 
 interface LifecycleRow {
@@ -49,6 +51,17 @@ interface LifecycleRow {
 
 interface LockedLifecycleRow extends LifecycleRow {
   write_plan: AgentEnsWritePlan | null;
+}
+
+interface LifecycleReadRow extends LifecycleRow {
+  verified_external_hires: string;
+  provenance_protocol: string | null;
+  provenance_chain_id: number | null;
+  provenance_contract_address: string | null;
+  provenance_token_id: string | null;
+  provenance_metadata_uri: string | null;
+  provenance_evidence_hash: string | null;
+  provenance_observed_at: Date | null;
 }
 
 const PUBLICATION_AUTHORITY_TIMEOUT_MS = 5_000;
@@ -448,6 +461,38 @@ function asPublished(value: AgentLifecycleVersion): ProtectedPublishedAgent {
     authorityReleaseSha: value.authorityReleaseSha,
     publicationDecisionId: value.publicationDecisionId,
     publishedAt: value.publishedAt,
+  };
+}
+
+function mapProvenance(row: LifecycleReadRow): AgentVersionProvenance | null {
+  const chainId = row.provenance_chain_id;
+  const fields = [
+    row.provenance_protocol,
+    row.provenance_chain_id,
+    row.provenance_contract_address,
+    row.provenance_token_id,
+    row.provenance_evidence_hash,
+    row.provenance_observed_at,
+  ];
+  if (fields.every((field) => field === null)) return null;
+  if (
+    row.provenance_protocol !== "INFT" ||
+    typeof chainId !== "number" || !Number.isInteger(chainId) || chainId < 1 ||
+    !row.provenance_contract_address || !/^0x[0-9a-f]{40}$/.test(row.provenance_contract_address) ||
+    !row.provenance_token_id || !/^(0|[1-9][0-9]{0,77})$/.test(row.provenance_token_id) ||
+    !row.provenance_evidence_hash || !/^[0-9a-f]{64}$/.test(row.provenance_evidence_hash) ||
+    !row.provenance_observed_at
+  ) {
+    throw new Error("KERNEL_AGENT_PROVENANCE_INVALID");
+  }
+  return {
+    protocol: "INFT",
+    chainId,
+    contractAddress: row.provenance_contract_address,
+    tokenId: row.provenance_token_id,
+    metadataUri: row.provenance_metadata_uri,
+    evidenceHash: row.provenance_evidence_hash,
+    observedAt: row.provenance_observed_at.toISOString(),
   };
 }
 
@@ -1130,9 +1175,9 @@ export async function publishAgentVersion(
 export async function listAgentLifecycle(
   viewerUserId: string,
   options: { sql?: DatabaseClient } = {},
-): Promise<{ agents: ProtectedPublishedAgent[]; drafts: AgentLifecycleVersion[] }> {
+): Promise<{ agents: ProtectedPublishedAgentRead[]; drafts: AgentLifecycleVersion[] }> {
   const sql = options.sql ?? getDb();
-  const rows = await sql<LifecycleRow[]>`
+  const rows = await sql<LifecycleReadRow[]>`
     SELECT
       a.id AS agent_id, v.id AS version_id, v.version, a.name,
       COALESCE(v.manifest->>'description', '') AS description,
@@ -1143,16 +1188,43 @@ export async function listAgentLifecycle(
       v.canonical_state, v.authority_owner, v.authority_delegate,
       v.authority_policy_version, v.authority_refusal, v.authority_release_sha,
       v.publication_decision_id,
-      v.published_at
+      v.published_at,
+      COALESCE(hires.verified_external_hires, '0') AS verified_external_hires,
+      provenance.protocol AS provenance_protocol,
+      provenance.chain_id AS provenance_chain_id,
+      provenance.contract_address AS provenance_contract_address,
+      provenance.token_id AS provenance_token_id,
+      provenance.metadata_uri AS provenance_metadata_uri,
+      provenance.evidence_hash AS provenance_evidence_hash,
+      provenance.observed_at AS provenance_observed_at
     FROM agent_versions v
     JOIN kernel_agents a ON a.id = v.agent_id
+    LEFT JOIN agent_version_provenance provenance ON provenance.agent_version_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT count(*)::text AS verified_external_hires
+      FROM jobs job
+      JOIN effects effect ON effect.job_id = job.id
+      JOIN receipts receipt ON receipt.job_id = job.id AND receipt.effect_id = effect.id
+      WHERE job.agent_version_id = v.id
+        AND job.buyer_user_id <> a.owner_user_id
+        AND job.state = 'SUCCEEDED'
+        AND effect.state = 'SUCCEEDED'
+        AND effect.result_hash = receipt.result_hash
+        AND receipt.verified = true
+    ) hires ON true
     WHERE v.lifecycle_state = 'PUBLISHED'
        OR (a.owner_user_id = ${viewerUserId} AND v.lifecycle_state IN ('DRAFT', 'NAME_BOUND', 'WRITE_PREPARED'))
     ORDER BY v.created_at ASC, v.id ASC
   `;
-  const visible = rows.map((row) => mapLifecycle(row, viewerUserId));
+  const visible = rows.map((row) => ({ row, value: mapLifecycle(row, viewerUserId) }));
   return {
-    agents: visible.filter((entry) => entry.lifecycleState === "PUBLISHED").map(asPublished),
-    drafts: visible.filter((entry) => entry.lifecycleState !== "PUBLISHED"),
+    agents: visible.filter(({ value }) => value.lifecycleState === "PUBLISHED").map(({ row, value }) => {
+      const verifiedExternalHires = Number(row.verified_external_hires);
+      if (!Number.isSafeInteger(verifiedExternalHires) || verifiedExternalHires < 0) {
+        throw new Error("KERNEL_AGENT_HIRE_COUNT_INVALID");
+      }
+      return { ...asPublished(value), verifiedExternalHires, provenance: mapProvenance(row) };
+    }),
+    drafts: visible.filter(({ value }) => value.lifecycleState !== "PUBLISHED").map(({ value }) => value),
   };
 }
