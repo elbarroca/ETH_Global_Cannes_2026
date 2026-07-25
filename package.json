@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test": "tsx --test tests/foundation/*.test.ts tests/kernel/state.test.ts",
     "test:auth": "tsx --test tests/auth/*.test.ts",
-    "test:kernel": "tsx --test tests/kernel/*.test.ts",
+    "test:kernel": "tsx --test --test-concurrency=1 tests/kernel/*.test.ts",
     "test:integration": "tsx --test tests/integration/*.test.ts tests/a3/*.test.ts tests/a4/*.test.ts && tsx scripts/test-migrations.ts",
     "test:a3": "tsx --test tests/a3/*.test.ts",
     "test:a4": "tsx --test tests/a4/*.test.ts",

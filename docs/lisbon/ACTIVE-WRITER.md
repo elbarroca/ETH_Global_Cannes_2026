@@ -3,6 +3,44 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/goal_loop_kernel
+task_id: KERNEL-TEST-SCRAM-SERIALIZATION-20260725
+task_instance_id: KERNEL-TEST-SCRAM-SERIALIZATION-20260725:W1:D33F58E
+generation: 1
+sprint: serialize Kernel test files to avoid PostgreSQL 14 cluster-global role races
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: d33f58efac556e06aa9da9b46bce36916ff8d5b1
+control_sha: d33f58efac556e06aa9da9b46bce36916ff8d5b1
+token: KERNEL-TEST-SERIAL-W1-D33F58E-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T15:06:55Z
+expires_at: 2026-07-25T21:15:00Z
+allowed_paths:
+  - package.json
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T15:06:55Z
+deadline: 2026-07-25T21:15:00Z
+expected_exit: native Node test concurrency one for the Kernel file set with unchanged test and PostgreSQL authentication behavior
+external_effect_authority: local files existing dependencies local tests and one local commit only; no Neon external database install push deploy live signature transaction funding form spend or claim
+completed_at: 2026-07-25T15:08:36Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - Node v22.22.3 native help exposes --test-concurrency and installed tsx is 4.21.0
+  - npm run test:kernel PASS 35 of 35 with test concurrency one
+  - npm run typecheck PASS
+  - git diff --check PASS
+  - npm run scan:secrets PASS
+remaining_blocks:
+  - W3 protected goal-loop audit remediation remains paused pending owner resumption after CI-faithful SCRAM rerun
+  - managed Neon external database install push deploy live signature transaction funding form spend and claims remain unauthorized
+external_effects_attempted: none
+verdict: PASS_TO_AUDIT
+lock_release: release only exact token KERNEL-TEST-SERIAL-W1-D33F58E-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: ENS Integrator /root/ens_scram_ci_fix
 task_id: A4-ENS-SCRAM-CI-FIX-20260725
 task_instance_id: A4-ENS-SCRAM-CI-FIX-20260725:W1:5D6C604
