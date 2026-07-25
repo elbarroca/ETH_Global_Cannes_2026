@@ -35,6 +35,7 @@ import type {
   AdapterExecutionResult,
   KernelAdapter,
 } from "../../src/worker/adapter";
+import type { GoalRunReportV1, GoalRunState } from "../../src/kernel/types";
 import { runWorkerOnce } from "../../src/worker/runner";
 import {
   configureDatabaseEnvironment,
@@ -343,6 +344,8 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       name: "Self Owned Agent", parent: "buyer.eth", label: "self",
       capabilities: ["market-analysis", "risk-analysis", "research"],
     });
+    const terminalRunIds = new Map<GoalRunState, string>();
+    let canonicalReady: { runId: string; report: GoalRunReportV1; reportHash: string } | null = null;
 
     await t.test("matching is deterministic, excludes self, freezes versions, and synthesizes verified outputs", async () => {
       const created = await createGoal(BUYER_ID, activeGoal({
@@ -397,6 +400,9 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       assert.equal(ready.report?.swapProposal, null);
       assert.equal(ready.report?.evidence.length, 3);
       assert.match(ready.reportHash ?? "", /^[0-9a-f]{64}$/);
+      assert.ok(ready.report && ready.reportHash);
+      terminalRunIds.set("READY", ready.runId);
+      canonicalReady = { runId: ready.runId, report: ready.report, reportHash: ready.reportHash };
 
       const second = await createGoalRun(BUYER_ID, created.goal.goalId, "goal-multi-run-02", {
         now: at(10_000), sql: database.sql,
@@ -421,6 +427,7 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       assert.equal(partial.report?.status, "PARTIAL");
       assert.equal(partial.report?.swapProposal, null);
       assert.equal(partial.report?.evidence.length, 1);
+      terminalRunIds.set("PARTIAL", partial.runId);
       assert.equal((await getGoal(BUYER_ID, created.goal.goalId))?.state, "COMPLETED");
       await assert.rejects(
         createGoalRun(BUYER_ID, created.goal.goalId, "goal-multi-run-03", { sql: database.sql }),
@@ -441,6 +448,7 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       assert.equal(missingRun.run.state, "BLOCKED");
       assert.equal(missingRun.run.errorCode, "GOAL_CAPABILITY_UNAVAILABLE");
       assert.equal(missingRun.run.jobs.length, 0);
+      terminalRunIds.set("BLOCKED", missingRun.run.runId);
 
       const budget = await createGoal(BUYER_ID, activeGoal({
         objective: "Refuse before hiring when the exact selected price exceeds the cap.",
@@ -454,6 +462,70 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       assert.equal(budgetRun.run.state, "BLOCKED");
       assert.equal(budgetRun.run.errorCode, "GOAL_PER_RUN_CAP_EXCEEDED");
       assert.equal(budgetRun.run.jobs.length, 0);
+    });
+
+    await t.test("continuous reservations serialize concurrent runs and charge delayed slots on the actual day", async () => {
+      const concurrent = await createGoal(BUYER_ID, activeGoal({
+        objective: "Serialize concurrent continuous runs before any extra hire can be created.",
+        capabilities: ["research"], runMode: "CONTINUOUS", maxAgents: 1,
+        perRunCapAtomic: "1000", dailyCapAtomic: "1000",
+      }), "goal-concurrent-create-01", { now: at(24_000), sql: database.sql });
+      const concurrentRuns = await Promise.all([
+        createGoalRun(BUYER_ID, concurrent.goal.goalId, "goal-concurrent-run-01", {
+          now: at(24_001), sql: database.sql,
+        }),
+        createGoalRun(BUYER_ID, concurrent.goal.goalId, "goal-concurrent-run-02", {
+          now: at(24_002), sql: database.sql,
+        }),
+      ]);
+      assert.equal(concurrentRuns.filter(({ run }) => run.state === "RUNNING").length, 1);
+      assert.equal(concurrentRuns.filter(({ run }) => run.state === "BLOCKED").length, 1);
+      const concurrentTotals = await database.sql<{ reserved: string; jobs: string }[]>`
+        SELECT COALESCE(sum(total_price_atomic), 0)::text AS reserved,
+          (SELECT count(*)::text FROM jobs WHERE buyer_user_id = ${BUYER_ID}
+            AND id IN (SELECT job_id FROM goal_run_jobs WHERE goal_run_id IN (
+              SELECT id FROM goal_runs WHERE goal_id = ${concurrent.goal.goalId}::uuid
+            ))) AS jobs
+        FROM goal_runs WHERE goal_id = ${concurrent.goal.goalId}::uuid
+      `;
+      assert.deepEqual(concurrentTotals[0], { reserved: "1000", jobs: "1" });
+
+      const delayed = await createGoal(BUYER_ID, activeGoal({
+        objective: "Charge delayed scheduled work against the day its cost is actually reserved.",
+        capabilities: ["research"], runMode: "CONTINUOUS", maxAgents: 1,
+        perRunCapAtomic: "1000", dailyCapAtomic: "1000",
+      }), "goal-delayed-create-01", { now: at(25_000), sql: database.sql });
+      const beforeReservation = new Date();
+      const currentRun = await createGoalRun(BUYER_ID, delayed.goal.goalId, "goal-delayed-current-01", {
+        now: at(25_001), sql: database.sql,
+      });
+      const afterReservation = new Date();
+      assert.equal(currentRun.run.state, "RUNNING");
+      assert.ok(currentRun.run.costReservedAt);
+      const reservedAt = new Date(currentRun.run.costReservedAt);
+      assert.ok(reservedAt >= beforeReservation && reservedAt <= afterReservation);
+      const historicalSlot = new Date("2026-07-20T10:00:00.000Z");
+      const delayedRows = await database.sql<{ id: string }[]>`
+        INSERT INTO goal_runs (
+          goal_id, owner_user_id, idempotency_key, scheduled_for, state,
+          objective_snapshot, capabilities_snapshot, policy_snapshot, policy_hash,
+          effect_identity, created_at, updated_at
+        ) VALUES (
+          ${delayed.goal.goalId}::uuid, ${BUYER_ID}, 'goal-delayed-slot-01', ${historicalSlot}, 'SCHEDULED',
+          ${delayed.goal.objective}, ${[...delayed.goal.requiredCapabilities]},
+          ${database.sql.json(delayed.goal.policy)}, ${domainHash("goal-policy", delayed.goal.policy)},
+          ${domainHash("goal-delayed-slot", { goalId: delayed.goal.goalId, scheduledFor: historicalSlot.toISOString() })},
+          ${at(25_002)}, ${at(25_002)}
+        ) RETURNING id
+      `;
+      assert.ok(delayedRows[0]);
+      const delayedRun = await processGoalRun(BUYER_ID, delayedRows[0].id, {
+        now: at(25_003), sql: database.sql,
+      });
+      assert.equal(delayedRun.state, "BLOCKED");
+      assert.equal(delayedRun.errorCode, "GOAL_DAILY_CAP_EXCEEDED");
+      assert.equal(delayedRun.costReservedAt, null);
+      assert.equal(delayedRun.jobs.length, 0);
     });
 
     await t.test("continuous daily cap, failed results, pause/resume, canceled slots, and tenant isolation are explicit", async () => {
@@ -491,6 +563,7 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       });
       assert.equal(failed.state, "FAILED");
       assert.equal(failed.errorCode, "GOAL_NO_VERIFIED_OUTPUT");
+      terminalRunIds.set("FAILED", failed.runId);
 
       const draft = await createGoal(BUYER_ID, parseGoalCreate({
         objective: "Pause, edit, and resume this goal without changing historical runs.",
@@ -539,13 +612,38 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       const paused = await patchGoal(BUYER_ID, active.goalId, parseGoalPatch({ action: "PAUSE" }),
         "goal-state-pause-01", { now: at(40_000), sql: database.sql });
       assert.equal(paused.state, "PAUSED");
-      const canceled = await database.sql<{ state: string }[]>`
-        SELECT state FROM goal_runs WHERE goal_id = ${active.goalId}::uuid AND scheduled_for = ${scheduledFor}
+      const canceled = await database.sql<{ id: string; state: string }[]>`
+        SELECT id, state FROM goal_runs WHERE goal_id = ${active.goalId}::uuid AND scheduled_for = ${scheduledFor}
       `;
       assert.equal(canceled[0]?.state, "CANCELED");
+      assert.ok(canceled[0]?.id);
+      terminalRunIds.set("CANCELED", canceled[0].id);
       const resumed = await patchGoal(BUYER_ID, active.goalId, parseGoalPatch({ action: "RESUME" }),
         "goal-state-resume-01", { now: at(41_000), sql: database.sql });
       assert.equal(resumed.state, "ACTIVE");
+      const delayedPauseReplay = await patchGoal(
+        BUYER_ID,
+        active.goalId,
+        parseGoalPatch({ action: "PAUSE" }),
+        "goal-state-pause-01",
+        { now: at(42_000), sql: database.sql },
+      );
+      assert.equal(delayedPauseReplay.state, "PAUSED");
+      assert.equal((await getGoal(BUYER_ID, active.goalId, { sql: database.sql }))?.state, "ACTIVE");
+      await assert.rejects(
+        patchGoal(
+          BUYER_ID,
+          active.goalId,
+          parseGoalPatch({ action: "RESUME" }),
+          "goal-state-pause-01",
+          { now: at(43_000), sql: database.sql },
+        ),
+        (error: unknown) => error instanceof KernelError && error.code === "KERNEL_IDEMPOTENCY_MISMATCH",
+      );
+      await assert.rejects(database.sql`
+        UPDATE goal_mutations SET payload_hash = ${"0".repeat(64)}
+        WHERE owner_user_id = ${BUYER_ID} AND idempotency_key = 'goal-state-pause-01'
+      `, /append-only/);
       assert.equal((await listGoalRuns(BUYER_ID, active.goalId, { sql: database.sql })).length, 1);
       await assert.rejects(
         listGoalRuns(OTHER_ID, active.goalId, { sql: database.sql }),
@@ -585,6 +683,56 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
           '0xNOTANADDRESS', '007', ${"b".repeat(64)}, ${at(51_000)}
         )
       `, /agent_version_provenance_address_check|agent_version_provenance_token_check/);
+    });
+
+    await t.test("terminal runs are immutable and every persisted report is revalidated on read", async () => {
+      for (const state of ["READY", "PARTIAL", "BLOCKED", "FAILED", "CANCELED"] as const) {
+        const runId = terminalRunIds.get(state);
+        assert.ok(runId, `missing ${state} fixture`);
+        await assert.rejects(database.sql`
+          UPDATE goal_runs SET updated_at = clock_timestamp() WHERE id = ${runId}::uuid
+        `, /terminal goal run is immutable/);
+      }
+      assert.ok(canonicalReady);
+      const canonical = canonicalReady;
+      await database.sql`ALTER TABLE goal_runs DISABLE TRIGGER USER`;
+      await database.sql`ALTER TABLE goal_runs DROP CONSTRAINT goal_runs_report_binding_check`;
+
+      const persist = async (report: GoalRunReportV1, reportHash: string): Promise<void> => {
+        await database.sql`
+          UPDATE goal_runs SET report = ${database.sql.json(report)}, report_hash = ${reportHash}
+          WHERE id = ${canonical.runId}::uuid
+        `;
+      };
+      const rejectsRead = async (): Promise<void> => {
+        await assert.rejects(
+          getGoalRun(BUYER_ID, canonical.runId, { sql: database.sql }),
+          /GOAL_RUN_REPORT_INVALID/,
+        );
+      };
+
+      const changedSummary = structuredClone(canonical.report);
+      changedSummary.summary = "Tampered persisted summary.";
+      await persist(changedSummary, canonical.reportHash);
+      await rejectsRead();
+
+      const changedEvidence = structuredClone(canonical.report);
+      changedEvidence.evidence = changedEvidence.evidence.map((item, index) => index === 0
+        ? { ...item, resultHash: "0".repeat(64) }
+        : item);
+      await persist(changedEvidence, domainHash("goal-run-report-v1", changedEvidence));
+      await rejectsRead();
+
+      const changedRun = { ...structuredClone(canonical.report), runId: randomUUID() };
+      await persist(changedRun, domainHash("goal-run-report-v1", changedRun));
+      await rejectsRead();
+
+      const changedStatus = { ...structuredClone(canonical.report), status: "PARTIAL" as const };
+      await persist(changedStatus, domainHash("goal-run-report-v1", changedStatus));
+      await rejectsRead();
+
+      await persist(canonical.report, "f".repeat(64));
+      await rejectsRead();
     });
   } finally {
     await database.close();

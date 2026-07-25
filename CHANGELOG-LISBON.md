@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - A5 protected goal-loop immutable-audit remediation
+
+- Added migration `20260725173000_goal_loop_hardening` (SHA-256 `3d7fe63aab32c5e8b77c4752c55bbceb02b5f879221cb2423c5abcf228069774`) to bind immutable actual-time cost reservations, append-only goal-mutation results, terminal-run immutability, and report identity/status/swap constraints.
+- Serialized continuous reservations under the goal row, used the database reservation clock instead of historical schedule time, and kept failed reservations free of Kernel jobs or charges.
+- Replaced latest-key PATCH replay with durable owner/key/payload records whose original validated result is returned without mutating newer goal state.
+- Recomputed canonical report hashes and revalidated run/goal identity, status, objective, admitted receipt evidence, and swap policy on every read; persisted tampering now fails closed.
+- Passed all sixteen migration lanes, Kernel 35/35, focused goal-loop 9/9, A4 22/22, A5 3/3, A6 19/19, focused integration 3/3, foundation/auth/e2e/resilience/redaction/boot, lint, typecheck, build, secret scan, and diff checks. Aggregate integration remains 31/41 only because the inherited A3 fixture cannot build without local Go.
+- Returned only `PASS_TO_REAUDIT; LOCAL_ONLY`. Managed migration, live calls, signature, transaction, deployment, push, release, and claim promotion remain blocked.
+
 ## 2026-07-25 - A5 protected recurring goal-loop Kernel
 
 - Added authenticated goal definitions and run APIs with cadence, bounded or continuous policies, explicit atomic-unit caps, pause/resume, manual runs, and server-derived tenant isolation.

@@ -212,7 +212,7 @@ export interface GoalRunReportV1 extends Record<string, CanonicalValue> {
   swapProposal: SwapProposalV1 | null;
 }
 
-export interface GoalSnapshot {
+export interface GoalSnapshot extends Record<string, CanonicalValue> {
   goalId: string;
   objective: string;
   requiredCapabilities: readonly string[];
@@ -246,6 +246,7 @@ export interface GoalRunSnapshot {
   policyHash: string;
   effectIdentity: string;
   totalPriceAtomic: string;
+  costReservedAt: string | null;
   report: GoalRunReportV1 | null;
   reportHash: string | null;
   errorCode: string | null;

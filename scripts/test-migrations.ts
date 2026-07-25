@@ -35,6 +35,7 @@ const A4_KERNEL_ACTION_INTEGRITY_MIGRATION = "20260725082000_a4_kernel_action_in
 const A6_UNISWAP_TOOL_RECEIPT_MIGRATION = "20260725100000_a6_uniswap_tool_receipt";
 const A5_A6_KERNEL_FOUNDATION_MIGRATION = "20260725113000_a5_a6_kernel_foundation";
 const PROTECTED_GOAL_LOOP_MIGRATION = "20260725163000_protected_goal_loop";
+const GOAL_LOOP_HARDENING_MIGRATION = "20260725173000_goal_loop_hardening";
 const PRE_HARDENING_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -732,6 +733,8 @@ async function verifyDatabase(
       goal_runs: string | null;
       goal_run_jobs: string | null;
       agent_version_provenance: string | null;
+      goal_mutations: string | null;
+      cost_reserved_at: string | null;
       user_count: string;
       migration_count: string;
       baseline_count: string;
@@ -772,6 +775,9 @@ async function verifyDatabase(
       protected_goal_loop_count: string;
       protected_goal_loop_constraint_count: string;
       protected_goal_loop_trigger_count: string;
+      goal_loop_hardening_count: string;
+      goal_loop_hardening_constraint_count: string;
+      goal_loop_hardening_trigger_count: string;
       sequence_type: string;
       sequence_start: string;
       sequence_min: string;
@@ -800,6 +806,12 @@ async function verifyDatabase(
         to_regclass('public.goal_runs')::text AS goal_runs,
         to_regclass('public.goal_run_jobs')::text AS goal_run_jobs,
         to_regclass('public.agent_version_provenance')::text AS agent_version_provenance,
+        to_regclass('public.goal_mutations')::text AS goal_mutations,
+        (
+          SELECT is_nullable FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'goal_runs'
+            AND column_name = 'cost_reserved_at'
+        ) AS cost_reserved_at,
         (SELECT count(*)::text FROM users) AS user_count,
         (
           SELECT count(*)::text
@@ -1144,6 +1156,29 @@ async function verifyDatabase(
             'agent_version_provenance_append_only'
           )
         ) AS protected_goal_loop_trigger_count,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${GOAL_LOOP_HARDENING_MIGRATION} AND finished_at IS NOT NULL
+        ) AS goal_loop_hardening_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'goal_runs_reservation_check',
+            'goal_runs_report_binding_check',
+            'goals_id_owner_key',
+            'goal_mutations_goal_owner_fkey',
+            'goal_mutations_result_check'
+          )
+        ) AS goal_loop_hardening_constraint_count,
+        (
+          SELECT count(*)::text FROM pg_trigger
+          WHERE NOT tgisinternal AND tgname IN (
+            'goal_runs_reservation_immutable',
+            'goal_runs_terminal_immutable',
+            'goal_mutations_append_only',
+            'goal_run_jobs_terminal_insert_guard'
+          )
+        ) AS goal_loop_hardening_trigger_count,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
         seq.min_value::text AS sequence_min,
@@ -1175,8 +1210,10 @@ async function verifyDatabase(
       result.goal_runs !== "goal_runs" ||
       result.goal_run_jobs !== "goal_run_jobs" ||
       result.agent_version_provenance !== "agent_version_provenance" ||
+      result.goal_mutations !== "goal_mutations" ||
+      result.cost_reserved_at !== "YES" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 15 ||
+      Number(result.migration_count) !== 16 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1213,6 +1250,9 @@ async function verifyDatabase(
       Number(result.protected_goal_loop_count) !== 1 ||
       Number(result.protected_goal_loop_constraint_count) !== 12 ||
       Number(result.protected_goal_loop_trigger_count) !== 5 ||
+      Number(result.goal_loop_hardening_count) !== 1 ||
+      Number(result.goal_loop_hardening_constraint_count) !== 5 ||
+      Number(result.goal_loop_hardening_trigger_count) !== 4 ||
       result.receipt_authority_nullable !== "NO" ||
       result.lifecycle_action_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||

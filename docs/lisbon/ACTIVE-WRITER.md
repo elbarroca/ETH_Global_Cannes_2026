@@ -4,6 +4,72 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Kernel Integrator /root/goal_loop_kernel
+task_id: A5-GOAL-LOOP-KERNEL-REMEDIATION-20260725
+task_instance_id: A5-GOAL-LOOP-KERNEL-REMEDIATION-20260725:W2:D8C9E6D
+generation: 2
+sprint: repair three immutable-audit HIGH findings in the protected goal loop
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: d8c9e6d4d71c63e09133f3ec6b6b42b68d19b4f4
+control_sha: d8c9e6d4d71c63e09133f3ec6b6b42b68d19b4f4
+token: A5-GOAL-LOOP-KERNEL-W2-D8C9E6D-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T14:34:09Z
+expires_at: 2026-07-25T20:30:00Z
+allowed_paths:
+  - prisma/schema.prisma
+  - prisma/migrations/20260725173000_goal_loop_hardening/**
+  - src/kernel/**
+  - app/api/kernel/goals/** only if the route contract must change
+  - scripts/test-migrations.ts
+  - tests/kernel/**
+  - tests/integration/protected-goal-loop.test.ts
+  - tests/integration/worker-fencing.test.ts only if remediation affects it
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T14:34:09Z
+deadline: 2026-07-25T20:30:00Z
+expected_exit: serialized actual-day budget reservations durable append-only PATCH idempotency immutable terminal outcomes and fail-closed report reads
+external_effect_authority: local files existing dependencies disposable local PostgreSQL tests and one local commit only; no managed Neon network install push deploy live API signature transaction funding form spend or claim promotion
+completed_at: 2026-07-25T14:46:54Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - migration 20260725173000_goal_loop_hardening SHA-256 3d7fe63aab32c5e8b77c4752c55bbceb02b5f879221cb2423c5abcf228069774
+  - prisma validate and generate PASS
+  - tsx scripts/test-migrations.ts PASS all sixteen fresh Cannes canonical W6 and noncanonical W6 lanes
+  - focused goal-loop PASS 9 of 9
+  - focused goal-loop and worker-fencing integration PASS 3 of 3
+  - npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm test PASS 10 of 10
+  - npm run test:auth PASS 9 of 9
+  - npm run test:kernel PASS 35 of 35
+  - npm run test:a4 PASS 22 of 22
+  - npm run test:a5 PASS 3 of 3
+  - npm run test:a6 PASS 19 of 19
+  - npm run test:e2e PASS 4 of 4
+  - npm run test:resilience PASS 1 of 1
+  - npm run test:redaction PASS 3 of 3
+  - npm run test:boot PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+  - npm run build PASS 35 generated pages and three protected goal API routes
+remaining_blocks:
+  - npm run test:integration PASS 31 of 41; ten inherited A3 tests hook-fail only because the host has no local Go toolchain
+  - immutable exact-SHA remediation re-audit remains required
+  - managed Neon migration deployment cycle and frontend wiring live APIs signatures transactions push release and claims remain unauthorized or sequentially pending
+external_effects_attempted: none
+verdict: PASS_TO_REAUDIT
+lock_release: release only exact token A5-GOAL-LOOP-KERNEL-W2-D8C9E6D-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
+owner: Kernel Integrator /root/goal_loop_kernel
 task_id: A5-GOAL-LOOP-KERNEL-20260725
 task_instance_id: A5-GOAL-LOOP-KERNEL-20260725:W1:C4E2536
 generation: 1

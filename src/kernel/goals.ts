@@ -62,6 +62,7 @@ interface GoalRunRow {
   policy_hash: string;
   effect_identity: string;
   total_price_atomic: string;
+  cost_reserved_at: Date | null;
   report: unknown;
   report_hash: string | null;
   error_code: string | null;
@@ -73,6 +74,13 @@ interface GoalRunRow {
   completed_at: Date | null;
   created_at: Date;
   updated_at: Date;
+}
+
+interface GoalMutationRow {
+  goal_id: string;
+  payload_hash: string;
+  result_snapshot: unknown;
+  result_hash: string;
 }
 
 interface GoalRunJobRow {
@@ -313,6 +321,58 @@ function mapGoal(row: GoalRow): GoalSnapshot {
   };
 }
 
+function storedIsoDate(value: unknown): string {
+  if (typeof value !== "string") throw new Error("GOAL_MUTATION_RESULT_INVALID");
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== value) {
+    throw new Error("GOAL_MUTATION_RESULT_INVALID");
+  }
+  return value;
+}
+
+function parseStoredGoalSnapshot(
+  value: unknown,
+  expectedGoalId: string,
+  expectedHash: string,
+): GoalSnapshot {
+  try {
+    const snapshot = objectRecord(value);
+    exactKeys(snapshot, [
+      "goalId", "objective", "requiredCapabilities", "policy", "state",
+      "nextRunAt", "completedRuns", "createdAt", "updatedAt",
+    ]);
+    if (
+      snapshot.goalId !== expectedGoalId || !isKernelUuid(snapshot.goalId) ||
+      (snapshot.state !== "DRAFT" && snapshot.state !== "ACTIVE" &&
+        snapshot.state !== "PAUSED" && snapshot.state !== "COMPLETED") ||
+      !Number.isSafeInteger(snapshot.completedRuns) || Number(snapshot.completedRuns) < 0
+    ) {
+      throw new Error("GOAL_MUTATION_RESULT_INVALID");
+    }
+    const nextRunAt = snapshot.nextRunAt === null ? null : storedIsoDate(snapshot.nextRunAt);
+    if ((snapshot.state === "ACTIVE") !== (nextRunAt !== null)) {
+      throw new Error("GOAL_MUTATION_RESULT_INVALID");
+    }
+    const parsed: GoalSnapshot = {
+      goalId: snapshot.goalId,
+      objective: boundedString(snapshot.objective, "objective", 10, 2_000),
+      requiredCapabilities: capabilities(snapshot.requiredCapabilities),
+      policy: parseGoalPolicy(snapshot.policy),
+      state: snapshot.state,
+      nextRunAt,
+      completedRuns: Number(snapshot.completedRuns),
+      createdAt: storedIsoDate(snapshot.createdAt),
+      updatedAt: storedIsoDate(snapshot.updatedAt),
+    };
+    if (domainHash("goal-mutation-result", parsed) !== expectedHash) {
+      throw new Error("GOAL_MUTATION_RESULT_INVALID");
+    }
+    return parsed;
+  } catch {
+    throw new Error("GOAL_MUTATION_RESULT_INVALID");
+  }
+}
+
 function mapGoalRunJob(row: GoalRunJobRow): GoalRunJobSnapshot {
   return {
     agentVersionId: row.agent_version_id,
@@ -326,64 +386,91 @@ function mapGoalRunJob(row: GoalRunJobRow): GoalRunJobSnapshot {
   };
 }
 
-function parseReport(value: unknown): GoalRunReportV1 | null {
-  if (value === null) return null;
-  const report = objectRecord(value);
-  exactKeys(report, [
-    "schemaVersion", "goalId", "runId", "status", "objective", "summary",
-    "conclusion", "evidence", "swapProposal",
-  ]);
-  if (
-    report.schemaVersion !== 1 || !isKernelUuid(report.goalId) || !isKernelUuid(report.runId) ||
-    (report.status !== "READY" && report.status !== "PARTIAL") ||
-    typeof report.objective !== "string" || report.objective.length < 10 || report.objective.length > 2_000 ||
-    typeof report.summary !== "string" || report.summary.length < 1 || report.summary.length > 2_000 ||
-    typeof report.conclusion !== "string" || report.conclusion.length < 1 || report.conclusion.length > 2_000 ||
-    !Array.isArray(report.evidence) || report.evidence.length < 1 || report.evidence.length > 5
-  ) {
-    throw new Error("GOAL_REPORT_INVALID");
+function parseReport(
+  value: unknown,
+  row: GoalRunRow,
+  results: readonly JobResultRow[],
+): GoalRunReportV1 | null {
+  if (value === null) {
+    if (row.report_hash !== null) throw new Error("GOAL_RUN_REPORT_INVALID");
+    return null;
   }
-  const parsedEvidence = report.evidence.map((value): GoalRunEvidenceV1 => {
-    const item = objectRecord(value);
-    exactKeys(item, ["jobId", "agentVersionId", "resultHash", "receiptId"]);
+  try {
+    const report = objectRecord(value);
+    exactKeys(report, [
+      "schemaVersion", "goalId", "runId", "status", "objective", "summary",
+      "conclusion", "evidence", "swapProposal",
+    ]);
     if (
-      !isKernelUuid(item.jobId) || !isKernelUuid(item.agentVersionId) ||
-      typeof item.resultHash !== "string" || !/^[0-9a-f]{64}$/.test(item.resultHash) ||
-      !isKernelUuid(item.receiptId)
+      report.schemaVersion !== 1 || report.goalId !== row.goal_id || report.runId !== row.run_id ||
+      (report.status !== "READY" && report.status !== "PARTIAL") || report.status !== row.state ||
+      report.objective !== row.objective_snapshot ||
+      typeof report.summary !== "string" || report.summary.length < 1 || report.summary.length > 2_000 ||
+      typeof report.conclusion !== "string" || report.conclusion.length < 1 || report.conclusion.length > 2_000 ||
+      !Array.isArray(report.evidence) || report.evidence.length < 1 || report.evidence.length > 5
     ) {
-      throw new Error("GOAL_REPORT_EVIDENCE_INVALID");
+      throw new Error("GOAL_REPORT_INVALID");
     }
-    return {
-      jobId: item.jobId,
-      agentVersionId: item.agentVersionId,
-      resultHash: item.resultHash,
-      receiptId: item.receiptId,
+    const parsedEvidence = report.evidence.map((entry): GoalRunEvidenceV1 => {
+      const item = objectRecord(entry);
+      exactKeys(item, ["jobId", "agentVersionId", "resultHash", "receiptId"]);
+      if (
+        !isKernelUuid(item.jobId) || !isKernelUuid(item.agentVersionId) ||
+        typeof item.resultHash !== "string" || !/^[0-9a-f]{64}$/.test(item.resultHash) ||
+        !isKernelUuid(item.receiptId)
+      ) {
+        throw new Error("GOAL_REPORT_EVIDENCE_INVALID");
+      }
+      return {
+        jobId: item.jobId,
+        agentVersionId: item.agentVersionId,
+        resultHash: item.resultHash,
+        receiptId: item.receiptId,
+      };
+    });
+    if (new Set(parsedEvidence.map((item) => item.jobId)).size !== parsedEvidence.length) {
+      throw new Error("GOAL_REPORT_EVIDENCE_DUPLICATE");
+    }
+    const expectedEvidence = new Map(results.filter(admitted).map((result) => [result.job_id, result]));
+    if (parsedEvidence.length !== expectedEvidence.size) throw new Error("GOAL_REPORT_EVIDENCE_INCOMPLETE");
+    for (const item of parsedEvidence) {
+      const expected = expectedEvidence.get(item.jobId);
+      if (
+        !expected || expected.agent_version_id !== item.agentVersionId ||
+        expected.effect_result_hash !== item.resultHash || expected.receipt_id !== item.receiptId
+      ) {
+        throw new Error("GOAL_REPORT_EVIDENCE_MISMATCH");
+      }
+    }
+    const policy = parseGoalPolicy(row.policy_snapshot);
+    if (report.status === "PARTIAL" && report.swapProposal !== null) {
+      throw new Error("GOAL_PARTIAL_SWAP_PROPOSAL_FORBIDDEN");
+    }
+    if (policy.executionMode === "RESEARCH_ONLY" && report.swapProposal !== null) {
+      throw new Error("GOAL_REPORT_POLICY_MISMATCH");
+    }
+    const parsed: GoalRunReportV1 = {
+      schemaVersion: 1,
+      goalId: report.goalId,
+      runId: report.runId,
+      status: report.status,
+      objective: report.objective,
+      summary: report.summary,
+      conclusion: report.conclusion,
+      evidence: parsedEvidence,
+      swapProposal: report.swapProposal === null ? null : parseSwapProposal(report.swapProposal),
     };
-  });
-  if (report.status === "PARTIAL" && report.swapProposal !== null) {
-    throw new Error("GOAL_PARTIAL_SWAP_PROPOSAL_FORBIDDEN");
+    if (!row.report_hash || domainHash("goal-run-report-v1", parsed) !== row.report_hash) {
+      throw new Error("GOAL_REPORT_HASH_MISMATCH");
+    }
+    return parsed;
+  } catch {
+    throw new Error("GOAL_RUN_REPORT_INVALID");
   }
-  return {
-    schemaVersion: 1,
-    goalId: report.goalId,
-    runId: report.runId,
-    status: report.status,
-    objective: report.objective,
-    summary: report.summary,
-    conclusion: report.conclusion,
-    evidence: parsedEvidence,
-    swapProposal: report.swapProposal === null ? null : parseSwapProposal(report.swapProposal),
-  };
 }
 
 async function mapGoalRun(sql: DatabaseClient, row: GoalRunRow): Promise<GoalRunSnapshot> {
-  const jobs = await sql<GoalRunJobRow[]>`
-    SELECT id, goal_run_id, agent_version_id, job_id, role, selection_rank,
-      covered_capabilities, price_atomic_snapshot::text,
-      manifest_hash_snapshot, full_subname_snapshot
-    FROM goal_run_jobs WHERE goal_run_id = ${row.run_id}::uuid
-    ORDER BY selection_rank ASC, role ASC, id ASC
-  `;
+  const jobs = await jobRows(sql, row.run_id);
   return {
     runId: row.run_id,
     goalId: row.goal_id,
@@ -395,7 +482,8 @@ async function mapGoalRun(sql: DatabaseClient, row: GoalRunRow): Promise<GoalRun
     policyHash: row.policy_hash,
     effectIdentity: row.effect_identity,
     totalPriceAtomic: row.total_price_atomic,
-    report: parseReport(row.report),
+    costReservedAt: row.cost_reserved_at?.toISOString() ?? null,
+    report: parseReport(row.report, row, jobs),
     reportHash: row.report_hash,
     errorCode: row.error_code,
     startedAt: row.started_at?.toISOString() ?? null,
@@ -420,7 +508,7 @@ function runSelect(sql: DatabaseClient, ownerUserId: string, runId: string): Pro
   return sql<GoalRunRow[]>`
     SELECT id AS run_id, goal_id, owner_user_id, idempotency_key, scheduled_for,
       state, objective_snapshot, capabilities_snapshot, policy_snapshot,
-      policy_hash, effect_identity, total_price_atomic::text, report, report_hash,
+      policy_hash, effect_identity, total_price_atomic::text, cost_reserved_at, report, report_hash,
       error_code, claim_owner, claim_epoch::text, claim_version, claim_expires_at,
       started_at, completed_at, created_at, updated_at
     FROM goal_runs WHERE id = ${runId}::uuid AND owner_user_id = ${ownerUserId}
@@ -522,14 +610,28 @@ export async function patchGoal(
 ): Promise<GoalSnapshot> {
   const sql = options.sql ?? getDb();
   const now = options.now ?? new Date();
-  const lockKey = domainHash("goal-patch-lock", { goalId, idempotencyKey, ownerUserId });
+  const lockKey = domainHash("goal-patch-lock", { idempotencyKey, ownerUserId });
   const mutationHash = domainHash("goal-mutation", { goalId, input });
   return sql.begin(async (transaction) => {
     const tx = transactionClient(transaction);
     await tx`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+    const replay = await tx<GoalMutationRow[]>`
+      SELECT goal_id, payload_hash, result_snapshot, result_hash
+      FROM goal_mutations
+      WHERE owner_user_id = ${ownerUserId} AND idempotency_key = ${idempotencyKey}
+    `;
+    if (replay[0]) {
+      if (replay[0].goal_id !== goalId || replay[0].payload_hash !== mutationHash) {
+        throw new KernelError(
+          "KERNEL_IDEMPOTENCY_MISMATCH",
+          "Idempotency key was used for another goal mutation",
+          409,
+        );
+      }
+      return parseStoredGoalSnapshot(replay[0].result_snapshot, goalId, replay[0].result_hash);
+    }
     const rows = await tx<GoalRow[]>`
-      SELECT id AS goal_id, owner_user_id, definition_hash, last_mutation_key,
-        last_mutation_hash, objective, required_capabilities,
+      SELECT id AS goal_id, owner_user_id, definition_hash, objective, required_capabilities,
         cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
         per_run_cap_atomic::text, daily_cap_atomic::text, state, next_run_at,
         completed_runs, created_at, updated_at
@@ -538,16 +640,6 @@ export async function patchGoal(
     `;
     const goal = rows[0];
     if (!goal) throw new KernelError("KERNEL_NOT_FOUND", "Goal not found", 404);
-    if (goal.last_mutation_key === idempotencyKey) {
-      if (goal.last_mutation_hash !== mutationHash) {
-        throw new KernelError(
-          "KERNEL_IDEMPOTENCY_MISMATCH",
-          "Idempotency key was used for another goal mutation",
-          409,
-        );
-      }
-      return mapGoal(goal);
-    }
     if (goal.state === "COMPLETED") {
       throw new KernelError("KERNEL_ILLEGAL_TRANSITION", "Completed goals are immutable", 409);
     }
@@ -589,14 +681,20 @@ export async function patchGoal(
         `;
       }
     }
-    await tx`
-      UPDATE goals SET last_mutation_key = ${idempotencyKey},
-        last_mutation_hash = ${mutationHash}, updated_at = ${now}
-      WHERE id = ${goalId}::uuid AND owner_user_id = ${ownerUserId}
-    `;
     const updated = await goalSelect(tx, ownerUserId, goalId);
     if (!updated[0]) throw new Error("GOAL_UPDATE_READBACK_FAILED");
-    return mapGoal(updated[0]);
+    const result = mapGoal(updated[0]);
+    const resultHash = domainHash("goal-mutation-result", result);
+    await tx`
+      INSERT INTO goal_mutations (
+        goal_id, owner_user_id, idempotency_key, payload_hash,
+        result_snapshot, result_hash, created_at
+      ) VALUES (
+        ${goalId}::uuid, ${ownerUserId}, ${idempotencyKey}, ${mutationHash},
+        ${tx.json(result)}, ${resultHash}, ${now}
+      )
+    `;
+    return result;
   });
 }
 
@@ -637,7 +735,7 @@ async function insertGoalRun(
     ) RETURNING
       id AS run_id, goal_id, owner_user_id, idempotency_key, scheduled_for,
       state, objective_snapshot, capabilities_snapshot, policy_snapshot,
-      policy_hash, effect_identity, total_price_atomic::text, report, report_hash,
+      policy_hash, effect_identity, total_price_atomic::text, cost_reserved_at, report, report_hash,
       error_code, claim_owner, claim_epoch::text, claim_version, claim_expires_at,
       started_at, completed_at, created_at, updated_at
   `;
@@ -669,7 +767,7 @@ export async function createGoalRun(
     const existing = await tx<GoalRunRow[]>`
       SELECT id AS run_id, goal_id, owner_user_id, idempotency_key, scheduled_for,
         state, objective_snapshot, capabilities_snapshot, policy_snapshot,
-        policy_hash, effect_identity, total_price_atomic::text, report, report_hash,
+        policy_hash, effect_identity, total_price_atomic::text, cost_reserved_at, report, report_hash,
         error_code, claim_owner, claim_epoch::text, claim_version, claim_expires_at,
         started_at, completed_at, created_at, updated_at
       FROM goal_runs WHERE owner_user_id = ${ownerUserId} AND idempotency_key = ${idempotencyKey}
@@ -717,7 +815,7 @@ export async function listGoalRuns(
   const rows = await sql<GoalRunRow[]>`
     SELECT id AS run_id, goal_id, owner_user_id, idempotency_key, scheduled_for,
       state, objective_snapshot, capabilities_snapshot, policy_snapshot,
-      policy_hash, effect_identity, total_price_atomic::text, report, report_hash,
+      policy_hash, effect_identity, total_price_atomic::text, cost_reserved_at, report, report_hash,
       error_code, claim_owner, claim_epoch::text, claim_version, claim_expires_at,
       started_at, completed_at, created_at, updated_at
     FROM goal_runs WHERE goal_id = ${goalId}::uuid AND owner_user_id = ${ownerUserId}
@@ -855,11 +953,22 @@ async function selectRunAgents(
 ): Promise<void> {
   await sql.begin(async (transaction) => {
     const tx = transactionClient(transaction);
+    const identity = await tx<{ goal_id: string }[]>`
+      SELECT goal_id FROM goal_runs
+      WHERE id = ${runId}::uuid AND owner_user_id = ${ownerUserId}
+    `;
+    if (!identity[0]) throw new KernelError("KERNEL_NOT_FOUND", "Goal run not found", 404);
+    const lockedGoal = await tx<{ id: string }[]>`
+      SELECT id FROM goals
+      WHERE id = ${identity[0].goal_id}::uuid AND owner_user_id = ${ownerUserId}
+      FOR UPDATE
+    `;
+    if (!lockedGoal[0]) throw new KernelError("KERNEL_NOT_FOUND", "Goal not found", 404);
     await guardClaim(tx, claim, now);
     const runs = await tx<GoalRunRow[]>`
       SELECT id AS run_id, goal_id, owner_user_id, idempotency_key, scheduled_for,
         state, objective_snapshot, capabilities_snapshot, policy_snapshot,
-        policy_hash, effect_identity, total_price_atomic::text, report, report_hash,
+        policy_hash, effect_identity, total_price_atomic::text, cost_reserved_at, report, report_hash,
         error_code, claim_owner, claim_epoch::text, claim_version, claim_expires_at,
         started_at, completed_at, created_at, updated_at
       FROM goal_runs WHERE id = ${runId}::uuid AND owner_user_id = ${ownerUserId} FOR UPDATE
@@ -925,20 +1034,29 @@ async function selectRunAgents(
       await terminalizeRun(tx, run, "BLOCKED", now, { errorCode: "GOAL_PER_RUN_CAP_EXCEEDED" });
       return;
     }
+    const clocks = await tx<{ reserved_at: Date }[]>`SELECT clock_timestamp() AS reserved_at`;
+    const reservedAt = clocks[0]?.reserved_at;
+    if (!reservedAt) throw new Error("GOAL_RESERVATION_CLOCK_UNAVAILABLE");
     if (policy.runMode === "CONTINUOUS" && policy.dailyCapAtomic) {
-      const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const dayStart = new Date(Date.UTC(
+        reservedAt.getUTCFullYear(), reservedAt.getUTCMonth(), reservedAt.getUTCDate(),
+      ));
       const dayEnd = new Date(dayStart.getTime() + 86_400_000);
       const spent = await tx<{ total: string }[]>`
         SELECT COALESCE(sum(total_price_atomic), 0)::text AS total FROM goal_runs
         WHERE goal_id = ${run.goal_id}::uuid AND id <> ${run.run_id}::uuid
-          AND scheduled_for >= ${dayStart} AND scheduled_for < ${dayEnd}
-          AND state NOT IN ('BLOCKED', 'CANCELED')
+          AND cost_reserved_at >= ${dayStart} AND cost_reserved_at < ${dayEnd}
       `;
       if (BigInt(spent[0]?.total ?? "0") + total > BigInt(policy.dailyCapAtomic)) {
         await terminalizeRun(tx, run, "BLOCKED", now, { errorCode: "GOAL_DAILY_CAP_EXCEEDED" });
         return;
       }
     }
+    await tx`
+      UPDATE goal_runs SET state = 'RUNNING', total_price_atomic = ${total.toString()}::bigint,
+        cost_reserved_at = ${reservedAt}, updated_at = ${now}
+      WHERE id = ${run.run_id}::uuid AND state = 'SELECTING'
+    `;
     let rank = 1;
     for (const item of selection.selected) {
       await tx`
@@ -965,10 +1083,6 @@ async function selectRunAgents(
         )
       `;
     }
-    await tx`
-      UPDATE goal_runs SET state = 'RUNNING', total_price_atomic = ${total.toString()}::bigint,
-        updated_at = ${now} WHERE id = ${run.run_id}::uuid AND state = 'SELECTING'
-    `;
   });
 }
 
@@ -1226,11 +1340,15 @@ async function reconcileGoalRun(
   }
   if (pending(synthesis)) return;
   if (!admitted(synthesis)) {
+    const content = resultText(accepted[0]?.effect_result);
     await sql.begin(async (transaction) => {
       const tx = transactionClient(transaction);
       await guardClaim(tx, claim, now);
       runs = await runSelect(tx, ownerUserId, runId);
-      if (runs[0]) await terminalizeRun(tx, runs[0], "PARTIAL", now, { errorCode: "GOAL_SYNTHESIS_UNAVAILABLE" });
+      if (runs[0]) await terminalizeRun(tx, runs[0], "PARTIAL", now, {
+        report: reportFor(runs[0], "PARTIAL", accepted, content),
+        errorCode: "GOAL_SYNTHESIS_UNAVAILABLE",
+      });
     });
     return;
   }
@@ -1239,11 +1357,15 @@ async function reconcileGoalRun(
   try {
     content = synthesisResult(synthesis.effect_result, policy);
   } catch {
+    const content = resultText(accepted[0]?.effect_result);
     await sql.begin(async (transaction) => {
       const tx = transactionClient(transaction);
       await guardClaim(tx, claim, now);
       runs = await runSelect(tx, ownerUserId, runId);
-      if (runs[0]) await terminalizeRun(tx, runs[0], "PARTIAL", now, { errorCode: "GOAL_SYNTHESIS_MALFORMED" });
+      if (runs[0]) await terminalizeRun(tx, runs[0], "PARTIAL", now, {
+        report: reportFor(runs[0], "PARTIAL", [...accepted, synthesis], content),
+        errorCode: "GOAL_SYNTHESIS_MALFORMED",
+      });
     });
     return;
   }
@@ -1325,7 +1447,7 @@ export async function runGoalLoopOnce(options: {
     const unfinished = await tx<GoalRunRow[]>`
       SELECT id AS run_id, goal_id, owner_user_id, idempotency_key, scheduled_for,
         state, objective_snapshot, capabilities_snapshot, policy_snapshot,
-        policy_hash, effect_identity, total_price_atomic::text, report, report_hash,
+        policy_hash, effect_identity, total_price_atomic::text, cost_reserved_at, report, report_hash,
         error_code, claim_owner, claim_epoch::text, claim_version, claim_expires_at,
         started_at, completed_at, created_at, updated_at
       FROM goal_runs
@@ -1383,7 +1505,7 @@ export async function runGoalLoopOnce(options: {
       const existingRuns = await tx<GoalRunRow[]>`
         SELECT id AS run_id, goal_id, owner_user_id, idempotency_key, scheduled_for,
           state, objective_snapshot, capabilities_snapshot, policy_snapshot,
-          policy_hash, effect_identity, total_price_atomic::text, report, report_hash,
+          policy_hash, effect_identity, total_price_atomic::text, cost_reserved_at, report, report_hash,
           error_code, claim_owner, claim_epoch::text, claim_version, claim_expires_at,
           started_at, completed_at, created_at, updated_at
         FROM goal_runs WHERE goal_id = ${goal.goal_id}::uuid AND scheduled_for = ${scheduledFor}

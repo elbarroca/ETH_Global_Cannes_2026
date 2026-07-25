@@ -177,3 +177,31 @@ available. Managed Neon migration, deployment, live APIs, signatures,
 transactions, push, release, and claim promotion were not authorized or run.
 
 Verdict: `PASS_TO_AUDIT; LOCAL_ONLY; MANAGED_MIGRATION_NOT_AUTHORIZED`.
+
+## Protected goal-loop immutable-audit remediation on 2026-07-25
+
+Kernel task `A5-GOAL-LOOP-KERNEL-REMEDIATION-20260725:W2:D8C9E6D`
+repairs the three immutable-audit HIGH findings. Migration
+`20260725173000_goal_loop_hardening` has SHA-256
+`3d7fe63aab32c5e8b77c4752c55bbceb02b5f879221cb2423c5abcf228069774`.
+It adds an immutable database-clock reservation timestamp, a daily reservation
+index, append-only `goal_mutations`, terminal-run mutation refusal, and report
+identity/status/swap constraints.
+
+Run selection locks the owning goal before reserving cost. Concurrent manual or
+scheduled runs therefore serialize, sum the actual reservation day rather than
+the historical scheduled slot, and either reserve the complete selected price
+or create no Kernel job. PATCH replay is keyed by owner and idempotency key,
+validates the original payload and result hashes, returns the original snapshot,
+and cannot rewind newer state. Every report read recomputes its canonical hash
+and binds its run, goal, state, objective, admitted job/receipt evidence, and
+swap policy. All five terminal states reject even same-state updates.
+
+Focused reproductions pass: goal-loop 9/9 and goal-loop plus worker-fencing
+integration 3/3. All sixteen migrations pass fresh, synthetic Cannes, canonical
+W6, and noncanonical W6 lanes with every prior sentinel preserved. Kernel
+35/35, foundation 10/10, auth 9/9, A4 22/22, A5 3/3, A6 19/19, e2e 4/4,
+resilience 1/1, redaction 3/3, boot, lint, typecheck, secret scan, diff check,
+and the 35-page build pass. Aggregate integration is 31/41; all ten failures
+are inherited A3 hook failures caused by the absent local Go toolchain. Verdict
+remains `PASS_TO_REAUDIT; LOCAL_ONLY; MANAGED_MIGRATION_NOT_AUTHORIZED`.

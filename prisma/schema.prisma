@@ -28,6 +28,7 @@ model User {
   lifecycleActions   AgentLifecycleAction[]
   goals              Goal[]                 @relation("GoalOwner")
   goalRuns           GoalRun[]              @relation("GoalRunOwner")
+  goalMutations      GoalMutation[]          @relation("GoalMutationOwner")
 
   @@index([walletAddress], map: "idx_users_wallet")
   @@map("users")
@@ -556,6 +557,7 @@ model Goal {
   updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
   owner                User      @relation("GoalOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
   runs                 GoalRun[]
+  mutations            GoalMutation[]
 
   @@unique([ownerUserId, idempotencyKey], map: "uniq_goals_owner_idempotency")
   @@index([ownerUserId, createdAt], map: "idx_goals_owner_created")
@@ -576,6 +578,7 @@ model GoalRun {
   policyHash            String    @map("policy_hash")
   effectIdentity        String    @unique @map("effect_identity")
   totalPriceAtomic      BigInt    @default(0) @map("total_price_atomic")
+  costReservedAt        DateTime? @map("cost_reserved_at") @db.Timestamptz(6)
   report                Json?
   reportHash            String?   @map("report_hash")
   errorCode             String?   @map("error_code")
@@ -596,6 +599,23 @@ model GoalRun {
   @@index([ownerUserId, createdAt], map: "idx_goal_runs_owner_created")
   @@index([state, scheduledFor], map: "idx_goal_runs_state_scheduled")
   @@map("goal_runs")
+}
+
+model GoalMutation {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  goalId          String   @map("goal_id") @db.Uuid
+  ownerUserId     String   @map("owner_user_id")
+  idempotencyKey  String   @map("idempotency_key")
+  payloadHash     String   @map("payload_hash")
+  resultSnapshot  Json     @map("result_snapshot")
+  resultHash      String   @map("result_hash")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  goal            Goal     @relation(fields: [goalId], references: [id], onDelete: Restrict)
+  owner           User     @relation("GoalMutationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+
+  @@unique([ownerUserId, idempotencyKey], map: "uniq_goal_mutations_owner_idempotency")
+  @@index([goalId, createdAt], map: "idx_goal_mutations_goal_created")
+  @@map("goal_mutations")
 }
 
 model GoalRunJob {
