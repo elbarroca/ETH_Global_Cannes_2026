@@ -3,6 +3,49 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: 0G Integrator /root/v3_strict_a3
+task_id: A3-MANIFEST-V3-ADMISSION-W1
+task_instance_id: A3-MANIFEST-V3-ADMISSION-W1:W1:871B938
+generation: 1
+sprint: Admit catalog-derived manifest V3 to strict A3
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 871b93835d4162653dbfc72d1757fc0f75ee36de
+control_sha: 871b93835d4162653dbfc72d1757fc0f75ee36de
+token: A3-MANIFEST-V3-ADMISSION-W1-871B938-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T18:47:19Z
+expires_at: 2026-07-25T20:07:45Z
+allowed_paths:
+  - src/og/strict-a3.ts
+  - tests/a3/strict-a3.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T18:37:45Z
+deadline: 2026-07-25T20:07:45Z
+expected_exit: manifest V3 admission with positive context-bound execution and pre-effect tamper refusal
+external_effect_authority: local files existing dependencies local deterministic tests and one local commit only; no push deploy managed migration provider call upload ENS signature transaction funding spend or claim
+completed_at: 2026-07-25T18:47:19Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - strict A3 admits exact numeric manifest schema 3 at the existing V1 and V2 admission point while schema 4 remains the unknown-schema refusal
+  - regression covers one catalog-built context-bearing V3 request through READBACK_VERIFIED and checks manifest input and request hashes plus zero Compute Storage and verifier calls after manifest prompt or input-hash tampering
+  - npm run lint PASS with zero errors and 23 inherited warnings; npm run typecheck PASS; npm test PASS 10 of 10
+  - npm run test:resilience PASS 1 of 1; npm run test:redaction PASS 3 of 3; npm run scan:secrets PASS
+  - npm run build PASS with 35 static pages; git diff --check PASS; changed paths remain exactly within the dispatch allowlist
+  - npm run test:a3 PARTIAL with 3 non-Go verifier tests passing and 11 strict tests hook-failed before execution because the host Go binary is absent with Go fixture build failed undefined
+  - npm run test:go BLOCKED exit 127 with sh go command not found; npm run test:integration PARTIAL 32 passing and the same 11 strict hook failures before migration replay
+remaining_blocks:
+  - provide the reviewed host Go binary then rerun the focused strict test test:go test:a3 and test:integration lanes
+  - immutable exact-SHA independent audit remains required
+  - push deploy managed migration provider upload ENS signature transaction funding spend and claims remain unauthorized
+external_effects_attempted: none
+claim_changes: none
+verdict: PASS_TO_AUDIT_WITH_HOST_GO_BLOCKER; LOCAL_ONLY
+lock_release: release only exact token A3-MANIFEST-V3-ADMISSION-W1-871B938-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Frontend Builder /root/protected_v3_ui
 task_id: A5-PROTECTED-V3-UI-W2
 task_instance_id: A5-PROTECTED-V3-UI-W2:W2:1D7F82B
