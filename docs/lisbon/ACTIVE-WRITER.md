@@ -3,6 +3,48 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Root README task 019f9691-557e-73d2-bc5f-30b9fe6a6154
+task_id: README-GOALS-CLAIM-DRIFT-20260725
+task_instance_id: README-GOALS-CLAIM-DRIFT-20260725:W1:B72F5BB
+generation: 1
+sprint: A1_readme_claim_drift_remediation
+mode: sole_documentation_writer
+branch: Eth_global_lisbon_
+start_sha: b72f5bbc46681ed9ece4f6aed4c2924ee554eb59
+control_sha: b72f5bbc46681ed9ece4f6aed4c2924ee554eb59
+token: README-GOALS-W1-B72F5BB-6369206D-F03F-4EAF-9BDF-6CF9DBF13079
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T00:37:31Z
+expires_at: 2026-07-25T01:34:22Z
+allowed_paths:
+  - README.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/EVIDENCE.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T00:34:22Z
+deadline: 2026-07-25T01:34:22Z
+expected_exit: replace the Cannes-era README with a concise GOALS-aligned Lisbon overview and remediate the unqualified target-pool claim without promoting any release sponsor or live-effect claim
+external_effect_authority: safe local documentation edits deterministic checks and one atomic commit only; no product code push deploy managed migration live call signature transaction form funding upload spend public claim or gate advancement
+completed_at: 2026-07-25T00:37:31Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - root README reduced from 571 lines to 120 and aligned to the protected creator ENS immutable version external hire verified 0G receipt browser path
+  - unqualified target-pool banner inherited bounty table live-address marketing and unsupported production framing removed
+  - current status defers to canonical controls and states local-only release-blocked live-effect-blocked audit-gated and expected-winnings floor zero boundaries
+  - README local links pass 8 of 8 and the claim-boundary scan finds no stale target-pool or inherited live-promotion sections
+  - lint passes with zero errors and 23 inherited warnings typecheck passes foundation tests pass 9 of 9 secret scan passes diff check passes and the 31-page production build passes
+remaining_blocks:
+  - independent immutable-SHA README claim-drift remediation audit
+  - A4 schema-v1 Unicode repair A5 acceptance live ENS and 0G sponsor qualification and every release gate
+external_effects_attempted: none
+result: PASS_TO_AUDIT_README_CLAIM_DRIFT_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token README-GOALS-W1-B72F5BB-6369206D-F03F-4EAF-9BDF-6CF9DBF13079 after the containing commit and clean allowed-path verification
+status: closed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-A4-REMEDIATION-AUDIT-RECONCILIATION-20260725
 task_instance_id: C0-A4-REMEDIATION-AUDIT-RECONCILIATION-20260725:A22BBB3

@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - Lisbon README and claim-drift remediation
+
+- Replaced the 571-line Cannes pitch with a concise Lisbon overview centered on the protected creator-wallet, ENS authority, immutable version, external hire, verified 0G execution, canonical receipt, and browser-evidence path.
+- Removed the unqualified `~$27K Target Pool` banner, inherited bounty-promotion table, live-address marketing, and unsupported production framing. Current state now defers to the canonical claim/evidence ledgers and states expected winnings as unproven with floor `$0`.
+- Recorded the documentation repair as `PASS_TO_AUDIT; LOCAL_ONLY`. A4 remediation, A5 acceptance, live ENS/0G, sponsor qualification, push, deployment, release, and public claims remain closed.
+- Passed 8/8 local README links, claim-boundary scan, diff check, lint with zero errors and 23 inherited warnings, typecheck, foundation tests 9/9, secret scan, and the 31-page production build. No product code or external effect was attempted.
+
 ## 2026-07-25 - A4 ENSv2 remediation audit
 
 - Independent immutable-SHA audit `a22bbb3b7d049c0a9827b87fb4ce7cb634a43d82` returned `FIX; LOCAL_ONLY`. The strict schema split, covered ASCII `.eth` binding recovery, both required ENSv2 role scopes, and complete local floor passed.
