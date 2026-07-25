@@ -10,8 +10,11 @@ import { KernelJobDialog } from "@/components/kernel-job-dialog";
 import { EvidenceStatus } from "@/components/ui/evidence";
 import { useUser } from "@/contexts/user-context";
 import {
+  ApiError,
   getAgentLifecycle,
+  getOwnerEarnings,
   type AgentLifecycleVersion,
+  type OwnerEarningsResponse,
   type ProtectedPublishedAgentRead,
 } from "@/lib/api";
 import { formatUsdc, formatUsdcAtomic } from "@/lib/format-usdc";
@@ -43,6 +46,12 @@ function MarketplaceContent() {
     enabled: ready,
     retry: false,
   });
+  const earnings = useQuery({
+    queryKey: ["protected-owner-earnings"],
+    queryFn: ({ signal }) => getOwnerEarnings(signal),
+    enabled: ready && tab === "mine",
+    retry: false,
+  });
 
   const agents = useMemo(() => lifecycle.data?.agents ?? [], [lifecycle.data?.agents]);
   const drafts = lifecycle.data?.drafts ?? [];
@@ -54,6 +63,10 @@ function MarketplaceContent() {
   );
   const defaultCreatorParent = ownedCreatorParents[0] ?? null;
   const selected = agents.find((agent) => agent.versionId === selectedAgentId) ?? null;
+  const earningsByAgent = useMemo(
+    () => new Map((earnings.data?.agents ?? []).map((item) => [item.agentVersionId, item])),
+    [earnings.data?.agents],
+  );
 
   function replaceQuery(changes: Record<string, string | null>): void {
     router.replace(queryHref(changes), { scroll: false });
@@ -109,11 +122,12 @@ function MarketplaceContent() {
 
       {lifecycle.isLoading && <MarketplaceLoading />}
       {lifecycle.error && <div role="alert" className="mt-6 flex items-start justify-between gap-4 border-l-2 border-blood-500 pl-3"><p className="break-words text-sm text-blood-300">{lifecycle.error.message}</p><button type="button" onClick={() => void lifecycle.refetch()} className="text-sm font-semibold text-void-200">Retry</button></div>}
+      {tab === "mine" && <OwnerEarningsSummary query={earnings} />}
       {lifecycle.data && (
         <section className="mt-5" aria-live="polite">
           <p className="mb-3 text-xs text-void-500">Authenticated protected catalog</p>
           {tab === "available" && <AgentList agents={available} empty="No external canonical versions are available." agentHref={agentHref} />}
-          {tab === "mine" && <AgentList agents={mine} empty="You have not published a canonical version." agentHref={agentHref} />}
+          {tab === "mine" && <AgentList agents={mine} empty="You have not published a canonical version." agentHref={agentHref} earningsByAgent={earningsByAgent} earningsReady={Boolean(earnings.data)} earningsPending={earnings.isLoading} />}
           {tab === "drafts" && <DraftList drafts={drafts} />}
         </section>
       )}
@@ -128,12 +142,24 @@ function MarketplaceLoading() {
   return <main className="mx-auto max-w-[90rem] px-4 py-10 sm:px-6"><p role="status" className="border-y border-void-800 py-10 text-center text-sm text-void-400">Loading protected agents…</p></main>;
 }
 
-function AgentList({ agents, empty, agentHref }: { agents: ProtectedPublishedAgentRead[]; empty: string; agentHref: (agent: ProtectedPublishedAgentRead) => string }) {
-  if (!agents.length) return <p className="rounded-[14px] border border-dashed border-void-800 py-12 text-center text-sm text-void-500">{empty}</p>;
-  return <ul className="grid gap-3">{agents.map((agent) => <AgentRow key={agent.versionId} agent={agent} href={agentHref(agent)} />)}</ul>;
+type AgentEarnings = OwnerEarningsResponse["agents"][number];
+
+function OwnerEarningsSummary({ query }: { query: ReturnType<typeof useQuery<OwnerEarningsResponse, Error>> }) {
+  if (query.isLoading) return <section aria-label="Owner settled earnings" className="mt-5 rounded-[14px] border border-void-800 bg-void-900/40 p-5"><p role="status" className="text-sm text-void-400">Loading owner-only settled earnings…</p></section>;
+  if (query.error) {
+    const denied = query.error instanceof ApiError && (query.error.status === 401 || query.error.status === 403);
+    return <section aria-label="Owner settled earnings" className="mt-5 rounded-[14px] border border-void-800 bg-void-900/40 p-5"><div role="alert" className="border-l-2 border-blood-500 pl-3"><p className="text-sm text-blood-300">{denied ? "Owner earnings denied. Reauthorize the authenticated creator wallet." : query.error.message}</p><button type="button" onClick={() => void query.refetch()} className="mt-3 text-sm font-semibold text-void-200">Retry earnings</button></div></section>;
+  }
+  if (!query.data) return null;
+  return <section aria-label="Owner settled earnings" className="mt-5 rounded-[14px] border border-void-800 bg-void-900/40 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0"><p className="instrument-label text-dawg-400">Owner-only settled earnings</p><p className="mt-2 break-all font-mono text-2xl text-void-100 tnums">{formatUsdcAtomic(query.data.ownerEarningsAtomic)}</p><p className="mt-2 text-xs text-void-500">Finalized receipt-backed external hires only. Creator payout is 100%; platform fee is {formatUsdcAtomic(query.data.platformFeeAtomic)}.</p></div><EvidenceStatus state={query.data.settledHireCount > 0 ? "verified" : "unavailable"} label={query.data.settledHireCount > 0 ? "Settled" : "No settlements"} /></div><dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm"><div><dt className="text-xs text-void-500">Settled hires</dt><dd className="mt-1 font-mono text-void-100">{query.data.settledHireCount}</dd></div><div><dt className="text-xs text-void-500">Last settled</dt><dd className="mt-1 break-all font-mono text-void-300">{query.data.lastSettledAt ?? "None"}</dd></div></dl></section>;
 }
 
-function AgentRow({ agent, href }: { agent: ProtectedPublishedAgentRead; href: string }) {
+function AgentList({ agents, empty, agentHref, earningsByAgent = new Map(), earningsReady = false, earningsPending = false }: { agents: ProtectedPublishedAgentRead[]; empty: string; agentHref: (agent: ProtectedPublishedAgentRead) => string; earningsByAgent?: ReadonlyMap<string, AgentEarnings>; earningsReady?: boolean; earningsPending?: boolean }) {
+  if (!agents.length) return <p className="rounded-[14px] border border-dashed border-void-800 py-12 text-center text-sm text-void-500">{empty}</p>;
+  return <ul className="grid gap-3">{agents.map((agent) => <AgentRow key={agent.versionId} agent={agent} href={agentHref(agent)} earnings={earningsByAgent.get(agent.versionId) ?? null} earningsReady={earningsReady} earningsPending={earningsPending} />)}</ul>;
+}
+
+function AgentRow({ agent, href, earnings, earningsReady, earningsPending }: { agent: ProtectedPublishedAgentRead; href: string; earnings?: AgentEarnings | null; earningsReady?: boolean; earningsPending?: boolean }) {
   return (
     <li className="rounded-[16px] border border-void-800 bg-void-900/40 p-5 transition-colors hover:border-void-700">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
@@ -145,7 +171,7 @@ function AgentRow({ agent, href }: { agent: ProtectedPublishedAgentRead; href: s
             <div><dt className="text-xs font-medium text-void-500">Price / hire</dt><dd className="mt-0.5 font-mono text-void-100 tnums">{formatUsdc(agent.priceAtomic)}</dd></div>
             <div><dt className="text-xs font-medium text-void-500">Verified external hires</dt><dd className="mt-0.5 font-mono text-void-100 tnums">{agent.verifiedExternalHires}</dd></div>
             <div><dt className="text-xs font-medium text-void-500">Version</dt><dd className="mt-0.5 font-mono text-void-300">{agent.version}</dd></div>
-            <div><dt className="text-xs font-medium text-void-500">Settled earnings</dt><dd className="mt-0.5 text-void-400">Unavailable until the protected owner projection lands</dd></div>
+            {agent.ownedByViewer && <div className="min-w-0"><dt className="text-xs font-medium text-void-500">Settled earnings</dt><dd className="mt-0.5 break-all font-mono text-void-100 tnums">{earnings ? formatUsdcAtomic(earnings.ownerEarningsAtomic) : earningsReady ? formatUsdcAtomic("0") : earningsPending ? "Loading…" : "Unavailable"}</dd></div>}
           </dl>
           <p className="mt-2 text-xs leading-relaxed text-void-500">Runtime proof and financial outcome remain attached to each job.</p>
           <div className="mt-4 flex flex-wrap gap-2"><EvidenceStatus state={agent.mcpAvailability === "AVAILABLE" ? "verified" : "unavailable"} label={`MCP ${agent.mcpAvailability.toLowerCase()}`} />{agent.provenance && <EvidenceStatus state="verified" label="Provenance recorded" />}</div>

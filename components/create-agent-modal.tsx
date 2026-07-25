@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { createPublicClient, http } from "viem";
+import { mainnet } from "viem/chains";
+import { useAccount } from "wagmi";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -32,6 +35,7 @@ import { formatUsdc, formatUsdcAtomic } from "@/lib/format-usdc";
 
 const STAGES = ["Identity", "Capability bundle", "ENS authority", "Publish and receipt"] as const;
 type Stage = 0 | 1 | 2 | 3;
+const mainnetEnsClient = createPublicClient({ chain: mainnet, transport: http() });
 
 interface CreateAgentModalProps {
   onClose: () => void;
@@ -114,7 +118,7 @@ function TemplateSkills({ catalog, template }: { catalog: AgentCatalogProjection
             {(() => { const CategoryIcon = CATEGORY_META[category].icon; return <CategoryIcon data-category-heading-icon={category} size={18} className="mt-0.5 shrink-0 text-dawg-400" aria-hidden />; })()}
             <div><h4 className="text-sm font-semibold text-void-200">{CATEGORY_META[category].label}</h4><p className="mt-1 text-xs leading-relaxed text-void-500">{CATEGORY_META[category].description}</p></div>
           </div>
-          {skills.length ? <ul className="mt-3 space-y-4">{skills.map((skill) => skill && <li key={skill.id} className="min-w-0"><p className="text-xs font-semibold text-void-200">{humanize(skill.id)}</p><p className="mt-1 font-mono text-[0.6875rem] text-dawg-300">Included by template</p><CapabilityList capabilities={skill.capabilities} /><ConstraintList constraints={skill.constraints} />{skill.category === "DATA" && <EvidenceStatus className="mt-2" state={skill.providerAvailability === "AVAILABLE" ? "verified" : "unavailable"} label={`Provider ${skill.providerAvailability.toLowerCase()}`} />}</li>)}</ul> : <p className="mt-3 text-xs text-void-500">No {CATEGORY_META[category].label.toLowerCase()} skill is included by this template.</p>}
+          {skills.length ? <ul className="mt-3 space-y-4">{skills.map((skill) => skill && <li key={skill.id} className="min-w-0"><p className="text-xs font-semibold text-void-200">{humanize(skill.id)}</p><p className="mt-1 font-mono text-[0.6875rem] text-dawg-300">Included by template</p><CapabilityList capabilities={skill.capabilities} /><ConstraintList constraints={skill.constraints} />{skill.category === "DATA" && <EvidenceStatus className="mt-2" state={skill.providerAvailability === "AVAILABLE" ? "verified" : skill.providerAvailability === "CONFIGURED" ? "pending" : "unavailable"} label={`Provider ${skill.providerAvailability.toLowerCase()}`} />}</li>)}</ul> : <p className="mt-3 text-xs text-void-500">No {CATEGORY_META[category].label.toLowerCase()} skill is included by this template.</p>}
         </section>
       ))}
     </div>
@@ -136,7 +140,7 @@ function ProviderReadiness({ catalog }: { catalog: AgentCatalogProjection }) {
               ))}
             </ul>
           </div>
-          <EvidenceStatus state={provider.availability === "AVAILABLE" ? "verified" : "unavailable"} label={provider.availability} />
+          <EvidenceStatus state={provider.availability === "AVAILABLE" ? "verified" : provider.availability === "CONFIGURED" ? "pending" : "unavailable"} label={provider.availability} />
         </li>
       ))}
     </ul>
@@ -153,9 +157,9 @@ function SelectionPreview({ catalog, template, name, description, fullSubname }:
       <PreviewRow label="ENS subname" value={fullSubname} mono />
       <PreviewRow label="Capabilities" value={`${template.capabilities.length} included by template`} />
       <PreviewRow label="Price per protected hire" value={formatUsdc(template.priceAtomic)} mono />
-      <PreviewRow label="Settled earnings" value="Unavailable until the protected owner projection lands" />
+      <PreviewRow label="Settled earnings" value="Owner-only after finalized receipt-backed settlement" />
       <PreviewRow label="Skill snapshots" value={`${template.skillIds.length} locked by template`} />
-      <PreviewRow label="MCP providers" value={`${catalog.mcpProviders.filter((provider) => provider.availability === "AVAILABLE").length} of ${catalog.mcpProviders.length} available`} />
+      <PreviewRow label="MCP providers" value={`${catalog.mcpProviders.filter((provider) => provider.availability === "AVAILABLE" || provider.availability === "CONFIGURED").length} of ${catalog.mcpProviders.length} configured or available`} />
     </dl>
   );
 }
@@ -165,6 +169,7 @@ function PreviewRow({ label, value, mono = false }: { label: string; value: stri
 }
 
 export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, creatorParentOptions = [] }: CreateAgentModalProps) {
+  const { address } = useAccount();
   const reduceMotion = useReducedMotion();
   const [stage, setStage] = useState<Stage>(0);
   const [direction, setDirection] = useState<1 | -1>(1);
@@ -178,6 +183,7 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [publicationUncertain, setPublicationUncertain] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [primaryNameStatus, setPrimaryNameStatus] = useState<"idle" | "loading" | "resolved" | "unavailable">("idle");
   const stageFocusRef = useRef<HTMLDivElement>(null);
   const initialStageRef = useRef(true);
   const creatorParentEditedRef = useRef(false);
@@ -200,6 +206,25 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
     defaultParentAppliedRef.current = true;
     setCreatorParent(ownedParent);
   }, [defaultCreatorParent]);
+
+  useEffect(() => {
+    if (defaultCreatorParent || !address || creatorParentEditedRef.current) return;
+    let canceled = false;
+    setPrimaryNameStatus("loading");
+    void mainnetEnsClient.getEnsName({ address, strict: true }).then((name) => {
+      if (canceled) return;
+      const candidate = normalizeCreatorParent(name ?? "");
+      if (!candidate.endsWith(".eth")) {
+        setPrimaryNameStatus("unavailable");
+        return;
+      }
+      setPrimaryNameStatus("resolved");
+      if (!creatorParentEditedRef.current && !defaultCreatorParent) setCreatorParent(candidate);
+    }).catch(() => {
+      if (!canceled) setPrimaryNameStatus("unavailable");
+    });
+    return () => { canceled = true; };
+  }, [address, defaultCreatorParent]);
 
   useEffect(() => {
     if (initialStageRef.current) {
@@ -263,7 +288,7 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
       <div className="mt-4 grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
         <AnimatePresence mode="wait" initial={false}>
         <motion.div data-testid="agent-stage" key={stage} ref={stageFocusRef} tabIndex={-1} initial={reduceMotion ? false : { opacity: 0, x: direction * 18 }} animate={{ opacity: 1, x: 0 }} exit={reduceMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: direction * -12 }} transition={{ duration: reduceMotion ? 0 : 0.18 }} className="min-w-0 pb-4 focus:outline-none">
-          {stage === 0 && <section aria-labelledby="agent-identity-title"><h3 id="agent-identity-title" className="text-2xl font-semibold tracking-tight text-void-100">Identity</h3><p className="mt-2.5 text-sm leading-relaxed text-void-400">Name the bounded role. Instructions and capability policy remain server-owned.</p><div className="mt-7 space-y-6"><label className="block text-sm font-semibold text-void-200" htmlFor="agent-name">Agent name<input id="agent-name" value={name} onChange={(event) => { setName(event.target.value); setPreparedAgent(null); }} maxLength={80} placeholder="Research analyst" className="goal-control" /><FieldCount current={name.length} maximum={80} /></label><label className="block text-sm font-semibold text-void-200" htmlFor="agent-description">Description<textarea id="agent-description" value={description} onChange={(event) => { setDescription(event.target.value); setPreparedAgent(null); }} maxLength={800} rows={4} placeholder="Describe the bounded role this agent performs." className="goal-control min-h-32 resize-y leading-relaxed" /><FieldCount current={description.length} maximum={800} /></label></div></section>}
+          {stage === 0 && <section aria-labelledby="agent-identity-title"><h3 id="agent-identity-title" className="text-2xl font-semibold tracking-tight text-void-100">Identity</h3><p className="mt-2.5 text-sm leading-relaxed text-void-400">Name the bounded role. Instructions and capability policy remain server-owned.</p><div className="mt-7 space-y-6"><label className="block text-sm font-semibold text-void-200" htmlFor="agent-name">Agent name<input id="agent-name" value={name} onChange={(event) => { setName(event.target.value); setPreparedAgent(null); }} maxLength={80} placeholder="Research analyst" className="goal-control" /><FieldCount current={name.length} maximum={80} /></label><label className="block text-sm font-semibold text-void-200" htmlFor="agent-description">Description<textarea id="agent-description" value={description} onChange={(event) => { setDescription(event.target.value); setPreparedAgent(null); }} maxLength={800} rows={4} placeholder="Describe the bounded role this agent performs." className="goal-control resize-y leading-relaxed" /><FieldCount current={description.length} maximum={800} /></label></div></section>}
 
           {stage === 1 && (
             <section aria-labelledby="capability-bundle-title">
@@ -279,11 +304,12 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
                     <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors ${selected ? "border-dawg-500 bg-dawg-500 text-void-950" : "border-void-600 text-transparent group-hover:border-void-500"}`}><CheckIcon size={12} weight="bold" aria-hidden /></span>
                   </span>
                   <span className="mt-3 flex flex-wrap gap-1.5">{item.capabilities.length ? item.capabilities.map((cap) => <span key={cap} className="rounded-full border border-void-800 bg-void-900/60 px-2 py-0.5 text-[0.6875rem] text-void-400">{humanize(cap)}</span>) : <span className="text-xs text-void-500">No direct capability claim</span>}</span>
+                  <span className="mt-3 text-xs leading-relaxed text-void-500">{item.skillIds.map(humanize).join(" · ")}</span>
                   <span className="mt-auto pt-4 font-mono text-xs text-dawg-300 tnums">{formatUsdc(item.priceAtomic)}</span>
                 </button>;
               })}</div>}
               {catalog.data && template && <details className="mt-6 border-y border-void-800"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-void-300">Inspect exact skills and constraints</summary><div className="border-t border-void-800 pb-5"><TemplateSkills catalog={catalog.data} template={template} /></div></details>}
-              {catalog.data && <details className="mt-4 border-y border-void-800"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-void-300">Inspect catalog provider readiness</summary><div className="border-t border-void-800 py-4"><p className="text-xs leading-relaxed text-void-500">Provider readiness is separate from the selected skills. Unavailable providers supply no runtime evidence.</p><ProviderReadiness catalog={catalog.data} /></div></details>}
+              {catalog.data && <details className="mt-4 border-y border-void-800"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-void-300">Inspect catalog provider readiness</summary><div className="border-t border-void-800 py-4"><p className="text-xs leading-relaxed text-void-500">CONFIGURED means server credentials are present, not that a live query succeeded. Only per-job hashes and source metadata prove live evidence.</p><ProviderReadiness catalog={catalog.data} /></div></details>}
             </section>
           )}
 
@@ -295,7 +321,7 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
                 <input id="creator-parent" list={creatorParentOptions.length ? "owned-creator-parents" : undefined} value={creatorParent} onChange={(event) => { creatorParentEditedRef.current = true; setCreatorParent(event.target.value); setPreparedAgent(null); }} autoComplete="off" spellCheck={false} className="goal-control" />
               </label>
               {creatorParentOptions.length > 0 && <datalist id="owned-creator-parents">{creatorParentOptions.map((parent) => <option key={parent} value={normalizeCreatorParent(parent)} />)}</datalist>}
-              <p className="mt-2 text-xs leading-relaxed text-void-500">{defaultCreatorParent ? `Prefilled from your authenticated owned agents. ${creatorParentOptions.length > 1 ? `${creatorParentOptions.length} canonical parents are available.` : "You can edit it."}` : "No canonical owned creator parent is available. Enter the exact .eth parent you control."}</p>
+              <p className="mt-2 text-xs leading-relaxed text-void-500">{defaultCreatorParent ? `Prefilled from your authenticated owned agents. ${creatorParentOptions.length > 1 ? `${creatorParentOptions.length} canonical parents are available.` : "You can edit it."}` : primaryNameStatus === "loading" ? "Checking your mainnet primary ENS name as a convenience only…" : primaryNameStatus === "resolved" ? "Suggested from your mainnet primary ENS record. PREPARE_ENS_WRITE and server A4 authority checks remain decisive." : "No primary ENS name was available. Enter the exact .eth parent manually; this input grants no authority before server verification."}</p>
               <div className="mt-5 rounded-[10px] bg-void-950 p-3" aria-label="Full agent subname preview">
                 <p className="text-xs font-semibold text-void-500">Full subname preview</p>
                 <p data-testid="agent-subname-preview" className={`mt-2 break-all font-mono text-sm ${ensValid ? "text-dawg-300" : "text-void-400"}`}>{fullSubnamePreview}</p>
@@ -305,7 +331,7 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
             </section>
           )}
 
-          {stage === 3 && <section aria-labelledby="publish-receipt-title"><h3 id="publish-receipt-title" className="text-2xl font-semibold text-void-100">{publishedAgent ? "Publication receipt" : "Publish immutable version"}</h3>{publishedAgent ? <><div className="mt-4 flex flex-wrap items-start justify-between gap-3 border-y border-void-800 py-4"><div><p className="font-semibold text-void-100">{publishedAgent.name}</p><p className="mt-2 break-all font-mono text-sm text-dawg-300">{publishedAgent.fullSubname ?? "Canonical subname unavailable"}</p></div><EvidenceStatus state={publishedAgent.hireable && publishedAgent.canonicalState === "CANONICAL" ? "verified" : "unavailable"} label={publishedAgent.hireable ? "ELIGIBLE" : "REFUSED"} /></div><dl className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2"><CopyableIdentifier label="Agent ID" value={publishedAgent.agentId} /><CopyableIdentifier label="Version ID" value={publishedAgent.versionId} /><CopyableIdentifier label="Owner wallet" value={publishedAgent.ownerWallet} /><CopyableIdentifier label="Creator parent" value={publishedAgent.creatorParent ?? "Unavailable"} /><CopyableIdentifier label="Agent subname" value={publishedAgent.fullSubname ?? "Unavailable"} /><CopyableIdentifier label="Authority owner" value={publishedAgent.authorityOwner ?? "Unavailable"} /><CopyableIdentifier label="Delegate" value={publishedAgent.authorityDelegate ?? "Unavailable"} /><CopyableIdentifier label="Release SHA" value={publishedAgent.authorityReleaseSha ?? "Unavailable"} /><CopyableIdentifier label="Manifest hash" value={publishedAgent.manifestHash} /></dl><div className="mt-4 rounded-[10px] border border-void-800 bg-void-950 p-4"><p className="text-xs font-semibold text-void-500">Price per protected hire</p><p className="mt-2 font-mono text-sm text-void-200">{formatUsdcAtomic(publishedAgent.priceAtomic)}</p><p className="mt-3 text-xs leading-relaxed text-void-500">Settled earnings unavailable until the protected owner projection lands.</p></div><p className="mt-4 text-sm text-void-400">Published confirms registry eligibility only. Runtime, MCP, 0G, Storage, receipt, delivery, and settlement remain per-job evidence.</p></> : <><p className="mt-2 text-sm leading-relaxed text-void-400">Publishing activates this immutable application version and its runtime configuration. It is not a contract deployment or proof that the runtime or providers are online.</p><p className="mt-3 text-xs leading-relaxed text-void-500">Only the exact server-returned draft is published. Refusal and lost-response states remain visible.</p><button type="button" onClick={() => void publish()} disabled={!preparedAgent || busy || publicationUncertain} className="instrument-button instrument-button-primary mt-6"><ShieldCheckIcon size={16} aria-hidden />{publicationUncertain ? "Refresh registry before retry" : busy ? "Publishing version" : "Publish immutable version"}</button></>}</section>}
+          {stage === 3 && <section aria-labelledby="publish-receipt-title"><h3 id="publish-receipt-title" className="text-2xl font-semibold text-void-100">{publishedAgent ? "Publication receipt" : "Publish immutable version"}</h3>{publishedAgent ? <><div className="mt-4 flex flex-wrap items-start justify-between gap-3 border-y border-void-800 py-4"><div><p className="font-semibold text-void-100">{publishedAgent.name}</p><p className="mt-2 break-all font-mono text-sm text-dawg-300">{publishedAgent.fullSubname ?? "Canonical subname unavailable"}</p></div><EvidenceStatus state={publishedAgent.hireable && publishedAgent.canonicalState === "CANONICAL" ? "verified" : "unavailable"} label={publishedAgent.hireable ? "ELIGIBLE" : "REFUSED"} /></div><dl className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2"><CopyableIdentifier label="Agent ID" value={publishedAgent.agentId} /><CopyableIdentifier label="Version ID" value={publishedAgent.versionId} /><CopyableIdentifier label="Owner wallet" value={publishedAgent.ownerWallet} /><CopyableIdentifier label="Creator parent" value={publishedAgent.creatorParent ?? "Unavailable"} /><CopyableIdentifier label="Agent subname" value={publishedAgent.fullSubname ?? "Unavailable"} /><CopyableIdentifier label="Authority owner" value={publishedAgent.authorityOwner ?? "Unavailable"} /><CopyableIdentifier label="Delegate" value={publishedAgent.authorityDelegate ?? "Unavailable"} /><CopyableIdentifier label="Release SHA" value={publishedAgent.authorityReleaseSha ?? "Unavailable"} /><CopyableIdentifier label="Manifest hash" value={publishedAgent.manifestHash} /></dl><div className="mt-4 rounded-[10px] border border-void-800 bg-void-950 p-4"><p className="text-xs font-semibold text-void-500">Price per protected hire</p><p className="mt-2 font-mono text-sm text-void-200">{formatUsdcAtomic(publishedAgent.priceAtomic)}</p><p className="mt-3 text-xs leading-relaxed text-void-500">Open Mine to view finalized owner-only earnings.</p></div><p className="mt-4 text-sm text-void-400">Published confirms registry eligibility only. Runtime, MCP, 0G, Storage, receipt, delivery, and settlement remain per-job evidence.</p></> : <><p className="mt-2 text-sm leading-relaxed text-void-400">Publishing activates this immutable application version and its runtime configuration. It is not a contract deployment or proof that the runtime or providers are online.</p><p className="mt-3 text-xs leading-relaxed text-void-500">Only the exact server-returned draft is published. Refusal and lost-response states remain visible.</p><button type="button" onClick={() => void publish()} disabled={!preparedAgent || busy || publicationUncertain} className="instrument-button instrument-button-primary mt-6"><ShieldCheckIcon size={16} aria-hidden />{publicationUncertain ? "Refresh registry before retry" : busy ? "Publishing version" : "Publish immutable version"}</button></>}</section>}
 
           {errorMessage && <div role="alert" className="mt-6 border-l-2 border-blood-500 pl-3 text-sm text-blood-300">{errorMessage}</div>}
         </motion.div>

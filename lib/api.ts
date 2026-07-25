@@ -11,8 +11,9 @@ import type {
   GoalPolicy,
   GoalRunSnapshot,
   GoalSnapshot,
-  SubmittedJob,
+  HireRequestSnapshot,
 } from "@/src/kernel/types";
+import type { OwnerEarningsResponse } from "@/src/kernel/earnings";
 import type { TokenPick } from "@/src/types/index";
 
 export type {
@@ -27,9 +28,10 @@ export type {
   GoalRunReportV1,
   GoalRunSnapshot,
   GoalSnapshot,
+  HireRequestSnapshot,
   SwapProposalV1,
-  SubmittedJob,
 } from "@/src/kernel/types";
+export type { OwnerEarningsResponse } from "@/src/kernel/earnings";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -370,7 +372,7 @@ export interface CatalogCreateAgentDraftInput {
 export type CreateAgentDraftInput = LegacyCreateAgentDraftInput | CatalogCreateAgentDraftInput;
 
 export type AgentCatalogCategory = "PERSONA" | "DATA" | "ACTION" | "CONNECTION";
-export type AgentCatalogAvailability = "AVAILABLE" | "UNAVAILABLE" | "NOT_REQUIRED";
+export type AgentCatalogAvailability = "AVAILABLE" | "CONFIGURED" | "UNAVAILABLE" | "NOT_REQUIRED";
 
 export interface AgentCatalogSkill {
   id: string;
@@ -402,7 +404,7 @@ export interface AgentCatalogProjection {
 }
 
 const CATALOG_CATEGORIES = new Set<AgentCatalogCategory>(["PERSONA", "DATA", "ACTION", "CONNECTION"]);
-const CATALOG_AVAILABILITY = new Set<AgentCatalogAvailability>(["AVAILABLE", "UNAVAILABLE", "NOT_REQUIRED"]);
+const CATALOG_AVAILABILITY = new Set<AgentCatalogAvailability>(["AVAILABLE", "CONFIGURED", "UNAVAILABLE", "NOT_REQUIRED"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -649,19 +651,33 @@ export async function getKernelJobDetail(
   return response.job;
 }
 
-export async function submitKernelJob(
+export async function createProtectedHireRequest(
   input: { agentVersionId: string; prompt: string },
   idempotencyKey: string,
-): Promise<SubmittedJob> {
-  const response = await apiFetch<{ job: SubmittedJob }>("/api/kernel/jobs", {
+): Promise<HireRequestSnapshot> {
+  const response = await apiFetch<{ hireRequest: HireRequestSnapshot }>("/api/kernel/hire-requests", {
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey },
-    body: JSON.stringify({
-      agentVersionId: input.agentVersionId,
-      input: { prompt: input.prompt },
-    }),
+    body: JSON.stringify(input),
   });
-  return response.job;
+  return response.hireRequest;
+}
+
+export async function getProtectedHireRequest(
+  hireRequestId: string,
+  signal?: AbortSignal,
+): Promise<HireRequestSnapshot> {
+  const response = await apiFetch<{ hireRequests: HireRequestSnapshot[] }>(
+    `/api/kernel/hire-requests?id=${encodeURIComponent(hireRequestId)}`,
+    { cache: "no-store", signal },
+  );
+  const hireRequest = response.hireRequests[0];
+  if (!hireRequest) throw new ApiError("Protected hire request not found", 404, "KERNEL_NOT_FOUND");
+  return hireRequest;
+}
+
+export async function getOwnerEarnings(signal?: AbortSignal): Promise<OwnerEarningsResponse> {
+  return apiFetch<OwnerEarningsResponse>("/api/kernel/earnings", { cache: "no-store", signal });
 }
 
 export async function cancelKernelJob(jobId: string): Promise<JobSnapshot> {

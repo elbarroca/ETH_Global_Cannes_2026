@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { getAgentCatalog } from "../../lib/api";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -88,6 +89,10 @@ test("creation wizard explains locked catalog capabilities and canonical ENS pre
   assert.match(creator, /CREATOR_PARENT_REQUIRED: No wallet-derived ENS parent was substituted\./);
   assert.doesNotMatch(creator, /\.creator\.eth/);
   assert.doesNotMatch(creator, /skillIds:\s*|mcpBindings:\s*/);
+  assert.match(creator, /useAccount\(\)/);
+  assert.match(creator, /mainnetEnsClient\.getEnsName\(\{ address, strict: true \}\)/);
+  assert.match(creator, /!creatorParentEditedRef\.current && !defaultCreatorParent/);
+  assert.match(creator, /PREPARE_ENS_WRITE and server A4 authority checks remain decisive\./);
 });
 
 test("premium creator surfaces remain server-visible and evidence-conditional", async () => {
@@ -110,8 +115,26 @@ test("premium creator surfaces remain server-visible and evidence-conditional", 
   assert.match(creator, /data-testid="agent-stage"[\s\S]*tabIndex=\{-1\}/);
   assert.doesNotMatch(creator, /pb-20|min-h-32|rows=\{5\}|max-w-6xl/);
   assert.match(creator, /It is not a contract deployment or proof that the runtime or providers are online\./);
-  assert.match(creator, /Settled earnings unavailable until the protected owner projection lands\./);
+  assert.match(creator, /Open Mine to view finalized owner-only earnings\./);
   assert.match(marketplace, /Verified external hires/);
+  assert.match(marketplace, /getOwnerEarnings/);
   assert.match(marketplace, /Runtime proof and financial outcome remain attached to each job\./);
   assert.doesNotMatch([landing, nav, creator, marketplace].join("\n"), /[—–]/);
+});
+
+test("configured catalog responses remain strict and parseable", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    categories: ["DATA"],
+    skills: [{ id: "data.the-graph.read", category: "DATA", capabilities: [], constraints: ["read-only"], providerAvailability: "CONFIGURED" }],
+    templates: [{ id: "liquidity-scout", label: "Liquidity Scout", capabilities: ["research", "market-analysis"], skillIds: ["data.the-graph.read"], priceAtomic: "1000" }],
+    mcpProviders: [{ provider: "the-graph", availability: "CONFIGURED", capabilities: ["pinned-deployment-lookup", "liquidity-volume-snapshot"] }],
+  }));
+  try {
+    const catalog = await getAgentCatalog();
+    assert.equal(catalog.skills[0]?.providerAvailability, "CONFIGURED");
+    assert.equal(catalog.mcpProviders[0]?.availability, "CONFIGURED");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

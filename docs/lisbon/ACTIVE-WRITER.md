@@ -3,6 +3,44 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root
+task_id: MARKETPLACE-V5-FRONTEND-R8
+task_instance_id: MARKETPLACE-V5-FRONTEND-R8:R8:3DB3D19
+generation: 1
+sprint: Complete async Marketplace hire owner earnings and Graph proof UI
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 3db3d19df4134ced37e71c8b0a66de077fdba6ed
+control_sha: 3db3d19df4134ced37e71c8b0a66de077fdba6ed
+token: MARKETPLACE-V5-FRONTEND-R8-3DB3D19-20260725T230424Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T23:04:24Z
+expires_at: 2026-07-26T02:04:24Z
+allowed_paths:
+  - lib/api.ts
+  - components/create-agent-modal.tsx
+  - components/kernel-job-dialog.tsx
+  - components/proof-rail.tsx
+  - app/marketplace/page.tsx
+  - tests/a5/auth-state-regression.test.ts
+  - tests/playwright/a5-ui.spec.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T23:04:24Z
+deadline: 2026-07-26T02:04:24Z
+expected_exit: authenticated async hire and settled owner earnings with Graph CONFIGURED and safe proof metadata UI
+external_effect_authority: local files deterministic mocked tests and one atomic local commit only; no live Graph call database migration push deploy signature transaction spend form upload or public claim
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T23:22:27Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+evidence: lint zero errors with 23 inherited warnings; typecheck; base 10/10; auth 9/9; kernel 86/86; A5 10/10; A6 24/24; e2e 5/5; redaction 3/3; focused browser 28/28 at mobile tablet and desktop; production build; secret scan; diff check; mocked ENS paths made zero live RPC calls
+remaining_block: exact-SHA independent UI audit and final release validation; every push deploy migration and live sponsor effect remains separately unauthorized
+verdict: PASS_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token MARKETPLACE-V5-FRONTEND-R8-3DB3D19-20260725T230424Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/graph_kernel_g1
 task_id: GRAPH-KERNEL-G1-R1
 task_instance_id: GRAPH-KERNEL-G1-R1:R2:1745845
