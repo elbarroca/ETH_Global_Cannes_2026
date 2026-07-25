@@ -75,6 +75,7 @@
     "dotenv": "*",
     "ethers": "6.17.0",
     "express": "4.22.2",
+    "motion": "12.42.2",
     "next": "16.2.11",
     "node-telegram-bot-api": "0.67.0",
     "postgres": "^3.4.8",

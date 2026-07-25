@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { MotionConfig, motion, useReducedMotion } from "motion/react";
 import { Card, CardHeader, CardBody, CodeBlock } from "@/components/ui/card";
 import { NasdaqHeader } from "@/components/nasdaq-header";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
@@ -58,6 +59,7 @@ const COMMIT_STAGES = [
 
 export default function DashboardPage() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const {
     user,
     userId,
@@ -388,11 +390,14 @@ export default function DashboardPage() {
     rebuttalTriggered: pendingCycle?.debate?.rebuttalTriggered,
   } : null;
 
+  const sectionReveal = reduceMotion
+    ? { initial: { opacity: 1 }, animate: { opacity: 1 } }
+    : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } };
+
   return (
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}>
     <>
       <DashboardOnboardingModal open={showOnboarding} onDismiss={() => setShowOnboarding(false)} />
-      {/* Swarm Observatory — full-width health strip at the top of every dashboard load. */}
-      <SwarmStatusBar />
       <main className="max-w-screen-2xl mx-auto px-5 py-5">
       {/* Unskippable Telegram verification modal */}
       {user && !telegramVerified && (
@@ -409,19 +414,17 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* 2-column layout: left = dashboard content, right = sticky live activity ticker */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4">
-        <div className="min-w-0 space-y-3">
+      <div className="min-w-0 space-y-4">
 
       {/* Degraded-cycle banner: only rendered when the last committed cycle
           had a proof failure OR a specialist ran without TEE attestation.
           This replaces the previous silent-degradation behavior so users know
           when something on the glass-box proof chain didn't succeed. */}
       {cycle?.degraded && (
-        <div className="rounded-xl border border-amber-700/40 bg-amber-950/40 px-4 py-3">
+        <div className="rounded-xl border border-amber-700/40 bg-amber-950/40 px-4 py-3" role="alert">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-amber-300">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true" />
               Degraded cycle #{cycle.id}
             </div>
             <Badge variant="amber">Partial proofs</Badge>
@@ -436,15 +439,34 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Nasdaq-style terminal header — big NAV + ticker strip. */}
-      <NasdaqHeader
-        fund={fund}
-        connected={!!user}
-        agentBalance={agentBalance}
-        agentBalanceFetchedAt={agentBalanceFetchedAt}
-      />
+      <motion.section
+        {...sectionReveal}
+        data-testid="protected-work-hero"
+        aria-labelledby="protected-work-title"
+        className="relative overflow-hidden rounded-2xl border border-dawg-500/30 bg-void-950 px-5 py-7 sm:px-7 sm:py-9"
+      >
+        <div className="brand-hairline absolute inset-x-0 top-0 h-0.5" aria-hidden="true" />
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-300">Protected commerce kernel</p>
+        <h1 id="protected-work-title" className="text-gradient-brand mt-3 max-w-4xl text-3xl font-bold tracking-[-0.035em] sm:text-5xl">
+          Hire immutable agents. Inspect exact proof.
+        </h1>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-void-400 sm:text-base">
+          Authenticated jobs expose owner, immutable version, price, ENS authority, compute, storage, receipt, and exact refusal state without promoting missing evidence.
+        </p>
+      </motion.section>
 
-      <KernelJobsPanel />
+      <motion.div {...sectionReveal} transition={{ delay: reduceMotion ? 0 : 0.04 }} data-dashboard-order="protected-jobs">
+        <KernelJobsPanel />
+      </motion.div>
+
+      <motion.div {...sectionReveal} transition={{ delay: reduceMotion ? 0 : 0.08 }} data-dashboard-order="observed-balance">
+        <NasdaqHeader
+          fund={fund}
+          connected={!!user}
+          agentBalance={agentBalance}
+          agentBalanceFetchedAt={agentBalanceFetchedAt}
+        />
+      </motion.div>
 
       {/* Cycle header — shows the current/last hunt status. The user's saved
           goal (user.agent.goal) drives every cycle; they edit it inline in
@@ -485,7 +507,7 @@ export default function DashboardPage() {
           </p>
         )}
         {(running || approving) && (
-          <p className="text-sm text-void-400 animate-pulse">{stages[stageIdx]}</p>
+          <p className="text-sm text-void-400">{stages[stageIdx]}</p>
         )}
       </div>
 
@@ -794,7 +816,7 @@ export default function DashboardPage() {
                 Computing Hunt #{(user?.agent?.lastCycleId ?? 0) + 1}…
               </span>
             </div>
-            <p className="text-xs text-void-500 animate-pulse">{stages[stageIdx]}</p>
+            <p className="text-xs text-void-500">{stages[stageIdx]}</p>
           </CardBody>
         </Card>
       ) : (
@@ -900,16 +922,19 @@ export default function DashboardPage() {
       {chatOpen && userId && (
         <ChatPanel userId={userId} onClose={() => setChatOpen(false)} />
       )}
-        </div>
-        {/* Right column: sticky live activity ticker (desktop only) */}
-        <aside className="hidden xl:block">
-          <div className="sticky top-4 space-y-2">
-            <SwarmActivityTicker />
-            <p className="text-[10px] text-void-600 leading-snug px-0.5">
-              Sidebar: observed network activity. Main column: your hunts after completion.
-            </p>
-          </div>
-        </aside>
+        <motion.section
+          {...sectionReveal}
+          transition={{ delay: reduceMotion ? 0 : 0.12 }}
+          data-dashboard-order="network-telemetry"
+          className="space-y-3 pt-3"
+          aria-label="Network telemetry and activity"
+        >
+          <SwarmStatusBar />
+          <SwarmActivityTicker />
+          <p className="px-0.5 text-xs leading-relaxed text-void-600">
+            Network activity is platform-wide telemetry, not personal job evidence.
+          </p>
+        </motion.section>
       </div>
     </main>
     {showCreateAgent && (
@@ -918,6 +943,7 @@ export default function DashboardPage() {
       />
     )}
     </>
+    </MotionConfig>
   );
 }
 
@@ -967,7 +993,7 @@ function ApprovalPanel({
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-            <span className="w-2 h-2 rounded-full bg-gold-400 animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-gold-400" aria-hidden="true" />
             Your Decision
           </div>
           <Badge variant="amber">Pending</Badge>
@@ -1153,7 +1179,7 @@ function ChallengeColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => vo
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2 text-sm font-semibold text-void-200">
-          <span className="w-2 h-2 rounded-full bg-blood-500 animate-pulse" />
+          <span className="h-2 w-2 rounded-full bg-blood-500" aria-hidden="true" />
           The challenge
           {cycle.rebuttalTriggered && (
             <Badge variant="amber">2 rounds</Badge>

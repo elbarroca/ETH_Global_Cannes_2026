@@ -62,6 +62,25 @@ const TELEGRAM_USER = {
   inftTokenId: null,
 } as const;
 
+const DASHBOARD_USER = {
+  ...TELEGRAM_USER,
+  telegram: {
+    ...TELEGRAM_USER.telegram,
+    chatId: "123456",
+    username: "evidence_user",
+    verified: true,
+  },
+  fund: {
+    ...TELEGRAM_USER.fund,
+    depositedUsdc: 10,
+    currentNav: 10,
+  },
+  proxyWallet: {
+    address: "0x9999999999999999999999999999999999999999",
+  },
+  inftTokenId: 42,
+} as const;
+
 const JOB_LIST_ITEM = {
   jobId: JOB_ID,
   effectId: EFFECT_ID,
@@ -244,6 +263,7 @@ interface ApiMockOptions {
   jobDetail?: unknown;
   onJobSubmit?: () => void;
   onCancel?: () => void;
+  user?: typeof TELEGRAM_USER | typeof DASHBOARD_USER;
 }
 
 async function fulfillJson(route: Route, body: unknown, status = 200): Promise<void> {
@@ -281,7 +301,7 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}): Promis
       return;
     }
     if (path.startsWith("/api/user/")) {
-      await fulfillJson(route, TELEGRAM_USER);
+      await fulfillJson(route, options.user ?? TELEGRAM_USER);
       return;
     }
 
@@ -324,6 +344,14 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}): Promis
     }
     if (path === "/api/swarm/health") {
       await fulfillJson(route, { agents: [], summary: { online: 0, total: 0 } });
+      return;
+    }
+    if (path === "/api/swarm/metrics") {
+      await fulfillJson(route, { last24h: { cycles: 0, teeAttestations: 0, hires: 0, paymentsUsd: 0 } });
+      return;
+    }
+    if (path === "/api/swarm/activity") {
+      await fulfillJson(route, { rows: [] });
       return;
     }
     if (path === "/api/marketplace/earnings") {
@@ -398,6 +426,75 @@ test("preserves the product shell without horizontal overflow", async ({ page })
       expect(overflow, `${path} overflows at ${width}px`).toBeLessThanOrEqual(1);
     }
   }
+});
+
+test("keeps navigation compact, active, and keyboard operable", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/dashboard");
+  const activeDashboard = page.getByRole("link", { name: "Dashboard", exact: true }).first();
+  await expect(activeDashboard).toHaveAttribute("aria-current", "page");
+  await expect(activeDashboard.locator(".brand-hairline")).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const menuButton = page.getByRole("button", { name: "Open navigation menu" });
+  await menuButton.focus();
+  await page.keyboard.press("Enter");
+  const mobileNav = page.getByRole("navigation", { name: "Mobile primary" });
+  await expect(mobileNav).toBeVisible();
+  await expect(mobileNav.getByRole("link")).toHaveCount(6);
+  await page.keyboard.press("Escape");
+  await expect(mobileNav).toBeHidden();
+  await expect(menuButton).toBeFocused();
+});
+
+test("prioritizes protected work and keeps network telemetry fail closed", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { user: DASHBOARD_USER });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/dashboard");
+
+  await expect(page.getByRole("heading", { name: "Hire immutable agents. Inspect exact proof." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Protected jobs" })).toBeVisible();
+  const orderedRegions = page.locator("[data-dashboard-order]");
+  await expect(orderedRegions).toHaveCount(3);
+  await expect(orderedRegions.nth(0)).toHaveAttribute("data-dashboard-order", "protected-jobs");
+  await expect(orderedRegions.nth(1)).toHaveAttribute("data-dashboard-order", "observed-balance");
+  await expect(orderedRegions.nth(2)).toHaveAttribute("data-dashboard-order", "network-telemetry");
+  await expect(page.getByText("Freshness").locator("..")).toContainText("Unavailable");
+  await expect(page.getByText("Release SHA").locator("..")).toContainText("Unavailable");
+  await expect(page.getByText("Network activity is platform-wide telemetry, not personal job evidence.")).toBeVisible();
+  await page.getByRole("button", { name: "Expand evidence" }).click();
+  await expect(page.getByText(/Error code: STORAGE_READBACK_MISMATCH/).first()).toBeVisible();
+  await expect(page.getByTestId("protected-work-hero")).toHaveCSS("opacity", "1");
+  expect(consoleErrors).toEqual([]);
+
+  await page.screenshot({ path: "test-results/visual/a5-dashboard-nav-desktop-1440x900.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId("protected-work-hero")).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: "test-results/visual/a5-dashboard-nav-mobile-390x844.png" });
+});
+
+test("keeps long identity evidence contained", async ({ page }) => {
+  await installInjectedWallet(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("alphadawg_dashboard_tour_v1_done", "1");
+  });
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { user: DASHBOARD_USER });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Connect Wallet" }).click();
+  await page.getByText("Identity", { exact: true }).click();
+  await expect(page.getByRole("link", { name: new RegExp(`Connected wallet ${TEST_WALLET}`) })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test("presents one fail-closed agent-commerce story on the landing page", async ({ page }) => {

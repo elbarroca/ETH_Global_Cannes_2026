@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "motion/react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { WalletConnectButton } from "./wallet-connect";
 import { DawgLogo } from "./dawg-logo";
 import { useUser } from "@/contexts/user-context";
@@ -33,78 +34,54 @@ function formatUsdc(value: number | null): string {
   return `$${value.toFixed(4)}`;
 }
 
-/** User (EOA) wallet pill — links to ArcScan (external, new tab). */
-function UserWalletPill({ address }: { address: string }) {
-  return (
-    <a
-      href={arcAddressUrl(address)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="hidden lg:flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg bg-void-800/70 border border-void-700/60 hover:bg-void-800 hover:border-sky-500/40 transition-colors group"
-      title={`Your connected wallet (EOA) — ${address}\nClick to view on ArcScan ↗`}
-    >
-      <div className="flex items-center justify-center w-5 h-5 rounded-md bg-sky-500/15 border border-sky-500/30">
-        <svg viewBox="0 0 24 24" className="w-3 h-3 text-sky-400" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
-      </div>
-      <div className="flex flex-col leading-none">
-        <span className="text-[9px] uppercase tracking-wider text-void-500">You · ArcScan ↗</span>
-        <span className="text-[11px] font-mono text-void-200 mt-0.5 group-hover:text-sky-300">{shorten(address)}</span>
-      </div>
-    </a>
-  );
-}
-
-/** Agent (Circle MPC proxy) wallet pill — links to ArcScan (external, new tab). */
-function AgentWalletPill({
-  address,
+function IdentityDisclosure({
+  walletAddress,
+  proxyAddress,
   balance,
+  tokenId,
 }: {
-  address: string;
+  walletAddress: string | null;
+  proxyAddress: string | null;
   balance: number | null;
+  tokenId: number | null;
 }) {
+  if (!walletAddress && !proxyAddress && tokenId === null) return null;
+
   return (
-    <a
-      href={arcAddressUrl(address)}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={`Agent proxy wallet (Circle MPC) — ${address}\nClick to view on ArcScan ↗`}
-      className="hidden md:flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg bg-blood-900/25 border border-blood-700/40 hover:bg-blood-900/40 hover:border-blood-600/60 transition-colors group"
+    <details
+      className="group relative hidden xl:block"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") event.currentTarget.removeAttribute("open");
+      }}
     >
-      <div className="flex items-center justify-center w-5 h-5 rounded-md bg-blood-600/20 border border-blood-500/40">
-        <svg viewBox="0 0 24 24" className="w-3 h-3 text-blood-300" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="11" width="18" height="10" rx="2"/>
-          <circle cx="12" cy="5" r="2"/>
-          <path d="M12 7v4"/>
-          <line x1="8" y1="16" x2="8" y2="16"/>
-          <line x1="16" y1="16" x2="16" y2="16"/>
-        </svg>
-      </div>
-      <div className="flex flex-col leading-none">
-        <span className="text-[9px] uppercase tracking-wider text-blood-400">Agent · ArcScan ↗</span>
-        <span className="text-[11px] font-mono text-void-100 mt-0.5">
-          <span className="text-gold-400 font-semibold">{formatUsdc(balance)}</span>
-          <span className="text-void-600 mx-1">·</span>
-          <span className="text-void-400 group-hover:text-blood-200">{shorten(address)}</span>
+      <summary className="flex min-h-11 max-w-48 cursor-pointer list-none items-center gap-2 rounded-xl border border-void-700 bg-void-900 px-3 text-left marker:content-none hover:border-dawg-500/40 hover:bg-void-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dawg-400">
+        <span className="min-w-0">
+          <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-void-500">Identity</span>
+          <span className="block truncate font-mono text-[11px] text-void-200">
+            {proxyAddress ? `${formatUsdc(balance)} · ${shorten(proxyAddress)}` : walletAddress ? shorten(walletAddress) : `iNFT #${tokenId}`}
+          </span>
         </span>
+        <span aria-hidden="true" className="ml-auto text-xs text-gold-400 transition-transform group-open:rotate-180">⌄</span>
+      </summary>
+      <div className="absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] space-y-3 rounded-xl border border-void-700 bg-void-950 p-4 shadow-2xl">
+        {walletAddress && <IdentityLink label="Connected wallet" address={walletAddress} href={arcAddressUrl(walletAddress)} />}
+        {proxyAddress && <IdentityLink label={`Agent wallet · ${formatUsdc(balance)}`} address={proxyAddress} href={arcAddressUrl(proxyAddress)} />}
+        {tokenId !== null && (
+          <a className="block rounded-lg px-2 py-2 text-xs text-void-300 hover:bg-void-900 hover:text-gold-300" href={inftTokenUrl(tokenId)} target="_blank" rel="noopener noreferrer">
+            <span className="block text-[10px] uppercase tracking-wider text-void-500">Agent identity</span>
+            <span className="mt-1 block font-mono">iNFT #{String(tokenId).padStart(4, "0")} ↗</span>
+          </a>
+        )}
       </div>
-    </a>
+    </details>
   );
 }
 
-/** Lead Dawg iNFT pill — links to the specific token on 0G Chainscan. */
-function InftPill({ tokenId }: { tokenId: number }) {
+function IdentityLink({ label, address, href }: { label: string; address: string; href: string }) {
   return (
-    <a
-      href={inftTokenUrl(tokenId)}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={`Your Lead Dawg agent identity — iNFT #${tokenId}\nClick to view on 0G Chainscan ↗`}
-      className="hidden xl:inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-mono bg-gold-400/10 text-gold-400 border border-gold-400/30 hover:bg-gold-400/15 hover:border-gold-400/50 transition-colors"
-    >
-      iNFT #{String(tokenId).padStart(4, "0")} ↗
+    <a className="block rounded-lg px-2 py-2 hover:bg-void-900" href={href} target="_blank" rel="noopener noreferrer">
+      <span className="block text-[10px] font-semibold uppercase tracking-wider text-void-500">{label}</span>
+      <span className="mt-1 block break-all font-mono text-xs text-void-200">{address} ↗</span>
     </a>
   );
 }
@@ -112,6 +89,8 @@ function InftPill({ tokenId }: { tokenId: number }) {
 export function Nav() {
   const pathname = usePathname();
   const [mobileMenu, setMobileMenu] = useState({ open: false, pathname });
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const reduceMotion = useReducedMotion();
   const { user, walletAddress, agentBalance } = useUser();
   const mounted = useSyncExternalStore(
     subscribeToHydration,
@@ -126,19 +105,23 @@ export function Nav() {
   useEffect(() => {
     if (!mobileOpen) return;
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setMobileMenu({ open: false, pathname });
+      if (event.key === "Escape") {
+        setMobileMenu({ open: false, pathname });
+        window.requestAnimationFrame(() => menuButtonRef.current?.focus());
+      }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [mobileOpen, pathname]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-void-800 bg-void-900">
-      <div className="max-w-7xl mx-auto px-5 h-14 flex items-center gap-4">
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}>
+    <header className="sticky top-0 z-50 border-b border-void-800 bg-void-950/95 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-screen-2xl items-center gap-3 px-4 sm:px-5">
         {/* Logo */}
         <Link href="/" onClick={() => setMobileMenu({ open: false, pathname })} className="flex min-h-11 items-center gap-2 shrink-0 group">
           <DawgLogo animated className="w-8 h-8" />
-          <span className="hidden font-bold text-void-100 text-base tracking-tight sm:inline">
+          <span className="text-gradient-brand hidden text-base font-bold tracking-tight sm:inline">
             AlphaDawg
           </span>
           <span className="rounded-md border border-void-700 bg-black px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-void-400">
@@ -155,13 +138,20 @@ export function Nav() {
                 key={tab.href}
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm transition-colors ${
+                className={`relative inline-flex min-h-11 items-center rounded-lg px-2.5 text-sm transition-colors ${
                   active
-                    ? "bg-void-800 text-void-100 font-medium"
+                    ? "text-void-100 font-semibold"
                     : "text-void-500 hover:text-void-300"
                 }`}
               >
                 {tab.label}
+                {active && (
+                  <motion.span
+                    layoutId="primary-nav-active"
+                    className="brand-hairline absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                    transition={reduceMotion ? { duration: 0 } : undefined}
+                  />
+                )}
               </Link>
             );
           })}
@@ -169,17 +159,12 @@ export function Nav() {
 
         {/* Right section — wallet identity */}
         <div className="ml-auto flex items-center gap-2 shrink-0">
-          {inftTokenId !== null && <InftPill tokenId={inftTokenId} />}
-
-          {/* Agent wallet — always relevant when user is onboarded */}
-          {mounted && proxyAddress && (
-            <AgentWalletPill address={proxyAddress} balance={agentBalance} />
+          {mounted && (
+            <IdentityDisclosure walletAddress={walletAddress} proxyAddress={proxyAddress} balance={agentBalance} tokenId={inftTokenId} />
           )}
 
-          {/* User (EOA) wallet — connected external wallet */}
-          {mounted && walletAddress && <UserWalletPill address={walletAddress} />}
-
           <button
+            ref={menuButtonRef}
             type="button"
             onClick={() => setMobileMenu({ open: !mobileOpen, pathname })}
             aria-expanded={mobileOpen}
@@ -195,9 +180,17 @@ export function Nav() {
         </div>
       </div>
 
+      <AnimatePresence initial={false}>
       {mobileOpen && (
-        <nav id="mobile-primary-nav" aria-label="Mobile primary" className="border-t border-void-800 bg-void-900 px-4 py-3 md:hidden">
-          <div className="grid grid-cols-2 gap-2">
+        <motion.nav
+          id="mobile-primary-nav"
+          aria-label="Mobile primary"
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+          className="overflow-hidden border-t border-void-800 bg-void-950 px-4 py-3 md:hidden"
+        >
+          <div className="grid grid-cols-1 gap-1.5">
             {TABS.map((tab) => {
               const active = pathname === tab.href || pathname.startsWith(tab.href + "/");
               return (
@@ -217,8 +210,10 @@ export function Nav() {
               );
             })}
           </div>
-        </nav>
+        </motion.nav>
       )}
+      </AnimatePresence>
     </header>
+    </MotionConfig>
   );
 }

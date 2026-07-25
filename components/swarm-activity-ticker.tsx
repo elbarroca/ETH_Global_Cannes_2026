@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SwarmActivityResponse, SwarmActivityRow } from "@/lib/types";
-import { agentEmoji, agentLabel } from "@/lib/swarm-endpoints";
+import { agentLabel } from "@/lib/swarm-endpoints";
 import { arcTxUrl } from "@/lib/links";
 import { useUser } from "@/contexts/user-context";
 
@@ -325,29 +325,29 @@ function describe(row: SwarmActivityRow): string {
 }
 
 const TONE_TEXT: Record<ActionStyle["tone"], string> = {
-  dawg:   "text-[#FFE066] glow-dawg-strong",
-  green:  "text-[#39FF7A] glow-green",
-  red:    "text-[#FF5A5A] glow-red",
-  teal:   "text-[#5EEAD4] glow-teal",
-  purple: "text-[#C497FF] glow-purple",
-  void:   "text-void-200 glow-void",
+  dawg:   "text-gold-300",
+  green:  "text-void-100",
+  red:    "text-blood-300",
+  teal:   "text-void-200",
+  purple: "text-void-200",
+  void:   "text-void-300",
 };
 
 const TONE_DOT: Record<ActionStyle["tone"], string> = {
-  dawg:   "bg-dawg-400 shadow-[0_0_10px_rgba(255,199,0,0.9)]",
-  green:  "bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.9)]",
-  red:    "bg-blood-500 shadow-[0_0_10px_rgba(239,68,68,0.9)]",
-  teal:   "bg-teal-400 shadow-[0_0_10px_rgba(20,184,166,0.9)]",
-  purple: "bg-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.9)]",
+  dawg:   "bg-dawg-400",
+  green:  "bg-emerald-400",
+  red:    "bg-blood-500",
+  teal:   "bg-void-400",
+  purple: "bg-void-400",
   void:   "bg-void-400",
 };
 
 const TONE_BORDER: Record<ActionStyle["tone"], string> = {
   dawg:   "border-l-dawg-500/80",
-  green:  "border-l-emerald-500/80",
+  green:  "border-l-void-600",
   red:    "border-l-blood-500/80",
-  teal:   "border-l-teal-500/80",
-  purple: "border-l-purple-500/80",
+  teal:   "border-l-void-600",
+  purple: "border-l-void-600",
   void:   "border-l-void-600",
 };
 
@@ -437,20 +437,16 @@ export function SwarmActivityTicker() {
   };
 
   return (
-    <div className="bg-black border-2 border-dawg-500/40 rounded-2xl overflow-hidden flex flex-col h-[620px] glow-card nasdaq-scanlines">
-      {/* Header strip — pixel LED title bar */}
-      <div className="relative flex items-center justify-between px-4 py-3 border-b border-dawg-500/30 bg-black">
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-dawg-400 opacity-60" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-dawg-400 shadow-[0_0_10px_rgba(255,199,0,0.9)]" />
-          </span>
-          <span className="font-pixel glow-dawg-strong text-[22px] leading-none text-[#FFE066] uppercase tracking-[0.1em]">
-            Swarm Activity
-          </span>
+    <section className="flex max-h-[34rem] min-h-80 flex-col overflow-hidden rounded-2xl border border-void-800 bg-void-950/45" aria-labelledby="network-activity-title">
+      <div className="flex items-center justify-between border-b border-void-800 px-4 py-3">
+        <div>
+          <h2 id="network-activity-title" className="text-sm font-semibold text-void-200">
+            Network activity
+          </h2>
+          <p className="mt-1 text-xs text-void-600">Observed platform events, not personal job evidence.</p>
         </div>
-        <span className="font-pixel glow-dawg text-[16px] leading-none text-[#FFCC00]">
-          {rows.length} EVENTS
+        <span className="font-mono text-xs tabular-nums text-void-500">
+          {rows.length} events
         </span>
       </div>
 
@@ -465,11 +461,11 @@ export function SwarmActivityTicker() {
             <div className="w-5 h-5 border-2 border-dawg-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : rows.length === 0 ? (
-          <div className="font-pixel glow-dawg text-center py-8 text-[18px] text-[#FFCC00]/60">
+          <div className="py-8 text-center text-sm text-void-500">
             Waiting for swarm events…
           </div>
         ) : (
-          <ul className="divide-y divide-dawg-500/10">
+          <ul className="divide-y divide-void-800/80">
             {rows.map((row) => (
               <TickerRow
                 key={row.id}
@@ -481,7 +477,7 @@ export function SwarmActivityTicker() {
           </ul>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -495,7 +491,6 @@ function TickerRow({
   onToggle: () => void;
 }) {
   const style = ACTION_STYLES[row.actionType] ?? DEFAULT_STYLE;
-  const emoji = row.agentName ? agentEmoji(row.agentName) : null;
   const teeOk = row.teeVerified === true;
   const amount = parsePaymentAmount(row.paymentAmount);
   const hasRealTx =
@@ -534,8 +529,7 @@ function TickerRow({
         >
           {style.label}
         </span>
-        {emoji && <span className="text-[18px] leading-none shrink-0">{emoji}</span>}
-        <span className="font-pixel glow-dawg ml-auto text-[16px] leading-none text-[#FFCC00]/70 shrink-0">
+        <span className="ml-auto shrink-0 font-mono text-[11px] text-void-600">
           {relativeTime(row.createdAt)}
         </span>
       </div>
@@ -549,7 +543,7 @@ function TickerRow({
       {(hasPayment || teeOk || hasRealTx || duration) && (
         <div className="mt-2 flex items-center gap-2.5 flex-wrap text-xs">
           {hasPayment && amount != null && (
-            <span className="font-pixel glow-green text-[15px] leading-none text-[#39FF7A]">
+            <span className="font-mono text-xs text-void-200">
               ${amount.toFixed(3)}
             </span>
           )}
@@ -570,7 +564,7 @@ function TickerRow({
             </span>
           ) : null}
           {teeOk && (
-            <span className="font-pixel glow-dawg text-[14px] leading-none text-[#FFCC00]">
+            <span className="font-mono text-xs text-gold-300">
               TEE ✓
             </span>
           )}

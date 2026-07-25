@@ -3,6 +3,59 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/a5_taste_audit
+task_id: A5-NAV-DASH-TASTE-20260725
+task_instance_id: A5-NAV-DASH-TASTE-20260725:W1:9288AB2
+generation: 1
+sprint: A5_local_ui_hierarchy_motion_remediation
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: 9288ab265323248c7ff3bbaaa75b184f66887521
+control_sha: 9288ab265323248c7ff3bbaaa75b184f66887521
+required_ancestors:
+  - 70d103450bc5b9ff5f294eefb9652dae93add100
+  - 8839d26b0b62824baec2211b4c8767d91e58a0a8
+  - 196ed92b5b29db381118ba41c703eebbb6d7540b
+token: A5-NAVDASH-W1-9288AB2-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T01:14:58Z
+expires_at: 2026-07-25T03:00:00Z
+allowed_paths:
+  - components/nav.tsx
+  - app/dashboard/page.tsx
+  - components/nasdaq-header.tsx
+  - components/swarm-status-bar.tsx
+  - components/swarm-activity-ticker.tsx
+  - app/globals.css
+  - tests/playwright/a5-ui.spec.ts
+  - package.json
+  - package-lock.json
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T01:14:58Z
+deadline: 2026-07-25T03:00:00Z
+expected_exit: evidence-first dashboard hierarchy with a compact protected-work hero restrained Motion consolidated navigation and lower-priority network telemetry
+external_effect_authority: safe local allowed files deterministic checks loopback browser verification local screenshots as UI evidence only and one atomic commit; no push deploy sponsor call signature transaction form funding upload spend public claim or gate advancement
+completed_at: 2026-07-25T01:32:15Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - protected work renders before observed balance specialist controls and network telemetry with exact refusal and missing evidence semantics preserved
+  - desktop navigation remains one line at 64 pixels with six stable labels an animated active underline one accessible identity disclosure and mobile Escape focus return
+  - Motion 12.42.2 is pinned and scoped to existing client components with local MotionConfig reduced motion opacity and transforms only and no scroll listener or perpetual decorative animation
+  - one gold to warm cream gradient family is limited to the AlphaDawg wordmark protected-work title and restrained hairlines
+  - network health activity and 24 hour metrics are explicitly platform-wide and freshness plus release SHA remain unavailable instead of inferred
+  - lint passed with zero errors and 23 inherited warnings typecheck foundation 9 of 9 A5 3 of 3 Playwright 13 of 13 secret scan 31-page production build and diff check passed
+  - settled local screenshots captured at 1440x900 and 390x844 as UI evidence only
+remaining_blocks:
+  - independent immutable-SHA A5 audit and same-SHA live protected journey
+  - every deployment push sponsor bounty release and public claim gate
+external_effects_attempted: none
+result: PASS_TO_AUDIT_NAV_DASH_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token A5-NAVDASH-W1-9288AB2-20260725 after the containing commit and allowed-path clean verification
+status: closed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-UNATTRIBUTED-PUSH-RECONCILIATION-20260725
 task_instance_id: C0-UNATTRIBUTED-PUSH-RECONCILIATION-20260725:196ED92

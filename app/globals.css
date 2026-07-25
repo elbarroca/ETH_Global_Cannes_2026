@@ -62,6 +62,29 @@
   --font-pixel: var(--font-vt323);
 }
 
+:root {
+  --brand-gradient: linear-gradient(108deg, #ffc700 0%, #ffe38a 52%, #f6f3e4 100%);
+  --brand-gradient-muted: linear-gradient(90deg, rgba(255, 199, 0, 0.88), rgba(246, 243, 228, 0.7));
+}
+
+.text-gradient-brand {
+  color: var(--color-dawg-300);
+}
+
+.brand-hairline {
+  background: var(--brand-gradient-muted);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .text-gradient-brand {
+    background-image: var(--brand-gradient);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
 body {
   background:
     radial-gradient(ellipse 1100px 700px at 85% -10%, rgba(255, 199, 0, 0.07), transparent 62%),
