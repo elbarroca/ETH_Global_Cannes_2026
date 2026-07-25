@@ -90,9 +90,15 @@ test("creation wizard explains locked catalog capabilities and canonical ENS pre
   assert.doesNotMatch(creator, /\.creator\.eth/);
   assert.doesNotMatch(creator, /skillIds:\s*|mcpBindings:\s*/);
   assert.match(creator, /useAccount\(\)/);
-  assert.match(creator, /mainnetEnsClient\.getEnsName\(\{ address, strict: true \}\)/);
+  assert.match(creator, /mainnetEnsClient\.getEnsName\(\{ address, strict: false \}\)/);
   assert.match(creator, /!creatorParentEditedRef\.current && !defaultCreatorParent/);
   assert.match(creator, /PREPARE_ENS_WRITE and server A4 authority checks remain decisive\./);
+  assert.match(creator, /href="https:\/\/app\.ens\.domains\/" target="_blank" rel="noreferrer"/);
+  assert.match(creator, />Check again<\/button>/);
+  assert.match(creator, /Its ETH Address must match this connected wallet; set it as Primary or enter it manually\./);
+  assert.match(creator, /No verified mainnet Primary Name found\./);
+  assert.match(creator, /ENS lookup failed; enter your \.eth parent manually or retry\./);
+  assert.doesNotMatch(creator, /barrocaa\.eth/);
 });
 
 test("premium creator surfaces remain server-visible and evidence-conditional", async () => {

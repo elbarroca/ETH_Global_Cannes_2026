@@ -219,6 +219,7 @@ interface MockOptions {
   hirePollStatus?: 503;
   earningsStatus?: 403;
   ensPrimaryName?: string | null;
+  ensPrimaryNames?: readonly (string | null)[];
   ensRpcFailure?: boolean;
   catalog?: unknown;
   onGoalCreate?: (body: Record<string, unknown>) => void;
@@ -241,14 +242,16 @@ async function installApiMocks(page: Page, options: MockOptions = {}): Promise<v
   let actionRequiredRemaining = options.actionRequiredOnce === true;
   let drafts: unknown[] = [];
   let hirePolls = 0;
+  let ensLookups = 0;
   await page.unroute("https://eth.merkle.io/**");
   await page.route("https://eth.merkle.io/**", async (route) => {
     if (options.ensRpcFailure) return route.fulfill({ status: 503, body: "unavailable" });
     const request = route.request().postDataJSON() as { id?: number; method?: string };
+    const primaryName = options.ensPrimaryNames?.[Math.min(ensLookups++, options.ensPrimaryNames.length - 1)] ?? options.ensPrimaryName ?? "";
     const result = request.method === "eth_chainId" ? "0x1" : encodeFunctionResult({
       abi: ENS_REVERSE_ABI,
       functionName: "reverseWithGateways",
-      result: [options.ensPrimaryName ?? "", "0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"],
+      result: [primaryName, "0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"],
     });
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: request.id ?? 1, result }) });
   });
@@ -701,7 +704,9 @@ test("first agent keeps ENS parent blank and never invents a wallet-derived name
   await reachFirstAgentEns(page, "First Evidence Agent");
   await expect(page.getByLabel("Creator ENS parent")).toHaveValue("");
   await expect(page.getByTestId("agent-subname-preview")).toHaveText("Unavailable until a canonical creator parent is entered.");
-  await expect(page.getByText("No primary ENS name was available.", { exact: false })).toBeVisible();
+  await expect(page.getByText("No verified mainnet Primary Name found.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Get or manage ENS" })).toHaveAttribute("href", "https://app.ens.domains/");
+  await expect(page.getByRole("link", { name: "Get or manage ENS" })).toHaveAttribute("target", "_blank");
   await expect(page.getByText("CREATOR_PARENT_REQUIRED: No wallet-derived ENS parent was substituted.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Prepare immutable draft" })).toBeDisabled();
 });
@@ -722,6 +727,28 @@ test("non-ENS reverse results preserve manual entry and grant no authority", asy
   await reachFirstAgentEns(page, "Invalid Reverse Agent");
   await expect(page.getByLabel("Creator ENS parent")).toHaveValue("");
   await expect(page.getByRole("button", { name: "Prepare immutable draft" })).toBeDisabled();
+});
+
+test("primary ENS retry detects a newly configured name without reconnecting", async ({ page }) => {
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { noAgents: true, ensPrimaryNames: [null, "retry-agent.eth"] });
+  await connectReady(page, "/marketplace?view=mine&create=1");
+  await reachFirstAgentEns(page, "Retry Primary Agent");
+  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("");
+  await page.getByRole("button", { name: "Check again" }).click();
+  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("retry-agent.eth");
+  await expect(page.getByText("PREPARE_ENS_WRITE and server A4 authority checks remain decisive.")).toBeVisible();
+});
+
+test("primary ENS transport failure stays manual and retryable", async ({ page }) => {
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { noAgents: true, ensRpcFailure: true });
+  await connectReady(page, "/marketplace?view=mine&create=1");
+  await reachFirstAgentEns(page, "ENS Error Agent");
+  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("");
+  await expect(page.getByText("ENS lookup failed; enter your .eth parent manually or retry.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Get or manage ENS" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check again" })).toBeVisible();
 });
 
 for (const status of [500, 503] as const) {

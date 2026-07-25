@@ -4,6 +4,40 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Frontend Builder /root
+task_id: MARKETPLACE-ENS-RECOVERY-R9
+task_instance_id: MARKETPLACE-ENS-RECOVERY-R9:96D0F23
+generation: 1
+sprint: Add manual ENS recovery link and strict lookup retry
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 96d0f23aa96d704b600b0ccb64ca7e1d079053db
+control_sha: 96d0f23aa96d704b600b0ccb64ca7e1d079053db
+token: MARKETPLACE-ENS-RECOVERY-R9-96D0F23-20260725T233021Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T23:30:21Z
+expires_at: 2026-07-26T00:30:21Z
+allowed_paths:
+  - components/create-agent-modal.tsx
+  - tests/a5/auth-state-regression.test.ts
+  - tests/playwright/a5-ui.spec.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T23:30:21Z
+deadline: 2026-07-26T00:30:21Z
+expected_exit: unavailable primary ENS remains manual with external recovery and strict retry
+external_effect_authority: local files deterministic mocked tests and one atomic local commit only; no live ENS call network push deploy migration signature transaction spend or public claim
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T23:37:00Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+evidence: scoped lint typecheck A5 10 of 10 production build five mocked ENS null resolved non-ENS retry and error browser paths plus focused final error test secret scan and diff check passed with zero live RPC calls
+remaining_block: none inside ENS recovery scope; PREPARE_ENS_WRITE and server A4 remain decisive; release and live effects remain unauthorized
+verdict: PASS; LOCAL_ONLY
+lock_release: release only exact token MARKETPLACE-ENS-RECOVERY-R9-96D0F23-20260725T233021Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
+owner: Frontend Builder /root
 task_id: MARKETPLACE-V5-FRONTEND-R8-G1
 task_instance_id: MARKETPLACE-V5-FRONTEND-R8-G1:FE019A4
 generation: 1

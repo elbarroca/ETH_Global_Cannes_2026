@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createPublicClient, http } from "viem";
@@ -183,11 +183,12 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [publicationUncertain, setPublicationUncertain] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [primaryNameStatus, setPrimaryNameStatus] = useState<"idle" | "loading" | "resolved" | "unavailable">("idle");
+  const [primaryNameStatus, setPrimaryNameStatus] = useState<"idle" | "loading" | "resolved" | "not-found" | "error">("idle");
   const stageFocusRef = useRef<HTMLDivElement>(null);
   const initialStageRef = useRef(true);
   const creatorParentEditedRef = useRef(false);
   const defaultParentAppliedRef = useRef(Boolean(defaultCreatorParent));
+  const primaryNameRequestRef = useRef(0);
   const catalog = useQuery({ queryKey: ["protected-agent-catalog"], queryFn: ({ signal }) => getAgentCatalog(signal), retry: false });
 
   const template = useMemo(() => catalog.data?.templates.find((item) => item.id === templateId) ?? null, [catalog.data?.templates, templateId]);
@@ -207,24 +208,29 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
     setCreatorParent(ownedParent);
   }, [defaultCreatorParent]);
 
-  useEffect(() => {
-    if (defaultCreatorParent || !address || creatorParentEditedRef.current) return;
-    let canceled = false;
+  const checkPrimaryName = useCallback(async (): Promise<void> => {
+    if (defaultCreatorParent || !address) return;
+    const requestId = ++primaryNameRequestRef.current;
     setPrimaryNameStatus("loading");
-    void mainnetEnsClient.getEnsName({ address, strict: true }).then((name) => {
-      if (canceled) return;
+    await mainnetEnsClient.getEnsName({ address, strict: false }).then((name) => {
+      if (requestId !== primaryNameRequestRef.current) return;
       const candidate = normalizeCreatorParent(name ?? "");
       if (!candidate.endsWith(".eth")) {
-        setPrimaryNameStatus("unavailable");
+        setPrimaryNameStatus("not-found");
         return;
       }
       setPrimaryNameStatus("resolved");
       if (!creatorParentEditedRef.current && !defaultCreatorParent) setCreatorParent(candidate);
     }).catch(() => {
-      if (!canceled) setPrimaryNameStatus("unavailable");
+      if (requestId === primaryNameRequestRef.current) setPrimaryNameStatus("error");
     });
-    return () => { canceled = true; };
   }, [address, defaultCreatorParent]);
+
+  useEffect(() => {
+    if (creatorParentEditedRef.current) return;
+    void checkPrimaryName();
+    return () => { primaryNameRequestRef.current += 1; };
+  }, [checkPrimaryName]);
 
   useEffect(() => {
     if (initialStageRef.current) {
@@ -321,7 +327,8 @@ export function CreateAgentModal({ onClose, onCreated, defaultCreatorParent, cre
                 <input id="creator-parent" list={creatorParentOptions.length ? "owned-creator-parents" : undefined} value={creatorParent} onChange={(event) => { creatorParentEditedRef.current = true; setCreatorParent(event.target.value); setPreparedAgent(null); }} autoComplete="off" spellCheck={false} className="goal-control" />
               </label>
               {creatorParentOptions.length > 0 && <datalist id="owned-creator-parents">{creatorParentOptions.map((parent) => <option key={parent} value={normalizeCreatorParent(parent)} />)}</datalist>}
-              <p className="mt-2 text-xs leading-relaxed text-void-500">{defaultCreatorParent ? `Prefilled from your authenticated owned agents. ${creatorParentOptions.length > 1 ? `${creatorParentOptions.length} canonical parents are available.` : "You can edit it."}` : primaryNameStatus === "loading" ? "Checking your mainnet primary ENS name as a convenience only…" : primaryNameStatus === "resolved" ? "Suggested from your mainnet primary ENS record. PREPARE_ENS_WRITE and server A4 authority checks remain decisive." : "No primary ENS name was available. Enter the exact .eth parent manually; this input grants no authority before server verification."}</p>
+              <p className="mt-2 text-xs leading-relaxed text-void-500">{defaultCreatorParent ? `Prefilled from your authenticated owned agents. ${creatorParentOptions.length > 1 ? `${creatorParentOptions.length} canonical parents are available.` : "You can edit it."}` : primaryNameStatus === "loading" ? "Checking your mainnet primary ENS name as a convenience only…" : primaryNameStatus === "resolved" ? "Suggested from your mainnet primary ENS record. PREPARE_ENS_WRITE and server A4 authority checks remain decisive." : primaryNameStatus === "error" ? "ENS lookup failed; enter your .eth parent manually or retry. This grants no authority before server verification." : "No verified mainnet Primary Name found. Enter the exact .eth parent manually; this grants no authority before server verification."}</p>
+              {!defaultCreatorParent && (primaryNameStatus === "not-found" || primaryNameStatus === "error") && <div className="mt-3 flex flex-wrap items-center gap-3 text-xs"><p className="w-full text-void-500">Already own a name? Its ETH Address must match this connected wallet; set it as Primary or enter it manually. No ENS yet? Get one.</p><a href="https://app.ens.domains/" target="_blank" rel="noreferrer" className="font-semibold text-dawg-300 hover:text-dawg-200">Get or manage ENS</a><button type="button" onClick={() => void checkPrimaryName()} disabled={!address} className="font-semibold text-void-200 disabled:opacity-50">Check again</button></div>}
               <div className="mt-5 rounded-[10px] bg-void-950 p-3" aria-label="Full agent subname preview">
                 <p className="text-xs font-semibold text-void-500">Full subname preview</p>
                 <p data-testid="agent-subname-preview" className={`mt-2 break-all font-mono text-sm ${ensValid ? "text-dawg-300" : "text-void-400"}`}>{fullSubnamePreview}</p>
