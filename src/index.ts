@@ -123,7 +123,10 @@ export async function bootRuntime(
   const boot = (async (): Promise<RuntimeHandle> => {
     const mcpProvider = workersEnabled ? createProductionMcpProvider(source) : undefined;
     const goalRunner = workersEnabled
-      ? dependencies.startGoalRunner({ leaseSeconds: environment.kernelWorkerLeaseSeconds })
+      ? dependencies.startGoalRunner({
+          leaseSeconds: environment.kernelWorkerLeaseSeconds,
+          mcpProvider,
+        })
       : null;
     const kernelWorker = workersEnabled
       ? dependencies.startKernelWorker({

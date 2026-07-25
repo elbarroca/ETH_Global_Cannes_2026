@@ -4,6 +4,40 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Release Integrator /root
+task_id: GOAL-MCP-WIRE-R7
+task_instance_id: GOAL-MCP-WIRE-R7:R7:BBA836F
+generation: 1
+sprint: Pass the bounded MCP provider into protected goal runs
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: bba836f7820101dac493a7d82a3991ea633c3c2d
+control_sha: bba836f7820101dac493a7d82a3991ea633c3c2d
+token: GOAL-MCP-WIRE-R7-BBA836F-20260725T222448Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T22:27:33Z
+expires_at: 2026-07-26T01:24:48Z
+allowed_paths:
+  - src/agents/goal-runner.ts
+  - src/index.ts
+  - tests/kernel/runtime-lifecycle.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T22:24:48Z
+deadline: 2026-07-26T01:24:48Z
+expected_exit: one provider instance shared by goal and hire workers
+external_effect_authority: local files deterministic tests and one atomic local commit only; no live provider call managed migration network push deploy sponsor call signature transaction spend claim or public proof
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T22:27:33Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+evidence: focused goal and runtime lanes 16/16, base 10/10, typecheck, scoped and full lint, production build, secret scan, and diff check passed
+remaining_block: Graph Kernel G1 owns the next serialized writer slot
+verdict: PASS_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token GOAL-MCP-WIRE-R7-BBA836F-20260725T222448Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
+owner: Release Integrator /root
 task_id: R6-LATE-WRITE
 task_instance_id: R6-LATE-WRITE:R6:107A522
 generation: 1

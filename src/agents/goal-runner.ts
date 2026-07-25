@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { runGoalLoopOnce } from "../kernel/goals";
+import type { McpContextProvider } from "../kernel/mcp-context";
 
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const DEFAULT_MAX_BACKOFF_MS = 30_000;
@@ -15,6 +16,7 @@ export interface GoalRunnerOptions {
   limit?: number;
   pollIntervalMs?: number;
   maxBackoffMs?: number;
+  mcpProvider?: McpContextProvider;
 }
 
 export interface GoalRunner {
@@ -77,6 +79,7 @@ export function startGoalRunner(options: GoalRunnerOptions): GoalRunner {
           ownerId,
           leaseSeconds: options.leaseSeconds,
           limit: options.limit,
+          mcpProvider: options.mcpProvider,
         });
         consecutiveFailures = 0;
         if (result.claimed > 0) {

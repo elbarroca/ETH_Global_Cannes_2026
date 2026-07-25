@@ -182,10 +182,13 @@ test("health boot failure drains already-started protected workers", async () =>
   let goalStops = 0;
   let kernelStops = 0;
   const dependencies: RuntimeDependencies = {
-    startGoalRunner: () => ({
-      ownerId: "goal-owner",
-      stop: async () => { goalStops += 1; },
-    }),
+    startGoalRunner: (options) => {
+      assert.ok(options.mcpProvider);
+      return {
+        ownerId: "goal-owner",
+        stop: async () => { goalStops += 1; },
+      };
+    },
     startKernelWorker: (options) => {
       assert.ok(options.mcpProvider);
       return {
