@@ -3,6 +3,39 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 /root
+task_id: GITHUB-BRANCH-CLEANUP-W1
+task_instance_id: GITHUB-BRANCH-CLEANUP-W1:W1:DE6ABF
+generation: 1
+sprint: Preserve Fly history and reduce GitHub to the Lisbon branch
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: de6abf901f510b937f94c1eea99d68343330a5ab
+control_sha: de6abf901f510b937f94c1eea99d68343330a5ab
+token: GITHUB-BRANCH-CLEANUP-W1-DE6ABF-20260725T202640Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T20:26:58Z
+expires_at: 2026-07-25T21:26:58Z
+allowed_paths:
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T20:26:58Z
+deadline: 2026-07-25T21:26:58Z
+expected_exit: archive the unique Fly commit, switch the GitHub default, delete only six authorized remote branches, and verify one remaining branch
+external_effect_authority: exact owner-authorized GITHUB-BRANCH-CLEANUP-20260725-01 tuple only; no application push force rewrite merge release deploy transaction spend or local main worktree mutation
+completed_at: null
+exit_sha: null
+verification_evidence: []
+remaining_blocks:
+  - pre-effect remote default branch protection and ref readback must match the authorization row
+external_effects_attempted: none
+claim_changes: none
+verdict: IN_PROGRESS_AUTHORIZATION_RECORDING
+lock_release: release only exact token GITHUB-BRANCH-CLEANUP-W1-DE6ABF-20260725T202640Z after post-effect reconciliation commit
+status: active
+```
+
+```yaml
 owner: Kernel Integrator /root/tri_risk_kernel_w1
 task_id: TRI-RISK-V1-W1
 task_instance_id: TRI-RISK-V1-W1:W1:00147DD
