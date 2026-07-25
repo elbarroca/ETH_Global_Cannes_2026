@@ -31,6 +31,7 @@ export interface ValidatedEnvironment {
   nodeEnv: "development" | "test" | "production";
   databaseUrl?: string;
   directUrl?: string;
+  ensPublicationDatabaseUrl?: string;
   serverPort: number;
   runtimeMode: "protected" | "legacy";
   enableKernelWorker: boolean;
@@ -149,6 +150,20 @@ export function validateEnvironment(
     options.requireDatabase === true,
     issues,
   );
+  const ensPublicationDatabaseUrl = parseUrl(
+    "ENS_PUBLICATION_DATABASE_URL",
+    source.ENS_PUBLICATION_DATABASE_URL,
+    POSTGRES_PROTOCOLS,
+    false,
+    issues,
+  );
+  if (databaseUrl && ensPublicationDatabaseUrl) {
+    const kernel = new URL(databaseUrl);
+    const publication = new URL(ensPublicationDatabaseUrl);
+    if (kernel.username === publication.username) {
+      issues.push("ENS_PUBLICATION_DATABASE_URL: must use a distinct restricted database login");
+    }
+  }
 
   for (const key of OPTIONAL_HTTP_URLS) {
     parseUrl(key, source[key], HTTP_PROTOCOLS, false, issues);
@@ -270,6 +285,7 @@ export function validateEnvironment(
     nodeEnv: nodeEnv as ValidatedEnvironment["nodeEnv"],
     databaseUrl,
     directUrl,
+    ensPublicationDatabaseUrl,
     serverPort,
     runtimeMode: runtimeMode as ValidatedEnvironment["runtimeMode"],
     enableKernelWorker,
@@ -293,6 +309,35 @@ export function requireDatabaseUrl(source: EnvironmentSource = process.env): str
   const databaseUrl = parseUrl("DATABASE_URL", source.DATABASE_URL, POSTGRES_PROTOCOLS, true, issues);
   if (!databaseUrl || issues.length > 0) throw new EnvironmentValidationError(issues);
   return databaseUrl;
+}
+
+export function requireEnsPublicationDatabaseUrl(
+  source: EnvironmentSource = process.env,
+): string {
+  const issues: string[] = [];
+  const publicationUrl = parseUrl(
+    "ENS_PUBLICATION_DATABASE_URL",
+    source.ENS_PUBLICATION_DATABASE_URL,
+    POSTGRES_PROTOCOLS,
+    true,
+    issues,
+  );
+  const databaseUrl = parseUrl(
+    "DATABASE_URL",
+    source.DATABASE_URL,
+    POSTGRES_PROTOCOLS,
+    false,
+    issues,
+  );
+  if (publicationUrl && databaseUrl) {
+    const publication = new URL(publicationUrl);
+    const kernel = new URL(databaseUrl);
+    if (publication.username === kernel.username) {
+      issues.push("ENS_PUBLICATION_DATABASE_URL: must use a distinct restricted database login");
+    }
+  }
+  if (!publicationUrl || issues.length > 0) throw new EnvironmentValidationError(issues);
+  return publicationUrl;
 }
 
 export function withPrismaPoolParameters(databaseUrl: string): string {

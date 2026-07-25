@@ -101,3 +101,19 @@ External effects attempted: none. Local effects were limited to repository files
 Kernel task `A5-KERNEL-LIFECYCLE-20260725:W2:B41F3ED` replaces the historical immediate-publish API behavior with typed private draft, name binding, inert ENS write preparation, and A4-gated immutable publication. The read model adds creator parent, full subname, canonical state, owner/delegate, policy/refusal, and release SHA without raw ENS evidence. Protected jobs admit only canonical lifecycle publications on real API calls and require a different server-derived buyer.
 
 The independent immutable audit of exact SHA `4e741d05d25e49ed9a0a8964a3119a1ae98f3e59` returned `FIX; LOCAL_ONLY`, not A5 acceptance. The full current-generation floor passed with checksum-pinned temporary Go, but production publication has no accepted A4 adapter, database state is not bound to a durable A4 decision and matching publication event, and freshness is not rechecked at commit. Durable lifecycle-action idempotency and bounded malformed-body handling are also incomplete. The existing UI has not yet been independently proven against the new four-action API. Live journey, deployment, sponsor, release, and claim gates remain closed.
+
+## Kernel publication-integrity remediation handoff on 2026-07-25
+
+Kernel task `A4-KERNEL-PUBLICATION-REMEDIATION-20260725:W4:9C6E37D`
+locally repairs every backend finding above: the production route traverses the
+accepted ENS-owned authority boundary, publication binds one durable W8 decision
+to one exact event and version under database-time deferred constraints,
+lifecycle actions are durably idempotent, protected hire requires the decision,
+and request bodies fail closed at a bounded pre-authentication boundary. Its
+full local floor passes and its detailed writer evidence is in
+[`A4-ENS-AUTHORITY.md`](A4-ENS-AUTHORITY.md).
+
+This is `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`, not A5 acceptance. The existing
+UI still requires sequential owner wiring to the repaired four-action API and
+its own browser proof after the immutable Kernel audit passes. Live journey,
+A6, deployment, sponsor, push, release, and claim gates remain closed.

@@ -1,7 +1,6 @@
 import { KernelError } from "./errors";
 import { normalize, packetToBytes } from "viem/ens";
 import type {
-  A4PublicationReadback,
   AgentEnsBinding,
   AgentManifest,
   KernelJobInput,
@@ -178,74 +177,6 @@ export function parseAgentAction(value: unknown, ownerWallet: string): ParsedAge
     return { action: body.action, versionId: body.versionId };
   }
   throw new KernelError("KERNEL_INVALID_REQUEST", "Unsupported agent lifecycle action", 400);
-}
-
-export function validateA4PublicationReadback(
-  value: unknown,
-  expected: {
-    agentVersionId: string;
-    manifestHash: string;
-    binding: AgentEnsBinding;
-    ownerWallet: string;
-  },
-  now: Date,
-): A4PublicationReadback {
-  const readback = objectRecord(value);
-  rejectUnexpectedKeys(readback, [
-    "allowed", "errorCode", "agentVersionId", "manifestHash", "creatorParent",
-    "agentLabel", "fullSubname", "canonical", "owner", "delegate", "policyVersion",
-    "recordHash", "observedAt", "freshUntil", "releaseSha",
-  ]);
-  const errorCode = readback.errorCode;
-  if (readback.allowed !== true) {
-    if (typeof errorCode !== "string" || !/^[A-Z][A-Z0-9_]{2,64}$/.test(errorCode)) {
-      throw new KernelError("KERNEL_ENS_AUTHORITY_DENIED", "A4 authority refused publication", 409);
-    }
-    throw new KernelError("KERNEL_ENS_AUTHORITY_DENIED", errorCode, 409);
-  }
-  const owner = typeof readback.owner === "string" ? readback.owner.toLowerCase() : "";
-  const delegate = readback.delegate === null
-    ? null
-    : typeof readback.delegate === "string" ? readback.delegate.toLowerCase() : "";
-  const observedAt = typeof readback.observedAt === "string" ? new Date(readback.observedAt) : new Date(NaN);
-  const freshUntil = typeof readback.freshUntil === "string" ? new Date(readback.freshUntil) : new Date(NaN);
-  if (
-    readback.errorCode !== null ||
-    readback.agentVersionId !== expected.agentVersionId ||
-    readback.manifestHash !== expected.manifestHash ||
-    readback.creatorParent !== expected.binding.creatorParent ||
-    readback.agentLabel !== expected.binding.agentLabel ||
-    readback.fullSubname !== expected.binding.fullSubname ||
-    readback.canonical !== true ||
-    !/^0x[0-9a-f]{40}$/.test(owner) ||
-    delegate !== null && !/^0x[0-9a-f]{40}$/.test(delegate) ||
-    owner !== expected.ownerWallet && delegate !== expected.ownerWallet ||
-    typeof readback.policyVersion !== "string" || !/^[a-z][a-z0-9-]{2,63}$/.test(readback.policyVersion) ||
-    typeof readback.recordHash !== "string" || !/^[0-9a-f]{64}$/.test(readback.recordHash) ||
-    Number.isNaN(observedAt.getTime()) || observedAt.toISOString() !== readback.observedAt ||
-    Number.isNaN(freshUntil.getTime()) || freshUntil.toISOString() !== readback.freshUntil ||
-    observedAt > now || freshUntil <= now || freshUntil.getTime() - observedAt.getTime() > 3_600_000 ||
-    typeof readback.releaseSha !== "string" || !/^[0-9a-f]{40}$/.test(readback.releaseSha)
-  ) {
-    throw new KernelError("KERNEL_ENS_AUTHORITY_DENIED", "A4 authority readback is stale or mismatched", 409);
-  }
-  return {
-    allowed: true,
-    errorCode: null,
-    agentVersionId: expected.agentVersionId,
-    manifestHash: expected.manifestHash,
-    creatorParent: expected.binding.creatorParent,
-    agentLabel: expected.binding.agentLabel,
-    fullSubname: expected.binding.fullSubname,
-    canonical: true,
-    owner,
-    delegate,
-    policyVersion: readback.policyVersion,
-    recordHash: readback.recordHash,
-    observedAt: observedAt.toISOString(),
-    freshUntil: freshUntil.toISOString(),
-    releaseSha: readback.releaseSha,
-  };
 }
 
 export function parseJobSubmission(value: unknown): {

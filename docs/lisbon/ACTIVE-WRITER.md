@@ -3,6 +3,65 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/kernel_publication_remediation
+task_id: A4-KERNEL-PUBLICATION-REMEDIATION-20260725
+task_instance_id: A4-KERNEL-PUBLICATION-REMEDIATION-20260725:W4:9C6E37D
+generation: 4
+sprint: A4_kernel_publication_integrity_remediation
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 9c6e37d169ac6ddee2439602551deaca5347c41a
+control_sha: 9c6e37d169ac6ddee2439602551deaca5347c41a
+token: A4-KERNEL-PUB-W4-9C6E37D-D4AFE74A-21CE-4B0F-8A32-A4627FD15BC2
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T06:46:47Z
+expires_at: 2026-07-25T09:46:47Z
+allowed_paths:
+  - src/kernel/**
+  - app/api/kernel/**
+  - tests/kernel/**
+  - tests/auth/**
+  - tests/foundation/**
+  - tests/integration/worker-fencing.test.ts
+  - src/config/env.ts
+  - src/config/database.ts
+  - .env.example
+  - prisma/schema.prisma
+  - prisma/migrations/20260725072000_a4_kernel_publication_integrity/**
+  - scripts/test-migrations.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T06:46:47Z
+deadline: 2026-07-25T09:46:47Z
+expected_exit: bind protected publication to an accepted durable A4 decision and close the Kernel FIX
+acceptance_items:
+  - production PUBLISH_VERSION traverses accepted server-composed ENS publication authority fail closed
+  - decision FK event and state transition are atomic and database enforced at commit-time freshness
+  - lifecycle actions require durable owner action idempotency with exact replay and mismatch refusal
+  - route content type and streamed body bounds refuse before policy database or resolver work
+  - complete eleven-migration local floor one atomic commit clean matching-token release
+external_effect_authority: safe local allowed files disposable loopback PostgreSQL and processes build output checksum-pinned temporary Go and one local commit only; no live ENS 0G Uniswap sponsor shared or managed database migration deploy push signature transaction faucet form funding upload spend public ID claim or mainnet effect
+completed_at: 2026-07-25T07:28:44Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - production PUBLISH_VERSION traverses the accepted ENS-owned authority keyed only by immutable agentVersionId and fails closed until exact live runtime policy exists
+  - one fresh exact durable W8 decision foreign key exact event protected state and durable action complete atomically under deferred database-time constraints
+  - all four lifecycle actions use owner action idempotency payload hashes exact replay mismatch refusal and transactional completion
+  - JSON media type malformed UTF-8 and declared or streamed bodies beyond 8192 bytes refuse before authentication policy database mutation or resolver work
+  - foundation 10 of 10 auth 9 of 9 Kernel 22 of 22 A3 12 of 12 A4 22 of 22 A5 3 of 3 integration 39 of 39 and all five eleven-migration checks passed
+  - lint zero errors with 23 inherited warnings typecheck Go e2e resilience redaction boot secret shell diff build 31 pages and loopback HTTP passed
+  - task-specific checksum-pinned Go toolchain cache verifier binary disposable PostgreSQL and loopback server were cleaned
+  - no live call shared or managed database effect migration deploy signature transaction push deployment form funding upload spend public identifier proof or claim occurred
+verdict: PASS_TO_AUDIT_REMEDIATION
+status: completed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-A4-W8-AUDIT-RECONCILIATION-20260725
 task_instance_id: C0-A4-W8-AUDIT-RECONCILIATION-20260725:9B70F24

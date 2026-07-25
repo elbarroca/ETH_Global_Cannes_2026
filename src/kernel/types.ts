@@ -65,36 +65,6 @@ export interface AgentEnsWritePlan extends Record<string, CanonicalValue> {
   requiresWalletSignature: true;
 }
 
-export interface A4PublicationReadback {
-  allowed: boolean;
-  errorCode: string | null;
-  agentVersionId: string;
-  manifestHash: string;
-  creatorParent: string;
-  agentLabel: string;
-  fullSubname: string;
-  canonical: boolean;
-  owner: string | null;
-  delegate: string | null;
-  policyVersion: string;
-  recordHash: string | null;
-  observedAt: string;
-  freshUntil: string;
-  releaseSha: string;
-}
-
-export interface A4PublicationAuthority {
-  verify(
-    request: {
-      agentVersionId: string;
-      manifestHash: string;
-      binding: AgentEnsBinding;
-      ownerWallet: string;
-    },
-    signal: AbortSignal,
-  ): Promise<unknown>;
-}
-
 export interface AgentLifecycleVersion {
   agentId: string;
   versionId: string;
@@ -123,6 +93,7 @@ export interface AgentLifecycleVersion {
   authorityPolicyVersion: string | null;
   refusalReason: string | null;
   authorityReleaseSha: string | null;
+  publicationDecisionId: string | null;
   publishedAt: string | null;
 }
 
@@ -137,6 +108,7 @@ export interface ProtectedPublishedAgent extends AgentLifecycleVersion {
   authorityOwner: string;
   authorityPolicyVersion: string;
   authorityReleaseSha: string;
+  publicationDecisionId: string;
   publishedAt: string;
 }
 

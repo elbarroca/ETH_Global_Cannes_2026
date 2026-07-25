@@ -4,6 +4,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   EnvironmentValidationError,
+  requireEnsPublicationDatabaseUrl,
   validateEnvironment,
   withPrismaPoolParameters,
 } from "../../src/config/env";
@@ -78,6 +79,49 @@ test("database URLs require an explicit database name", () => {
       assert.deepEqual(error.issues, ["DATABASE_URL: URL must include hostname and database name"]);
       return true;
     },
+  );
+});
+
+test("ENS publication database requires a distinct restricted login without secret echo", () => {
+  const main = "postgresql://kernel:main-secret@localhost:5432/app";
+  assert.throws(
+    () => requireEnsPublicationDatabaseUrl({ DATABASE_URL: main }),
+    (error: unknown) => {
+      assert.ok(error instanceof EnvironmentValidationError);
+      assert.deepEqual(error.issues, ["ENS_PUBLICATION_DATABASE_URL: required"]);
+      return true;
+    },
+  );
+  assert.throws(
+    () => requireEnsPublicationDatabaseUrl({
+      DATABASE_URL: main,
+      ENS_PUBLICATION_DATABASE_URL: "postgresql://kernel:do-not-print@localhost:5432/app",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EnvironmentValidationError);
+      assert.match(error.message, /distinct restricted database login/);
+      assert.doesNotMatch(error.message, /do-not-print|main-secret/);
+      return true;
+    },
+  );
+  assert.throws(
+    () => requireEnsPublicationDatabaseUrl({
+      DATABASE_URL: main,
+      ENS_PUBLICATION_DATABASE_URL: "postgresql://ens_runtime:never-print@[/app",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EnvironmentValidationError);
+      assert.deepEqual(error.issues, ["ENS_PUBLICATION_DATABASE_URL: invalid URL"]);
+      assert.doesNotMatch(error.message, /never-print|main-secret/);
+      return true;
+    },
+  );
+  assert.equal(
+    requireEnsPublicationDatabaseUrl({
+      DATABASE_URL: main,
+      ENS_PUBLICATION_DATABASE_URL: "postgresql://ens_runtime:restricted@localhost:5432/app",
+    }),
+    "postgresql://ens_runtime:restricted@localhost:5432/app",
   );
 });
 

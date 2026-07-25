@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W9 Kernel publication-integrity remediation
+
+- Wired production `PUBLISH_VERSION` through the ENS-owned authority contract keyed only by immutable `agentVersionId`; removed the Kernel summary adapter and added a separately validated restricted publication DSN that remains fail-closed until exact live ENSv2 runtime policy is admitted.
+- Added additive migration `20260725072000_a4_kernel_publication_integrity` (SHA-256 `23c151f8d1de52221731088783a6e861c581cd3ff41b2bef5fae4cc0ab36bc29`) with decision FK/unique binding, durable lifecycle actions, and deferred exact decision/event/state/freshness enforcement. Existing protected publications require explicit preflight adjudication rather than guessed backfill.
+- Made all four lifecycle actions owner/action/idempotency-bound with canonical payload hashes, exact replay, mismatch refusal, and transactional completion. Protected hire now requires the durable accepted decision and matching publication event.
+- Bounded the agents route to JSON and 8 KiB declared/streamed bodies with bounded 400/413/415 refusal before auth, policy, database mutation, or resolver work. Added production-removal, direct-SQL, version substitution, 20-way convergence, and commit-time expiry regressions.
+- Passed all five eleven-migration checks and the complete local floor: lint zero errors/23 inherited warnings, typecheck, foundation 10/10, auth 9/9, Kernel 22/22, checksum-pinned Go, A3 12/12, A4 22/22, A5 3/3, integration 39/39, e2e 4/4, resilience 1/1, redaction 3/3, boot, secret/shell/diff checks, build 31 pages, and bounded loopback HTTP smoke.
+- Returned only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS/0G/Uniswap, sponsor, managed migration, signature, transaction, push, deployment, release, and claims remain closed.
+
 ## 2026-07-25 - W8 upgrade-preflight immutable audit
 
 - Independent audit accepted exact SHA `9b70f246ec91e3475851b873ed43152ebfa36d75`, tree `fdb9ad188a1ff65019673ae6f7c92b5fe0b151ba`, with no W8 finding.

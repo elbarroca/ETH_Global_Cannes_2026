@@ -12,11 +12,7 @@ import {
   createEnsPublicationAuthority,
   createEnsPublicationPolicyDocument,
 } from "../src/ens/authority";
-import {
-  bindAgentName,
-  createAgentDraft,
-  prepareAgentEnsWrite,
-} from "../src/kernel/lifecycle";
+import { domainHash } from "../src/kernel/canonical";
 import { parseAgentInput, parseEnsBinding } from "../src/kernel/policy";
 import { createEnsPublicationAuthorityFixture } from "../tests/helpers/ens";
 
@@ -33,6 +29,7 @@ const A4_PUBLICATION_AUTHORITY_MIGRATION = "20260725045500_a4_publication_decisi
 const A4_PUBLICATION_HARDENING_MIGRATION = "20260725053000_a4_publication_authority_hardening";
 const A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION = "20260725062500_a4_publication_block_normalization";
 const A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION = "20260725064000_a4_publication_upgrade_preflight";
+const A4_KERNEL_PUBLICATION_INTEGRITY_MIGRATION = "20260725072000_a4_kernel_publication_integrity";
 const PRE_HARDENING_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -409,14 +406,63 @@ async function seedW6PublicationDecision(
     instructions: "## Task\n\nReturn a bounded upgrade fixture result.",
     capabilities: ["research", "market-analysis"],
   }, UPGRADE_CREATOR_WALLET).manifest;
-  const draft = await createAgentDraft(
-    { userId: creatorId, walletAddress: UPGRADE_CREATOR_WALLET },
-    manifest,
-    { now, sql },
-  );
   const nameBinding = parseEnsBinding({ creatorParent: "creator.eth", agentLabel: "research" });
-  await bindAgentName(creatorId, draft.versionId, nameBinding, { now, sql });
-  await prepareAgentEnsWrite(creatorId, draft.versionId, { now, sql });
+  const boundManifest = { ...manifest, ensBinding: nameBinding };
+  const manifestHash = domainHash("agent-manifest", boundManifest);
+  const promptHash = domainHash("agent-prompt", boundManifest.instructions);
+  const configHash = domainHash("agent-config", {
+    adapterKey: boundManifest.adapterKey,
+    capabilities: boundManifest.capabilities,
+    connectorKey: boundManifest.connectorKey,
+    endpoint: boundManifest.endpoint,
+    ensBinding: boundManifest.ensBinding,
+    priceAtomic: boundManifest.priceAtomic,
+    proofPolicy: boundManifest.proofPolicy,
+  });
+  const agents = await sql<{ id: string }[]>`
+    INSERT INTO kernel_agents (owner_user_id, name, created_at)
+    VALUES (${creatorId}, ${boundManifest.name}, ${now}) RETURNING id
+  `;
+  const agent = agents[0];
+  if (!agent) throw new Error("pre-W7 fixture agent missing");
+  const plan = {
+    schemaVersion: 1,
+    kind: "LOCAL_ONLY_UNAUTHORIZED",
+    agentVersionId: "pending",
+    manifestHash,
+    creatorParent: nameBinding.creatorParent,
+    agentLabel: nameBinding.agentLabel,
+    fullSubname: nameBinding.fullSubname,
+    creatorDnsName: nameBinding.creatorDnsName,
+    agentDnsName: nameBinding.agentDnsName,
+    operations: ["CREATE_OR_UPDATE_SUBNAME", "SET_IMMUTABLE_MANIFEST_BINDING"],
+    requiresAuthorization: true,
+    requiresWalletSignature: true,
+  };
+  const versions = await sql<{ id: string }[]>`
+    INSERT INTO agent_versions (
+      agent_id, version, manifest, manifest_hash, prompt_hash, config_hash,
+      capabilities, adapter_key, endpoint, connector_key, owner_wallet,
+      payout_address, price_atomic, asset, proof_policy, lifecycle_state,
+      creator_parent, agent_label, full_subname, write_plan, write_plan_hash,
+      published, published_at, created_at
+    ) VALUES (
+      ${agent.id}::uuid, 1, ${sql.json(boundManifest)}, ${manifestHash}, ${promptHash},
+      ${configHash}, ${boundManifest.capabilities}, ${boundManifest.adapterKey}, NULL, NULL,
+      ${UPGRADE_CREATOR_WALLET}, NULL, ${boundManifest.priceAtomic}::bigint,
+      ${boundManifest.asset}, ${boundManifest.proofPolicy}, 'WRITE_PREPARED',
+      ${nameBinding.creatorParent}, ${nameBinding.agentLabel}, ${nameBinding.fullSubname},
+      ${sql.json(plan)}, ${domainHash("ens-write-plan", plan)}, false, NULL, ${now}
+    ) RETURNING id
+  `;
+  const versionId = versions[0]?.id;
+  if (!versionId) throw new Error("pre-W7 fixture version missing");
+  const exactPlan = { ...plan, agentVersionId: versionId };
+  await sql`
+    UPDATE agent_versions
+    SET write_plan = ${sql.json(exactPlan)}, write_plan_hash = ${domainHash("ens-write-plan", exactPlan)}
+    WHERE id = ${versionId}::uuid
+  `;
   await sql`
     INSERT INTO ens_publication_authority_releases (release_sha, not_before, expires_at)
     VALUES (
@@ -442,7 +488,7 @@ async function seedW6PublicationDecision(
   try {
     const fixture = createEnsPublicationAuthorityFixture({ now });
     const authority = createEnsPublicationAuthority({ sql: runtimeSql, runtime: fixture.runtime, now });
-    const missingPolicy = await authority({ agentVersionId: draft.versionId });
+    const missingPolicy = await authority({ agentVersionId: versionId });
     if (
       missingPolicy.allowed || missingPolicy.decisionId !== null ||
       missingPolicy.errorCode !== "ENS_PUBLICATION_PERSIST_FAILED"
@@ -456,7 +502,7 @@ async function seedW6PublicationDecision(
       INSERT INTO ens_publication_authority_policies (
         release_sha, agent_version_id, binding, binding_hash
       ) VALUES (
-        ${UPGRADE_RELEASE_SHA}, ${draft.versionId}::uuid,
+        ${UPGRADE_RELEASE_SHA}, ${versionId}::uuid,
         ${sql.json(JSON.parse(JSON.stringify(policy)))}, ${"0".repeat(64)}
       )
     `;
@@ -474,7 +520,7 @@ async function seedW6PublicationDecision(
     }
     const admitted = await runtimeSql<{ decision_id: string }[]>`
       SELECT decision_id::text FROM public.admit_ens_publication_decision(
-        ${draft.versionId}::uuid,
+        ${versionId}::uuid,
         ${runtimeSql.json(JSON.parse(JSON.stringify(record)))},
         ${blockNumber}::numeric,
         ${blockTimestamp}::timestamptz,
@@ -486,7 +532,7 @@ async function seedW6PublicationDecision(
     if (!decisionId) throw new Error("pre-W7 fixture did not admit one durable decision");
     return {
       decisionId,
-      versionId: draft.versionId,
+      versionId,
       record,
       blockTimestamp,
       transactionHash,
@@ -656,6 +702,7 @@ async function verifyDatabase(
       ens_publication_authority_releases: string | null;
       ens_publication_authority_policies: string | null;
       agent_version_events: string | null;
+      agent_lifecycle_actions: string | null;
       user_count: string;
       migration_count: string;
       baseline_count: string;
@@ -668,6 +715,7 @@ async function verifyDatabase(
       a4_publication_hardening_count: string;
       a4_publication_block_normalization_count: string;
       a4_publication_upgrade_preflight_count: string;
+      a4_kernel_publication_integrity_count: string;
       invariant_trigger_count: string;
       a4_constraint_count: string;
       a4_publication_constraint_count: string;
@@ -681,6 +729,8 @@ async function verifyDatabase(
       a4_publication_upgrade_marker_count: string;
       a4_publication_old_function_count: string;
       a5_constraint_count: string;
+      a4_kernel_publication_constraint_count: string;
+      a4_kernel_publication_function_count: string;
       receipt_authority_nullable: string;
       sequence_type: string;
       sequence_start: string;
@@ -705,6 +755,7 @@ async function verifyDatabase(
         to_regclass('public.ens_publication_authority_releases')::text AS ens_publication_authority_releases,
         to_regclass('public.ens_publication_authority_policies')::text AS ens_publication_authority_policies,
         to_regclass('public.agent_version_events')::text AS agent_version_events,
+        to_regclass('public.agent_lifecycle_actions')::text AS agent_lifecycle_actions,
         (SELECT count(*)::text FROM users) AS user_count,
         (
           SELECT count(*)::text
@@ -754,6 +805,11 @@ async function verifyDatabase(
             AND finished_at IS NOT NULL
         ) AS a4_publication_upgrade_preflight_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A4_KERNEL_PUBLICATION_INTEGRITY_MIGRATION}
+            AND finished_at IS NOT NULL
+        ) AS a4_kernel_publication_integrity_count,
+        (
           SELECT count(*)::text FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN (
             'agent_versions_immutable_published',
@@ -773,7 +829,11 @@ async function verifyDatabase(
             'ens_publication_authority_releases_append_only',
             'ens_publication_authority_releases_no_truncate',
             'ens_publication_authority_policies_append_only',
-            'ens_publication_authority_policies_no_truncate'
+            'ens_publication_authority_policies_no_truncate',
+            'agent_lifecycle_actions_integrity',
+            'agent_lifecycle_actions_no_truncate',
+            'agent_versions_publication_integrity',
+            'agent_version_events_publication_integrity'
           )
         ) AS invariant_trigger_count,
         (
@@ -914,6 +974,28 @@ async function verifyDatabase(
           )
         ) AS a5_constraint_count,
         (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'agent_versions_publication_decision_fkey',
+            'agent_versions_publication_decision_state_check',
+            'agent_lifecycle_actions_pkey',
+            'agent_lifecycle_actions_owner_fkey',
+            'agent_lifecycle_actions_version_fkey',
+            'agent_lifecycle_actions_action_check',
+            'agent_lifecycle_actions_key_check',
+            'agent_lifecycle_actions_hash_check',
+            'agent_lifecycle_actions_completion_check',
+            'agent_lifecycle_actions_owner_action_key'
+          )
+        ) AS a4_kernel_publication_constraint_count,
+        (
+          SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname IN (
+            'enforce_agent_lifecycle_action',
+            'enforce_agent_publication_integrity'
+          )
+        ) AS a4_kernel_publication_function_count,
+        (
           SELECT is_nullable FROM information_schema.columns
           WHERE table_schema = 'public' AND table_name = 'receipts'
             AND column_name = 'authority_check_id'
@@ -944,8 +1026,9 @@ async function verifyDatabase(
       result.ens_publication_authority_releases !== "ens_publication_authority_releases" ||
       result.ens_publication_authority_policies !== "ens_publication_authority_policies" ||
       result.agent_version_events !== "agent_version_events" ||
+      result.agent_lifecycle_actions !== "agent_lifecycle_actions" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 10 ||
+      Number(result.migration_count) !== 11 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -956,7 +1039,8 @@ async function verifyDatabase(
       Number(result.a4_publication_hardening_count) !== 1 ||
       Number(result.a4_publication_block_normalization_count) !== 1 ||
       Number(result.a4_publication_upgrade_preflight_count) !== 1 ||
-      Number(result.invariant_trigger_count) !== 18 ||
+      Number(result.a4_kernel_publication_integrity_count) !== 1 ||
+      Number(result.invariant_trigger_count) !== 22 ||
       Number(result.a4_constraint_count) !== 14 ||
       Number(result.a4_publication_constraint_count) !== 7 ||
       Number(result.a4_publication_authority_constraint_count) !== 3 ||
@@ -969,6 +1053,8 @@ async function verifyDatabase(
       Number(result.a4_publication_upgrade_marker_count) !== 1 ||
       Number(result.a4_publication_old_function_count) !== 0 ||
       Number(result.a5_constraint_count) !== 11 ||
+      Number(result.a4_kernel_publication_constraint_count) !== 10 ||
+      Number(result.a4_kernel_publication_function_count) !== 2 ||
       result.receipt_authority_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||
       result.sequence_start !== "1" ||

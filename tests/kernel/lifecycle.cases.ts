@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
+import postgres from "postgres";
+import {
+  createEnsPublicationAuthority,
+  createEnsPublicationPolicyDocument,
+  type EnsPublicationAuthority,
+} from "../../src/ens/authority";
 import { KernelError } from "../../src/kernel/errors";
 import {
   bindAgentName,
@@ -9,9 +15,14 @@ import {
   publishAgentVersion,
 } from "../../src/kernel/lifecycle";
 import { parseAgentAction, parseAgentInput, parseEnsBinding } from "../../src/kernel/policy";
+import { createProductionEnsPublicationAuthority } from "../../src/kernel/publication-authority";
 import { cancelBuyerJob, submitJob } from "../../src/kernel/service";
-import type { A4PublicationAuthority, A4PublicationReadback } from "../../src/kernel/types";
 import type { DisposableDatabase } from "../helpers/postgres";
+import {
+  createEnsPublicationAuthorityFixture,
+  type EnsPublicationFixtureMutator,
+} from "../helpers/ens";
+import { POST as postAgentAction } from "../../app/api/kernel/agents/route";
 
 const CREATOR_ID = "lifecycle-creator";
 const BUYER_ID = "lifecycle-buyer";
@@ -20,44 +31,67 @@ const CREATOR_WALLET = "0x6666666666666666666666666666666666666666";
 const BUYER_WALLET = "0x4444444444444444444444444444444444444444";
 const OTHER_WALLET = "0x5555555555555555555555555555555555555555";
 const NOW = new Date("2026-07-25T02:00:00.000Z");
-const RELEASE_SHA = "b41f3ed522670db020c4a2dba0402584dca803dc";
+const RELEASE_SHA = "9c6e37d169ac6ddee2439602551deaca5347c41a";
 
-class FixtureA4Authority implements A4PublicationAuthority {
-  readonly requests: Array<{
-    agentVersionId: string;
-    manifestHash: string;
-    fullSubname: string;
-  }> = [];
-  denialCode: string | null = null;
-  mutate: ((readback: A4PublicationReadback) => unknown) | null = null;
+interface PublicationAuthorityFixture {
+  authority: EnsPublicationAuthority;
+  resolverCalls: () => number;
+  close: () => Promise<void>;
+}
 
-  async verify(
-    request: Parameters<A4PublicationAuthority["verify"]>[0],
-  ): Promise<unknown> {
-    this.requests.push({
-      agentVersionId: request.agentVersionId,
-      manifestHash: request.manifestHash,
-      fullSubname: request.binding.fullSubname,
-    });
-    const readback: A4PublicationReadback = {
-      allowed: this.denialCode === null,
-      errorCode: this.denialCode,
-      agentVersionId: request.agentVersionId,
-      manifestHash: request.manifestHash,
-      creatorParent: request.binding.creatorParent,
-      agentLabel: request.binding.agentLabel,
-      fullSubname: request.binding.fullSubname,
-      canonical: this.denialCode === null,
-      owner: CREATOR_WALLET,
-      delegate: null,
-      policyVersion: "ensv2-local-v1",
-      recordHash: "a".repeat(64),
-      observedAt: NOW.toISOString(),
-      freshUntil: new Date(NOW.getTime() + 60_000).toISOString(),
-      releaseSha: RELEASE_SHA,
-    };
-    return this.mutate?.(readback) ?? readback;
-  }
+async function publicationAuthority(
+  database: DisposableDatabase,
+  versionId: string,
+  options: { mutator?: EnsPublicationFixtureMutator } = {},
+): Promise<PublicationAuthorityFixture> {
+  const suffix = Math.random().toString(36).slice(2, 10);
+  const role = `kernel_pub_${process.pid}_${suffix}`;
+  await database.sql.unsafe(
+    `CREATE ROLE "${role}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT; ` +
+    `GRANT alphadawg_runtime TO "${role}"`,
+  );
+  const runtimeUrl = new URL(database.url);
+  runtimeUrl.username = role;
+  runtimeUrl.password = "";
+  const runtimeSql = postgres(runtimeUrl.toString(), { max: 1, prepare: false });
+  const now = new Date();
+  await database.sql`
+    INSERT INTO ens_publication_authority_releases (release_sha, not_before, expires_at)
+    VALUES (
+      ${RELEASE_SHA},
+      ${new Date(now.getTime() - 60_000)},
+      ${new Date(now.getTime() + 3_600_000)}
+    ) ON CONFLICT (release_sha) DO NOTHING
+  `;
+  const fixture = createEnsPublicationAuthorityFixture({ now, mutator: options.mutator });
+  const authority = createEnsPublicationAuthority({
+    sql: runtimeSql,
+    runtime: fixture.runtime,
+    now,
+  });
+  const missingPolicy = await authority({ agentVersionId: versionId });
+  assert.equal(missingPolicy.errorCode, "ENS_PUBLICATION_PERSIST_FAILED");
+  const binding = fixture.resolver.calls.at(-1)?.binding;
+  assert.ok(binding);
+  const policy = createEnsPublicationPolicyDocument(binding);
+  await database.sql`
+    INSERT INTO ens_publication_authority_policies (
+      release_sha, agent_version_id, binding, binding_hash
+    ) VALUES (
+      ${RELEASE_SHA}, ${versionId}::uuid,
+      ${database.sql.json(JSON.parse(JSON.stringify(policy)))}, ${"0".repeat(64)}
+    )
+    ON CONFLICT (release_sha, agent_version_id) DO NOTHING
+  `;
+  fixture.resolver.calls.length = 0;
+  return {
+    authority,
+    resolverCalls: () => fixture.resolver.calls.length,
+    close: async () => {
+      await runtimeSql.end({ timeout: 1 });
+      await database.sql.unsafe(`DROP ROLE "${role}"`);
+    },
+  };
 }
 
 async function seedUsers(database: DisposableDatabase): Promise<void> {
@@ -86,14 +120,16 @@ async function preparedVersion(
   const draft = await createAgentDraft(
     { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
     manifest(name),
-    { now: NOW, sql: database.sql },
+    { idempotencyKey: `draft-${agentLabel}-01`, now: NOW, sql: database.sql },
   );
   const binding = parseEnsBinding({ creatorParent: "creator.eth", agentLabel });
   const bound = await bindAgentName(CREATOR_ID, draft.versionId, binding, {
+    idempotencyKey: `bind-${agentLabel}-01`,
     now: NOW,
     sql: database.sql,
   });
   const prepared = await prepareAgentEnsWrite(CREATOR_ID, draft.versionId, {
+    idempotencyKey: `prepare-${agentLabel}-01`,
     now: NOW,
     sql: database.sql,
   });
@@ -106,30 +142,30 @@ export async function runLifecycleCases(
 ): Promise<void> {
   await seedUsers(database);
   await t.test("agent lifecycle action parsing rejects authority fields and active Markdown", () => {
-  assert.throws(
-    () => parseAgentAction({ action: "UNKNOWN" }, CREATOR_WALLET),
-    /Unsupported agent lifecycle action/,
-  );
-  assert.throws(
-    () => parseAgentAction({
-      action: "CREATE_DRAFT",
-      name: "Unsafe agent",
-      description: "This draft contains an active instruction payload.",
-      instructions: "Open <script>alert(1)</script> and https://example.invalid now.",
-      capabilities: ["research"],
-      ownerWallet: OTHER_WALLET,
-    }, CREATOR_WALLET),
-    /Unexpected or server-owned field/,
-  );
-  assert.throws(
-    () => parseAgentAction({
-      action: "BIND_NAME",
-      versionId: "55555555-5555-4555-8555-555555555555",
-      creatorParent: "creator.eth",
-      agentLabel: "nested.research",
-    }, CREATOR_WALLET),
-    /Invalid ENS creator parent or agent label/,
-  );
+    assert.throws(
+      () => parseAgentAction({ action: "UNKNOWN" }, CREATOR_WALLET),
+      /Unsupported agent lifecycle action/,
+    );
+    assert.throws(
+      () => parseAgentAction({
+        action: "CREATE_DRAFT",
+        name: "Unsafe agent",
+        description: "This draft contains an active instruction payload.",
+        instructions: "Open <script>alert(1)</script> and https://example.invalid now.",
+        capabilities: ["research"],
+        ownerWallet: OTHER_WALLET,
+      }, CREATOR_WALLET),
+      /Unexpected or server-owned field/,
+    );
+    assert.throws(
+      () => parseAgentAction({
+        action: "BIND_NAME",
+        versionId: "55555555-5555-4555-8555-555555555555",
+        creatorParent: "creator.eth",
+        agentLabel: "nested.research",
+      }, CREATOR_WALLET),
+      /Invalid ENS creator parent or agent label/,
+    );
   });
 
   await t.test("private draft binds an inert plan and publishes only exact fresh A4 authority", async () => {
@@ -161,37 +197,43 @@ export async function runLifecycleCases(
     );
 
     await assert.rejects(
-      publishAgentVersion(CREATOR_ID, draft.versionId, { now: NOW, sql: database.sql }),
+      publishAgentVersion(CREATOR_ID, draft.versionId, {
+        idempotencyKey: "publish-missing-01",
+        now: NOW,
+        sql: database.sql,
+      }),
       (error: unknown) => error instanceof KernelError && error.code === "KERNEL_ENS_AUTHORITY_REQUIRED",
     );
     const refused = await listAgentLifecycle(CREATOR_ID, { sql: database.sql });
     assert.equal(refused.drafts[0]?.canonicalState, "REFUSED");
-    assert.equal(refused.drafts[0]?.refusalReason, "ENS_AUTHORITY_NOT_CONFIGURED");
+    assert.equal(refused.drafts[0]?.refusalReason, "ENS_PUBLICATION_NOT_CONFIGURED");
 
-    const authority = new FixtureA4Authority();
+    const fixture = await publicationAuthority(database, draft.versionId);
     const published = await publishAgentVersion(CREATOR_ID, draft.versionId, {
-      authority,
+      authority: fixture.authority,
+      idempotencyKey: "publish-research-01",
       now: NOW,
       sql: database.sql,
     });
+    await fixture.close();
     assert.equal(published.lifecycleState, "PUBLISHED");
     assert.equal(published.hireable, true);
     assert.equal(published.fullSubname, "research.creator.eth");
     assert.equal(published.authorityOwner, CREATOR_WALLET);
-    assert.equal(published.authorityPolicyVersion, "ensv2-local-v1");
+    assert.equal(published.authorityPolicyVersion, "ens-publication-v1");
     assert.equal(published.authorityReleaseSha, RELEASE_SHA);
-    assert.deepEqual(authority.requests, [{
-      agentVersionId: draft.versionId,
-      manifestHash: prepared.version.manifestHash,
-      fullSubname: "research.creator.eth",
-    }]);
+    assert.match(published.publicationDecisionId, /^[0-9a-f-]{36}$/);
 
     const publicView = await listAgentLifecycle(BUYER_ID, { sql: database.sql });
     assert.equal(publicView.agents.length, 1);
     assert.equal(publicView.drafts.length, 0);
     assert.doesNotMatch(JSON.stringify(publicView), /recordBytes|roles|ccip|transactionHash/i);
     await assert.rejects(
-      bindAgentName(CREATOR_ID, draft.versionId, binding, { now: NOW, sql: database.sql }),
+      bindAgentName(CREATOR_ID, draft.versionId, binding, {
+        idempotencyKey: "bind-published-01",
+        now: NOW,
+        sql: database.sql,
+      }),
       (error: unknown) => error instanceof KernelError && error.code === "KERNEL_IMMUTABLE_VERSION",
     );
     await assert.rejects(
@@ -202,7 +244,12 @@ export async function runLifecycleCases(
     const nextDraft = await createAgentDraft(
       { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
       manifest(),
-      { agentId: draft.agentId, now: NOW, sql: database.sql },
+      {
+        agentId: draft.agentId,
+        idempotencyKey: "draft-research-v2",
+        now: NOW,
+        sql: database.sql,
+      },
     );
     assert.equal(nextDraft.version, 2);
     assert.notEqual(nextDraft.versionId, draft.versionId);
@@ -215,35 +262,44 @@ export async function runLifecycleCases(
       "Protected Refusal Agent",
       "refusal",
     );
-    const authority = new FixtureA4Authority();
-    for (const code of [
-      "ENS_AUTHORITY_OWNER_MISMATCH",
-      "ENS_AUTHORITY_ROLE_MISMATCH",
-      "ENS_AUTHORITY_RESOLVER_POLICY_MISMATCH",
-      "ENS_AUTHORITY_STALE",
-    ]) {
-      authority.denialCode = code;
-      await assert.rejects(
-        publishAgentVersion(CREATOR_ID, draft.versionId, {
-          authority,
-          now: NOW,
-          sql: database.sql,
-        }),
-        (error: unknown) => error instanceof KernelError && error.code === "KERNEL_ENS_AUTHORITY_DENIED",
-      );
-    }
-    authority.denialCode = null;
-    authority.mutate = (readback) => ({ ...readback, agentVersionId: "55555555-5555-4555-8555-555555555555" });
+    const deniedFixture = await publicationAuthority(database, draft.versionId, {
+      mutator: () => ({ malformed: true }),
+    });
     await assert.rejects(
       publishAgentVersion(CREATOR_ID, draft.versionId, {
-        authority,
+        authority: deniedFixture.authority,
+        idempotencyKey: "publish-refusal-01",
         now: NOW,
         sql: database.sql,
       }),
       (error: unknown) => error instanceof KernelError && error.code === "KERNEL_ENS_AUTHORITY_DENIED",
     );
+    await deniedFixture.close();
+
+    const { draft: otherDraft } = await preparedVersion(
+      database,
+      "Protected Substitute Agent",
+      "substitute",
+    );
+    const otherFixture = await publicationAuthority(database, otherDraft.versionId);
+    const otherDecision = await otherFixture.authority({ agentVersionId: otherDraft.versionId });
+    assert.equal(otherDecision.allowed, true);
     await assert.rejects(
-      prepareAgentEnsWrite(OTHER_ID, draft.versionId, { now: NOW, sql: database.sql }),
+      publishAgentVersion(CREATOR_ID, draft.versionId, {
+        authority: async () => otherDecision,
+        idempotencyKey: "publish-substitute-01",
+        now: NOW,
+        sql: database.sql,
+      }),
+      (error: unknown) => error instanceof KernelError && error.code === "KERNEL_ENS_AUTHORITY_DENIED",
+    );
+    await otherFixture.close();
+    await assert.rejects(
+      prepareAgentEnsWrite(OTHER_ID, draft.versionId, {
+        idempotencyKey: "prepare-cross-user-01",
+        now: NOW,
+        sql: database.sql,
+      }),
       (error: unknown) => error instanceof KernelError && error.code === "KERNEL_NOT_FOUND",
     );
     const counts = await database.sql<{ jobs: string; effects: string }[]>`
@@ -255,17 +311,365 @@ export async function runLifecycleCases(
     assert.deepEqual(counts[0], { jobs: "0", effects: "0" });
   });
 
+  await t.test("production composition removal fails closed with zero authority or effect", async () => {
+    const { draft } = await preparedVersion(
+      database,
+      "Production Composition Removal Agent",
+      "composition-removal",
+    );
+    const previousRestrictedUrl = process.env.ENS_PUBLICATION_DATABASE_URL;
+    delete process.env.ENS_PUBLICATION_DATABASE_URL;
+    try {
+      const authority = createProductionEnsPublicationAuthority();
+      const decision = await authority({ agentVersionId: draft.versionId });
+      assert.deepEqual(decision, {
+        allowed: false,
+        decisionId: null,
+        errorCode: "ENS_PUBLICATION_NOT_CONFIGURED",
+      });
+      await assert.rejects(
+        publishAgentVersion(CREATOR_ID, draft.versionId, {
+          authority,
+          idempotencyKey: "publish-composition-removal-01",
+          now: NOW,
+          sql: database.sql,
+        }),
+        (error: unknown) => error instanceof KernelError && error.code === "KERNEL_ENS_AUTHORITY_REQUIRED",
+      );
+    } finally {
+      if (previousRestrictedUrl === undefined) {
+        delete process.env.ENS_PUBLICATION_DATABASE_URL;
+      } else {
+        process.env.ENS_PUBLICATION_DATABASE_URL = previousRestrictedUrl;
+      }
+    }
+    const rows = await database.sql<{
+      decisions: number;
+      effects: number;
+      jobs: number;
+      publish_actions: number;
+      publish_events: number;
+      publication_decision_id: string | null;
+      published: boolean;
+    }[]>`
+      SELECT
+        v.published,
+        v.publication_decision_id::text,
+        (SELECT count(*)::int FROM ens_publication_decisions d
+          WHERE d.agent_version_id = v.id) AS decisions,
+        (SELECT count(*)::int FROM agent_version_events e
+          WHERE e.agent_version_id = v.id AND e.action = 'PUBLISH_VERSION') AS publish_events,
+        (SELECT count(*)::int FROM agent_lifecycle_actions a
+          WHERE a.agent_version_id = v.id AND a.action = 'PUBLISH_VERSION') AS publish_actions,
+        (SELECT count(*)::int FROM jobs j WHERE j.agent_version_id = v.id) AS jobs,
+        (SELECT count(*)::int FROM effects e JOIN jobs j ON j.id = e.job_id
+          WHERE j.agent_version_id = v.id) AS effects
+      FROM agent_versions v WHERE v.id = ${draft.versionId}::uuid
+    `;
+    assert.deepEqual(rows[0], {
+      decisions: 0,
+      effects: 0,
+      jobs: 0,
+      publish_actions: 0,
+      publish_events: 0,
+      publication_decision_id: null,
+      published: false,
+    });
+  });
+
+  await t.test("all lifecycle actions converge under twenty durable idempotent replays", async () => {
+    const create = () => createAgentDraft(
+      { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
+      manifest("Concurrent Lifecycle Agent"),
+      {
+        idempotencyKey: "lifecycle-create-20",
+        now: NOW,
+        sql: database.sql,
+      },
+    );
+    const drafts = await Promise.all(Array.from({ length: 20 }, create));
+    assert.equal(new Set(drafts.map((entry) => entry.versionId)).size, 1);
+    const draft = drafts[0];
+    assert.ok(draft);
+    await assert.rejects(
+      createAgentDraft(
+        { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
+        manifest("Mismatched Lifecycle Agent"),
+        {
+          idempotencyKey: "lifecycle-create-20",
+          now: NOW,
+          sql: database.sql,
+        },
+      ),
+      (error: unknown) => error instanceof KernelError && error.code === "KERNEL_IDEMPOTENCY_MISMATCH",
+    );
+
+    const binding = parseEnsBinding({ creatorParent: "creator.eth", agentLabel: "concurrent" });
+    const binds = await Promise.all(Array.from({ length: 20 }, () => bindAgentName(
+      CREATOR_ID,
+      draft.versionId,
+      binding,
+      { idempotencyKey: "lifecycle-bind-20", now: NOW, sql: database.sql },
+    )));
+    assert.equal(new Set(binds.map((entry) => entry.versionId)).size, 1);
+    const preparations = await Promise.all(Array.from({ length: 20 }, () => prepareAgentEnsWrite(
+      CREATOR_ID,
+      draft.versionId,
+      { idempotencyKey: "lifecycle-prepare-20", now: NOW, sql: database.sql },
+    )));
+    assert.equal(new Set(preparations.map((entry) => entry.planHash)).size, 1);
+
+    const fixture = await publicationAuthority(database, draft.versionId);
+    const publications = await Promise.all(Array.from({ length: 20 }, () => publishAgentVersion(
+      CREATOR_ID,
+      draft.versionId,
+      {
+        authority: fixture.authority,
+        idempotencyKey: "lifecycle-publish-20",
+        now: NOW,
+        sql: database.sql,
+      },
+    )));
+    assert.equal(new Set(publications.map((entry) => entry.publicationDecisionId)).size, 1);
+    const resolverCalls = fixture.resolverCalls();
+    const replay = await publishAgentVersion(CREATOR_ID, draft.versionId, {
+      authority: fixture.authority,
+      idempotencyKey: "lifecycle-publish-20",
+      now: NOW,
+      sql: database.sql,
+    });
+    assert.equal(replay.publicationDecisionId, publications[0]?.publicationDecisionId);
+    assert.equal(fixture.resolverCalls(), resolverCalls);
+    await fixture.close();
+
+    const rows = await database.sql<{
+      actions: number;
+      decisions: number;
+      events: number;
+      versions: number;
+    }[]>`
+      SELECT
+        (SELECT count(*)::int FROM agent_lifecycle_actions
+          WHERE agent_version_id = ${draft.versionId}::uuid) AS actions,
+        (SELECT count(*)::int FROM ens_publication_decisions
+          WHERE agent_version_id = ${draft.versionId}::uuid) AS decisions,
+        (SELECT count(*)::int FROM agent_version_events
+          WHERE agent_version_id = ${draft.versionId}::uuid) AS events,
+        (SELECT count(*)::int FROM agent_versions
+          WHERE id = ${draft.versionId}::uuid) AS versions
+    `;
+    assert.deepEqual(rows[0], { actions: 4, decisions: 1, events: 4, versions: 1 });
+  });
+
+  await t.test("publication state-only event-only and other-version decision bypasses fail", async () => {
+    const { draft } = await preparedVersion(database, "Direct SQL Agent", "direct-sql");
+    const fixture = await publicationAuthority(database, draft.versionId);
+    const allowed = await fixture.authority({ agentVersionId: draft.versionId });
+    assert.equal(allowed.allowed, true);
+    assert.ok(allowed.decisionId);
+    const decision = await database.sql<{
+      owner: string;
+      delegate: string;
+      policy_version: string;
+      record_hash: string;
+      observed_at: Date;
+      fresh_until: Date;
+      release_sha: string;
+    }[]>`
+      SELECT owner, delegate, policy_version, record_hash, observed_at, fresh_until, release_sha
+      FROM ens_publication_decisions WHERE id = ${allowed.decisionId}::uuid
+    `;
+    const evidence = decision[0];
+    assert.ok(evidence);
+    await assert.rejects(
+      database.sql.begin(async (tx) => {
+        const sql = tx as unknown as DisposableDatabase["sql"];
+        await sql`
+          UPDATE agent_versions
+          SET lifecycle_state = 'PUBLISHED', published = true, published_at = clock_timestamp(),
+              canonical_state = 'CANONICAL', authority_owner = ${evidence.owner},
+              authority_delegate = ${evidence.delegate},
+              authority_policy_version = ${evidence.policy_version}, authority_refusal = NULL,
+              authority_record_hash = ${evidence.record_hash},
+              authority_observed_at = ${evidence.observed_at},
+              authority_fresh_until = ${evidence.fresh_until},
+              authority_release_sha = ${evidence.release_sha},
+              publication_decision_id = ${allowed.decisionId}::uuid
+          WHERE id = ${draft.versionId}::uuid
+        `;
+      }),
+      /exact PUBLISH_VERSION event/,
+    );
+    await assert.rejects(
+      database.sql.begin(async (tx) => {
+        const sql = tx as unknown as DisposableDatabase["sql"];
+        await sql`
+          INSERT INTO agent_version_events (agent_version_id, sequence, action, payload, created_at)
+          SELECT ${draft.versionId}::uuid, COALESCE(max(sequence), -1) + 1,
+            'PUBLISH_VERSION', '{}'::jsonb, clock_timestamp()
+          FROM agent_version_events WHERE agent_version_id = ${draft.versionId}::uuid
+        `;
+      }),
+      /unpublished version cannot retain publication authority or event/,
+    );
+    await fixture.close();
+  });
+
+  await t.test("deferred publication integrity rejects a decision that expires before commit", async () => {
+    const { draft } = await preparedVersion(
+      database,
+      "Commit Freshness Agent",
+      "commit-freshness",
+    );
+    const fixture = await publicationAuthority(database, draft.versionId, {
+      mutator: (response) => {
+        const observation = response.observation;
+        const record = response.record;
+        const observationRecord = observation && typeof observation === "object" && !Array.isArray(observation)
+          ? observation as Record<string, unknown>
+          : null;
+        const authorityRecord = record && typeof record === "object" && !Array.isArray(record)
+          ? record as Record<string, unknown>
+          : null;
+        if (
+          !observationRecord || !authorityRecord ||
+          typeof observationRecord.blockTimestamp !== "string"
+        ) {
+          return { malformed: true };
+        }
+        authorityRecord.freshUntil = new Date(
+          new Date(observationRecord.blockTimestamp as string).getTime() + 2_000,
+        ).toISOString();
+        return response;
+      },
+    });
+    const allowed = await fixture.authority({ agentVersionId: draft.versionId });
+    assert.equal(allowed.allowed, true);
+    assert.ok(allowed.decisionId);
+    await assert.rejects(
+      database.sql.begin(async (tx) => {
+        const sql = tx as unknown as DisposableDatabase["sql"];
+        await sql`
+          INSERT INTO agent_version_events (agent_version_id, sequence, action, payload, created_at)
+          SELECT ${draft.versionId}::uuid, COALESCE(max(e.sequence), -1) + 1,
+            'PUBLISH_VERSION', jsonb_build_object(
+              'manifestHash', d.manifest_hash,
+              'policyVersion', d.policy_version,
+              'publicationDecisionId', d.id::text,
+              'recordHash', d.record_hash,
+              'releaseSha', d.release_sha
+            ), clock_timestamp()
+          FROM ens_publication_decisions d
+          LEFT JOIN agent_version_events e ON e.agent_version_id = d.agent_version_id
+          WHERE d.id = ${allowed.decisionId}::uuid
+          GROUP BY d.id
+        `;
+        await sql`
+          UPDATE agent_versions v
+          SET lifecycle_state = 'PUBLISHED', published = true,
+              published_at = clock_timestamp(), canonical_state = 'CANONICAL',
+              authority_owner = d.owner, authority_delegate = d.delegate,
+              authority_policy_version = d.policy_version, authority_refusal = NULL,
+              authority_record_hash = d.record_hash,
+              authority_observed_at = d.observed_at,
+              authority_fresh_until = d.fresh_until,
+              authority_release_sha = d.release_sha,
+              publication_decision_id = d.id
+          FROM ens_publication_decisions d
+          WHERE v.id = ${draft.versionId}::uuid AND d.id = ${allowed.decisionId}::uuid
+        `;
+        await sql`SELECT pg_sleep(2.2)`;
+      }),
+      /fresh exact accepted A4 decision/,
+    );
+    await fixture.close();
+    const rows = await database.sql<{
+      effects: number;
+      jobs: number;
+      publish_events: number;
+      publication_decision_id: string | null;
+      published: boolean;
+    }[]>`
+      SELECT
+        v.published,
+        v.publication_decision_id::text,
+        (SELECT count(*)::int FROM agent_version_events e
+          WHERE e.agent_version_id = v.id AND e.action = 'PUBLISH_VERSION') AS publish_events,
+        (SELECT count(*)::int FROM jobs j WHERE j.agent_version_id = v.id) AS jobs,
+        (SELECT count(*)::int FROM effects e JOIN jobs j ON j.id = e.job_id
+          WHERE j.agent_version_id = v.id) AS effects
+      FROM agent_versions v WHERE v.id = ${draft.versionId}::uuid
+    `;
+    assert.deepEqual(rows[0], {
+      effects: 0,
+      jobs: 0,
+      publish_events: 0,
+      publication_decision_id: null,
+      published: false,
+    });
+  });
+
+  await t.test("agent route rejects content type malformed and oversized JSON before auth or mutation", async () => {
+    const before = await database.sql<{ actions: number }[]>`
+      SELECT count(*)::int AS actions FROM agent_lifecycle_actions
+    `;
+    const requests = [
+      new Request("http://localhost/api/kernel/agents", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: "{}",
+      }),
+      new Request("http://localhost/api/kernel/agents", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": "9000",
+          "idempotency-key": "route-boundary-01",
+        },
+        body: "{}",
+      }),
+      new Request("http://localhost/api/kernel/agents", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "route-boundary-02",
+        },
+        body: "x".repeat(9_000),
+      }),
+      new Request("http://localhost/api/kernel/agents", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "route-boundary-03",
+        },
+        body: "{",
+      }),
+    ];
+    const responses = await Promise.all(requests.map((request) => postAgentAction(request)));
+    assert.deepEqual(responses.map((response) => response.status), [415, 413, 413, 400]);
+    for (const response of responses) {
+      assert.ok((await response.text()).length < 256);
+    }
+    const after = await database.sql<{ actions: number }[]>`
+      SELECT count(*)::int AS actions FROM agent_lifecycle_actions
+    `;
+    assert.deepEqual(after, before);
+  });
+
   await t.test("protected external hire rejects self and twenty submissions keep one effect", async () => {
     const { draft } = await preparedVersion(
       database,
       "Protected Hire Agent",
       "hire",
     );
+    const fixture = await publicationAuthority(database, draft.versionId);
     const published = await publishAgentVersion(CREATOR_ID, draft.versionId, {
-      authority: new FixtureA4Authority(),
+      authority: fixture.authority,
+      idempotencyKey: "publish-hire-01",
       now: NOW,
       sql: database.sql,
     });
+    await fixture.close();
     await assert.rejects(
       submitJob(CREATOR_ID, {
         agentVersionId: published.versionId,

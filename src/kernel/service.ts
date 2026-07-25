@@ -510,6 +510,18 @@ export async function submitJob(
           (
             v.lifecycle_state = 'PUBLISHED' AND v.canonical_state = 'CANONICAL'
             AND v.write_plan_hash IS NOT NULL AND v.authority_record_hash IS NOT NULL
+            AND v.publication_decision_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1
+              FROM ens_publication_decisions decision
+              JOIN agent_version_events publication_event
+                ON publication_event.agent_version_id = v.id
+               AND publication_event.action = 'PUBLISH_VERSION'
+               AND publication_event.payload->>'publicationDecisionId' = decision.id::text
+              WHERE decision.id = v.publication_decision_id
+                AND decision.agent_version_id = v.id
+                AND decision.decision = 'ALLOW' AND decision.error_code IS NULL
+            )
           )
           OR (${allowLegacyFixture} AND v.lifecycle_state IS NULL)
         )

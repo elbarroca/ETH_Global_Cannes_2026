@@ -693,3 +693,76 @@ The independent audit found no W8 defect. Exact W7 canonical-key/null semantics,
 All available independent lanes passed, including environment/Prisma, ten-migration replay, lint/typecheck, foundation/auth/Kernel/A4/A5, integration-only, e2e/resilience/redaction, boot, secret/shell/diff checks, build 31 pages, and HTTP 200. The audit host lacked Go, so Go-dependent A3 and aggregate integration were not independently promoted; W8 writer evidence records their checksum-pinned pass. Audit cleanup left no repository mutation or external effect.
 
 W8 now opens only the sequential Kernel owner to consume durable publication decisions and repair transaction-time freshness, publication event, SQL integrity, lifecycle idempotency, and request bounds. `A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor qualification, push, release, and public claims remain closed.
+
+## W9 Kernel publication-integrity remediation
+
+- Task: `A4-KERNEL-PUBLICATION-REMEDIATION-20260725:W4:9C6E37D`
+- Start/control SHA: `9c6e37d169ac6ddee2439602551deaca5347c41a`
+- Accepted prerequisite: W8 exact SHA `9b70f246ec91e3475851b873ed43152ebfa36d75`
+- Migration: `20260725072000_a4_kernel_publication_integrity`
+- Migration SHA-256: `23c151f8d1de52221731088783a6e861c581cd3ff41b2bef5fae4cc0ab36bc29`
+- Result: `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`
+
+Production `POST /api/kernel/agents` now supplies a server-composed
+`EnsPublicationAuthority` to `PUBLISH_VERSION`. Its only call input is the
+immutable `agentVersionId`; caller-supplied summaries and the former Kernel
+authority shape are removed. The wrapper uses a separately validated
+`ENS_PUBLICATION_DATABASE_URL` whose login must differ from the application
+login. It remains deliberately fail-closed with
+`ENS_PUBLICATION_NOT_CONFIGURED` until an exact live ENSv2 deployment/resolver
+policy is admitted server-side. The example environment contains only a blank
+restricted-DSN field.
+
+The Kernel transaction re-reads the accepted durable W8 decision by UUID and
+matches the immutable version, manifest, price, payout, normalized/DNS names,
+owner/delegate, hierarchy, roles, resolver/CCIP policy, release, W8 readiness
+marker, and every database-time freshness/expiry boundary. It then appends one
+exact `PUBLISH_VERSION` event, copies authority fields directly from the
+decision row, binds `agent_versions.publication_decision_id`, and completes the
+durable action in the same transaction. Protected job admission requires that
+decision and matching event. Generic summaries, state-only updates, event-only
+inserts, other-version decisions, and decisions expiring during a deferred
+commit are rejected with the whole publication rolled back.
+
+The additive migration adds the decision foreign key/unique binding, durable
+owner/action/idempotency records, immutable completion triggers, and deferred
+decision/event/state integrity triggers. Its preflight aborts if an existing
+protected `PUBLISHED` lifecycle row requires explicit owner adjudication; it
+never guesses or backfills authority. Fresh, synthetic Cannes, unsafe-role,
+canonical W6 upgrade/replay, and noncanonical W6 rollback lanes now exercise
+eleven migrations. The exact synthetic Cannes sentinel remains
+`fb8aece1677586a330f0cfeb0850b71488849302324eb1d6a079673e35e3829e`.
+
+All four lifecycle actions now use a durable owner/action/idempotency key plus
+canonical payload hash, exact replay, mismatch refusal, and transactional
+completion. Twenty concurrent submissions converge to one version/action set
+and one protected hire effect. The agents route accepts only JSON, bounds both
+declared and streamed bodies to 8 KiB, rejects malformed UTF-8/JSON, and returns
+bounded 400/413/415 responses before authentication, policy, database mutation,
+or resolver work. Removal/configuration-negative coverage proves zero durable
+decision, publication event, job, effect, or tool success.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| `npm ci --legacy-peer-deps` | 0 | Clean install and Prisma generation passed; npm reported 41 inherited advisories (22 low, 13 moderate, 6 high), with no dependency or lockfile change in this remediation. |
+| `npm run validate:env` / loopback-placeholder Prisma validate/generate | 0 | Offline environment passed; the schema is valid and Prisma Client `6.19.3` generated. The initial bare validate refused only because `DIRECT_URL` was intentionally unset. |
+| `npx tsx scripts/test-migrations.ts` | 0 | All five eleven-migration checks passed: fresh, synthetic Cannes, unsafe direct/nested role, canonical W6 upgrade/replay, and noncanonical W6 rollback. |
+| `npm run lint` / `npm run typecheck` | 0 | Lint has zero errors and 23 inherited warnings; strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | Foundation 10/10, authentication 9/9, and Kernel 22/22 passed. |
+| checksum-pinned `npm run test:go` / `npm run test:a3` | 0 | Official Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`; A3 passed 12/12. |
+| `npm run test:a4` / checksum-pinned `npm run test:integration` | 0 | A4 passed 22/22; integration passed 39/39 plus all five migration checks. Initial unprepared/concurrent probes failed on absent host Go and one contention timeout; the clean pinned sequential reruns passed without waiver. |
+| `npm run test:a5` / `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 3/3, 4/4, 1/1, and 3/3 passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` / `git diff --check` | 0 | Protected boot, tracked secret scan, shell syntax, and diff hygiene passed. |
+| `npm run build` / loopback `next start` | 0 | Next `16.2.11` generated 31/31 pages; root/dashboard returned 200, unauthenticated protected agents requests returned 401, and invalid media type returned 415 before auth. |
+
+The official Go archive matched SHA-256
+`25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`
+and reported exact `go1.23.10 darwin/arm64`. Its task-specific archive,
+toolchain/cache, and verifier binary were deleted. No live ENS, 0G, Uniswap, or
+sponsor call; shared or managed database effect; managed migration; signature;
+transaction; push; deployment; form; funding; upload; spend; public identifier;
+live proof; or claim promotion occurred.
+
+W9 is writer evidence only. Independent immutable-SHA audit remains mandatory
+before `A4_ACCEPTED`; A5 acceptance, mandatory A6 entry, live ENS, sponsor,
+push, release, and public claims remain closed.
