@@ -3,6 +3,46 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: ENS Integrator /root/a4_delivery_ready_reconcile
+task_id: A4-DELIVERY-READY-RECONCILE-20260725
+task_instance_id: A4-DELIVERY-READY-RECONCILE-20260725:W1:8B8405A
+generation: 1
+sprint: A4_delivery_ready_expectation_reconciliation
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 8b8405a6fbdf12708f1d6c8658df61548f594ae9
+control_sha: 8b8405a6fbdf12708f1d6c8658df61548f594ae9
+token: A4-DELIVERY-READY-RECONCILE-W1-8B8405A-BCB6ED07-0937-4DEE-A33B-3A13333C0458
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T13:28:55Z
+expires_at: 2026-07-25T15:30:00Z
+allowed_paths:
+  - tests/a4/**
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/** only if required
+  - docs/lisbon/EVIDENCE.md only if required
+  - CHANGELOG-LISBON.md only if required
+started_at: 2026-07-25T13:28:55Z
+deadline: 2026-07-25T15:30:00Z
+expected_exit: reconcile exactly six stale A4 expectations to intentional DELIVERY_READY with zero settlement and commission before canonical receipt
+external_effect_authority: local files existing dependencies local tests processes and one local commit only; no network download push deploy migration signature transaction or live external effect
+completed_at: 2026-07-25T13:33:12Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - npm run test:a4 PASS 22 of 22
+  - npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+remaining_blocks:
+  - A3 remains BLOCKED_MISSING_LOCAL_GO and was out of scope
+external_effects_attempted: none
+verdict: PASS_TO_AUDIT
+lock_release: release only matching token A4-DELIVERY-READY-RECONCILE-W1-8B8405A-BCB6ED07-0937-4DEE-A33B-3A13333C0458 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Frontend Builder /root/frontend_localhost_journey
 task_id: A5-LOCALHOST-CREATOR-HIRE-UX-20260725
 task_instance_id: A5-LOCALHOST-CREATOR-HIRE-UX-20260725:W1:62C2F04

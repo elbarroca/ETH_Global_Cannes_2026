@@ -433,13 +433,13 @@ test("stable ENS authority gates the full A3 path twice and twenty duplicates se
       authority_denies: 0,
       authority_checks: 7,
       bindings: 1,
-      commissions: 1,
+      commissions: 0,
       effect_state: "SUCCEEDED",
       effects: 1,
-      job_state: "SUCCEEDED",
+      job_state: "DELIVERY_READY",
       receipts: 1,
       refunds: 0,
-      settlements: 1,
+      settlements: 0,
     });
 
   } finally {
@@ -475,13 +475,13 @@ test("persisted Unicode and multi-label schema-1 binding survives normal executi
       authority_denies: 0,
       authority_checks: 7,
       bindings: 1,
-      commissions: 1,
+      commissions: 0,
       effect_state: "SUCCEEDED",
       effects: 1,
-      job_state: "SUCCEEDED",
+      job_state: "DELIVERY_READY",
       receipts: 1,
       refunds: 0,
-      settlements: 1,
+      settlements: 0,
     });
 
     const crashTime = new Date(NOW.getTime() + 70_000);
@@ -538,13 +538,13 @@ test("persisted Unicode and multi-label schema-1 binding survives normal executi
       authority_denies: 0,
       authority_checks: 7,
       bindings: 1,
-      commissions: 1,
+      commissions: 0,
       effect_state: "SUCCEEDED",
       effects: 1,
-      job_state: "SUCCEEDED",
+      job_state: "DELIVERY_READY",
       receipts: 1,
       refunds: 0,
-      settlements: 1,
+      settlements: 0,
     });
   } finally {
     await database.close();
@@ -599,13 +599,13 @@ test("ENSv2 hierarchy fixture binds DNS names, permissions, CCIP provenance, and
       authority_denies: 0,
       authority_checks: 7,
       bindings: 1,
-      commissions: 1,
+      commissions: 0,
       effect_state: "SUCCEEDED",
       effects: 1,
-      job_state: "SUCCEEDED",
+      job_state: "DELIVERY_READY",
       receipts: 1,
       refunds: 0,
-      settlements: 1,
+      settlements: 0,
     });
     const inheritedJob = await submit(database, version, "a4-ensv2-inherited-resolver", new Date(NOW.getTime() + 1));
     const inherited = fixture(database, { ensv2: true, now: new Date(NOW.getTime() + 1) });
@@ -630,7 +630,7 @@ test("ENSv2 hierarchy fixture binds DNS names, permissions, CCIP provenance, and
     assert.equal(inheritedBinding?.agentCanonicalRegistry, null);
     assert.equal(inheritedBinding?.resolverMode, "INHERITED");
     assert.equal(inheritedBinding?.resolverSuffix, "creator.alphadawg.eth");
-    assert.equal((await snapshot(database, inheritedJob.jobId)).job_state, "SUCCEEDED");
+    assert.equal((await snapshot(database, inheritedJob.jobId)).job_state, "DELIVERY_READY");
   } finally {
     await database.close();
   }
@@ -1127,7 +1127,7 @@ test("transfer during execution and resumed A3 stages recheck only remaining ope
       });
       assert.equal(run.compute.calls.request, counts.compute, phase.hook);
       if (phase.skipped === "compute-and-storage") assert.equal(run.storage.calls, counts.storage, phase.hook);
-      assert.equal((await snapshot(database, submitted.jobId)).job_state, "SUCCEEDED", phase.hook);
+      assert.equal((await snapshot(database, submitted.jobId)).job_state, "DELIVERY_READY", phase.hook);
     }
   } finally {
     await database.close();
@@ -1241,7 +1241,7 @@ test("READBACK restart and lease takeover re-resolve delivery authority without 
       const errors = await database.sql<{ error_code: string | null }[]>`
         SELECT error_code FROM effects WHERE job_id = ${submitted.jobId}::uuid
       `;
-      assert.equal(state.job_state, transferred ? "FAILED" : "SUCCEEDED", errors[0]?.error_code ?? undefined);
+      assert.equal(state.job_state, transferred ? "FAILED" : "DELIVERY_READY", errors[0]?.error_code ?? undefined);
       assert.equal(state.receipts, transferred ? 0 : 1);
       assert.equal(state.refunds, transferred ? 1 : 0);
     }
@@ -1282,7 +1282,7 @@ test("lease takeover during PRE_EXECUTION and PRE_DELIVERY cannot persist stale 
       sql: database.sql,
       now: NOW,
     });
-    assert.equal((await snapshot(database, preJob.jobId)).job_state, "SUCCEEDED");
+    assert.equal((await snapshot(database, preJob.jobId)).job_state, "DELIVERY_READY");
 
     const deliveryTime = new Date(NOW.getTime() + 70_000);
     const deliveryJob = await submit(database, version, "a4-takeover-delivery", deliveryTime);
@@ -1332,7 +1332,7 @@ test("lease takeover during PRE_EXECUTION and PRE_DELIVERY cannot persist stale 
       now: deliveryTime,
     }), { leaseAcquired: true, claimed: 1 });
     assert.equal(recoveryAdapterCalls, 0);
-    assert.equal((await snapshot(database, deliveryJob.jobId)).job_state, "SUCCEEDED");
+    assert.equal((await snapshot(database, deliveryJob.jobId)).job_state, "DELIVERY_READY");
   } finally {
     await database.close();
   }
