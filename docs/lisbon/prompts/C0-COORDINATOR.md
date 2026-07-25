@@ -48,7 +48,7 @@ GATES
 - Required missing scripts, skipped required checks, mocks presented as live behavior, stale rules, moving SHAs, or incomplete evidence are blockers.
 - `A0_LOCAL` passes only on Git provenance, local project-owner authority, and writer serialization. It opens safe local A1 and authorizes later A2/offline A3 after their prerequisites pass. H0 plus rights, license, team, owners, eligibility, access, caps, static-compatibility, and live-P0 gaps do not block that local work; they remain `RELEASE_BLOCKED`, claim-blocking, or `LIVE_EFFECT_BLOCKED`. Pre-H0 commits remain disclosed prior/pre-window work and never Lisbon-window evidence.
 - A3 cannot code around failed 0G verification or proof readback.
-- A6 is optional and is CUT unless every entry gate passes with six hours reserved.
+- A6 is mandatory after `A4_ACCEPTED` and frozen `A5_ACCEPTED`. Its local implementation/audit must complete, and missing live authority becomes `A6_BLOCKED_LIVE`; A7 never opens by removing A6.
 - A7 runs the complete fresh-clone, functionality, UI, security, deployment, documentation, eligibility, demo, and bounty audit on one frozen SHA.
 
 RECOVERY
@@ -59,7 +59,7 @@ RECOVERY
 - STOP only on explicit owner cancellation, deadline expiry, or unrecoverable repository integrity.
 
 TERMINAL
-Declare RELEASE_VALIDATED only when the full release contract in docs/lisbon/GOALS.md passes on one unchanged SHA and every required sprint is PASS_TO_NEXT_GATE, while optional A6 is PASS or evidence-backed CUT. Otherwise report the exact non-terminal state without promoting claims.
+Declare RELEASE_VALIDATED only when the full release contract in docs/lisbon/GOALS.md passes on one unchanged SHA and every required sprint, including `A6_SWAP_TOOLING_ACCEPTED`, is `PASS_TO_NEXT_GATE`. Otherwise report the exact non-terminal state, including `A6_BLOCKED_LIVE` when applicable, without promoting claims.
 
 After every gate, output:
 checkpoint:

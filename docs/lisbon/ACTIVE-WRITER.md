@@ -3,6 +3,57 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Root README task 019f9691-557e-73d2-bc5f-30b9fe6a6154
+task_id: README-SIMPLE-FLOW-A6-CONTRACT-20260725
+task_instance_id: README-SIMPLE-FLOW-A6-CONTRACT-20260725:W1:D1CF3FC
+generation: 1
+sprint: readme_and_a6_control_contract
+mode: sole_documentation_control_writer
+branch: Eth_global_lisbon_
+start_sha: d1cf3fcc390563614b8b34ecc81754d106b37903
+control_sha: d1cf3fcc390563614b8b34ecc81754d106b37903
+token: README-A6-W1-D1CF3FC-6F63A953-C3F6-4B9E-8929-3D509AAF0275
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T02:43:38Z
+expires_at: 2026-07-25T04:34:59Z
+allowed_paths:
+  - README.md
+  - CHANGELOG-LISBON.md
+  - AGENTS.md
+  - .codex/agents/payments-integrator.toml
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/BASELINE.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/SPRINTS.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/prompts/C0-A4-CONTINUATION.md
+  - docs/lisbon/prompts/C0-COORDINATOR.md
+started_at: 2026-07-25T02:34:59Z
+deadline: 2026-07-25T04:34:59Z
+expected_exit: simplify the README story and Mermaid while replacing directly contradictory cuttable A6 policy with one mandatory fail-closed A6 swap-tooling contract across active controls
+external_effect_authority: safe local documentation and control edits deterministic checks and one atomic commit only; no product or package code install push deploy live call signature transaction form funding spend public claim or gate advancement
+completed_at: 2026-07-25T02:43:38Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - root README follows the six-stage protected journey with different buyer and Telegram as secondary inputs
+  - plain-English ENS 0G and Uniswap bounty fit adds no prize live eligibility or sponsor claim
+  - mandatory A6 sequence and A6_BLOCKED_LIVE state replace the directly contradictory cuttable current policy
+  - bounded Unichain Sepolia target prohibitions compromised-key handling and exact external-effect gates are canonical
+  - links fences Mermaid stale-policy TOML diff lint typecheck tests secret scan and 31-page build passed
+remaining_blocks:
+  - repair and immutable-SHA re-audit of the Kernel publication and lifecycle findings before A4_ACCEPTED or A5_ACCEPTED
+  - mandatory A6 implementation audit and separately authorized Unichain Sepolia evidence before A7
+  - every live sponsor push release eligibility and public claim gate
+external_effects_attempted: none
+result: PASS_TO_AUDIT_README_AND_A6_CONTROL_CONTRACT_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token README-A6-W1-D1CF3FC-6F63A953-C3F6-4B9E-8929-3D509AAF0275 after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-KERNEL-W2-AUDIT-RECONCILIATION-20260725
 task_instance_id: C0-KERNEL-W2-AUDIT-RECONCILIATION-20260725:4E741D0

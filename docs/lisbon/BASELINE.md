@@ -40,7 +40,7 @@ New Lisbon work begins with this control packet. The protected new slice is:
 3. strict verified 0G Compute plus proof-enabled Storage;
 4. stable ENS creator and agent subnames with runtime authority checks;
 5. typed quote, settlement, commission, refund, and receipt state without claiming a live value rail;
-6. optional Uniswap Stack contribution only after its Continuity admission and removal tests pass;
+6. mandatory pre-gated A6 Uniswap swap tooling after accepted A4 and frozen A5, with live completion blocked until exact effect authority and Unichain Sepolia evidence exist;
 7. same-SHA demo and release evidence.
 
 Live payments/trading, Sui, Crawbot claims, legacy OpenClaw success fallbacks, and inherited sponsor receipts are excluded from the protected claim. Local marketplace state and fake-rail tests are engineering evidence, not sponsor evidence.

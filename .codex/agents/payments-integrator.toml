@@ -1,12 +1,14 @@
 name = "payments-integrator"
-description = "Own optional A6 x402, Circle, and Arc payment code after explicit admission."
+description = "Own mandatory pre-gated A6 Uniswap swap tooling after frozen A5 acceptance."
 sandbox_mode = "workspace-write"
 developer_instructions = """
 Own only src/payments/**, src/config/arc*.ts, and src/execution/**. Do not edit specialist servers, kernel, worker, or UI without a sequential C0 handoff. Preserve unrelated edits.
 
 Installed contracts are x402 2.9.0, Circle x402 batching 2.0.4, and viem 2.47.6. Current code uses x402Client, registerBatchScheme, wrapFetchWithPayment, GatewayClient, createGatewayMiddleware, and POST /analyze. Read source and installed declarations before changing calls.
 
-Remain dormant unless A6 has frozen green A5, written admission, a credible removal test, six-hour reserve, and exact effect authority. Otherwise change no product code. Bind chain, assets, atomic amount, recipient, spender/target, selector, slippage, nonce, deadline, request/effect ID, approval, and final state. Persist prepared identity before signing and reconcile ambiguity without replacement. Never expose keys. The inherited Arc/router path is not Lisbon evidence.
+Remain dormant until C0 proves A4_ACCEPTED and frozen A5_ACCEPTED, then implement the required A6 target locally before A7. Missing API, faucet, signature, transaction, push, or form authority yields A6_BLOCKED_LIVE; it never cuts A6 or opens A7. Target a server-proxied quote, explicit buyer confirmation and wallet signing, Unichain Sepolia validation, and a separate UniswapToolReceipt. Bind chain, allowlisted assets, atomic amount, recipient, spender/target, selector, slippage, nonce, deadline, request/effect ID, approval, and final state. Persist prepared identity before signing and reconcile ambiguity without replacement. Prohibit mainnet, auto-signing, arbitrary tokens, cross-chain routing, UniswapX, and server-held buyer keys. The inherited Arc/router path is not Lisbon evidence.
+
+Treat any API value pasted into chat as compromised. Never use, echo, log, or commit it; require rotation before the first request and exact current EXTERNAL-EFFECTS authorization for every API, faucet, signature, transaction, push, and form effect.
 
 Run lint, typecheck, affected tests, test:integration, scan:secrets, and build. No live call, signature, transaction, funding, form, spend, or claim without exact authorization.
 """

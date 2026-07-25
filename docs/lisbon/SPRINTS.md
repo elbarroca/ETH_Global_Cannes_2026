@@ -13,8 +13,8 @@ These are acceptance cards, not standalone prompts. C0 runs them in order using 
 | `R0` agent and prompt readiness | 45-90 min | Control writer + read-only audit | Current controls | Every specialist has current paths/APIs, one non-overlapping domain, and complete A4-A7 acceptance coverage. |
 | `A4` ENS authority | 2-4 h | Writer | A3 + R0 + ENS static gate | Canonical creator authority and deterministic agent subnames gate publication, 0G, and delivery. |
 | `A5` product UI and E2E | 5-8 h | Writer | Accepted A4 | Creator -> publish -> external hire -> receipt, Telegram identity linking, required service health, and the UI are usable and automatically tested. |
-| `A6` optional Uniswap | max 4 h | Writer or CUT | Frozen A5 core + admission + 6 h reserve | Exact admitted contribution passes removal and live gates, or is cut untouched. |
-| `A7` release and submission | Remaining >=4 h | Writer | Required gates pass; A6 pass/cut | One SHA passes clean-clone release, two demos, deployment, evidence, and final audit. |
+| `A6` mandatory Uniswap swap tooling | 4-6 h local + live gate | Writer | `A4_ACCEPTED` + frozen `A5_ACCEPTED` | Server-proxied quote, explicit buyer confirmation/signing, Unichain Sepolia validation, separate `UniswapToolReceipt`, immutable audit, and authorized live evidence pass; missing authority is `A6_BLOCKED_LIVE`. |
+| `A7` release and submission | Remaining >=4 h | Writer | Required gates pass; `A6_SWAP_TOOLING_ACCEPTED` | One SHA passes clean-clone release, two demos, deployment, evidence, and final audit. |
 
 Only read-only A0 research and audits may overlap a product writer. A0 control edits are serialized under the writer lease. No two writers overlap.
 
@@ -86,7 +86,7 @@ Deliver:
   `.agents/skills/source-command-*/**` workflows, and the active
   coordinator/executor/auditor prompt chain. `.claude/**` is migration
   provenance only and cannot dispatch work.
-- Give authentication/kernel, ENS, 0G, product UI/E2E, optional payments, cycle wiring, and final bounty audit exactly one owner each. ENS must explicitly own `src/ens/**` and its migrations/tests.
+- Give authentication/kernel, ENS, 0G, product UI/E2E, mandatory A6 swap tooling, cycle wiring, and final bounty audit exactly one owner each. ENS must explicitly own `src/ens/**` and its migrations/tests.
 - Reconcile every declared path, package/API version, command, product name, event/bounty rule, and allowed effect against the current checkout. Remove stale Cannes-only, `VaultMind`, missing-path, and outdated-SDK guidance.
 - Dry-dispatch each specialist read-only and record its domain, paths, commands, dependencies, conflicts, and verdict.
 
@@ -124,7 +124,7 @@ Deliver:
 - Bind Telegram to the authenticated app user through one short-lived, single-use code and private-chat numeric identity. Prove expiry, replay, cross-user, group-chat, forged-webhook, unlink/relink, and webhook-versus-polling refusal. Telegram commands use the same backend identity and never bypass the protected kernel.
 - Select exactly one Telegram receive mode. Production webhook mode requires a configured secret and durable/awaited command handling; production must never accept unsigned updates when the secret is absent.
 - Derive the expected agent/service fleet from one registry. Health requires fresh non-effectful checks plus exact release SHA/version; functional readiness requires separately authorized role-level smokes. UI badges never manufacture health.
-- Treat the observed `12/13 ONLINE`, stale wallet authorization, permanent Arc wait, and empty feed as regression cases. Identify the failed agent, prove wallet retry recovery, and show optional Arc as healthy or explicitly cut instead of loading forever.
+- Treat the observed `12/13 ONLINE`, stale wallet authorization, permanent Arc wait, and empty feed as regression cases. Identify the failed agent, prove wallet retry recovery, remove Arc from the protected path, and show A6 Unichain Sepolia as pre-gated or `A6_BLOCKED_LIVE` instead of loading forever.
 - Keep model output advisory. The UI cannot create authority, rewrite terminal state, or show success from mocks, cached flags, or missing evidence.
 - Add functional API/integration tests for the complete path and refusal cases.
 - Add one automated browser path with creator wallet A publishing an agent subname and buyer wallet B hiring its exact version through progress -> verified delivery -> receipt; cover self/cross-user refusal, forgery, stale authority, version substitution, duplicate hire, and replay no-op.
@@ -133,20 +133,20 @@ Deliver:
 
 Gate: build/start, functional tests, automated critical-path UI tests, Telegram identity/security tests, required service health, accessibility baseline, zero required browser console/network errors, and two local reset/replays pass without manual data repair.
 
-## A6 - optional Uniswap
+## A6 - mandatory Uniswap swap tooling
 
-Objective: add only an honestly admitted, load-bearing Uniswap contribution.
+Objective: after accepted A4 and frozen A5, prove one bounded buyer-controlled swap-tooling lifecycle before A7.
 
-Entry requires all of: frozen green A5 core, current written admission for the exact track, required authorizations for the selected path (such as API, form, signing, network, or spend), successful removal test design, and at least six engineering hours before feature freeze.
+Deliver locally first:
 
-If any entry condition fails: record `CUT_UNISWAP`; change no product code.
+- Proxy the quote server-side; runtime-validate the response and expose no credential to browser code.
+- Bind Unichain Sepolia, allowlisted tokens, integer amount, recipient, slippage, route, deadline, spender, target, selector, calldata hash, quote/request ID, buyer confirmation, and expected final state.
+- Require explicit buyer confirmation and wallet signing. Prohibit mainnet, automatic signing, arbitrary tokens, cross-chain routing, UniswapX, and server-held buyer keys.
+- Persist a separate immutable `UniswapToolReceipt` for quote, confirmation, transaction/finality, balance delta, failure state, agent version, job, buyer, and release SHA. It does not replace the canonical delivery receipt.
+- Verify malformed/tampered responses, wrong chain/token/policy fields, quote expiry, duplicate/restart, refusal, timeout, outage, revert, ambiguous broadcast, finality, and balance deltas.
+- Pass the focused/full local floor and an independent immutable-SHA audit.
 
-When admitted:
-
-- Bind chain, tokens, atomic amount, recipient, slippage, deadline, spender, target, selector, quote/request ID, approval, and expected final state.
-- Runtime-validate official responses; persist prepared transaction/calldata hash before signature; reconcile ambiguity by the same ID; never replace blindly.
-- For Stack Contribution, produce genuinely reusable public tooling, tests/example, code pointers, `FEEDBACK.md`, and separately authorized form submission. A one-off wrapper is not Stack evidence.
-- Verify rejection, malformed/tampered data, wrong policy fields, duplicate/restart, timeout, outage, revert, finality/balance deltas, and removal of the claimed guarantee.
+Then run only separately authorized Unichain Sepolia API, faucet, signature, transaction, push, and form effects. Missing authority is `A6_BLOCKED_LIVE`; A7 stays closed. Any API value pasted into chat is compromised and must never be used, echoed, logged, or committed; rotate it before the first request.
 
 ## A7 - release and submission
 
@@ -156,7 +156,7 @@ Deliver:
 
 - Freeze one SHA; run the complete release contract in `docs/lisbon/GOALS.md` from a fresh checkout.
 - Deploy web/API, PostgreSQL migration, and long-running worker from the same SHA only under exact current authorization. Expose non-secret release and evidence versions.
-- Run authorized live 0G and ENS smokes; run Uniswap only if A6 passed.
+- Run authorized live 0G and ENS smokes; revalidate the already accepted A6 Unichain Sepolia lifecycle and separate `UniswapToolReceipt` on the same release SHA.
 - Prove the same creator parent, agent subname, immutable version, marketplace listing, external-buyer job, receipt, and release SHA across UI, API, worker, database, evidence, deployment, and video.
 - Prove the public app URL, Telegram receiver, worker, and every required agent report the same release SHA; verify Telegram webhook/polling state and an app-link command/result round-trip.
 - Run failure-first and success-plus-replay demos twice from resettable state within four minutes.

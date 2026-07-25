@@ -30,7 +30,7 @@ Codex loads project agents from `.codex/agents/*.toml`. Files under
 |---|---|---|
 | **0G Integrator** | `.codex/agents/og-integrator.toml` | `src/og/**`, `src/config/og-*.ts`, `tools/0g-storage-verifier/**`, `tests/a3/**`, `prisma/migrations/20260724041000_strict_0g/**` |
 | **Hedera Integrator** | `.codex/agents/hedera-integrator.toml` | `src/hedera/**`, `src/config/hedera.ts`, `scripts/setup-topic.ts`, `scripts/setup-token.ts` |
-| **Payments Integrator** | `.codex/agents/payments-integrator.toml` | `src/payments/**`, `src/config/arc*.ts`, `src/execution/**`; optional A6 only |
+| **Payments Integrator** | `.codex/agents/payments-integrator.toml` | `src/payments/**`, `src/config/arc*.ts`, `src/execution/**`; mandatory pre-gated A6 swap tooling |
 | **Frontend Builder** | `.codex/agents/frontend-builder.toml` | page/layout/style files under `app/**`, `components/**`, `contexts/**`, `hooks/**`, client UI helpers under `lib/**`, `tests/a5/**`, `tests/playwright/**`; not `app/api/**` |
 | **OpenClaw Builder** | `.codex/agents/openclaw-builder.toml` | `openclaw/**`; inherited non-authoritative path |
 | **Kernel Integrator** | `.codex/agents/kernel-integrator.toml` | `src/auth/**`, `src/kernel/**`, `src/worker/**`, protected `app/api/auth/**` and `app/api/kernel/**`, `tests/auth/**`, `tests/kernel/**`, `tests/integration/worker-fencing.test.ts`, `prisma/migrations/20260724024500_authenticated_kernel/**` |

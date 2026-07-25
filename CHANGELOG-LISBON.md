@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - Six-stage README and mandatory A6 contract
+
+- Simplified the root architecture to six protected stages: wallet, ENSv2 identity, immutable agent, marketplace hire, verified 0G delivery, and receipt/UI. Kept the different buyer and Telegram as secondary inputs.
+- Added plain-English ENS, 0G, and Uniswap bounty-fit explanations without prize, eligibility, production, or live-proof promotion.
+- Superseded the current cuttable A6 policy with the mandatory sequence `A4_ACCEPTED` -> frozen `A5_ACCEPTED` -> `A6_SWAP_TOOLING_ACCEPTED` -> A7. Missing live authority is `A6_BLOCKED_LIVE`; A6 is not removed.
+- Defined the bounded A6 target as a server-proxied quote, explicit buyer confirmation and wallet signing, Unichain Sepolia validation, and a separate immutable `UniswapToolReceipt`. Mainnet, automatic signing, arbitrary tokens, cross-chain routing, UniswapX, and server-held buyer keys remain prohibited.
+- Preserved the Kernel publication/lifecycle audit `FIX`, closed A4/A5 pre-gates, `RELEASE_BLOCKED`, `LIVE_EFFECT_BLOCKED`, expected-winnings floor `$0`, and the historical evidence ledger. No product code or external effect was attempted.
+- Passed 8/8 README links, balanced fences, the six-stage Mermaid contract, stale-A6 scan, payments-agent TOML parse, diff check, lint with zero errors and 23 inherited warnings, typecheck, foundation tests 9/9, secret scan, and the 31-page production build.
+
 ## 2026-07-25 - Kernel lifecycle immutable audit
 
 - Reconciled independent audit verdict `FIX` for exact SHA `4e741d05d25e49ed9a0a8964a3119a1ae98f3e59` and range `b41f3ed522670db020c4a2dba0402584dca803dc..4e741d05d25e49ed9a0a8964a3119a1ae98f3e59`.

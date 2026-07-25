@@ -33,60 +33,34 @@ marketplace. A different authenticated buyer hires it through an idempotent
 job. Delivery is accepted only after fresh ENS checks, verified 0G Compute,
 proof-enabled Storage readback, and one canonical receipt.
 
-The required path is:
+The protected journey is simple:
 
-`creator wallet → ENSv2 agent subname → immutable version → marketplace → external hire → verified 0G delivery → canonical receipt → browser evidence`
+`wallet → ENSv2 identity → immutable agent → marketplace hire → verified 0G delivery → receipt/UI`
 
-Uniswap is an optional A6 extension. It enters only after the protected core is
-frozen, repeatable, currently eligible, and explicitly admitted.
+A different buyer performs the hire. Telegram can reach the same protected
+flow, but neither a buyer wallet nor Telegram can replace creator authority.
 
 ---
 
-## Architecture — Identity, Commerce, Proof, Optional Swap
+## Architecture — Six Protected Stages
 
 ```mermaid
-flowchart TB
-    subgraph Identity["1. ENSv2 identity"]
-        direction LR
-        Creator["Creator wallet"] --> SIWE["SIWE authentication"]
-        SIWE --> Parent["Creator parent<br/>creator.eth"]
-        Parent --> Agent["Agent subname<br/>agent-slug.creator.eth"]
-        Agent --> Version["Immutable AgentVersion"]
-    end
+flowchart LR
+    Wallet["Wallet"] --> Identity["ENSv2 Identity<br/>creator.eth / agent.creator.eth"]
+    Identity --> Agent["Immutable Agent"]
+    Agent --> Hire["Marketplace Hire"]
+    Hire --> Delivery["Verified 0G Delivery"]
+    Delivery --> Result["Receipt / UI"]
 
-    subgraph Commerce["2. Protected commerce"]
-        direction LR
-        Publish["Publish exact version"] --> Market["Marketplace listing"]
-        Market --> Hire["Idempotent hire"]
-        Buyer["Different buyer wallet"] --> Hire
-    end
-
-    subgraph Delivery["3. Verified delivery"]
-        direction LR
-        PreENS["Fresh ENS pre-check"] --> Compute["Verified 0G Compute"]
-        Compute --> Storage["Proof-enabled Storage readback"]
-        Storage --> PostENS["Fresh delivery check"]
-        PostENS --> Receipt["Canonical receipt"]
-        Receipt --> UI["Judge-visible UI"]
-    end
-
-    Version --> Publish
-    Hire --> PreENS
+    Buyer["Different buyer wallet"] --> Hire
     Telegram["Linked Telegram account"] -. "same app identity" .-> Hire
 
-    subgraph Optional["4. Optional A6 Uniswap tooling"]
-        direction LR
-        Gate{"Core frozen + A6 admitted?"}
-        Gate -. "yes" .-> Swap["Official Uniswap tooling<br/>policy-bound quote · route · swap"]
-        Swap -.-> SwapProof["Swap lifecycle evidence"]
-        Gate -. "no" .-> Cut["CUT_UNISWAP<br/>no product change"]
-    end
-
-    Receipt -. "only after protected core passes" .-> Gate
+    Result -. "after A4_ACCEPTED + frozen A5_ACCEPTED" .-> Swap["A6 Uniswap target<br/>quote → confirm/sign → Unichain Sepolia → UniswapToolReceipt"]
+    Swap -. "missing live authority" .-> Blocked["A6_BLOCKED_LIVE"]
 ```
 
-Solid arrows are the required commerce path. Dashed arrows are linked or
-conditional capabilities; they are not current live proof.
+Solid arrows are the protected product path. Dashed arrows are secondary or
+pre-gated paths; they are not implementation, eligibility, or live proof.
 
 | Role | Component | What it proves |
 |---|---|---|
@@ -95,7 +69,7 @@ conditional capabilities; they are not current live proof.
 | Commerce | Protected marketplace + different-buyer job | Who published, who hired, and which version was selected |
 | Execution | 0G Compute + proof-enabled Storage readback | The accepted output matches the stored delivery |
 | Receipt | Canonical terminal receipt | One delivery and one mutually exclusive financial outcome |
-| Optional swap | Official Uniswap tooling after A6 admission | A policy-bound quote, route, swap, and lifecycle record |
+| Swap tooling | Mandatory pre-gated A6 Uniswap target | A buyer-approved testnet swap and separate tooling receipt |
 
 ---
 
@@ -117,8 +91,9 @@ conditional capabilities; they are not current live proof.
    the immutable job and version.
 8. **Deliver:** ENS is checked again before one canonical receipt is accepted
    and shown in the UI.
-9. **Optionally swap:** only an admitted A6 flow may add policy-bound Uniswap
-   tooling. Otherwise the system records `CUT_UNISWAP` and changes nothing.
+9. **Prove swap tooling:** after `A4_ACCEPTED` and frozen `A5_ACCEPTED`, A6 must
+   prove its bounded Unichain Sepolia lifecycle before A7. Missing live
+   authority yields `A6_BLOCKED_LIVE`; it never removes A6.
 
 ## ENSv2 — A Human Name With Machine Authority
 
@@ -147,24 +122,30 @@ those facts to the exact buyer, job, version, hashes, and terminal outcome.
 A fixture, installed SDK, HTTP `200`, request ID, or green UI badge is not live
 sponsor proof.
 
-## Uniswap — Optional Agent Swap Tooling
+## Uniswap — Mandatory, Pre-Gated Swap Tooling
 
-Current state: `U0_ADMITTED_CONDITIONAL_NOT_OPEN`.
+Current state: `A6_REQUIRED_TARGET; PRE_GATES_CLOSED; NOT_IMPLEMENTED;
+LIVE_EFFECT_BLOCKED`.
 
-The minimal safe setup, if A6 opens, is:
+After `A4_ACCEPTED` and frozen `A5_ACCEPTED`, A6 must implement and independently
+audit one narrow target: a server-proxied quote, explicit buyer confirmation and
+wallet signing, Unichain Sepolia validation, and a separate immutable
+`UniswapToolReceipt`. Mainnet, automatic signing, arbitrary tokens, cross-chain
+routing, UniswapX, and server-held buyer keys are prohibited.
 
-1. use official, reusable Uniswap SDK/tooling rather than treating the inherited
-   Arc custom-router path as evidence;
-2. have the agent produce a typed swap intent, never an unconstrained command;
-3. validate chain, assets, integer amount, slippage, route, deadline, and policy
-   before any signature;
-4. require exact effect authorization before signing or broadcasting; and
-5. bind quote, route, transaction, final outcome, and failure state into the
-   same evidence lifecycle.
+API, faucet, signature, transaction, push, and form effects each require an
+exact current `AUTHORIZED` row. Without that authority, A6 is
+`A6_BLOCKED_LIVE` and A7 stays closed. Any API value pasted into chat is treated
+as compromised: it must never be used, echoed, logged, or committed, and must
+be rotated before the first request.
 
-If eligibility, time reserve, safety, or proof is insufficient, A6 returns
-`CUT_UNISWAP` without product changes. No live Uniswap request, signature, or
-transaction is currently authorized.
+## Bounty Fit — Plain English
+
+| Track | What AlphaDawg is designed to demonstrate | Honest state |
+|---|---|---|
+| ENS | A creator controls a parent name, each agent gets a deterministic subname, and authority is checked again before execution and delivery. | Local evidence exists, but the Kernel publication handoff is `AUDIT_FIX`; no live ENS or eligibility claim. |
+| 0G | Compute produces the result, Storage preserves it, and proof-enabled readback must match before delivery is accepted. | Deterministic local evidence exists; live 0G execution is `NOT_RUN`. |
+| Uniswap | A server supplies a bounded quote, the buyer confirms and signs, Unichain Sepolia validates it, and a separate receipt records the tooling lifecycle. | Mandatory A6 target only; not implemented, audited, live-proven, or eligibility-proven. |
 
 ---
 
@@ -175,11 +156,13 @@ The [Lisbon Claim Matrix](docs/lisbon/CLAIM-MATRIX.md) is the source of truth.
 - `LOCAL_BUILD_AUTHORIZED`: deterministic local files, tests, loopback services,
   disposable databases, and atomic commits are allowed.
 - A0-A3 have accepted local evidence; live 0G execution remains `NOT_RUN`.
-- A4 retains an accepted stable ENS base, but the ENSv2 owner layer is
-  `AUDIT_FIX` pending schema-v1 Unicode compatibility repair, immutable-SHA
-  re-audit, and the Kernel publication handoff.
-- A5 remains local-only and audit-gated. A6 Uniswap remains conditional and
-  unopened.
+- A4 W3 schema-v1 compatibility is `PASS_TO_NEXT_GATE`, but the Kernel
+  publication handoff audit returned `FIX`; current `A4_ACCEPTED` remains
+  closed.
+- A5's Kernel lifecycle audit returned `FIX`; A5 remains local-only and is not
+  accepted.
+- A6 is mandatory after accepted A4 and frozen A5, but is not implemented and
+  its pre-gates and live-effect gate remain closed.
 - `RELEASE_BLOCKED` and `LIVE_EFFECT_BLOCKED` remain in force. Production
   readiness is rejected currently; expected winnings are unproven with floor
   `$0`.
@@ -207,7 +190,7 @@ non-authoritative unless a current sprint explicitly admits them.
 | Identity | SIWE, viem, ENS Universal Resolver + ENSv2 readiness fixtures |
 | Execution | 0G Compute, Storage, pinned Go proof verifier |
 | UI verification | Playwright Chromium |
-| Optional swap | Uniswap tooling only after A6 admission |
+| Swap tooling | Mandatory pre-gated A6 target on Unichain Sepolia |
 
 ## Quick Start
 

@@ -13,7 +13,7 @@ Complete the smallest protected release path:
 
 authenticated creator wallet -> canonical creator ENS authority -> immutable agent version + agent subname -> marketplace publication -> authenticated external buyer hire -> fresh pre/post ENS authority -> strictly verified 0G delivery and Storage readback -> canonical receipt -> judge-visible UI
 
-Uniswap remains optional. Do not open it unless every A6 admission condition passes. Do not claim RELEASE_VALIDATED until the complete same-SHA A7 contract passes.
+A6 Uniswap swap tooling is mandatory after `A4_ACCEPTED` and frozen `A5_ACCEPTED`. Missing live authority is `A6_BLOCKED_LIVE`; never remove A6 or open A7 without `A6_SWAP_TOOLING_ACCEPTED`. Do not claim RELEASE_VALIDATED until the complete same-SHA A7 contract passes.
 
 CONTROLLING FRONTIER
 
@@ -31,7 +31,7 @@ CONTROLLING FRONTIER
 - R0: all seven legacy Claude specialists were migrated into nine Codex-native project agents plus two Codex skills. The ownership-boundary remediation and independent read-only re-audit passed exact local SHA `a8a45286980c1312713872c4b8c90c90b283c3ed`; it is not pushed. Reconcile that result into the canonical ledgers before advancing.
 - A4: implemented and remediated locally, but canonical acceptance remains fail-closed until the exact unchanged-SHA audit is reconciled in `EVIDENCE.md` and `CLAIM-MATRIX.md`. Live ENS is not run.
 - A5: implemented and remediated locally, but canonical acceptance remains `PASS_TO_AUDIT` until an independent exact-SHA audit is reconciled. The creator-subname-publication-external-hire journey added by the current contract is not yet proven.
-- A6: not admitted for implementation; select the exact conditional Stack contribution or record `CUT_UNISWAP`.
+- A6: mandatory target not implemented or live-proven; it requires the accepted pre-gates, immutable audit, and authorized Unichain Sepolia evidence before A7.
 - A7: release prerequisites and later micro-commits are not `RELEASE_VALIDATED`.
 - Never rerun or rewrite accepted A0-A3 work without observed drift, a failed current check, or a direct dependency required by A4+.
 
@@ -80,7 +80,7 @@ SETUP AND EVIDENCE STILL REQUIRED
 2. Reconcile the exact A4/A5 audit frontier without promoting writer prose.
 3. A4 ENSv2 compatibility: authenticated creator authority, canonical registry hierarchy, deterministic agent subname, permissions, resolver provenance, and pre/post execution checks.
 4. A5 protected creator -> immutable publication -> different-buyer hire -> verified receipt UI/API/browser journey, secure Telegram identity link, and complete required service fleet using only the kernel authority path.
-5. A6 explicit admission or evidence-backed `CUT_UNISWAP`.
+5. A6 mandatory server-proxied quote, explicit buyer confirmation/signing, Unichain Sepolia validation, separate `UniswapToolReceipt`, immutable audit, and authorized live evidence; otherwise `A6_BLOCKED_LIVE`.
 6. A7 same-SHA deployment, live smokes, demo, evidence, documentation, and current Lisbon bounty audit.
 7. A future reviewed production 0G adapter. Credentials alone cannot re-enable the removed live path.
 8. Exact 0G provider/model, signer/TEE metadata, network/RPC, indexer/Storage endpoints, request scope, funding policy, and atomic spend cap.
@@ -108,7 +108,7 @@ RECORDED OWNER ANSWERS - DO NOT ASK AGAIN
 - Creator payout: derive the payout destination from the authenticated creator wallet. Local settlement/accounting is not proof that the wallet received funds; an actual transfer requires an admitted rail and exact effect authorization.
 - ENS: use `barrocaa.eth` as the intended creator parent and derive deterministic agent subnames automatically. Chain/testnet, owner/delegate roles, write/readback scope, gas cap, and freshness remain unset. Direct ENSv2 live work remains blocked.
 - Browser journey: creator A and buyer B mean two different SIWE wallet accounts; no addresses or signing material have been supplied.
-- Arc: cut and remove it from the protected product/UI. Never leave `Waiting for Arc RPC`. A6 is optional Uniswap, not Arc, and still follows its separate pass-or-cut gate.
+- Arc: remove it from the protected product/UI. Never leave `Waiting for Arc RPC`. A6 targets Unichain Sepolia and must show its pre-gates or `A6_BLOCKED_LIVE`, never Arc fallback or perpetual loading.
 - External effects: none are currently authorized. Vercel/Telegram configuration and credentials are setup facts, not deploy or webhook-registration authority.
 
 REMAINING OWNER QUESTIONS - ASK ONCE BEFORE THE AFFECTED EXTERNAL GATE
@@ -162,7 +162,7 @@ R0 - AGENT AND PROMPT READINESS
 
 - Start from the accepted migration baseline `a8a45286980c1312713872c4b8c90c90b283c3ed`: nine `.codex/agents/*.toml` project agents plus two `.agents/skills/source-command-*/SKILL.md` workflows. `.claude/**` is inactive migration provenance; never rerun or edit it as current agent work.
 - Reconcile `docs/lisbon/evidence/R0-AGENT-READINESS.md` and its immutable re-audit into the canonical ledgers. Compare the current tree to that accepted matrix and revalidate only changed agent, skill, prompt, path, command, dependency/API, or Lisbon-criteria surfaces.
-- Confirm exactly one current owner for authentication/kernel, ENS, 0G, UI/E2E, optional payments, cycle wiring, and final bounty audit. `ens-integrator` already owns `src/ens/**` and its registered migrations/tests; do not add another ENS owner unless observed drift proves the registry changed.
+- Confirm exactly one current owner for authentication/kernel, ENS, 0G, UI/E2E, mandatory A6 swap tooling, cycle wiring, and final bounty audit. `ens-integrator` already owns `src/ens/**` and its registered migrations/tests; do not add another ENS owner unless observed drift proves the registry changed.
 - Confirm the accepted remediation still excludes stale Cannes-only criteria, `VaultMind` identity, obsolete `src/dashboard/**` paths, stale SDK signatures, generic Cycle test ownership, and any legacy success path. Repair only a reproduced current-tree defect through its registered owner.
 - Record agent, domain, allowed paths, dependencies, checks, conflicts, changed-surface validation, and verdict. Do not dry-dispatch unchanged specialists again merely because this continuation started.
 - `R0_AGENT_READY` requires the accepted result to be canonical plus no current missing owner, overlap, nonexistent path, stale API, or stale Lisbon audit criterion.
@@ -217,11 +217,14 @@ A5 - PRODUCT UI, FUNCTIONALITY, AND E2E
 - Load `/`, `/dashboard`, `/marketplace`, `/verify`, and protected job detail with zero uncaught console errors, failed required requests, hydration errors, clipped controls, or horizontal overflow across supported desktop/mobile widths.
 - Require build/start, automated critical path, Telegram link/security tests, complete required fleet health, accessibility baseline, and two local reset/replays without manual repair.
 
-A6 - OPTIONAL UNISWAP
+A6 - MANDATORY UNISWAP SWAP TOOLING
 
-- Open only with a frozen green A5 core, current written admission, exact effect authorizations, a credible removal test, and at least six engineering hours before feature freeze.
-- If any entry condition fails, record `CUT_UNISWAP` and change no product code.
-- Never revive the inherited one-off Arc/router path as Lisbon evidence.
+- Start only after current `A4_ACCEPTED` and frozen `A5_ACCEPTED`; finish before A7.
+- Implement a server-proxied bounded quote, explicit buyer confirmation and wallet signing, Unichain Sepolia validation, and a separate immutable `UniswapToolReceipt`.
+- Prohibit mainnet, auto-signing, arbitrary tokens, cross-chain routing, UniswapX, server-held buyer keys, and the inherited Arc/router path.
+- Require local negative coverage, full verification, and immutable-SHA audit before live evidence.
+- Missing API/faucet/signature/transaction/push/form authority is `A6_BLOCKED_LIVE` and keeps A7 closed. Never remove or simulate A6.
+- Treat any API value pasted into chat as compromised: never use, echo, log, or commit it; require rotation before the first request.
 
 A7 - RELEASE AND SUBMISSION
 
@@ -230,7 +233,7 @@ A7 - RELEASE AND SUBMISSION
 - Run the complete release contract in `docs/lisbon/GOALS.md` from a fresh checkout.
 - Target Vercel for web/API and the Telegram webhook. Deploy it, the managed migration, and the separately compatible worker host only under exact authorization and from the same SHA.
 - Deploy or verify the Telegram receiver and every required agent from the same SHA/version. Reconcile public app URL, webhook-versus-polling state, health endpoints, and exact offline/degraded causes.
-- Run authorized live 0G and ENS smokes; run Uniswap only if A6 passed.
+- Run authorized live 0G and ENS smokes; revalidate accepted A6 Unichain Sepolia evidence and the separate `UniswapToolReceipt` on the same release SHA.
 - Run failure-first and success-plus-replay demos twice from resettable state within four minutes.
 - Include one web-to-Telegram link and command/result round-trip plus one creator-A to buyer-B protected marketplace run in both demos.
 - Repair README claim drift; complete setup, prior-work disclosure, changelog, AI disclosure, public identifiers, screenshots, demo/video, and current sponsor artifacts.

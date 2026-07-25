@@ -15,8 +15,8 @@
 | Open-source/license authority | `PENDING` | Contributor authorization and root license. |
 | 0G Keep qualification | `research_only_not_promotable; A3_REAUDIT_PASS; LIVE_EFFECT_BLOCKED` | Separately authorize and implement a future reviewed live adapter before obtaining any live provider/network/request/funding/cap authority or public Compute/Storage/proof identifiers; classify Lisbon-new work; then pass A7 release validation. |
 | ENS Continuity qualification | `research_only_not_promotable; KERNEL_HANDOFF_AUDIT_FIX; LIVE_EFFECT_BLOCKED` | Repair and re-audit authoritative publication, then obtain separately authorized live owner write/readback and identifiers, booth/demo artifacts, and A7. |
-| Uniswap Stack qualification | `U0_ADMITTED_CONDITIONAL_NOT_OPEN` | Green frozen A5 core, A6 admission, upstream reusable contribution, live proof if applicable, FEEDBACK.md/form, A7. |
-| Uniswap API qualification | `REJECTED_WITHOUT_WRITTEN_ADMISSION` | Written admission, A6 live API/onchain lifecycle, and A7. |
+| Uniswap Stack qualification | `A6_REQUIRED; PRE_GATES_CLOSED; NOT_IMPLEMENTED; LIVE_EFFECT_BLOCKED` | `A4_ACCEPTED`, frozen `A5_ACCEPTED`, reusable tooling, immutable audit, separately authorized artifacts/form, accepted A6, and A7. Product requirement does not itself prove track eligibility. |
+| Uniswap API qualification | `A6_REQUIRED_TARGET; NOT_IMPLEMENTED; ELIGIBILITY_UNPROVEN; LIVE_EFFECT_BLOCKED` | Server-proxied quote, explicit buyer confirmation/signing, Unichain Sepolia validation, separate `UniswapToolReceipt`, immutable audit, authorized live lifecycle, and A7. Missing authority is `A6_BLOCKED_LIVE`. |
 | Sui qualification | `NOT_ADMITTED` | No sprint is allocated; a material scope change and new evidence gate are required. |
 | Production ready | `REJECTED_CURRENTLY` | Every required A1-A7 gate on one SHA. |
 | Expected winnings | `UNPROVEN`; floor `$0` | Sponsor decision. |

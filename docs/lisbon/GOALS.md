@@ -8,7 +8,7 @@ Release one exact AlphaDawg SHA that proves this protected path:
 
 `authenticated creator wallet -> canonical creator ENS authority -> immutable agent version + agent subname -> marketplace publication -> authenticated external buyer hire -> fresh pre/post ENS authority -> verified 0G inference and Storage readback -> canonical delivery receipt -> judge-visible UI`
 
-Uniswap is optional. It may run only after the protected path is frozen, repeatable, currently eligible, and safely inside the time reserve.
+A6 Uniswap swap tooling is mandatory after `A4_ACCEPTED` and frozen `A5_ACCEPTED`, and before A7. Missing live authority yields `A6_BLOCKED_LIVE`; it never removes A6 or opens A7.
 
 ## Current frontier and remaining order
 
@@ -17,7 +17,7 @@ The evidence and claim ledgers, not agent prose, determine the current gate. Rec
 1. `R0_AGENT_READY`: audit and repair the registered specialists and A4-A7 prompt pack.
 2. `A4_ACCEPTED`: reconcile the existing local A4 remediation audit, then add the ENSv2 creator/subname contract and pass its offline/static gate. Live ENSv2 stays blocked until its separate deployment and effect gates pass.
 3. `A5_ACCEPTED`: reconcile the existing local A5 remediation audit, then prove one protected creator -> publish -> external hire -> receipt journey, Telegram-to-app identity link, required service fleet, and browser-ready UI with no legacy marketplace authority.
-4. `A6_PASS_OR_CUT`: admit the exact Uniswap contribution or record `CUT_UNISWAP` without product changes.
+4. `A6_SWAP_TOOLING_ACCEPTED`: implement and independently audit the server-proxied quote, explicit buyer confirmation/signing, Unichain Sepolia validation, and separate `UniswapToolReceipt`; missing live authority is `A6_BLOCKED_LIVE`.
 5. `A7_RELEASE_VALIDATED`: freeze one SHA, pass live/release gates, deploy, replay twice, complete evidence, and pass the final bounty audit.
 
 Local A4/A5 implementation or a micro-commit is not acceptance. A4/A5 remain `PASS_TO_AUDIT` whenever the canonical ledgers have not accepted the exact unchanged SHA.
@@ -68,7 +68,7 @@ The archive is provenance only. It cannot direct current work.
 - Inventory `AGENTS.md`, every `.codex/agents/*.toml`, both converted
   `.agents/skills/source-command-*/SKILL.md` workflows, this contract,
   `SPRINTS.md`, and the active coordinator/executor/auditor prompts.
-- Require exactly one owner for each protected domain: authentication/kernel, ENS, 0G, product UI/E2E, optional payments, cycle wiring, and final bounty audit. Add or narrow one specialist instead of leaving ENS unowned or duplicating writers.
+- Require exactly one owner for each protected domain: authentication/kernel, ENS, 0G, product UI/E2E, mandatory A6 swap tooling, cycle wiring, and final bounty audit. Add or narrow one specialist instead of leaving ENS unowned or duplicating writers.
 - Verify every declared path exists, every package/API version matches `package.json` and installed types, and every command exists. Remove stale Cannes-only bounty criteria, `VaultMind` identity, obsolete `src/dashboard/**` paths, and stale SDK signatures before trusting an agent.
 - The ENS owner must cover `src/ens/**`, ENS migrations/tests, Universal Resolver readiness, ENSv2 hierarchy/permission checks, and the creator-subname lifecycle. The Cycle Wirer owns only the cross-domain protected flow. The Frontend Builder owns root `app/**` and `components/**`. The Bounty Auditor must use current Lisbon controls and official requirements.
 - Run a deterministic structure/link/path/version scan and a read-only dry dispatch for each specialist. No agent may claim authority, live proof, bounty qualification, or completion from its prompt.
@@ -123,13 +123,25 @@ Deployment and agent health are evidence-backed:
 
 - Derive the required fleet from one canonical registry. Every required web, API, worker, Telegram receiver, and specialist service exposes non-secret health plus release SHA/version; UI counts come only from fresh probes.
 - `online` requires the expected process and configuration, not merely HTTP `200`. Run a non-effectful health/config check for every agent and an authorized functional request for every required role. One missing agent, SHA mismatch, wrong endpoint, stale probe, or degraded dependency blocks the corresponding gate.
-- The screenshot-observed `12/13 ONLINE`, `Fresh authorization required`, indefinite `Waiting for Arc RPC`, and empty activity are regression inputs. Identify the exact offline agent; make wallet reauthorization recover without reload loops; and either prove optional Arc healthy when A6 is admitted or show an explicit cut/unavailable state rather than perpetual loading.
+- The screenshot-observed `12/13 ONLINE`, `Fresh authorization required`, indefinite `Waiting for Arc RPC`, and empty activity are regression inputs. Identify the exact offline agent; make wallet reauthorization recover without reload loops; remove Arc from the protected Lisbon path; and show mandatory A6 Unichain Sepolia readiness as explicitly pre-gated or `A6_BLOCKED_LIVE`, never perpetual loading.
 
 UI readiness requires automated Chromium coverage plus manual visual evidence on the same SHA:
 
 - Load `/`, `/dashboard`, `/marketplace`, `/verify`, and protected job detail on desktop and mobile with zero uncaught console errors, failed required requests, hydration errors, clipped controls, or horizontal overflow.
 - Test disconnected, connected-not-onboarded, stale session, Telegram-unlinked/linked, service waking/offline, empty, loading, success, refusal, and long-content states. Every retry must perform a real bounded recovery.
 - A7 screenshots/video may be captured only after auth, Telegram link, required service health, creator publication, external hire, receipt, and two reset/replays pass on the release SHA.
+
+## Mandatory A6 Uniswap swap-tooling contract
+
+A6 starts only after current `A4_ACCEPTED` and frozen `A5_ACCEPTED`. It is required before A7 and has one narrow target:
+
+1. The server proxies the quote request and returns a bounded, runtime-validated quote/route; browser code never receives or logs an API credential.
+2. The buyer sees the exact chain, allowlisted tokens, integer amounts, route, slippage, deadline, spender, target, and calldata hash before explicit confirmation and wallet signing.
+3. Validation and any authorized transaction run only on Unichain Sepolia. Mainnet, automatic signing, arbitrary tokens, cross-chain routing, UniswapX, and server-held buyer keys are prohibited.
+4. A separate immutable `UniswapToolReceipt` binds the buyer, job, agent version, quote/request ID, policy fields, confirmation, transaction, finality, balance delta, failure state, and release SHA. It never replaces the canonical agent-delivery receipt.
+5. Local implementation, negative tests, and an immutable-SHA audit must pass before any live evidence. Acceptance additionally requires separately authorized Unichain Sepolia API/faucet/signature/transaction/form actions and exact causal evidence.
+
+Missing API, faucet, signature, transaction, push, or form authority is `A6_BLOCKED_LIVE`. It blocks A7 but does not authorize removal, substitution, simulated promotion, or a cut. Any API value pasted into chat is compromised: never use, echo, log, or commit it; require rotation before the first request.
 
 ## Autonomous loop
 
@@ -177,7 +189,7 @@ If a required command does not exist, the sprint is not green. A1 must create re
 - functional API and automated critical-path UI tests;
 - production build and start smoke;
 - secret, PII, plaintext, and tracked-history scan;
-- authorized live 0G and ENS paths, including canonical creator-parent and agent-subname readback; direct ENSv2 only when its deployment gate passes; plus Uniswap only if admitted;
+- authorized live 0G and ENS paths, including canonical creator-parent and agent-subname readback; direct ENSv2 only when its deployment gate passes; plus accepted A6 swap tooling with authorized Unichain Sepolia evidence and a separate `UniswapToolReceipt`;
 - one creator-wallet -> agent subname -> immutable publication -> different-buyer hire -> verified receipt browser journey;
 - one secure web-user -> Telegram private-chat link plus command/result round-trip against the same backend identity and release SHA;
 - every required service healthy and functionally proven; no unexplained partial fleet, stale health badge, permanent authorization error, or permanent loading state;
