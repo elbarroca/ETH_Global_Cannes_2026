@@ -2,6 +2,14 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - README narrative and provable architecture
+
+- Restored the useful `origin/main` narrative progression—problem, solution, architecture, end-to-end run, marketplace, proof, project structure, and quick start—without restoring its inherited live, bounty, cost, or production claims.
+- Replaced the architecture chart with the current protected path: SIWE creator wallet, ENSv2 creator parent and deterministic agent subname, immutable version, protected marketplace, different-buyer hire, fresh ENS checks, verified 0G Compute and Storage readback, canonical receipt, and judge-visible UI.
+- Added a dashed optional A6 Uniswap lane using official policy-bound quote, route, swap, and lifecycle tooling only after the protected core is frozen and A6 is admitted; otherwise the documented outcome is `CUT_UNISWAP` with no product change.
+- Kept A4 `AUDIT_FIX`, A5 local-only/audit-gated, A6 conditional/unopened, `RELEASE_BLOCKED`, `LIVE_EFFECT_BLOCKED`, and expected-winnings floor `$0` unchanged.
+- Passed 8/8 local README links, balanced-fence and Mermaid-contract checks, stale-claim scan, diff check, lint with zero errors and 23 inherited warnings, typecheck, foundation tests 9/9, secret scan, and the 31-page production build. No product code or external effect was attempted.
+
 ## 2026-07-25 - Lisbon README and claim-drift remediation
 
 - Replaced the 571-line Cannes pitch with a concise Lisbon overview centered on the protected creator-wallet, ENS authority, immutable version, external hire, verified 0G execution, canonical receipt, and browser-evidence path.

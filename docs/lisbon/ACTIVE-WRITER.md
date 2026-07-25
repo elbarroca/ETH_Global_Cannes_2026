@@ -3,6 +3,46 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Root README task 019f9691-557e-73d2-bc5f-30b9fe6a6154
+task_id: README-NARRATIVE-ARCHITECTURE-20260725
+task_instance_id: README-NARRATIVE-ARCHITECTURE-20260725:W1:70D1034
+generation: 1
+sprint: readme_narrative_architecture
+mode: sole_documentation_writer
+branch: Eth_global_lisbon_
+start_sha: 70d103450bc5b9ff5f294eefb9652dae93add100
+control_sha: 70d103450bc5b9ff5f294eefb9652dae93add100
+token: README-ARCH-W1-70D1034-BE8B04BB-A265-4306-A185-EF179FF6E3BA
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T00:50:55Z
+expires_at: 2026-07-25T01:47:31Z
+allowed_paths:
+  - README.md
+  - CHANGELOG-LISBON.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T00:47:31Z
+deadline: 2026-07-25T01:47:31Z
+expected_exit: retain the origin main narrative order while replacing legacy claims with a simple provable Lisbon architecture and a clearly conditional A6 Uniswap tooling lane
+external_effect_authority: safe local documentation edits deterministic checks and one atomic commit only; no product code push deploy live call signature transaction form funding upload spend public claim or gate advancement
+completed_at: 2026-07-25T00:50:55Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - retained origin main narrative order through problem solution architecture run marketplace proof project structure and quick start while excluding inherited unsupported claims
+  - Mermaid separates ENSv2 creator parent and agent subname immutable version protected marketplace external hire verified 0G delivery receipt and judge UI into one required path
+  - optional dashed A6 lane uses official policy-bound Uniswap quote route swap and lifecycle tooling only after core freeze and admission with explicit CUT_UNISWAP fallback
+  - current A4 AUDIT_FIX A5 local-only A6 conditional release live-effect and expected-winnings boundaries remain unchanged
+  - README local links pass 8 of 8 fences and Mermaid contract pass stale-claim scan passes diff check passes lint passes with zero errors and 23 inherited warnings typecheck passes foundation tests pass 9 of 9 secret scan passes and the 31-page production build passes
+remaining_blocks:
+  - independent immutable-SHA README narrative and architecture audit
+  - A4 schema-v1 Unicode repair A5 acceptance A6 admission live ENS and 0G sponsor qualification and every release gate
+external_effects_attempted: none
+result: PASS_TO_AUDIT_README_ARCHITECTURE_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token README-ARCH-W1-70D1034-BE8B04BB-A265-4306-A185-EF179FF6E3BA after the containing commit and clean allowed-path verification
+status: closed
+```
+
+```yaml
 owner: Frontend Builder /root/a5_taste_audit
 task_id: A5-UI-TASTE-REMEDIATION-20260725
 task_instance_id: A5-UI-TASTE-REMEDIATION-20260725:W2:333B873
