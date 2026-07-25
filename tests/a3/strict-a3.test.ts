@@ -11,6 +11,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { canonicalJson } from "../../src/kernel/canonical";
 import { parseAgentInput } from "../../src/kernel/policy";
 import { publishAgent, submitJob } from "../../src/kernel/service";
+import type { AgentManifest, AgentManifestV1 } from "../../src/kernel/types";
 import {
   A3SimulatedCrashError,
   StrictA3Adapter,
@@ -294,24 +295,84 @@ function processFailureVerifier(
   };
 }
 
-async function setupKernel(database: DisposableDatabase): Promise<string> {
+type ManifestFixture =
+  | "v1"
+  | "v2"
+  | "malformed-v2"
+  | "owner-tampered-v1"
+  | "unknown";
+
+function manifestFixture(
+  manifest: AgentManifest,
+  fixture: ManifestFixture,
+): AgentManifest {
+  if (fixture === "v2") return manifest;
+  if (fixture === "malformed-v2") {
+    return { ...manifest, instructions: 7 } as unknown as AgentManifest;
+  }
+  if (fixture === "unknown") {
+    return { ...manifest, schemaVersion: 3 } as unknown as AgentManifest;
+  }
+  const v1: AgentManifestV1 = {
+    schemaVersion: 1,
+    name: manifest.name,
+    description: manifest.description,
+    instructions: manifest.instructions,
+    capabilities: manifest.capabilities,
+    adapterKey: manifest.adapterKey,
+    endpoint: manifest.endpoint,
+    connectorKey: manifest.connectorKey,
+    ownerWallet: fixture === "owner-tampered-v1" ? BUYER_WALLET : manifest.ownerWallet,
+    payoutAddress: null,
+    priceAtomic: manifest.priceAtomic,
+    asset: manifest.asset,
+    proofPolicy: manifest.proofPolicy,
+    ensBinding: manifest.ensBinding,
+  };
+  return v1;
+}
+
+async function setupKernel(
+  database: DisposableDatabase,
+  fixture: ManifestFixture = "v2",
+  suffix = "",
+): Promise<string> {
   configureDatabaseEnvironment(database.url);
   await database.sql`
     INSERT INTO users (id, wallet_address) VALUES
       (${BUYER_ID}, ${BUYER_WALLET}),
       (${CREATOR_ID}, ${CREATOR_WALLET})
+    ON CONFLICT (id) DO NOTHING
   `;
   const parsed = parseAgentInput({
-    name: "Strict A3 Fixture Agent",
+    name: `Strict A3 Fixture Agent${suffix}`,
     description: "A deterministic agent used only by the strict offline A3 integration tests.",
     instructions: "Return exactly one deterministic fixture analysis response for verification.",
     capabilities: ["research"],
   }, CREATOR_WALLET);
-  const agent = await publishAgent(
-    { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
-    parsed.manifest,
-    { now: BASE_TIME, sql: database.sql },
-  );
+  const manifest = manifestFixture(parsed.manifest, fixture);
+  const requiresHistoricalPublication = fixture === "v1" ||
+    fixture === "owner-tampered-v1" || fixture === "unknown";
+  if (requiresHistoricalPublication) {
+    await database.sql`
+      ALTER TABLE agent_versions DISABLE TRIGGER agent_versions_manifest_v2_publication
+    `;
+  }
+  let agent: Awaited<ReturnType<typeof publishAgent>> | undefined;
+  try {
+    agent = await publishAgent(
+      { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
+      manifest,
+      { now: BASE_TIME, sql: database.sql },
+    );
+  } finally {
+    if (requiresHistoricalPublication) {
+      await database.sql`
+        ALTER TABLE agent_versions ENABLE TRIGGER agent_versions_manifest_v2_publication
+      `;
+    }
+  }
+  if (!agent) throw new Error("A3_TEST_AGENT_CREATE_FAILED");
   return agent.versionId;
 }
 
@@ -423,6 +484,11 @@ test("strict fixture binds signed Compute bytes to proved Storage readback and o
   const database = await startDisposableDatabase("a3-success");
   try {
     const agentVersionId = await setupKernel(database);
+    const manifestRows = await database.sql<{ schema_version: number }[]>`
+      SELECT (manifest->>'schemaVersion')::int AS schema_version
+      FROM agent_versions WHERE id = ${agentVersionId}::uuid
+    `;
+    assert.equal(manifestRows[0]?.schema_version, 2);
     const submissions = await Promise.all(Array.from({ length: 20 }, () => submit(
       database,
       agentVersionId,
@@ -479,6 +545,134 @@ test("strict fixture binds signed Compute bytes to proved Storage readback and o
       UPDATE a3_execution_journals SET response_content = 'tampered', version = version + 1
       WHERE effect_id = ${submitted.effectId}
     `, /terminal A3 journal is immutable/);
+  } finally {
+    await database.close();
+  }
+});
+
+test("manifest compatibility admits v1 and v2 only and denies tampering before remote effects", async () => {
+  const database = await startDisposableDatabase("a3-manifest");
+  try {
+    const v1VersionId = await setupKernel(database, "v1", " V1");
+    const v1Job = await submit(database, v1VersionId, "a3-manifest-v1");
+    const v1Fixture = fixtureAdapter(database);
+    await runWorkerOnce({
+      ownerId: "a3-manifest-worker",
+      concurrency: 1,
+      leaseSeconds: 30,
+      adapter: v1Fixture.adapter,
+      sql: database.sql,
+      now: BASE_TIME,
+    });
+    assert.deepEqual([
+      v1Fixture.compute.calls.send,
+      v1Fixture.storage.calls,
+      v1Fixture.verifier.calls,
+    ], [1, 1, 1]);
+    const v1Snapshot = await terminalSnapshot(database, v1Job.jobId);
+    assert.equal(v1Snapshot.job_state, "SUCCEEDED");
+    assert.equal(v1Snapshot.receipts, 1);
+    assert.equal(v1Snapshot.settlements, 1);
+    assert.equal(v1Snapshot.commissions, 1);
+
+    const cases: Array<{
+      fixture: Exclude<ManifestFixture, "v1" | "v2">;
+      suffix: string;
+      errorCode: string;
+    }> = [
+      { fixture: "malformed-v2", suffix: " Malformed", errorCode: "A3_MANIFEST_INVALID" },
+      {
+        fixture: "owner-tampered-v1",
+        suffix: " Owner Tampered",
+        errorCode: "A3_LINEAGE_HASH_MISMATCH",
+      },
+      { fixture: "unknown", suffix: " Unknown", errorCode: "A3_MANIFEST_INVALID" },
+    ];
+    await database.sql`
+      ALTER TABLE agent_versions DROP CONSTRAINT agent_versions_manifest_schema_check
+    `;
+    for (let index = 0; index < cases.length; index += 1) {
+      const item = cases[index];
+      const now = new Date(BASE_TIME.getTime() + (index + 1) * 1_000);
+      const versionId = await setupKernel(database, item.fixture, item.suffix);
+      const submitted = await submit(database, versionId, `a3-manifest-${item.fixture}`, now);
+      const fixture = fixtureAdapter(database, { now });
+      await runWorkerOnce({
+        ownerId: "a3-manifest-worker",
+        concurrency: 1,
+        leaseSeconds: 30,
+        adapter: fixture.adapter,
+        sql: database.sql,
+        now,
+      });
+      assert.deepEqual(fixture.compute.calls, {
+        resolve: 0,
+        headers: 0,
+        send: 0,
+        signature: 0,
+        verify: 0,
+      }, item.fixture);
+      assert.equal(fixture.storage.calls, 0, item.fixture);
+      assert.equal(fixture.verifier.calls, 0, item.fixture);
+      const snapshot = await terminalSnapshot(database, submitted.jobId);
+      assert.equal(snapshot.job_state, "FAILED", item.fixture);
+      assert.equal(snapshot.last_error_code, item.errorCode, item.fixture);
+      assert.equal(snapshot.journal_stage, null, item.fixture);
+      assert.equal(snapshot.receipts, 0, item.fixture);
+      assert.equal(snapshot.settlements, 0, item.fixture);
+      assert.equal(snapshot.commissions, 0, item.fixture);
+      assert.equal(snapshot.refunds, 1, item.fixture);
+    }
+
+    const tamperedVersionId = await setupKernel(database, "v2", " Tampered");
+    const tamperedJob = await submit(
+      database,
+      tamperedVersionId,
+      "a3-manifest-tampered",
+      new Date(BASE_TIME.getTime() + 3_000),
+    );
+    await database.sql`
+      ALTER TABLE agent_versions DISABLE TRIGGER agent_versions_immutable_published
+    `;
+    try {
+      await database.sql`
+        UPDATE agent_versions
+        SET manifest = jsonb_set(manifest, '{instructions}', '"tampered instructions"'::jsonb)
+        WHERE id = ${tamperedVersionId}::uuid
+      `;
+    } finally {
+      await database.sql`
+        ALTER TABLE agent_versions ENABLE TRIGGER agent_versions_immutable_published
+      `;
+    }
+    const tamperedFixture = fixtureAdapter(database, {
+      now: new Date(BASE_TIME.getTime() + 3_000),
+    });
+    await runWorkerOnce({
+      ownerId: "a3-manifest-worker",
+      concurrency: 1,
+      leaseSeconds: 30,
+      adapter: tamperedFixture.adapter,
+      sql: database.sql,
+      now: new Date(BASE_TIME.getTime() + 3_000),
+    });
+    assert.deepEqual(tamperedFixture.compute.calls, {
+      resolve: 0,
+      headers: 0,
+      send: 0,
+      signature: 0,
+      verify: 0,
+    });
+    assert.equal(tamperedFixture.storage.calls, 0);
+    assert.equal(tamperedFixture.verifier.calls, 0);
+    const tamperedSnapshot = await terminalSnapshot(database, tamperedJob.jobId);
+    assert.equal(tamperedSnapshot.job_state, "FAILED");
+    assert.equal(tamperedSnapshot.last_error_code, "A3_LINEAGE_HASH_MISMATCH");
+    assert.equal(tamperedSnapshot.journal_stage, null);
+    assert.equal(tamperedSnapshot.receipts, 0);
+    assert.equal(tamperedSnapshot.settlements, 0);
+    assert.equal(tamperedSnapshot.commissions, 0);
+    assert.equal(tamperedSnapshot.refunds, 1);
   } finally {
     await database.close();
   }

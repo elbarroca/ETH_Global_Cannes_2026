@@ -3,6 +3,54 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: 0G Integrator /root/a3_manifest_v2_compat_audit
+task_id: A3-MANIFEST-V2-COMPAT-REMEDIATION-20260725
+task_instance_id: A3-MANIFEST-V2-COMPAT-REMEDIATION-20260725:W1:6AFAA40
+generation: 1
+sprint: A3_manifest_v2_compatibility
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 6afaa405ced8c1ad1a4ad444b128424a8a6ac9e5
+control_sha: 6afaa405ced8c1ad1a4ad444b128424a8a6ac9e5
+token: A3-MANIFEST-V2-COMPAT-W1-6AFAA40-2F905A74-633A-49FB-8AF3-F60D52369EA0
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T12:56:24Z
+expires_at: 2026-07-25T20:00:00Z
+allowed_paths:
+  - src/og/strict-a3.ts
+  - tests/a3/strict-a3.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md only if exact A3 blocker/state is already tracked there
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T12:52:55Z
+deadline: 2026-07-25T20:00:00Z
+expected_exit: accept only valid manifest schema v1 history and v2 current publications without weakening strict A3 authority or proof checks
+acceptance_items:
+  - explicitly allow only manifest schema versions 1 and 2
+  - preserve adapter proof instructions owner hash ENS Compute and Storage checks
+  - prove valid v2 historical v1 malformed unknown and tampered manifests with zero remote effects on denial
+  - pass the authorized deterministic local floor then create one atomic local commit
+external_effect_authority: local files existing dependencies local tests processes disposable loopback PostgreSQL and one local commit only; no network download push deploy managed migration sponsor live API wallet signature transaction funding upload form spend public claim or claim promotion
+preserved_dirty_path: components/kernel-jobs-panel.tsx
+preserved_dirty_sha256: 5786a69db60f5fac3f01d603664b655d3313a1f7f24151888bedbe2c408566c9
+completed_at: 2026-07-25T12:56:24Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - npm run test:a3 stopped at 3 of 13 because the required Go fixture executable is absent
+  - command -v go and the standard local paths found no existing Go toolchain
+  - no download or network fallback was attempted under the exact dispatch boundary
+remaining_blocks:
+  - rerun test:a3 and the remaining deterministic floor with an already-authorized verified Go 1.23.10 darwin arm64 toolchain
+external_effects_attempted: none
+verdict: BLOCKED_MISSING_LOCAL_GO
+lock_release: release only matching token A3-MANIFEST-V2-COMPAT-W1-6AFAA40-2F905A74-633A-49FB-8AF3-F60D52369EA0 after the task-owned containing commit
+status: blocked
+```
+
+```yaml
 owner: Kernel Integrator /root/kernel_a5_a6_foundation
 task_id: A5-A6-KERNEL-FOUNDATION-20260725
 task_instance_id: A5-A6-KERNEL-FOUNDATION-20260725:W1:574323E

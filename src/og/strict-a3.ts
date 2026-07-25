@@ -520,7 +520,7 @@ function requiredManifestValues(manifest: CanonicalValue): {
   const object = plainRecord(manifest);
   if (
     !object ||
-    object.schemaVersion !== 1 ||
+    (object.schemaVersion !== 1 && object.schemaVersion !== 2) ||
     object.adapterKey !== "protected-a3" ||
     object.proofPolicy !== "verified-receipt-required" ||
     typeof object.instructions !== "string" ||
