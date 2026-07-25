@@ -3,6 +3,37 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: ENS Integrator /root/a4_ensv2_gap_inventory
+task_id: A4-ENSV2-SCHEMA1-COMPAT-REMEDIATION-20260725
+task_instance_id: A4-ENSV2-SCHEMA1-COMPAT-REMEDIATION-20260725:W3:8839D26
+generation: 3
+sprint: A4_remediation
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 8839d26b0b62824baec2211b4c8767d91e58a0a8
+control_sha: 8839d26b0b62824baec2211b4c8767d91e58a0a8
+token: A4-ENSV2-W3-8839D26-ADE5E26F-D7BB-4BDD-97F5-5CA014CDA0BB
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T00:52:19Z
+expires_at: 2026-07-25T04:30:00Z
+allowed_paths:
+  - src/ens/authority.ts
+  - tests/a4/ens-authority.test.ts
+  - tests/helpers/ens.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T00:52:19Z
+deadline: 2026-07-25T04:30:00Z
+expected_exit: preserve every pre-owner-layer normalized schema-v1 parent/descendant binding while retaining strict schema-v2 product-name policy and evidence
+external_effect_authority: safe local allowed files, installed-source inspection, tests, loopback/disposable databases, generated ignored output, checksum-pinned temporary Go download, and one atomic commit only
+status: active
+```
+
+```yaml
 owner: Root README task 019f9691-557e-73d2-bc5f-30b9fe6a6154
 task_id: README-NARRATIVE-ARCHITECTURE-20260725
 task_instance_id: README-NARRATIVE-ARCHITECTURE-20260725:W1:70D1034

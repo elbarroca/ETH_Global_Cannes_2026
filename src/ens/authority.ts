@@ -174,12 +174,7 @@ interface ParsedResolution extends ValidatedResolution {
   observation: Record<string, unknown>;
 }
 
-interface ValidatedRuntimePolicy {
-  creatorName: string;
-  creatorDnsName: `0x${string}`;
-  agentLabel: string;
-  agentName: string;
-  agentDnsName: `0x${string}`;
+interface ValidatedRuntimePolicyBase {
   chainId: number;
   registry: string;
   rootRegistry: string;
@@ -188,10 +183,26 @@ interface ValidatedRuntimePolicy {
   agentResolver: string;
   maxAgeSeconds: number;
   policyVersion: string;
-  ensv2: EnsV2RuntimePolicy | null;
   disposableTestClock: boolean;
   resolutionTimeoutMs: number;
 }
+
+interface ValidatedLegacyRuntimePolicy extends ValidatedRuntimePolicyBase {
+  creatorName: string;
+  agentName: string;
+  ensv2: null;
+}
+
+interface ValidatedEnsV2RuntimePolicy extends ValidatedRuntimePolicyBase {
+  creatorName: string;
+  creatorDnsName: `0x${string}`;
+  agentLabel: string;
+  agentName: string;
+  agentDnsName: `0x${string}`;
+  ensv2: EnsV2RuntimePolicy;
+}
+
+type ValidatedRuntimePolicy = ValidatedLegacyRuntimePolicy | ValidatedEnsV2RuntimePolicy;
 
 export class EnsAuthorityResolverError extends Error {
   readonly code: "ENS_AUTHORITY_RESOLVER_OUTAGE" | "ENS_AUTHORITY_TIMEOUT";
@@ -320,7 +331,19 @@ function supportedAsciiLabel(value: string): boolean {
   return ASCII_LABEL.test(value) && !value.startsWith("xn--") && !value.includes("--[");
 }
 
-function prepareNames(runtime: EnsAuthorityRuntime): {
+function prepareLegacyNames(runtime: EnsAuthorityRuntime): {
+  creatorName: string;
+  agentName: string;
+} {
+  const creatorName = normalizedName(runtime.creatorName);
+  const agentName = normalizedName(runtime.agentName);
+  if (agentName === creatorName || !agentName.endsWith(`.${creatorName}`)) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_PARENT_MISMATCH");
+  }
+  return { creatorName, agentName };
+}
+
+function prepareEnsV2Names(runtime: EnsAuthorityRuntime): {
   creatorName: string;
   creatorDnsName: `0x${string}`;
   agentLabel: string;
@@ -393,8 +416,7 @@ function validateRolePolicy(role: EnsV2RolePolicy): EnsV2RolePolicy {
   };
 }
 
-function validateRuntime(runtime: EnsAuthorityRuntime): ValidatedRuntimePolicy {
-  const names = prepareNames(runtime);
+function validateRuntimeBase(runtime: EnsAuthorityRuntime): ValidatedRuntimePolicyBase {
   if (!Number.isSafeInteger(runtime.chainId) || runtime.chainId < 1) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
   }
@@ -412,37 +434,59 @@ function validateRuntime(runtime: EnsAuthorityRuntime): ValidatedRuntimePolicy {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
   }
   const registry = nonzeroAddress(runtime.registry, "ENS_AUTHORITY_POLICY_INVALID");
-  let ensv2: EnsV2RuntimePolicy | null = null;
-  if (runtime.ensv2) {
-    if (
-      runtime.ensv2.resolverMode !== "EXPLICIT" &&
-      runtime.ensv2.resolverMode !== "INHERITED"
-    ) {
-      throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
-    }
-    if (
-      typeof runtime.ensv2.ccipGateway !== "string" ||
-      runtime.ensv2.ccipGateway.length < 1 ||
-      runtime.ensv2.ccipGateway.length > 2_048
-    ) {
-      throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
-    }
-    if (!Array.isArray(runtime.ensv2.roles) || runtime.ensv2.roles.length < 2 || runtime.ensv2.roles.length > 32) {
-      throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
-    }
-    const roles = runtime.ensv2.roles.map(validateRolePolicy).sort((left, right) => (
-      canonicalJson(canonicalValue(left)).localeCompare(canonicalJson(canonicalValue(right)))
-    ));
-    if (new Set(roles.map((role) => canonicalJson(canonicalValue(role)))).size !== roles.length) {
-      throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
-    }
-    if (
-      !roles.some((role) => role.scope === "CONTRACT") ||
-      !roles.some((role) => role.scope === "NAME")
-    ) {
-      throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
-    }
-    ensv2 = {
+  return {
+    chainId: runtime.chainId,
+    registry,
+    rootRegistry: registry,
+    universalResolver: address(CANONICAL_UNIVERSAL_RESOLVER),
+    creatorResolver: address(runtime.creatorResolver),
+    agentResolver: address(runtime.agentResolver),
+    maxAgeSeconds: runtime.maxAgeSeconds,
+    policyVersion: runtime.policyVersion,
+    disposableTestClock: runtime.disposableTestClock ?? false,
+    resolutionTimeoutMs,
+  };
+}
+
+function validateRuntime(runtime: EnsAuthorityRuntime): ValidatedRuntimePolicy {
+  if (!runtime.ensv2) {
+    const names = prepareLegacyNames(runtime);
+    return { ...names, ...validateRuntimeBase(runtime), ensv2: null };
+  }
+  const names = prepareEnsV2Names(runtime);
+  const base = validateRuntimeBase(runtime);
+  if (
+    runtime.ensv2.resolverMode !== "EXPLICIT" &&
+    runtime.ensv2.resolverMode !== "INHERITED"
+  ) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
+  }
+  if (
+    typeof runtime.ensv2.ccipGateway !== "string" ||
+    runtime.ensv2.ccipGateway.length < 1 ||
+    runtime.ensv2.ccipGateway.length > 2_048
+  ) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
+  }
+  if (!Array.isArray(runtime.ensv2.roles) || runtime.ensv2.roles.length < 2 || runtime.ensv2.roles.length > 32) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
+  }
+  const roles = runtime.ensv2.roles.map(validateRolePolicy).sort((left, right) => (
+    canonicalJson(canonicalValue(left)).localeCompare(canonicalJson(canonicalValue(right)))
+  ));
+  if (new Set(roles.map((role) => canonicalJson(canonicalValue(role)))).size !== roles.length) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
+  }
+  if (
+    !roles.some((role) => role.scope === "CONTRACT") ||
+    !roles.some((role) => role.scope === "NAME")
+  ) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
+  }
+  return {
+    ...names,
+    ...base,
+    ensv2: {
       creatorCanonicalRegistry: nonzeroAddress(
         runtime.ensv2.creatorCanonicalRegistry,
         "ENS_AUTHORITY_POLICY_INVALID",
@@ -455,21 +499,7 @@ function validateRuntime(runtime: EnsAuthorityRuntime): ValidatedRuntimePolicy {
       parentExpiry: parseDate(runtime.ensv2.parentExpiry).toISOString(),
       agentExpiry: parseDate(runtime.ensv2.agentExpiry).toISOString(),
       roles,
-    };
-  }
-  return {
-    ...names,
-    chainId: runtime.chainId,
-    registry,
-    rootRegistry: registry,
-    universalResolver: address(CANONICAL_UNIVERSAL_RESOLVER),
-    creatorResolver: address(runtime.creatorResolver),
-    agentResolver: address(runtime.agentResolver),
-    maxAgeSeconds: runtime.maxAgeSeconds,
-    policyVersion: runtime.policyVersion,
-    ensv2,
-    disposableTestClock: runtime.disposableTestClock ?? false,
-    resolutionTimeoutMs,
+    },
   };
 }
 
