@@ -86,7 +86,7 @@ export class FixtureEnsAuthorityResolver implements EnsAuthorityResolver {
       effectId: binding.effectId,
       freshUntil: new Date(now.getTime() + binding.maxAgeSeconds * 500).toISOString(),
     };
-    if (binding.ensv2) {
+    if (binding.schemaVersion === 2) {
       Object.assign(authorityRecord, {
         schemaVersion: 2,
         creatorDnsName: binding.creatorDnsName,
@@ -127,7 +127,7 @@ export class FixtureEnsAuthorityResolver implements EnsAuthorityResolver {
       });
     }
     const response: Record<string, unknown> = {
-      schemaVersion: binding.ensv2 ? 2 : 1,
+      schemaVersion: binding.schemaVersion,
       observation: {
         blockNumber: String(12_345 + call),
         blockTimestamp: now.toISOString(),

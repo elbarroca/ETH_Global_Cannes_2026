@@ -73,8 +73,7 @@ export type EnsAuthorityOperation =
 
 export type EnsAuthorityPhase = "PRE_EXECUTION" | "PRE_DELIVERY";
 
-export interface EnsAuthorityBinding {
-  schemaVersion: 2;
+interface EnsAuthorityBindingBase {
   effectId: string;
   jobId: string;
   agentVersionId: string;
@@ -82,19 +81,13 @@ export interface EnsAuthorityBinding {
   manifestHash: string;
   capabilities: string[];
   service: string;
-  priceAtomic: string;
   payout: string;
   chainId: number;
   creatorName: string;
-  creatorDnsName: `0x${string}`;
   creatorNode: `0x${string}`;
-  agentLabel: string;
   agentName: string;
-  agentDnsName: `0x${string}`;
   agentNode: `0x${string}`;
   registry: string;
-  rootRegistry: string;
-  universalResolver: string;
   creatorResolver: string;
   agentResolver: string;
   creatorOwner: string;
@@ -103,8 +96,24 @@ export interface EnsAuthorityBinding {
   agentDelegate: string;
   maxAgeSeconds: number;
   policyVersion: string;
-  ensv2: EnsV2Binding | null;
 }
+
+interface LegacyEnsAuthorityBinding extends EnsAuthorityBindingBase {
+  schemaVersion: 1;
+}
+
+interface EnsV2AuthorityBinding extends EnsAuthorityBindingBase {
+  schemaVersion: 2;
+  priceAtomic: string;
+  creatorDnsName: `0x${string}`;
+  agentLabel: string;
+  agentDnsName: `0x${string}`;
+  rootRegistry: string;
+  universalResolver: string;
+  ensv2: EnsV2Binding;
+}
+
+export type EnsAuthorityBinding = LegacyEnsAuthorityBinding | EnsV2AuthorityBinding;
 
 export interface EnsAuthorityResolutionRequest {
   binding: EnsAuthorityBinding;
@@ -427,6 +436,12 @@ function validateRuntime(runtime: EnsAuthorityRuntime): ValidatedRuntimePolicy {
     if (new Set(roles.map((role) => canonicalJson(canonicalValue(role)))).size !== roles.length) {
       throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
     }
+    if (
+      !roles.some((role) => role.scope === "CONTRACT") ||
+      !roles.some((role) => role.scope === "NAME")
+    ) {
+      throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
+    }
     ensv2 = {
       creatorCanonicalRegistry: nonzeroAddress(
         runtime.ensv2.creatorCanonicalRegistry,
@@ -504,28 +519,8 @@ async function deriveBinding(
   if (!ATOMIC_AMOUNT.test(lineage.price_atomic) || BigInt(lineage.price_atomic) < 1n) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_LINEAGE_INVALID");
   }
-  const ensv2 = policy.ensv2
-    ? {
-        creatorCanonicalRegistry: policy.ensv2.creatorCanonicalRegistry,
-        agentParentRegistry: policy.ensv2.creatorCanonicalRegistry,
-        agentCanonicalRegistry: policy.ensv2.agentCanonicalRegistry,
-        resolverMode: policy.ensv2.resolverMode,
-        resolverSuffix: policy.ensv2.resolverMode === "EXPLICIT" ? policy.agentName : policy.creatorName,
-        ccipGateway: policy.ensv2.ccipGateway,
-        parentExpiry: policy.ensv2.parentExpiry,
-        agentExpiry: policy.ensv2.agentExpiry,
-        roles: policy.ensv2.roles.map((role) => ({
-          scope: role.scope,
-          name: role.scope === "NAME" ? policy.agentName : null,
-          role: role.role,
-          adminRole: role.adminRole,
-          account: role.account === "OWNER" ? owner : delegate,
-          expiresAt: role.expiresAt,
-        })),
-      }
-    : null;
-  return {
-    schemaVersion: 2,
+  const legacyBinding: LegacyEnsAuthorityBinding = {
+    schemaVersion: 1,
     effectId: job.effectId,
     jobId: job.jobId,
     agentVersionId: job.agentVersionId,
@@ -533,19 +528,13 @@ async function deriveBinding(
     manifestHash: lineage.manifest_hash,
     capabilities,
     service,
-    priceAtomic: lineage.price_atomic,
     payout: delegate,
     chainId: policy.chainId,
     creatorName: policy.creatorName,
-    creatorDnsName: policy.creatorDnsName,
     creatorNode: namehash(policy.creatorName),
-    agentLabel: policy.agentLabel,
     agentName: policy.agentName,
-    agentDnsName: policy.agentDnsName,
     agentNode: namehash(policy.agentName),
     registry: policy.registry,
-    rootRegistry: policy.rootRegistry,
-    universalResolver: policy.universalResolver,
     creatorResolver: policy.creatorResolver,
     agentResolver: policy.agentResolver,
     creatorOwner: owner,
@@ -554,7 +543,35 @@ async function deriveBinding(
     agentDelegate: delegate,
     maxAgeSeconds: policy.maxAgeSeconds,
     policyVersion: policy.policyVersion,
-    ensv2,
+  };
+  if (policy.ensv2 === null) return legacyBinding;
+  return {
+    ...legacyBinding,
+    schemaVersion: 2,
+    priceAtomic: lineage.price_atomic,
+    creatorDnsName: policy.creatorDnsName,
+    agentLabel: policy.agentLabel,
+    agentDnsName: policy.agentDnsName,
+    rootRegistry: policy.rootRegistry,
+    universalResolver: policy.universalResolver,
+    ensv2: {
+      creatorCanonicalRegistry: policy.ensv2.creatorCanonicalRegistry,
+      agentParentRegistry: policy.ensv2.creatorCanonicalRegistry,
+      agentCanonicalRegistry: policy.ensv2.agentCanonicalRegistry,
+      resolverMode: policy.ensv2.resolverMode,
+      resolverSuffix: policy.ensv2.resolverMode === "EXPLICIT" ? policy.agentName : policy.creatorName,
+      ccipGateway: policy.ensv2.ccipGateway,
+      parentExpiry: policy.ensv2.parentExpiry,
+      agentExpiry: policy.ensv2.agentExpiry,
+      roles: policy.ensv2.roles.map((role) => ({
+        scope: role.scope,
+        name: role.scope === "NAME" ? policy.agentName : null,
+        role: role.role,
+        adminRole: role.adminRole,
+        account: role.account === "OWNER" ? owner : delegate,
+        expiresAt: role.expiresAt,
+      })),
+    },
   };
 }
 
@@ -957,7 +974,7 @@ function validateResolution(
   if (authorityRecord.chainId !== binding.chainId || observation.chainId !== binding.chainId) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_CHAIN_MISMATCH");
   }
-  if (binding.ensv2 === null) {
+  if (binding.schemaVersion === 1) {
     if (parsed.schemaVersion !== 1) throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_MISMATCH");
   } else {
     if (parsed.schemaVersion !== 2) throw new EnsAuthorityValidationError("ENS_AUTHORITY_HIERARCHY_MISSING");

@@ -89,7 +89,7 @@ Toolchain: Node `v22.22.3`, npm `10.9.8`, Prisma/Client `6.19.3`, TypeScript `5.
 - Task instance: `A4-ENSV2-HIERARCHY-20260724:W1:7C5DC8B`
 - Start/control SHA: `7c5dc8b246d16583606d6bc6115429db81cc69e8`
 - Observed through: `2026-07-24T23:30:07Z`
-- Result: `PASS_TO_AUDIT_OWNER_LAYER; PASS_FIXTURE; PASS_INTEGRATION; LOCAL_ONLY`
+- Result: `AUDIT_FIX; LOCAL_ONLY`
 - Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
 
 The accepted stable schema-v1 resolver and `checkFreshEnsAuthority` call contract remain supported. The owner layer adds a strict schema-v2 deterministic fixture policy without a live ENSv2 client, deployment address, or invented ABI. Creator parent and agent label are ENSIP-15-normalized separately, restricted to the admitted ASCII `.eth` product namespace, deterministically joined, and DNS-encoded with installed `viem@2.47.6` before binding. Reverse namespaces, malformed/unsupported/confusable labels, reserved labels, normalization collisions, and suffix spoofing deny before A3.
@@ -100,7 +100,7 @@ Deterministic fixtures enforce nonzero creator canonical Registry, exact parent 
 
 The canonical Universal Resolver is pinned at `0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe`. The official readiness vector `ur.integration-tests.eth -> 0x2222222222222222222222222222222222222222` is asserted as a deterministic constant only; no live resolution occurred. Both explicit and inherited resolver policies pass valid fixtures, including the valid absence of an agent subregistry.
 
-Fourteen focused A4 tests pass. They retain all nine accepted stable tests and add the readiness vector, valid ENSv2 hierarchy with twenty duplicate submissions, name-boundary refusals, a data-driven hierarchy/role/expiry/resolver/CCIP refusal matrix, delivery-time transfer/expiry/subregistry/role/resolver drift, and ENSv2 restart/takeover coverage. Combined integration passes 31/31 reported TypeScript tests plus both unchanged four-migration lanes.
+Fourteen focused A4 tests passed at owner-layer exit. They retained all nine accepted stable tests and added the readiness vector, valid ENSv2 hierarchy with twenty duplicate submissions, name-boundary refusals, a data-driven hierarchy/role/expiry/resolver/CCIP refusal matrix, delivery-time transfer/expiry/subregistry/role/resolver drift, and ENSv2 restart/takeover coverage. Combined integration passed 31/31 reported TypeScript tests plus both unchanged four-migration lanes. The later independent audit nevertheless classified exact SHA `091a657aa1967365fcbdecb6707b1e2dbb38f00f` as `AUDIT_FIX`: schema-v1 runtime derived schema-v2 binding bytes and could conflict with already persisted pre-owner-layer bytes, while the role policy admitted two unique roles with only one scope.
 
 | Command/check | Exit | Observed |
 |---|---:|---|
@@ -121,13 +121,49 @@ Fourteen focused A4 tests pass. They retain all nine accepted stable tests and a
 
 The host initially had no Go executable. C0 authorized one official `https://go.dev/dl/go1.23.10.darwin-arm64.tar.gz` download under a task-specific `/tmp` directory only. SHA-256 matched `25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`; `go version` was exactly `go1.23.10 darwin/arm64`; the archive and extracted toolchain were deleted before closeout. This was local verification tooling, not ENS, 0G, sponsor, product, or release evidence.
 
+## ENSv2 owner-layer audit remediation
+
+- Task: `A4-ENSV2-HIERARCHY-REMEDIATION-20260725`
+- Task instance: `A4-ENSV2-HIERARCHY-REMEDIATION-20260725:W2:091A657`
+- Generation: `2`
+- Start/control SHA: `091a657aa1967365fcbdecb6707b1e2dbb38f00f`
+- Observed through: `2026-07-25T00:03:03Z`
+- Prior owner-layer result: `AUDIT_FIX; LOCAL_ONLY`
+- Remediation result: `PASS_TO_AUDIT_REMEDIATION; PASS_FIXTURE; PASS_INTEGRATION; LOCAL_ONLY`
+- Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
+
+The authority binding is now a strict internal discriminated union. With no ENSv2 policy, derivation emits the exact pre-`091a657` schema-v1 object and no schema-v2-only key; an existing binding still must match its original canonical bytes and SHA-256 and is never rewritten. With ENSv2 configured, derivation emits only the strict schema-v2 shape and resolution accepts only schema-v2 evidence, so the repair introduces no schema fallback.
+
+A regression seeds the exact pre-owner-layer schema-v1 canonical bytes/hash directly into `ens_authority_bindings` before execution. Both normal execution and a simulated crash after proof-enabled readback followed by lease-takeover recovery succeed with one unchanged binding, one effect, one receipt/settlement/commission, no refund, no replacement, and zero recovery-adapter calls. This proves existing immutable bytes remain usable through the normal and recovered delivery paths.
+
+ENSv2 policy validation now requires at least one `CONTRACT` role and one `NAME` role in addition to existing uniqueness and structural checks. All-`CONTRACT` and all-`NAME` policies are refused both before execution and after A3 readback but before delivery. Pre-execution refusal creates zero Compute, Storage, and verifier calls; pre-delivery refusal leaves one A3 effect but creates no receipt, settlement, commission, or replacement and refunds exactly once.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| `npm run validate:env` | 0 | Offline protected defaults passed without secrets. |
+| loopback-placeholder `npx prisma validate` / `npx prisma generate` | 0 | Schema valid and Prisma Client `6.19.3` generated. |
+| `npx tsx scripts/test-migrations.ts` | 0 | Empty and synthetic Cannes-shaped four-migration lanes passed; sentinel SHA-256 remained exact. |
+| `npm run lint` | 1 then 0 | The first run found one new `prefer-const` test error; the declaration was corrected, and the rerun had zero errors and 23 inherited warnings. |
+| `npm run typecheck` | 0 | Strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | 9/9 foundation, 9/9 authentication, and 13/13 kernel tests passed. |
+| checksum-pinned `npm run test:go` | 0 | Official temporary Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`; the task-specific archive/toolchain and verifier binary were deleted. |
+| checksum-pinned `npm run test:a3` | 0 | 12/12 A3 tests passed. |
+| checksum-pinned `npm run test:a4` | 0 | 16/16 focused tests passed, including the two remediation regression families. |
+| `npm run test:a5` | 0 | 3/3 A5 tests passed. |
+| checksum-pinned `npm run test:integration` | 0 | 33/33 reported TypeScript tests plus both four-migration lanes passed. |
+| `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 4/4, 1/1, and 3/3 tests passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` | 0 | Protected boot, tracked secret scan, and entrypoint syntax passed. |
+| `npm run build` | 0 | Next `16.2.11` compiled, typechecked, and generated 31/31 static pages. |
+
+The authorized Go archive again matched SHA-256 `25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5` and exact `go1.23.10 darwin/arm64`; its task-specific archive/toolchain was deleted. No ENS, 0G, sponsor, API, shared/managed database, signature, transaction, deployment, push, form, funding, upload, spend, public identifier, live proof, or claim-promotion effect was attempted.
+
 ## Remaining blocks
 
 - The independent pinned-SHA re-audit accepted exact unchanged remediation SHA
   `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9`; the subsequent A5 writer ledger
   records that acceptance before its start. This accepts only the stable A4
-  base. The local ENSv2 hierarchy owner layer now returns
-  `PASS_TO_AUDIT_OWNER_LAYER`; independent exact-SHA audit and the sequential
+  base. The first ENSv2 hierarchy owner layer is `AUDIT_FIX`; its local
+  remediation now returns `PASS_TO_AUDIT_REMEDIATION`. Independent exact-SHA audit and the sequential
   Kernel draft/name/write/readback/publication gate remain required before
   current `A4_ACCEPTED` can open.
 - `PASS_LIVE` is `NOT_RUN` and `LIVE_EFFECT_BLOCKED`; no live ENS write/readback or public identifier exists.

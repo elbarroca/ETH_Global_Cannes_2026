@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
-import { canonicalJson } from "../../src/kernel/canonical";
+import { namehash } from "viem/ens";
+import { canonicalJson, type CanonicalValue } from "../../src/kernel/canonical";
 import { parseAgentInput } from "../../src/kernel/policy";
 import { publishAgent, submitJob } from "../../src/kernel/service";
 import {
@@ -49,6 +51,8 @@ const PROVIDER = "0x4000000000000000000000000000000000000004";
 const MODEL = "a4-fixture-model";
 const ROOT = `0x${"5".repeat(64)}`;
 const SIGNATURE = `0x${"ab".repeat(65)}`;
+const ENS_REGISTRY = "0x1111111111111111111111111111111111111111";
+const ENS_RESOLVER = "0x2222222222222222222222222222222222222222";
 
 class FixtureCompute implements StrictComputeTransport {
   readonly calls = { headers: 0, request: 0, resolve: 0, signature: 0, verify: 0 };
@@ -224,6 +228,96 @@ async function snapshot(database: DisposableDatabase, jobId: string) {
   return row;
 }
 
+interface LegacyLineageRow {
+  adapter_key: string;
+  capabilities: string[];
+  endpoint: string | null;
+  manifest_hash: string;
+  owner_wallet: string;
+  payout_address: string | null;
+  version: number;
+}
+
+interface PersistedBinding {
+  binding_bytes: string;
+  binding_hash: string;
+}
+
+async function seedLegacyBinding(
+  database: DisposableDatabase,
+  agentVersionId: string,
+  job: { effectId: string; jobId: string },
+  now: Date,
+): Promise<PersistedBinding> {
+  const rows = await database.sql<LegacyLineageRow[]>`
+    SELECT version, manifest_hash, capabilities, endpoint, adapter_key,
+      owner_wallet, payout_address
+    FROM agent_versions WHERE id = ${agentVersionId}::uuid
+  `;
+  const lineage = rows[0];
+  if (!lineage) throw new Error("A4_TEST_LEGACY_LINEAGE_MISSING");
+  const payout = lineage.payout_address ?? lineage.owner_wallet;
+  const binding = {
+    schemaVersion: 1,
+    effectId: job.effectId,
+    jobId: job.jobId,
+    agentVersionId,
+    agentVersion: lineage.version,
+    manifestHash: lineage.manifest_hash,
+    capabilities: [...new Set(lineage.capabilities)].sort(),
+    service: lineage.endpoint ?? lineage.adapter_key,
+    payout,
+    chainId: 11_155_111,
+    creatorName: "creator.alphadawg.eth",
+    creatorNode: namehash("creator.alphadawg.eth"),
+    agentName: "research.creator.alphadawg.eth",
+    agentNode: namehash("research.creator.alphadawg.eth"),
+    registry: ENS_REGISTRY,
+    creatorResolver: ENS_RESOLVER,
+    agentResolver: ENS_RESOLVER,
+    creatorOwner: lineage.owner_wallet,
+    creatorDelegate: payout,
+    agentOwner: lineage.owner_wallet,
+    agentDelegate: payout,
+    maxAgeSeconds: 300,
+    policyVersion: "ens-authority-v1",
+  } satisfies CanonicalValue;
+  const bindingBytes = canonicalJson(binding);
+  const bindingHash = createHash("sha256").update(bindingBytes, "utf8").digest("hex");
+  await database.sql`
+    INSERT INTO ens_authority_bindings (
+      effect_id, job_id, agent_version_id, binding_bytes, binding_hash,
+      creator_name, creator_node, agent_name, agent_node, chain_id,
+      registry, creator_resolver, agent_resolver,
+      creator_owner, creator_delegate, agent_owner, agent_delegate,
+      manifest_hash, capabilities, service, payout, max_age_seconds,
+      policy_version, created_at
+    ) VALUES (
+      ${job.effectId}, ${job.jobId}::uuid, ${agentVersionId}::uuid,
+      ${bindingBytes}, ${bindingHash}, ${binding.creatorName}, ${binding.creatorNode},
+      ${binding.agentName}, ${binding.agentNode}, ${binding.chainId}, ${binding.registry},
+      ${binding.creatorResolver}, ${binding.agentResolver}, ${binding.creatorOwner},
+      ${binding.creatorDelegate}, ${binding.agentOwner}, ${binding.agentDelegate},
+      ${binding.manifestHash}, ${binding.capabilities}, ${binding.service}, ${binding.payout},
+      ${binding.maxAgeSeconds}, ${binding.policyVersion}, ${now}
+    )
+  `;
+  return { binding_bytes: bindingBytes, binding_hash: bindingHash };
+}
+
+async function persistedBinding(
+  database: DisposableDatabase,
+  effectId: string,
+): Promise<PersistedBinding> {
+  const rows = await database.sql<PersistedBinding[]>`
+    SELECT binding_bytes, binding_hash FROM ens_authority_bindings
+    WHERE effect_id = ${effectId}
+  `;
+  const binding = rows[0];
+  if (!binding) throw new Error("A4_TEST_BINDING_MISSING");
+  return binding;
+}
+
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("A4_TEST_OBJECT_MISSING");
   return value as Record<string, unknown>;
@@ -272,6 +366,15 @@ function addExternalGrant(response: Record<string, unknown>): unknown {
   object(grant).account = "0x9999999999999999999999999999999999999999";
   hierarchy.externalGrants = [grant];
   return copy;
+}
+
+function forceRoleScope(runtime: EnsAuthorityRuntime, scope: "CONTRACT" | "NAME"): void {
+  const ensv2 = runtime.ensv2;
+  if (!ensv2) throw new Error("A4_TEST_ENSV2_POLICY_MISSING");
+  runtime.ensv2 = {
+    ...ensv2,
+    roles: ensv2.roles.map((role) => ({ ...role, scope })),
+  };
 }
 
 function requestFromClaim(claim: ClaimedJob): AdapterExecutionRequest {
@@ -338,6 +441,103 @@ test("stable ENS authority gates the full A3 path twice and twenty duplicates se
   }
 });
 
+test("persisted pre-ENSv2 schema-1 binding bytes survive normal execution and READBACK recovery", async () => {
+  const database = await startDisposableDatabase("a4-v1-upgrade");
+  try {
+    const version = await setup(database);
+    const normal = await submit(database, version, "a4-v1-upgrade-normal");
+    const normalBinding = await seedLegacyBinding(database, version, normal, NOW);
+    const normalRun = fixture(database);
+    assert.deepEqual(await runWorkerOnce({
+      ownerId: "a4-v1-upgrade-normal-worker",
+      concurrency: 1,
+      leaseSeconds: 30,
+      adapter: normalRun.adapter,
+      sql: database.sql,
+      now: NOW,
+    }), { leaseAcquired: true, claimed: 1 });
+    assert.equal(normalRun.ens.calls[0]?.binding.schemaVersion, 1);
+    assert.deepEqual(await persistedBinding(database, normal.effectId), normalBinding);
+    assert.deepEqual(await snapshot(database, normal.jobId), {
+      authority_allows: 7,
+      authority_denies: 0,
+      authority_checks: 7,
+      bindings: 1,
+      commissions: 1,
+      effect_state: "SUCCEEDED",
+      effects: 1,
+      job_state: "SUCCEEDED",
+      receipts: 1,
+      refunds: 0,
+      settlements: 1,
+    });
+
+    const crashTime = new Date(NOW.getTime() + 70_000);
+    const recovered = await submit(database, version, "a4-v1-upgrade-recovery", crashTime);
+    const recoveryBinding = await seedLegacyBinding(database, version, recovered, crashTime);
+    const firstOwner = "a4-v1-upgrade-recovery-a";
+    assert.equal((await acquireWorkerLease(firstOwner, 30, {
+      now: crashTime,
+      sql: database.sql,
+    })).acquired, true);
+    const claim = (await claimJobs(firstOwner, 1, 30, {
+      now: crashTime,
+      sql: database.sql,
+    }))[0];
+    if (!claim || claim.jobId !== recovered.jobId) throw new Error("A4_TEST_LEGACY_CLAIM_MISSING");
+    const first = fixture(database, {
+      now: crashTime,
+      hooks: { afterReadbackVerified: async () => { throw new A3SimulatedCrashError(); } },
+    });
+    await assert.rejects(first.adapter.execute(requestFromClaim(claim)), /A3_SIMULATED_CRASH/);
+    const interrupted = await snapshot(database, recovered.jobId);
+    assert.equal(interrupted.effects, 1);
+    assert.equal(interrupted.receipts, 0);
+    assert.equal(interrupted.refunds, 0);
+    assert.deepEqual(await persistedBinding(database, recovered.effectId), recoveryBinding);
+
+    const takeoverTime = new Date(crashTime.getTime() + 31_000);
+    await expireClaim(database, recovered.jobId, takeoverTime);
+    const recoveryAuthority = createEnsAuthorityFixture({ now: takeoverTime });
+    let adapterCalls = 0;
+    const recoveryAdapter: KernelAdapter = {
+      key: "protected-a3",
+      requiresVerifiedJournal: true,
+      execute: async () => {
+        adapterCalls += 1;
+        throw new Error("A4_LEGACY_RECOVERY_ADAPTER_MUST_NOT_RUN");
+      },
+    };
+    assert.deepEqual(await runWorkerOnce({
+      ownerId: "a4-v1-upgrade-recovery-b",
+      concurrency: 1,
+      leaseSeconds: 30,
+      adapter: recoveryAdapter,
+      authority: recoveryAuthority.runtime,
+      sql: database.sql,
+      now: takeoverTime,
+    }), { leaseAcquired: true, claimed: 1 });
+    assert.equal(adapterCalls, 0);
+    assert.equal(recoveryAuthority.resolver.calls[0]?.binding.schemaVersion, 1);
+    assert.deepEqual(await persistedBinding(database, recovered.effectId), recoveryBinding);
+    assert.deepEqual(await snapshot(database, recovered.jobId), {
+      authority_allows: 7,
+      authority_denies: 0,
+      authority_checks: 7,
+      bindings: 1,
+      commissions: 1,
+      effect_state: "SUCCEEDED",
+      effects: 1,
+      job_state: "SUCCEEDED",
+      receipts: 1,
+      refunds: 0,
+      settlements: 1,
+    });
+  } finally {
+    await database.close();
+  }
+});
+
 test("ENSv2 hierarchy fixture binds DNS names, permissions, CCIP provenance, and twenty duplicates once", async () => {
   const database = await startDisposableDatabase("a4-v2-ok");
   try {
@@ -364,7 +564,7 @@ test("ENSv2 hierarchy fixture binds DNS names, permissions, CCIP provenance, and
     `;
     assert.equal(ensv2Errors.length, 0);
     const binding = run.ens.calls[0]?.binding;
-    assert.ok(binding?.ensv2);
+    if (!binding || binding.schemaVersion !== 2) throw new Error("A4_TEST_ENSV2_BINDING_MISSING");
     assert.equal(binding.agentLabel, "research");
     assert.equal(binding.agentName, "research.creator.alphadawg.eth");
     assert.match(binding.creatorDnsName, /^0x[0-9a-f]+$/);
@@ -410,11 +610,76 @@ test("ENSv2 hierarchy fixture binds DNS names, permissions, CCIP provenance, and
       sql: database.sql,
       now: new Date(NOW.getTime() + 1),
     }), { leaseAcquired: true, claimed: 1 });
-    const inheritedBinding = inherited.ens.calls[0]?.binding.ensv2;
+    const inheritedAuthorityBinding = inherited.ens.calls[0]?.binding;
+    const inheritedBinding = inheritedAuthorityBinding?.schemaVersion === 2
+      ? inheritedAuthorityBinding.ensv2
+      : undefined;
     assert.equal(inheritedBinding?.agentCanonicalRegistry, null);
     assert.equal(inheritedBinding?.resolverMode, "INHERITED");
     assert.equal(inheritedBinding?.resolverSuffix, "creator.alphadawg.eth");
     assert.equal((await snapshot(database, inheritedJob.jobId)).job_state, "SUCCEEDED");
+  } finally {
+    await database.close();
+  }
+});
+
+test("ENSv2 all-CONTRACT and all-NAME role policies refuse before A3 and before delivery", async () => {
+  const database = await startDisposableDatabase("a4-v2-scope");
+  try {
+    const version = await setup(database);
+    const cases: Array<{
+      phase: "PRE_EXECUTION" | "PRE_DELIVERY";
+      scope: "CONTRACT" | "NAME";
+    }> = [
+      { phase: "PRE_EXECUTION", scope: "CONTRACT" },
+      { phase: "PRE_EXECUTION", scope: "NAME" },
+      { phase: "PRE_DELIVERY", scope: "CONTRACT" },
+      { phase: "PRE_DELIVERY", scope: "NAME" },
+    ];
+    for (let index = 0; index < cases.length; index += 1) {
+      const item = cases[index];
+      const now = new Date(NOW.getTime() + index * 70_000);
+      const submitted = await submit(
+        database,
+        version,
+        `a4-v2-scope-${item.phase.toLowerCase()}-${item.scope.toLowerCase()}`,
+        now,
+      );
+      const run = fixture(database, {
+        ensv2: true,
+        now,
+        hooks: item.phase === "PRE_DELIVERY"
+          ? { afterReadbackVerified: async () => { forceRoleScope(run.authority, item.scope); } }
+          : undefined,
+      });
+      if (item.phase === "PRE_EXECUTION") forceRoleScope(run.authority, item.scope);
+      assert.deepEqual(await runWorkerOnce({
+        ownerId: `a4-v2-scope-worker-${index}`,
+        concurrency: 1,
+        leaseSeconds: 30,
+        adapter: run.adapter,
+        sql: database.sql,
+        now,
+      }), { leaseAcquired: true, claimed: 1 });
+      const state = await snapshot(database, submitted.jobId);
+      assert.equal(state.effects, 1, `${item.phase}:${item.scope}`);
+      assert.equal(state.job_state, "FAILED", `${item.phase}:${item.scope}`);
+      assert.equal(state.receipts, 0, `${item.phase}:${item.scope}`);
+      assert.equal(state.settlements, 0, `${item.phase}:${item.scope}`);
+      assert.equal(state.commissions, 0, `${item.phase}:${item.scope}`);
+      assert.equal(state.refunds, 1, `${item.phase}:${item.scope}`);
+      if (item.phase === "PRE_EXECUTION") {
+        assert.deepEqual(
+          run.compute.calls,
+          { headers: 0, request: 0, resolve: 0, signature: 0, verify: 0 },
+          item.scope,
+        );
+        assert.equal(run.storage.calls, 0, item.scope);
+        assert.equal(run.verifier.calls, 0, item.scope);
+      } else {
+        assert.deepEqual([run.compute.calls.request, run.storage.calls, run.verifier.calls], [1, 1, 1], item.scope);
+      }
+    }
   } finally {
     await database.close();
   }

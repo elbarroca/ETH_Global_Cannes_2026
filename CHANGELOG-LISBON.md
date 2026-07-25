@@ -2,6 +2,14 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - A4 ENSv2 owner-layer audit remediation
+
+- Replaced unconditional schema-v2 binding derivation with a strict internal schema-v1/schema-v2 union. Runtime without ENSv2 now reproduces the exact pre-owner-layer schema-v1 canonical object, while schema-v2 retains its full strict hierarchy evidence and no fallback.
+- Preserved immutable existing binding bytes/hash: a seeded pre-`091a657` binding passes normal execution and simulated post-readback crash recovery unchanged, with one effect and one lawful delivery and no refund, replacement, or recovery-adapter replay.
+- Required ENSv2 policy to include at least one `CONTRACT` and one `NAME` role. Added all-`CONTRACT` and all-`NAME` refusals before A3 and after readback but before delivery; the former create zero A3 calls and the latter create no receipt or financial/replacement effect.
+- Passed 16/16 focused A4 tests, A3 12/12, A5 3/3, combined integration 33/33 plus both four-migration lanes, and the complete local gate. The authorized official Go 1.23.10 archive matched its pinned SHA-256 and exact darwin/arm64 version and was deleted with the task-specific toolchain after verification.
+- Classified the first owner-layer SHA `091a657aa1967365fcbdecb6707b1e2dbb38f00f` as `AUDIT_FIX; LOCAL_ONLY` and returned only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. Independent exact-SHA remediation audit, Kernel draft/name/write/readback/publication gating, `A4_ACCEPTED`, live ENS, sponsor qualification, A5 advancement, push, deployment, managed migration, signatures, transactions, spend, public identifiers, and claim promotion remain closed.
+
 ## 2026-07-25 - A4 deterministic ENSv2 hierarchy owner layer
 
 - Preserved the accepted stable schema-v1 viem resolver and `checkFreshEnsAuthority` call contract while adding a strict schema-v2 deterministic ENSv2 fixture policy. No live ENSv2 client, deployment address, ABI, dependency, schema, migration, kernel, worker, 0G, API, or UI change was introduced.
@@ -10,7 +18,7 @@ Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 - Added fail-closed hierarchy validation for missing/replaced Registries, transfer, unexpected role/admin/external grant, expiry, broken backlinks, aliasing, root/resolver/inheritance drift, and malformed/outage CCIP responses. Invalid pre-execution state causes zero A3 calls; delivery-time drift causes no receipt, settlement, commission, or replacement effect.
 - Pinned the canonical Universal Resolver and official readiness vector as deterministic constants only. Added valid explicit/inherited fixtures, twenty-duplicate convergence, the denial matrix, delivery drift, restart/recovery, and lease takeover coverage while retaining all stable tests.
 - Passed 14/14 focused A4 tests, A3 12/12, A5 3/3, combined integration 31/31 plus both unchanged migration lanes, and the complete local gate. An explicitly authorized official Go 1.23.10 archive matched the pinned SHA-256, ran only from task-specific temporary storage with `GOTOOLCHAIN=local`, and was deleted before closeout.
-- Returned only `PASS_TO_AUDIT_OWNER_LAYER; LOCAL_ONLY`. Kernel draft/name/write/readback/publication gating, independent exact-SHA audit, `A4_ACCEPTED`, live ENS, sponsor qualification, A5 advancement, push, deployment, managed migration, signatures, transactions, spend, public identifiers, and claim promotion remain closed.
+- Originally returned `PASS_TO_AUDIT_OWNER_LAYER; LOCAL_ONLY`; the subsequent exact-SHA audit classified this layer `AUDIT_FIX; LOCAL_ONLY`. Kernel draft/name/write/readback/publication gating, `A4_ACCEPTED`, live ENS, sponsor qualification, A5 advancement, push, deployment, managed migration, signatures, transactions, spend, public identifiers, and claim promotion remained closed.
 
 ## 2026-07-24 - R0 and stable A4 audit reconciliation
 

@@ -4,6 +4,57 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: ENS Integrator /root/a4_ensv2_gap_inventory
+task_id: A4-ENSV2-HIERARCHY-REMEDIATION-20260725
+task_instance_id: A4-ENSV2-HIERARCHY-REMEDIATION-20260725:W2:091A657
+generation: 2
+sprint: A4_remediation
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 091a657aa1967365fcbdecb6707b1e2dbb38f00f
+control_sha: 091a657aa1967365fcbdecb6707b1e2dbb38f00f
+token: A4-ENSV2-W2-091A657-EF4206C1-DCE4-493F-8BF8-2E7560793153
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T00:08:25Z
+expires_at: 2026-07-25T04:30:00Z
+allowed_paths:
+  - src/ens/authority.ts
+  - tests/helpers/ens.ts
+  - tests/a4/ens-authority.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-24T23:48:21Z
+deadline: 2026-07-25T04:30:00Z
+expected_exit: preserve exact legacy schema-1 binding bytes and require both admitted ENSv2 role scopes, with focused regressions and full local verification
+external_effect_authority: safe local allowed files, installed-source inspection, dependency install, tests, loopback/disposable databases, generated ignored output, checksum-pinned temporary Go download, and one atomic commit only
+concurrent_reconciliation:
+  - C0 verified docs/lisbon/EXTERNAL-EFFECTS.md as a user-owned concurrent change from Codex task 019f9690-e529-7d70-a5f4-527e088f6a5d
+  - the authenticated owner requested exactly 1 A0GI to the recorded recipient and then said just send; that task recorded AUTHORIZED_ONCE, broadcast once, confirmed block and receipt, consumed the row, and ended idle
+  - W2 preserves that file byte-for-byte and excludes it from staging and commit; the transfer is not A3 or A4 live evidence and opens no claim
+completed_at: 2026-07-25T00:08:25Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - absent ENSv2 policy derives the exact pre-091 schema-v1 canonical object and preserves seeded immutable bytes/hash through normal and recovered delivery
+  - schema-v2 remains strict with no legacy fallback, and ENSv2 policy requires at least one CONTRACT and one NAME role
+  - all-CONTRACT and all-NAME policies refuse before A3 with zero remote calls and before delivery with no receipt, financial effect, or replacement
+  - focused A4 passes 16 of 16; combined integration passes 33 of 33 plus both four-migration lanes; the complete local gate passes
+  - official temporary Go 1.23.10 matched the pinned checksum and exact darwin/arm64 version and was deleted before closeout
+remaining_blocks:
+  - independent immutable-SHA remediation audit
+  - sequential Kernel draft/name/write/readback/publication gate
+  - every live ENS, sponsor, claim, A5 advancement, and release gate
+external_effects_attempted: one authorized checksum-pinned official Go toolchain download to task-specific temporary storage; no ENS, 0G, sponsor, API, shared or managed database, signature, transaction, deployment, push, form, funding, upload, spend, public identifier, live proof, or claim-promotion effect
+result: PASS_TO_AUDIT_REMEDIATION_LOCAL_ONLY
+clean_status: W2_PATHS_CLEAN; KNOWN_USER_OWNED_EXTERNAL_LEDGER_PENDING_SEQUENTIAL_CONTROL_COMMIT
+lock_release: release only matching token A4-ENSV2-W2-091A657-EF4206C1-DCE4-493F-8BF8-2E7560793153 after the containing commit and W2-path clean verification
+status: closed
+```
+
+```yaml
+owner: ENS Integrator /root/a4_ensv2_gap_inventory
 task_id: A4-ENSV2-HIERARCHY-20260724
 task_instance_id: A4-ENSV2-HIERARCHY-20260724:W1:7C5DC8B
 generation: 1
