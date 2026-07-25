@@ -14,7 +14,7 @@ start_sha: 2f67d331c4da17328cede6e7ecc8d62edcaaaf16
 control_sha: 2f67d331c4da17328cede6e7ecc8d62edcaaaf16
 token: NEON-PROD-MIGRATE-W2-2F67D33-20260725
 lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
-heartbeat_at: 2026-07-25T19:29:03Z
+heartbeat_at: 2026-07-25T19:34:33Z
 expires_at: 2026-07-25T20:29:03Z
 allowed_paths:
   - docs/lisbon/EXTERNAL-EFFECTS.md
@@ -23,7 +23,23 @@ started_at: 2026-07-25T19:29:03Z
 deadline: 2026-07-25T20:29:03Z
 expected_exit: exact pending-set verification, one managed Neon migrate deploy through DIRECT_URL, up-to-date readback, and localhost protected-route smoke
 external_effect_authority: project owner explicitly authorized the managed Neon production migration in the current authenticated task; exact scope is NEON-PROD-MIGRATE-20260725-02 in EXTERNAL-EFFECTS.md; no provisioning reset seed push deploy signature transaction provider call outside Neon or public claim
-status: active
+completed_at: 2026-07-25T19:34:33Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - pre-effect Prisma status reported exactly four historical 20260724 migrations applied and the authorized 13 migrations pending
+  - DATABASE_URL is pooled DIRECT_URL is non-pooled and both use the same database login database name and required SSL without printing credentials
+  - one Prisma migrate deploy applied exactly the authorized 13 migrations from 20260725020000 through 20260725190000
+  - post-effect Prisma status reports all 17 migrations applied and database schema up to date
+  - direct readback reports 17 applied zero incomplete and all required goal provenance MCP receipt tables and lifecycle columns present
+  - pooled runtime service reads for the existing authenticated wallet succeed for goals jobs published agents and drafts without returning row contents
+  - restarted localhost root returns 200 and unauthenticated protected goals remains correctly gated at 401 AUTH_REQUIRED
+remaining_blocks:
+  - credential pasted into the authenticated task should be rotated in Neon and both ignored local environment values updated
+  - push Vercel Railway provider calls ENS writes signatures transactions funding spend and public claims remain unauthorized
+external_effects_attempted: exact authorized Neon migration and bounded readbacks only
+claim_changes: none
+verdict: PASS_NEON_SCHEMA_READY; LOCALHOST_READY
+status: completed
 ```
 
 ```yaml
