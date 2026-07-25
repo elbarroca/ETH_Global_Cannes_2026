@@ -42,6 +42,7 @@ const AGENT_MANIFEST_V3_MCP_EVIDENCE_MIGRATION = "20260725190000_agent_manifest_
 const TRI_RISK_AUGMENTED_LAYER_MIGRATION = "20260725203000_tri_risk_augmented_layer";
 const X402_LANE_PAYMENTS_MIGRATION = "20260725210000_x402_lane_payments";
 const AGENT_RUNTIME_V5_MIGRATION = "20260725220000_agent_runtime_v5";
+const MCP_HIRE_CLAIM_REPLAY_MIGRATION = "20260725230000_mcp_hire_claim_replay";
 const GOAL_LOOP_PREDECESSOR_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -924,7 +925,7 @@ async function verifyPopulatedLegacyX402UpgradeLane(
       row.transaction_hash !== `0x${"b".repeat(64)}` ||
       row.payment_attempt_id !== null ||
       row.gateway_transaction_id !== null ||
-      row.migration_count !== 20
+      row.migration_count !== 21
     ) {
       throw new Error("populated legacy x402 receipt did not upgrade exactly");
     }
@@ -1026,6 +1027,7 @@ async function verifyDatabase(
       x402_lane_constraint_count: string;
       x402_lane_trigger_count: string;
       agent_runtime_v5_count: string;
+      mcp_hire_claim_replay_count: string;
       manifest_v4_function_count: string;
       mcp_v4_function_count: string;
       sequence_type: string;
@@ -1525,6 +1527,10 @@ async function verifyDatabase(
           WHERE migration_name = ${AGENT_RUNTIME_V5_MIGRATION} AND finished_at IS NOT NULL
         ) AS agent_runtime_v5_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${MCP_HIRE_CLAIM_REPLAY_MIGRATION} AND finished_at IS NOT NULL
+        ) AS mcp_hire_claim_replay_count,
+        (
           SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname = 'enforce_manifest_v2_publication'
             AND position($needle$NEW.manifest->>'schemaVersion' IN ('3', '4', '5')$needle$ in p.prosrc) > 0
@@ -1578,7 +1584,7 @@ async function verifyDatabase(
       result.x402_payment_attempts !== "x402_payment_attempts" ||
       result.cost_reserved_at !== "YES" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 20 ||
+      Number(result.migration_count) !== 21 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1629,6 +1635,7 @@ async function verifyDatabase(
       Number(result.x402_lane_constraint_count) !== 4 ||
       Number(result.x402_lane_trigger_count) !== 3 ||
       Number(result.agent_runtime_v5_count) !== 1 ||
+      Number(result.mcp_hire_claim_replay_count) !== 1 ||
       Number(result.manifest_v4_function_count) !== 1 ||
       Number(result.mcp_v4_function_count) !== 1 ||
       result.receipt_authority_nullable !== "NO" ||

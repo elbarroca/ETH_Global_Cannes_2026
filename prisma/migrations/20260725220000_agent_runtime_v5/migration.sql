@@ -194,9 +194,7 @@ BEGIN
     THEN RAISE EXCEPTION 'hire request claim is not current' USING ERRCODE = '23514'; END IF;
   ELSIF OLD.state = 'CONTEXT_RUNNING' AND NEW.state = 'CONTEXT_RUNNING' THEN
     IF OLD.claim_expires_at > clock_timestamp() OR NEW.claim_owner IS NULL
-      OR NEW.claim_epoch < OLD.claim_epoch
-      OR (NEW.claim_epoch = OLD.claim_epoch AND NEW.claim_owner <> OLD.claim_owner)
-      OR NEW.claim_version <> OLD.claim_version + 1
+      OR NEW.claim_epoch <= OLD.claim_epoch OR NEW.claim_version <> OLD.claim_version + 1
       OR NEW.claim_expires_at <= clock_timestamp() OR NEW.job_id IS NOT NULL
       OR NEW.context_hash IS NOT NULL OR NEW.error_code IS NOT NULL
     THEN RAISE EXCEPTION 'hire request reclaim is not current' USING ERRCODE = '23514'; END IF;
@@ -241,9 +239,8 @@ ALTER TABLE public.mcp_invocations
 ALTER TABLE public.mcp_invocations DROP CONSTRAINT mcp_invocations_run_job_binding_key;
 CREATE UNIQUE INDEX uniq_mcp_invocations_run_job_binding
   ON public.mcp_invocations(goal_run_job_id, binding_id) WHERE goal_run_job_id IS NOT NULL;
-CREATE UNIQUE INDEX uniq_mcp_invocations_hire_claim_binding
-  ON public.mcp_invocations(hire_request_id, binding_id, hire_claim_version)
-  WHERE hire_request_id IS NOT NULL;
+CREATE UNIQUE INDEX uniq_mcp_invocations_hire_binding
+  ON public.mcp_invocations(hire_request_id, binding_id) WHERE hire_request_id IS NOT NULL;
 
 CREATE OR REPLACE FUNCTION public.enforce_mcp_invocation_lineage()
 RETURNS TRIGGER LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$

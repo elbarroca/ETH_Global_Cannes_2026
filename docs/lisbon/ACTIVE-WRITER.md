@@ -4,6 +4,47 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Release Integrator /root
+task_id: MCP-FORWARD-MIGRATION-R4
+task_instance_id: MCP-FORWARD-MIGRATION-R4:R4:6B21502
+generation: 1
+sprint: Restore applied V5 migration checksum and move MCP reclaim index forward
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 6b2150251c16e0f3409e0c9109c2bc434c7a86b9
+control_sha: 6b2150251c16e0f3409e0c9109c2bc434c7a86b9
+token: MCP-FORWARD-MIGRATION-R4-6B21502-20260725T215635Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T21:56:35Z
+expires_at: 2026-07-26T00:56:35Z
+allowed_paths:
+  - prisma/migrations/20260725220000_agent_runtime_v5/migration.sql
+  - prisma/migrations/20260725230000_mcp_hire_claim_replay/migration.sql
+  - scripts/test-migrations.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T21:56:35Z
+deadline: 2026-07-26T00:56:35Z
+expected_exit: historical checksum 425e542b restored and reclaim-safe uniqueness expressed forward-only
+external_effect_authority: local files deterministic migration replay and one atomic local commit only; no managed migration network push deploy sponsor call signature transaction spend claim or public proof
+external_effects_attempted: none
+claim_changes: none
+path_amendment: migration replay assertions updated for the new twenty-first forward-only migration
+completed_at: 2026-07-25T21:59:41Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - historical V5 migration checksum restored exactly to 425e542b97cbb522b6af769abfdcc37b5ec924d93829a79c1f4a804e76b84c8c
+  - reclaim-safe MCP uniqueness and same-epoch hire reclaim moved into forward migration 20260725230000
+  - Prisma validation and all 21 migration lanes PASS across empty Cannes populated goal loop legacy x402 and W6 upgrade fixtures
+  - scoped diff check PASS
+remaining_blocks:
+  - full worktree diff check reports an unrelated preserved blank line at tests/playwright/a5-ui.spec.ts EOF
+  - no managed migration network push deploy sponsor call signature transaction spend claim or public proof was attempted
+verdict: PASS_TO_AUDIT_WITH_UNRELATED_PLAYWRIGHT_DIFF; LOCAL_ONLY
+lock_release: release only exact token MCP-FORWARD-MIGRATION-R4-6B21502-20260725T215635Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
+owner: Release Integrator /root
 task_id: R3-LATE-WRITE-RECONCILE
 task_instance_id: R3-LATE-WRITE-RECONCILE:R1:4287EC6
 generation: 1
