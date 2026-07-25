@@ -6,13 +6,21 @@ Control state: `LIVE_EFFECT_BLOCKED`.
 
 This state is independent from `LOCAL_BUILD_AUTHORIZED`: local files, tests, loopback processes, disposable local databases, and atomic commits on the exact authorized branch are allowed when they cannot affect a shared or external system. It also preserves `RELEASE_BLOCKED`; local success grants no push, deployment, submission, or claim authority.
 
-Last reconciled: `2026-07-25T00:03:00Z`. `OG-TRANSFER-20260725-01` was
+Last reconciled: `2026-07-25T01:12:10Z`. `OG-TRANSFER-20260725-01` was
 authorized by the project owner, confirmed once on 0G Galileo testnet, read
-back exactly, and consumed; no replacement was attempted. No other live ENS/0G
-effect, shared database, or external effect was attempted. The project owner previously authorized one
-documentation/control commit on new branch `Eth_global_lisbon_` and one push
-of that exact containing commit; that one-time push is consumed by the observed
-remote control SHA and authorizes no descendant push.
+back exactly, and consumed; no replacement was attempted. The project owner
+previously authorized one documentation/control commit on new branch
+`Eth_global_lisbon_` and one push of exact commit
+`16622acb26f3decf13a2bb83d002a05f50f301d6`; that authorization is consumed.
+
+The remote-tracking reflog later observed four descendant updates without a
+matching current authorization row: `16622ac` to `5c63cc7` at 2026-07-24
+20:50 WEST, `5c63cc7` to `7287d85` at 21:25 WEST, `7287d85` to `333b873` at
+2026-07-25 01:40 WEST, and `333b873` to `7d9dad5` at 01:54 WEST. Their actor
+attribution remains unresolved. They are `OBSERVED_UNRECONCILED`, grant no
+repeat, replacement, final-W3 push, release, or claim authority, and cannot be
+used as sponsor or same-SHA release proof. Current final W3 commit `196ed92`
+remains local-only and is not on `origin/Eth_global_lisbon_`.
 
 `ACTIVE-WRITER.md` records a historical Neon provisioning/migration effect in
 commit `7287d85f76bff6d8c59d2def35a416a0c80a4944`, but this ledger contains no
@@ -30,7 +38,8 @@ Autonomous goals cannot change a row from `NOT_AUTHORIZED` to `AUTHORIZED` on th
 | Disposable local files, tests, loopback processes, and databases | `AUTHORIZED` | Project owner | Local-only; no shared/external endpoint, account, or system effect | 2026-07-24 00:45 WEST | Current controlling local-build instruction and `BASELINE.md`. |
 | Local A4-A7 work on `Eth_global_lisbon_` | `AUTHORIZED` | Project owner | Safe local files, tests, loopback services, disposable databases, and atomic commits only; no shared/external effect | 2026-07-24 12:55 WEST | Current authenticated instruction to create the continuation goal and publish all work on this branch. |
 | Documentation/control commit on `Eth_global_lisbon_` | `AUTHORIZED_ONCE` | Project owner | Exact continuation prompt, final A3 audit reconciliation, changelog, and this authorization in the containing commit only | 2026-07-24 12:55 WEST | Current authenticated project-owner instruction. |
-| Push `Eth_global_lisbon_` | `AUTHORIZED_ONCE` | Project owner | Push the exact containing commit to `origin/Eth_global_lisbon_`; no force, PR, merge, tag, release, or deployment | 2026-07-24 12:55 WEST | Current authenticated project-owner instruction. |
+| Push `Eth_global_lisbon_` | `CONSUMED` | Project owner | Exact commit `16622acb26f3decf13a2bb83d002a05f50f301d6`; no descendant, force, PR, merge, tag, release, or deployment | 2026-07-24 12:55 WEST | Remote-tracking reflog records the exact authorized update at 2026-07-24 13:20 WEST. |
+| Descendant pushes on `Eth_global_lisbon_` | `OBSERVED_UNRECONCILED; NOT_AUTHORIZED_CURRENTLY` |  | Observed remote transitions `16622ac..5c63cc7`, `5c63cc7..7287d85`, `7287d85..333b873`, and `333b873..7d9dad5`; no repeat or replacement authority; final W3 `196ed92` remains local | 2026-07-24 to 2026-07-25 | Local remote-tracking reflog timestamps 20:50, 21:25, 01:40, and 01:54 WEST; no matching current authorization rows. |
 | Push `developer` | `NOT_AUTHORIZED` |  | Exact remote/commits |  |  |
 | `0g_probe` | `NOT_AUTHORIZED` |  | Provider/network/request and spend cap |  |  |
 | `0g_live_smoke` | `NOT_AUTHORIZED` |  | Provider/network/request and spend cap |  |  |

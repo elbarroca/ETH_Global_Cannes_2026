@@ -3,6 +3,51 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-UNATTRIBUTED-PUSH-RECONCILIATION-20260725
+task_instance_id: C0-UNATTRIBUTED-PUSH-RECONCILIATION-20260725:196ED92
+generation: 1
+sprint: external_effect_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: 196ed92b5b29db381118ba41c703eebbb6d7540b
+control_sha: 196ed92b5b29db381118ba41c703eebbb6d7540b
+token: C0-PUSH-OBSERVED-RECONCILE-196ED92-474539AD-E475-4D25-BBD9-6BB47901AA36
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T01:12:10Z
+expires_at: 2026-07-25T02:12:10Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+started_at: 2026-07-25T01:12:10Z
+deadline: 2026-07-25T02:12:10Z
+expected_exit: record observed descendant branch pushes without inventing authority repeating the effect or promoting remote state as release proof
+acceptance_items:
+  - mark the sole exact 16622ac branch push authorization consumed
+  - record every later origin Eth_global_lisbon transition from the remote-tracking reflog as observed unreconciled and not authorized currently
+  - preserve origin at 7d9dad5 and final W3 196ed92 as local-only without push reset rewrite or replacement
+  - open no live sponsor release claim or later sprint gate
+external_effect_authority: safe local control files deterministic checks and one atomic local commit only; no push fetch mutation PR merge tag release deploy live call signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T01:13:35Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - remote-tracking reflog fixes the sole authorized branch push at exact 16622ac and proves four later descendant transitions
+  - the authorized-once row is consumed and all later transitions are observed unreconciled and not authorized currently
+  - origin remains at partial W3 7d9dad5 while final W3 196ed92 remains local and unpushed
+  - no actor attribution authority release proof sponsor claim repeat replacement reset rewrite or push was invented or attempted
+  - git diff check secret scan lint typecheck tests and production build passed; lint retained 23 inherited warnings and zero errors
+remaining_blocks:
+  - independent immutable-SHA W3 audit and canonical reconciliation
+  - owner reconciliation for unattributed descendant pushes and historical Neon effects
+  - every push live sponsor release and public claim gate
+external_effects_attempted: none
+result: PASS_UNATTRIBUTED_PUSH_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-PUSH-OBSERVED-RECONCILE-196ED92-474539AD-E475-4D25-BBD9-6BB47901AA36 after the containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: ENS Integrator /root/a4_ensv2_gap_inventory
 task_id: A4-ENSV2-SCHEMA1-COMPAT-REMEDIATION-20260725
 task_instance_id: A4-ENSV2-SCHEMA1-COMPAT-REMEDIATION-20260725:W3:8839D26
