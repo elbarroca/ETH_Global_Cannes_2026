@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { KernelError } from "./errors";
 
 const MAX_KERNEL_JSON_BYTES = 8_192;
+const SCHEMA_NOT_READY_SQLSTATES = new Set(["42P01", "42703"]);
+const SAFE_LOG_CONTEXT = /^[a-z][a-z0-9.-]{0,63}$/;
+
+function schemaNotReadySqlState(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("code" in error)) return null;
+  const code = error.code;
+  return typeof code === "string" && SCHEMA_NOT_READY_SQLSTATES.has(code) ? code : null;
+}
+
+function safeLogContext(context: string): string {
+  return SAFE_LOG_CONTEXT.test(context) ? context : "kernel.request";
+}
 
 export async function readBoundedKernelJson(request: Request): Promise<unknown> {
   const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
@@ -79,9 +91,11 @@ export function kernelErrorResponse(error: unknown, context: string): NextRespon
   if (error instanceof KernelError) {
     return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
   }
-  const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
-    ? error.message
-    : "INTERNAL_ERROR";
-  console.error(JSON.stringify({ level: "error", context, code }));
-  return NextResponse.json({ error: "Request failed", code }, { status: 500 });
+  const schemaNotReady = schemaNotReadySqlState(error) !== null;
+  const code = schemaNotReady ? "KERNEL_SCHEMA_NOT_READY" : "INTERNAL_ERROR";
+  console.error(JSON.stringify({ level: "error", context: safeLogContext(context), code }));
+  return NextResponse.json(
+    { error: schemaNotReady ? "Service temporarily unavailable" : "Request failed", code },
+    { status: schemaNotReady ? 503 : 500 },
+  );
 }

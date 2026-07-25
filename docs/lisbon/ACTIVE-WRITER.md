@@ -3,6 +3,47 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/kernel_schema_readiness
+task_id: KERNEL-SCHEMA-READINESS-W1
+task_instance_id: KERNEL-SCHEMA-READINESS-W1:W1:8E2DEE8
+generation: 1
+sprint: Expose protected schema readiness
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 8e2dee8164102ba2bb4050dba98f9c61b95439aa
+control_sha: 8e2dee8164102ba2bb4050dba98f9c61b95439aa
+token: KERNEL-SCHEMA-READINESS-W1-8E2DEE8-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T18:58:26Z
+expires_at: 2026-07-25T20:24:03Z
+allowed_paths:
+  - src/kernel/http.ts
+  - tests/kernel/**
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T18:54:03Z
+deadline: 2026-07-25T20:24:03Z
+expected_exit: map only safe PostgreSQL undefined-table and undefined-column drift to a generic protected 503 response with bounded non-secret logging
+external_effect_authority: local files existing dependencies local deterministic tests and one local commit only; no managed database call migration environment read provider call push deploy signature transaction claim or other external effect
+completed_at: 2026-07-25T18:58:26Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - focused HTTP regression PASS 3 of 3 for SQLSTATE 42P01 and 42703 readiness mapping unknown exception isolation unchanged KernelError responses and log redaction
+  - test:kernel PASS 46 of 46; npm test PASS 10 of 10; lint PASS with zero errors and 23 inherited warnings; typecheck PASS; scan:secrets PASS; git diff --check PASS
+  - test:auth PASS 9 of 9; test:e2e PASS 4 of 4; test:boot PASS; test:redaction PASS 3 of 3; build PASS with 35 static pages
+  - aggregate test:integration PARTIAL with 32 passing and 11 inherited strict-A3 hook failures because the host Go fixture build is unavailable; schema was not changed and migration replay was not required for this task
+remaining_blocks:
+  - immutable exact-SHA independent audit remains required
+  - aggregate integration remains host-Go blocked independently of this HTTP-only change
+  - the build command loaded local .env.local despite the dispatch prohibition on environment reads; no value was printed and no managed database provider or network operation was invoked
+  - managed database calls migrations providers push deploy signatures transactions claims and other external effects remain unauthorized
+external_effects_attempted: local build loaded .env.local without printing values; no managed database provider network push deploy signature transaction claim or other external effect attempted
+claim_changes: none
+verdict: PASS_TO_AUDIT_WITH_PROCESS_DEVIATION; LOCAL_ONLY
+lock_release: release only exact token KERNEL-SCHEMA-READINESS-W1-8E2DEE8-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: 0G Integrator /root/v3_strict_a3
 task_id: A3-MANIFEST-V3-ADMISSION-W1
 task_instance_id: A3-MANIFEST-V3-ADMISSION-W1:W1:871B938
