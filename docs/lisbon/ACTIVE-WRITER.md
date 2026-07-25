@@ -3,6 +3,64 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: ENS Integrator /root/a4_ensv2_gap_inventory
+task_id: A4-ENS-PUBLICATION-AUTHORITY-HARDENING-20260725
+task_instance_id: A4-ENS-PUBLICATION-AUTHORITY-HARDENING-20260725:W6:E53CD6D
+generation: 6
+sprint: A4_publication_authority_audit_remediation
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: e53cd6d5d8af34298b886812df0fec025eeaa852
+control_sha: e53cd6d5d8af34298b886812df0fec025eeaa852
+token: A4-ENS-PUB-HARD-W6-E53CD6D-B05A2892-182C-4CCA-ABF4-0907227CEE2D
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T05:09:37Z
+expires_at: 2026-07-25T06:41:31Z
+allowed_paths:
+  - src/ens/**
+  - tests/a4/**
+  - tests/helpers/ens.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260725053000_a4_publication_authority_hardening/**
+  - scripts/test-migrations.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T04:41:31Z
+deadline: 2026-07-25T06:41:31Z
+expected_exit: replace caller-controlled publication policy with immutable owner-admitted policy and close role window timezone and early-bound audit findings
+acceptance_items:
+  - complete release-and-version policy identity is immutable and database-owner admitted with no migration seed or caller policy authority
+  - runtime and nested role authority is rejected through effective privilege and membership checks while exact restricted admission remains usable
+  - finite bounded non-overlapping windows canonical UTC convergence and pre-hash JSON/scalar bounds are database enforced
+  - removal and regression tests cover all audit findings while prior A4 behavior remains intact
+  - eight-migration lanes full local floor one atomic commit and immutable audit handoff
+external_effect_authority: safe local allowed files disposable loopback PostgreSQL and processes build output checksum-pinned temporary Go and one local commit only; no live ENS 0G Uniswap sponsor shared or managed database migration deploy push signature transaction faucet form funding upload spend public ID claim or mainnet effect
+completed_at: 2026-07-25T05:09:37Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - immutable database-owner-admitted release-and-version policy replaces caller policy and no release or policy is seeded
+  - six-argument runtime function accepts bounded observations only and derives policy release clock UTC convergence hashes and decision identity in PostgreSQL
+  - direct nested and effective inherited authority is refused while exact restricted direct-member admission remains usable
+  - finite non-overlapping windows no longer than 24 hours and early JSON scalar and array bounds are enforced
+  - A4 22 of 22 integration 39 of 39 both eight-migration lanes unsafe-role migration probe and complete local floor passed
+  - migration SHA-256 ed16bf26acb3e2bca0bc70a5d12845ccd80f36aefd1e419c5b441ad94b5f68ae
+  - task-specific Go toolchain verifier binary and HTTP artifact were deleted
+remaining_blocks:
+  - immutable W6 audit against the containing commit
+  - sequential Kernel decision consumption and immutable audit
+  - A4_ACCEPTED A5 mandatory A6 live ENS sponsor push release and public claim gates
+external_effects_attempted: authorized checksum-pinned official Go archive download and task-local loopback processes only; no live product sponsor shared database release or public effect
+result: PASS_TO_AUDIT_REMEDIATION_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token A4-ENS-PUB-HARD-W6-E53CD6D-B05A2892-182C-4CCA-ABF4-0907227CEE2D after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-A4-W5-AUDIT-RECONCILIATION-20260725
 task_instance_id: C0-A4-W5-AUDIT-RECONCILIATION-20260725:5A5678C

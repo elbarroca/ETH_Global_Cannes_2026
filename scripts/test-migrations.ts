@@ -19,6 +19,16 @@ const A4_MIGRATION = "20260724130000_ens_authority";
 const A5_MIGRATION = "20260725020000_a5_protected_lifecycle";
 const A4_PUBLICATION_MIGRATION = "20260725042000_a4_publication_decision";
 const A4_PUBLICATION_AUTHORITY_MIGRATION = "20260725045500_a4_publication_decision_authority";
+const A4_PUBLICATION_HARDENING_MIGRATION = "20260725053000_a4_publication_authority_hardening";
+const PRE_HARDENING_MIGRATIONS = [
+  BASELINE_MIGRATION,
+  A2_MIGRATION,
+  A3_MIGRATION,
+  A4_MIGRATION,
+  A5_MIGRATION,
+  A4_PUBLICATION_MIGRATION,
+  A4_PUBLICATION_AUTHORITY_MIGRATION,
+] as const;
 const BASELINE_SQL = resolve(ROOT, "prisma/migrations", BASELINE_MIGRATION, "migration.sql");
 const SENTINEL_ID = "a1-cannes-sentinel";
 const SENTINEL_WALLET = "0xa1cannessentinel";
@@ -297,6 +307,7 @@ async function verifyDatabase(
       ens_authority_checks: string | null;
       ens_publication_decisions: string | null;
       ens_publication_authority_releases: string | null;
+      ens_publication_authority_policies: string | null;
       agent_version_events: string | null;
       user_count: string;
       migration_count: string;
@@ -307,6 +318,7 @@ async function verifyDatabase(
       a5_count: string;
       a4_publication_count: string;
       a4_publication_authority_count: string;
+      a4_publication_hardening_count: string;
       invariant_trigger_count: string;
       a4_constraint_count: string;
       a4_publication_constraint_count: string;
@@ -315,6 +327,8 @@ async function verifyDatabase(
       a4_publication_trigger_hardening_count: string;
       a4_publication_runtime_role_count: string;
       a4_publication_runtime_direct_privilege_count: string;
+      a4_publication_hardening_constraint_count: string;
+      a4_publication_old_function_count: string;
       a5_constraint_count: string;
       receipt_authority_nullable: string;
       sequence_type: string;
@@ -338,6 +352,7 @@ async function verifyDatabase(
         to_regclass('public.ens_authority_checks')::text AS ens_authority_checks,
         to_regclass('public.ens_publication_decisions')::text AS ens_publication_decisions,
         to_regclass('public.ens_publication_authority_releases')::text AS ens_publication_authority_releases,
+        to_regclass('public.ens_publication_authority_policies')::text AS ens_publication_authority_policies,
         to_regclass('public.agent_version_events')::text AS agent_version_events,
         (SELECT count(*)::text FROM users) AS user_count,
         (
@@ -374,6 +389,10 @@ async function verifyDatabase(
           WHERE migration_name = ${A4_PUBLICATION_AUTHORITY_MIGRATION} AND finished_at IS NOT NULL
         ) AS a4_publication_authority_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A4_PUBLICATION_HARDENING_MIGRATION} AND finished_at IS NOT NULL
+        ) AS a4_publication_hardening_count,
+        (
           SELECT count(*)::text FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN (
             'agent_versions_immutable_published',
@@ -391,7 +410,9 @@ async function verifyDatabase(
             'agent_version_events_append_only',
             'ens_publication_decisions_append_only',
             'ens_publication_authority_releases_append_only',
-            'ens_publication_authority_releases_no_truncate'
+            'ens_publication_authority_releases_no_truncate',
+            'ens_publication_authority_policies_append_only',
+            'ens_publication_authority_policies_no_truncate'
           )
         ) AS invariant_trigger_count,
         (
@@ -430,7 +451,8 @@ async function verifyDatabase(
           FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname = 'admit_ens_publication_decision'
             AND p.prosecdef
-            AND p.proconfig = ARRAY['search_path=pg_catalog, pg_temp']
+            AND p.pronargs = 6
+            AND p.proconfig @> ARRAY['search_path=pg_catalog, pg_temp', 'TimeZone=UTC']
             AND NOT has_function_privilege('public', p.oid, 'EXECUTE')
             AND has_function_privilege('alphadawg_runtime', p.oid, 'EXECUTE')
             AND pg_get_userbyid(p.proowner) <> 'alphadawg_runtime'
@@ -459,9 +481,35 @@ async function verifyDatabase(
               OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_releases', 'UPDATE')
               OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_releases', 'DELETE')
               OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_releases', 'TRUNCATE')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_policies', 'SELECT')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_policies', 'INSERT')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_policies', 'UPDATE')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_policies', 'DELETE')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_policies', 'TRUNCATE')
             THEN 1 ELSE 0 END
           )::text
         ) AS a4_publication_runtime_direct_privilege_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'ens_publication_authority_release_finite_check',
+            'ens_publication_authority_release_max_24h_check',
+            'ens_publication_authority_release_no_overlap',
+            'ens_publication_authority_policies_pkey',
+            'ens_publication_authority_policy_release_fkey',
+            'ens_publication_authority_policy_version_fkey',
+            'ens_publication_authority_policy_hash_check',
+            'ens_publication_authority_policy_size_check',
+            'ens_publication_authority_policy_release_version_key',
+            'ens_publication_authority_policy_release_binding_key'
+          )
+        ) AS a4_publication_hardening_constraint_count,
+        (
+          SELECT count(*)::text
+          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'admit_ens_publication_decision'
+            AND p.pronargs = 8
+        ) AS a4_publication_old_function_count,
         (
           SELECT count(*)::text FROM pg_constraint
           WHERE conname IN (
@@ -507,9 +555,10 @@ async function verifyDatabase(
       result.ens_authority_checks !== "ens_authority_checks" ||
       result.ens_publication_decisions !== "ens_publication_decisions" ||
       result.ens_publication_authority_releases !== "ens_publication_authority_releases" ||
+      result.ens_publication_authority_policies !== "ens_publication_authority_policies" ||
       result.agent_version_events !== "agent_version_events" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 7 ||
+      Number(result.migration_count) !== 8 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -517,7 +566,8 @@ async function verifyDatabase(
       Number(result.a5_count) !== 1 ||
       Number(result.a4_publication_count) !== 1 ||
       Number(result.a4_publication_authority_count) !== 1 ||
-      Number(result.invariant_trigger_count) !== 16 ||
+      Number(result.a4_publication_hardening_count) !== 1 ||
+      Number(result.invariant_trigger_count) !== 18 ||
       Number(result.a4_constraint_count) !== 14 ||
       Number(result.a4_publication_constraint_count) !== 7 ||
       Number(result.a4_publication_authority_constraint_count) !== 3 ||
@@ -525,6 +575,8 @@ async function verifyDatabase(
       Number(result.a4_publication_trigger_hardening_count) !== 1 ||
       Number(result.a4_publication_runtime_role_count) !== 1 ||
       Number(result.a4_publication_runtime_direct_privilege_count) !== 0 ||
+      Number(result.a4_publication_hardening_constraint_count) !== 10 ||
+      Number(result.a4_publication_old_function_count) !== 0 ||
       Number(result.a5_constraint_count) !== 11 ||
       result.receipt_authority_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||
@@ -559,6 +611,49 @@ async function verifyDatabase(
   }
 }
 
+async function verifyInheritedRuntimeRoleBlocksHardening(
+  adminUrl: string,
+  database: string,
+): Promise<void> {
+  const url = databaseUrl(adminUrl, database);
+  await createDatabase(adminUrl, database);
+  const sql = postgres(url, { max: 1, prepare: false });
+  const parent = `a4_migration_parent_${process.pid}`;
+  const nested = `a4_migration_nested_${process.pid}`;
+  try {
+    for (const migration of PRE_HARDENING_MIGRATIONS) {
+      const migrationSql = await readFile(
+        resolve(ROOT, "prisma/migrations", migration, "migration.sql"),
+        "utf8",
+      );
+      await sql.unsafe(migrationSql);
+    }
+    await sql.unsafe(
+      `CREATE ROLE "${parent}" NOLOGIN; CREATE ROLE "${nested}" NOLOGIN; ` +
+      `GRANT "${parent}" TO alphadawg_runtime; GRANT "${nested}" TO "${parent}"`,
+    );
+    const hardeningSql = await readFile(
+      resolve(ROOT, "prisma/migrations", A4_PUBLICATION_HARDENING_MIGRATION, "migration.sql"),
+      "utf8",
+    );
+    let rejected = false;
+    try {
+      await sql.unsafe(hardeningSql);
+    } catch (error) {
+      rejected = error instanceof Error && /must not inherit any parent role/.test(error.message);
+    }
+    if (!rejected) throw new Error("W6 migration accepted inherited alphadawg_runtime authority");
+    console.log("W6 migration rejected direct and nested alphadawg_runtime parent membership");
+  } finally {
+    await sql.unsafe(
+      `REVOKE "${nested}" FROM "${parent}"; ` +
+      `REVOKE "${parent}" FROM alphadawg_runtime; ` +
+      `DROP ROLE IF EXISTS "${nested}"; DROP ROLE IF EXISTS "${parent}"`,
+    ).catch(() => undefined);
+    await sql.end({ timeout: 1 });
+  }
+}
+
 async function main(): Promise<void> {
   verifyPipelineTimestampFallback();
   const suppliedUrl = process.env.TEST_DATABASE_URL;
@@ -572,6 +667,7 @@ async function main(): Promise<void> {
   const suffix = `${process.pid}_${Date.now().toString(36)}`;
   const emptyDatabase = `alphadawg_a1_empty_${suffix}`;
   const cannesDatabase = `alphadawg_a1_cannes_${suffix}`;
+  const unsafeRoleDatabase = `alphadawg_a4_unsafe_role_${suffix}`;
   const emptyUrl = databaseUrl(adminUrl, emptyDatabase);
   const cannesUrl = databaseUrl(adminUrl, cannesDatabase);
 
@@ -590,11 +686,13 @@ async function main(): Promise<void> {
     );
     run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(cannesUrl));
     await verifyDatabase(cannesUrl, 1, 43, sentinelBeforeResolution);
+    await verifyInheritedRuntimeRoleBlocksHardening(adminUrl, unsafeRoleDatabase);
 
     console.log("Migration replay passed: empty deploy and Cannes-shaped baseline resolution");
   } finally {
     await dropDatabase(adminUrl, emptyDatabase).catch(() => undefined);
     await dropDatabase(adminUrl, cannesDatabase).catch(() => undefined);
+    await dropDatabase(adminUrl, unsafeRoleDatabase).catch(() => undefined);
     await local?.close();
   }
 }

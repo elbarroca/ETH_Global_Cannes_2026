@@ -1433,7 +1433,7 @@ export async function checkFreshEnsAuthority(
   return { allowed: errorCode === null, checkId, errorCode };
 }
 
-function publicationDecisionBinding(binding: EnsPublicationBinding): CanonicalValue {
+export function createEnsPublicationPolicyDocument(binding: EnsPublicationBinding): CanonicalValue {
   return {
     schemaVersion: 1,
     agentVersionId: binding.agentVersionId,
@@ -1488,15 +1488,10 @@ function publicationDecisionBinding(binding: EnsPublicationBinding): CanonicalVa
 
 async function persistPublicationDecision(
   sql: DatabaseClient,
-  binding: EnsPublicationBinding,
-  observedAt: Date,
+  agentVersionId: string,
   resolution: ValidatedResolution | null,
   errorCode: string | null,
-  disposableTestClock: boolean,
 ): Promise<string> {
-  const bindingValue = publicationDecisionBinding(binding);
-  const bindingBytes = canonicalJson(bindingValue);
-  const bindingDocument = JSON.parse(bindingBytes);
   const recordDocument = resolution ? JSON.parse(resolution.recordBytes) : null;
   const decision = errorCode === null ? "ALLOW" : "DENY";
   const rows = await sql<{
@@ -1506,14 +1501,12 @@ async function persistPublicationDecision(
   }[]>`
     SELECT decision_id::text, decision, error_code
     FROM public.admit_ens_publication_decision(
-      ${binding.agentVersionId}::uuid,
-      ${sql.json(bindingDocument)},
+      ${agentVersionId}::uuid,
       ${resolution ? sql.json(recordDocument) : null},
       ${resolution?.blockNumber ?? null}::numeric,
       ${resolution?.blockTimestamp ?? null}::timestamptz,
       ${resolution?.transactionHash ?? null},
-      ${errorCode},
-      ${disposableTestClock ? observedAt : null}::timestamptz
+      ${errorCode}
     )
   `;
   const selected = rows[0];
@@ -1525,8 +1518,9 @@ async function persistPublicationDecision(
 
 /**
  * Creates the server-composed pre-publication boundary. Runtime policy, resolver,
- * database and clock are fixed by server composition; release identity and
- * convergence identity are selected and derived inside the database. The
+ * database and clock are fixed by server composition; complete policy,
+ * release identity, and convergence identity are selected and derived inside
+ * the database. The
  * per-call request accepts only the immutable agent-version identifier.
  */
 export function createEnsPublicationAuthority(
@@ -1592,11 +1586,9 @@ export function createEnsPublicationAuthority(
     try {
       const decisionId = await persistPublicationDecision(
         config.sql,
-        binding,
-        observedAt,
+        binding.agentVersionId,
         resolution,
         errorCode,
-        runtime.disposableTestClock === true,
       );
       return { allowed: errorCode === null, decisionId, errorCode };
     } catch {

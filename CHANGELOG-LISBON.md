@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W6 publication-authority audit remediation
+
+- Replaced runtime-supplied publication policy with one immutable database-owner-admitted complete policy per finite release and immutable version. Runtime now supplies only bounded resolver observations to a six-argument function; policy, release, convergence identity, and clock remain database-owned.
+- Rejected direct and nested runtime/caller parent memberships, unsafe role attributes, `SET ROLE`, schema creation, authority-table ownership, and effective inherited table privileges. Migration replay includes a pre-W6 direct/nested membership refusal.
+- Enforced finite positive non-overlapping release windows no longer than 24 hours, UTC-fixed microsecond convergence, and JSONB/scalar/array bounds before serialization, hashing, or traversal. Removed the old eight-argument admission function.
+- Added restricted-login regressions for owner-only immutable policy, all authority-table operations, malicious consistently altered policy/record evidence, three-session timezone convergence, exact window/size boundaries, wrong/stale evidence, and direct/nested/effective inherited roles.
+- Passed A4 22/22, integration 39/39 plus both eight-migration lanes and the unsafe-role probe, and the complete local floor through the 31-page production build and loopback HTTP 200. The W6 migration SHA-256 is `ed16bf26acb3e2bca0bc70a5d12845ccd80f36aefd1e419c5b441ad94b5f68ae`.
+- Returned only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. Immutable W6 audit, sequential Kernel consumption, `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS, sponsor, push, release, and public claims remain closed.
+
 ## 2026-07-25 - W5 publication-authority immutable audit
 
 - Reconciled independent verdict `FIX` for exact SHA `5a5678cf59d8f106870a9fd26fcd42e932a6da7b`, tree `413afd57206299e3eca7ff18cdc844930b95cd9d`, and range `4a9a82b927a7f944c3b4aeffd85073726c3424f3..5a5678cf59d8f106870a9fd26fcd42e932a6da7b`.

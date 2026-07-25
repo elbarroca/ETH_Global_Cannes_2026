@@ -429,3 +429,100 @@ The prescribed floor otherwise passed: both seven-migration lanes twice with sen
 Minimum repair is one ENS-owned W6: database-owner-admitted immutable policy identity; parent-membership and effective-privilege rejection; finite bounded release windows; canonical UTC convergence; early input bounds; restricted-role/removal regressions; then another immutable audit.
 
 W5 is `AUDIT_FIX`. The sequential Kernel owner may not consume the decision. `A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor qualification, push, release, and public claims remain closed.
+
+## W6 publication-authority hardening remediation
+
+- Task: `A4-ENS-PUBLICATION-AUTHORITY-HARDENING-20260725:W6:E53CD6D`
+- Start/control SHA: `e53cd6d5d8af34298b886812df0fec025eeaa852`
+- Migration: `20260725053000_a4_publication_authority_hardening`
+- Migration SHA-256: `ed16bf26acb3e2bca0bc70a5d12845ccd80f36aefd1e419c5b441ad94b5f68ae`
+- Result: `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`
+
+W6 removes policy, binding, release, convergence-key, observed-time, and test-clock
+authority from the runtime function boundary. A database owner must separately
+admit exactly one immutable complete policy for one finite release and one
+`WRITE_PREPARED` version. The policy trigger reloads immutable version/name
+lineage, rejects extra or inconsistent fields, stores the normalized JSONB form,
+and derives its SHA-256 inside PostgreSQL. The runtime function accepts only the
+version identifier and bounded resolver observations. It reloads the sole active
+release and matching owner policy, derives canonical binding/record hashes,
+decision identity, UTC convergence fields, and database-clock timestamps, and
+inserts through the inherited exact record-vs-policy/lineage trigger. No release
+or policy row is seeded by the migration or inferred from fixture state.
+
+The runtime boundary requires a real restricted login that is a direct member
+only of the no-login `alphadawg_runtime` group. It rejects unsafe caller/group
+attributes, `SET ROLE`, any direct or nested parent membership, `CREATE` on
+`public`, table ownership, and effective inherited `SELECT`, `INSERT`, `UPDATE`,
+`DELETE`, or `TRUNCATE` authority on decision, release, or policy tables. The
+migration itself aborts when the existing runtime group has direct or nested
+parent roles or effective authority-table privileges. Runtime retains only
+schema usage, inherited immutable-lineage reads, and execute on the six-argument
+observation function; `PUBLIC` execute and all authority-table access are
+revoked.
+
+Release admission now requires finite timestamps, a positive window no longer
+than exactly 24 hours, and globally non-overlapping `[not_before, expires_at)`
+windows. Function and policy-trigger timezone are fixed to UTC; convergence
+serializes block and freshness timestamps as explicit UTC microseconds. JSONB
+column size and scalar/array bounds execute before text conversion, hashing, or
+deep traversal. The old eight-argument W5 function is removed.
+
+The restricted-login regression proves: missing release or policy creates no
+decision/job/effect/receipt; non-finite, zero, over-24-hour, and overlapping
+windows fail; exact 24-hour and adjacent non-overlapping windows are admitted;
+policy update/delete/truncate fails; table reads and all DML fail; owner policy
+admission plus the exact observation succeeds; consistently altered policy and
+record evidence cannot produce `ALLOW`; wrong/stale evidence denies; exact
+131,071/131,072/131,073-byte boundaries and oversized nested/scalar inputs fail
+at the intended bounded layer; and direct, nested, or effective inherited role
+authority is refused. Twenty concurrent production checks across three real
+restricted sessions with UTC, Pacific/Honolulu, and Asia/Tokyo session zones
+converge to one durable decision.
+
+Current official ENS guidance was refreshed before closeout. ENSIP-15
+normalization still precedes DNS encoding; Universal Resolver forward resolution
+still uses `resolve(bytes,bytes)` with CCIP Read; and the canonical address remains
+`0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe`. Installed `viem@2.47.6`
+declarations still expose normalized names, `packetToBytes`, explicit Universal
+Resolver address, and CCIP gateway URLs. The [ENSv2 overview](https://docs.ens.domains/contracts/ensv2/overview/)
+remains work-in-progress pending finalized design and audits, so fixtures do not
+promote a live ENSv2 deployment claim. The current [name processing](https://docs.ens.domains/resolution/names/)
+and [Universal Resolver](https://docs.ens.domains/resolvers/universal/) guidance is
+the only live documentation claim used here; no direct ENS read or write ran.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| `npm run validate:env` / loopback-placeholder Prisma validate/generate | 0 | Offline environment passed; schema valid; Prisma Client `6.19.3` generated. |
+| `npx tsx scripts/test-migrations.ts` | 0 | Empty and synthetic Cannes-shaped eight-migration lanes passed; sentinel SHA-256 remained `fb8aece1677586a330f0cfeb0850b71488849302324eb1d6a079673e35e3829e`; a pre-W6 database with direct and nested runtime parents was rejected. |
+| `npm run lint` / `npm run typecheck` | 0 | Lint has zero errors and 23 inherited warnings; strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | Foundation 9/9, authentication 9/9, and Kernel 17/17 passed. |
+| checksum-pinned `npm run test:go` / `npm run test:a3` | 0 | Official Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`; A3 passed 12/12. |
+| `npm run test:a4` / checksum-pinned `npm run test:integration` | 0 | A4 passed 22/22; integration passed 39/39 plus both eight-migration lanes and the unsafe-role migration probe. |
+| `npm run test:a5` / `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 3/3, 4/4, 1/1, and 3/3 passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` / `git diff --check` | 0 | Protected boot, tracked secret scan, shell syntax, and diff hygiene passed. |
+| `npm run build` / loopback `next start` | 0 | Next `16.2.11` generated 31/31 pages, became ready in 133 ms, and served `/` with HTTP `200` and 32,236 bytes. |
+
+The official Go archive matched SHA-256
+`25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`
+and reported exact `go1.23.10 darwin/arm64`. Its task-specific toolchain,
+verifier binary, and HTTP artifact were deleted after verification. No live
+ENS/0G/Uniswap/sponsor call, shared or managed database effect, migration deploy,
+wallet signature, transaction, push, deployment, form, funding, upload, spend,
+public identifier, live proof, or claim promotion was attempted.
+
+Deployment remains fail-closed. `DIRECT_URL` must identify the separately
+authorized migration/database owner with authority to create the policy table,
+function, constraints, and exact restricted role boundary; that owner must later
+insert the exact authorized finite release and matching complete policy. The
+application `DATABASE_URL` must identify a distinct non-owner, non-superuser,
+non-bypass, non-create restricted login that is a direct member only of
+`alphadawg_runtime` and has no effective authority-table privilege. If either
+identity or privilege contract cannot be guaranteed, migration or admission
+must fail. No managed migration, release/policy admission, or live deployment is
+claimed by this fixture-only run.
+
+W6 requires a new immutable-SHA audit. Until that passes, the sequential Kernel
+owner may not consume publication decisions. `A4_ACCEPTED`, A5 acceptance,
+mandatory A6 entry, live ENS, sponsor qualification, push, release, and public
+claims remain closed.

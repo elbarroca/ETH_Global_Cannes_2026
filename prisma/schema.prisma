@@ -397,6 +397,7 @@ model AgentVersion {
   agent          KernelAgent @relation(fields: [agentId], references: [id], onDelete: Restrict)
   lifecycleEvents AgentVersionEvent[]
   ensPublicationDecisions EnsPublicationDecision[]
+  ensPublicationAuthorityPolicies EnsPublicationAuthorityPolicy[]
 
   @@unique([agentId, version], map: "uniq_agent_versions_agent_version")
   @@index([published, createdAt], map: "idx_agent_versions_published_created")
@@ -746,10 +747,26 @@ model EnsPublicationDecision {
 }
 
 model EnsPublicationAuthorityRelease {
-  releaseSha String   @id @map("release_sha")
-  notBefore DateTime @map("not_before") @db.Timestamptz(6)
-  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
-  admittedAt DateTime @default(now()) @map("admitted_at") @db.Timestamptz(6)
+  releaseSha String                          @id @map("release_sha")
+  notBefore DateTime                        @map("not_before") @db.Timestamptz(6)
+  expiresAt DateTime                        @map("expires_at") @db.Timestamptz(6)
+  admittedAt DateTime                       @default(now()) @map("admitted_at") @db.Timestamptz(6)
+  policies  EnsPublicationAuthorityPolicy[]
 
   @@map("ens_publication_authority_releases")
+}
+
+model EnsPublicationAuthorityPolicy {
+  id                   String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  releaseSha           String                         @map("release_sha")
+  agentVersionId       String                         @map("agent_version_id") @db.Uuid
+  binding              Json
+  bindingHash          String                         @map("binding_hash")
+  admittedAt           DateTime                       @default(now()) @map("admitted_at") @db.Timestamptz(6)
+  release              EnsPublicationAuthorityRelease @relation(fields: [releaseSha], references: [releaseSha], onDelete: Restrict)
+  agentVersion         AgentVersion                   @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([releaseSha, agentVersionId], map: "ens_publication_authority_policy_release_version_key")
+  @@unique([releaseSha, bindingHash], map: "ens_publication_authority_policy_release_binding_key")
+  @@map("ens_publication_authority_policies")
 }
