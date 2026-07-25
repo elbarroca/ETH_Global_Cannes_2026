@@ -3,6 +3,51 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Release Integrator /root
+task_id: RELEASE-V5-LOCAL-R2
+task_instance_id: RELEASE-V5-LOCAL-R2:R2:74BF5FE
+generation: 1
+sprint: Repair immutable-SHA 0G V5 audit findings
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 74bf5fed0ca165e4a96869c9f24ef31e2410fdf5
+control_sha: 74bf5fed0ca165e4a96869c9f24ef31e2410fdf5
+token: RELEASE-V5-LOCAL-R2-74BF5FE-20260725T213854Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T21:38:54Z
+expires_at: 2026-07-26T00:38:54Z
+allowed_paths:
+  - src/og/**
+  - src/worker/store.ts
+  - tests/a3/**
+  - tests/worker/**
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T21:38:54Z
+deadline: 2026-07-26T00:38:54Z
+expected_exit: schema-V5 admission signer pinning pre-effect reservation recheck and evidence-complete crash recovery
+external_effect_authority: local files deterministic tests and one atomic local commit only; no network sponsor call signature transaction deployment push migration spend claim or public proof
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T21:45:49Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - schema V5 exact LangChain runtime policy is admitted while malformed V5 policies fail closed
+  - the production signer is pinned before headers dispatch signature verification and receipt persistence
+  - the exact release reservation is rechecked under the current claim before REQUEST_SENT
+  - verified usage signature and readback evidence survive READBACK_VERIFIED crash recovery
+  - focused LangChain runtime PASS 6 of 6 base PASS 10 of 10 kernel PASS 53 of 53 redaction PASS 3 of 3
+  - typecheck full lint with 23 inherited warnings build secret scan and diff check PASS
+remaining_blocks:
+  - aggregate A3 is PARTIAL with 9 passing and 13 host-Go hook failures because Go is unavailable
+  - tests/playwright/a5-ui.spec.ts and expanded components/goal-workspace.tsx changed concurrently outside this lease and were preserved unstaged
+  - no push deployment managed migration network sponsor call signature transaction spend claim or public proof is authorized
+concurrent_path_breach: out-of-lease Playwright and goal-workspace changes were not created staged reverted or committed by RELEASE-V5-LOCAL-R2
+verdict: PASS_TO_AUDIT_WITH_HOST_GO_BLOCK; LOCAL_ONLY
+lock_release: release only exact token RELEASE-V5-LOCAL-R2-74BF5FE-20260725T213854Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/marketplace_kernel_v5
 task_id: MARKETPLACE-LANGCHAIN-KERNEL-V5-R1
 task_instance_id: MARKETPLACE-LANGCHAIN-KERNEL-V5-R1:R1:3EC298A

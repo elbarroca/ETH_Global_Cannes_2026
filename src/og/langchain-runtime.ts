@@ -75,12 +75,19 @@ function assertMessageBinding(messages: BaseMessage[], requestBytes: string): vo
 export class ZeroGStrictChatModel extends BaseChatModel<ZeroGCallOptions> implements StrictA3ChatModel {
   private readonly provider: string;
   private readonly model: string;
+  private readonly expectedSigner: string;
   private readonly transport: StrictComputeTransport;
 
-  constructor(input: { provider: string; model: string; transport: StrictComputeTransport }) {
+  constructor(input: {
+    provider: string;
+    model: string;
+    expectedSigner: string;
+    transport: StrictComputeTransport;
+  }) {
     super({ disableStreaming: true });
     this.provider = input.provider;
     this.model = input.model;
+    this.expectedSigner = input.expectedSigner;
     this.transport = input.transport;
   }
 
@@ -99,6 +106,9 @@ export class ZeroGStrictChatModel extends BaseChatModel<ZeroGCallOptions> implem
       this.provider,
       this.model,
     );
+    if (service.expectedSigner !== this.expectedSigner) {
+      throw new A3TerminalError("A3_PROVIDER_SIGNER_MISMATCH");
+    }
     await options.beforeEffect("COMPUTE_HEADERS");
     const headers = await this.transport.getRequestHeaders(
       service,
@@ -130,7 +140,7 @@ export class ZeroGStrictChatModel extends BaseChatModel<ZeroGCallOptions> implem
     );
     if (
       !Buffer.from(signature.text, "utf8").equals(Buffer.from(response.content, "utf8")) ||
-      !await this.transport.verifySignature(signature.text, signature.signature, service.expectedSigner)
+      !await this.transport.verifySignature(signature.text, signature.signature, this.expectedSigner)
     ) {
       throw new A3TerminalError("A3_COMPUTE_SIGNATURE_INVALID");
     }
@@ -299,6 +309,7 @@ export async function createProductionStrictA3Runtime(
     productionRuntime: {
       budgetExpiresAt: config.budgetExpiresAt,
       chatModel: new ZeroGStrictChatModel({
+        expectedSigner: config.expectedSigner,
         provider: config.provider,
         model: config.model,
         transport: options.compute,
@@ -308,6 +319,9 @@ export async function createProductionStrictA3Runtime(
       model: config.model,
       maxCostAtomic: config.reservationAmountAtomic,
       provider: config.provider,
+      releaseSha: config.releaseSha,
+      reservationAmountAtomic: config.reservationAmountAtomic,
+      reservationEffectIdentity: config.reservationEffectIdentity,
       storage: options.storage,
       storageIndexerUrl: config.storageIndexerUrl,
       verifier: options.verifier,

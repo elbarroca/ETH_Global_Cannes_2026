@@ -135,6 +135,9 @@ export interface StrictA3AdapterOptions {
     effectId: string;
     budgetExpiresAt: Date;
     maxCostAtomic: string;
+    releaseSha: string;
+    reservationAmountAtomic: string;
+    reservationEffectIdentity: string;
   };
   hooks?: StrictA3Hooks;
   environment?: Record<string, string | undefined>;
@@ -578,9 +581,27 @@ function requiredManifestValues(manifest: CanonicalValue): {
   ownerWallet: string;
 } {
   const object = plainRecord(manifest);
+  const runtimePolicy = plainRecord(object?.runtimePolicy);
+  const validV5Runtime = object?.schemaVersion !== 5 || (
+    runtimePolicy !== null &&
+    exactKeys(runtimePolicy, [
+      "deadlineMs",
+      "framework",
+      "maxMcpCalls",
+      "maxOutputTokens",
+      "modelCalls",
+    ]) &&
+    runtimePolicy.framework === "langchain-v1" &&
+    runtimePolicy.modelCalls === 1 &&
+    runtimePolicy.maxMcpCalls === 4 &&
+    runtimePolicy.maxOutputTokens === MAX_OUTPUT_TOKENS &&
+    runtimePolicy.deadlineMs === REQUEST_DEADLINE_MS
+  );
   if (
     !object ||
-    (object.schemaVersion !== 1 && object.schemaVersion !== 2 && object.schemaVersion !== 3) ||
+    (object.schemaVersion !== 1 && object.schemaVersion !== 2 &&
+      object.schemaVersion !== 3 && object.schemaVersion !== 5) ||
+    !validV5Runtime ||
     object.adapterKey !== "protected-a3" ||
     object.proofPolicy !== "verified-receipt-required" ||
     typeof object.instructions !== "string" ||
@@ -627,6 +648,9 @@ export class StrictA3Adapter implements KernelAdapter {
     effectId?: string;
     budgetExpiresAt?: Date;
     maxCostAtomic?: string;
+    releaseSha?: string;
+    reservationAmountAtomic?: string;
+    reservationEffectIdentity?: string;
   };
 
   constructor(options: StrictA3AdapterOptions = {}) {
@@ -882,6 +906,37 @@ export class StrictA3Adapter implements KernelAdapter {
 
   private async markRequestSent(job: ClaimedJob, journal: A3JournalRow): Promise<A3JournalRow> {
     return this.withCurrentClaim(job, async (tx) => {
+      const runtime = this.runtime;
+      if (
+        runtime?.releaseSha && runtime.reservationEffectIdentity &&
+        runtime.reservationAmountAtomic && runtime.budgetExpiresAt
+      ) {
+        const reservations = await tx<{
+          amount_atomic: string;
+          effect_identity: string;
+          release_sha: string;
+          state: string;
+        }[]>`
+          SELECT release_sha, effect_identity, amount_atomic::text, state
+          FROM og_spend_reservations
+          WHERE release_sha = ${runtime.releaseSha}
+            AND effect_identity = ${runtime.reservationEffectIdentity}
+          FOR UPDATE
+        `;
+        const reservation = reservations[0];
+        if (reservation?.state === "AMBIGUOUS") {
+          throw new A3TerminalError("A3_AMBIGUOUS_RESERVATION");
+        }
+        if (
+          !reservation || reservation.release_sha !== runtime.releaseSha ||
+          reservation.effect_identity !== runtime.reservationEffectIdentity ||
+          reservation.amount_atomic !== runtime.reservationAmountAtomic ||
+          reservation.state !== "RESERVED" ||
+          runtime.budgetExpiresAt.getTime() <= this.clock().getTime()
+        ) {
+          throw new A3TerminalError("A3_BUDGET_NOT_ADMITTED");
+        }
+      }
       const rows = await tx<A3JournalRow[]>`
         UPDATE a3_execution_journals
         SET stage = 'REQUEST_SENT', version = version + 1, updated_at = ${this.clock()}
@@ -985,12 +1040,17 @@ export class StrictA3Adapter implements KernelAdapter {
     journal: A3JournalRow,
     values: { result: CanonicalValue; proofHash: string },
   ): Promise<A3JournalRow> {
+    const result = plainRecord(values.result);
+    const readback = plainRecord(result?.readback);
+    const terminalResult: CanonicalValue = result && readback
+      ? { ...result, readback: { ...readback, verified: true } } as CanonicalValue
+      : values.result;
     return this.withCurrentClaim(job, async (tx) => {
       const rows = await tx<A3JournalRow[]>`
         UPDATE a3_execution_journals
         SET stage = 'READBACK_VERIFIED', version = version + 1,
             readback_root = expected_root, readback_digest = expected_digest,
-            readback_size = expected_size, result = ${tx.json(values.result)},
+            readback_size = expected_size, result = ${tx.json(terminalResult)},
             proof_hash = ${values.proofHash}, updated_at = ${this.clock()}
         WHERE effect_id = ${job.effectId}
           AND stage = 'STORAGE_COMMITTED'
@@ -1032,28 +1092,7 @@ export class StrictA3Adapter implements KernelAdapter {
       journal.stage === "READBACK_VERIFIED",
     );
     if (!payload.ok) throw new A3TerminalError(payload.errorCode);
-    if (!journal.request_signature || journal.prompt_tokens === null ||
-      journal.completion_tokens === null || journal.total_tokens === null ||
-      journal.actual_cost_atomic === null) return payload;
-    return {
-      ...payload,
-      result: {
-        ...(payload.result as Record<string, CanonicalValue>),
-        compute: {
-          actualCostAtomic: journal.actual_cost_atomic,
-          completionTokens: journal.completion_tokens,
-          inputTokens: journal.prompt_tokens,
-          teeSignature: journal.request_signature,
-          totalTokens: journal.total_tokens,
-        },
-        readback: {
-          digest: journal.readback_digest ?? "",
-          root: journal.readback_root ?? "",
-          size: journal.readback_size ?? -1,
-          verified: journal.stage === "READBACK_VERIFIED",
-        },
-      },
-    };
+    return payload;
   }
 
   private validateVerifierResult(

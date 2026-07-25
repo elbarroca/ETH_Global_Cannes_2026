@@ -8,14 +8,18 @@ import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { verifyMessage, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { buildManifestV3 } from "../../src/kernel/agent-catalog";
+import { buildManifestV3, buildManifestV5 } from "../../src/kernel/agent-catalog";
 import { canonicalJson, domainHash, type CanonicalValue } from "../../src/kernel/canonical";
 import { parseAgentInput } from "../../src/kernel/policy";
 import { publishAgent, submitJob } from "../../src/kernel/service";
 import type { AgentManifest, AgentManifestV1, AgentManifestV3 } from "../../src/kernel/types";
 import {
+  ZeroGStrictChatModel,
+} from "../../src/og/langchain-runtime";
+import {
   A3SimulatedCrashError,
   StrictA3Adapter,
+  type StrictA3ChatModel,
   type StrictA3Hooks,
   type StrictComputeResponse,
   type StrictComputeService,
@@ -113,6 +117,8 @@ class FixtureCompute implements StrictComputeTransport {
       model: MODEL,
       baseUrl: "https://fixture-provider.invalid",
       endpoint: "https://fixture-provider.invalid/v1/proxy",
+      inputPriceAtomic: "2",
+      outputPriceAtomic: "3",
       verifiability: "TeeML",
       teeSignerAddress: signer.address.toLowerCase(),
       teeSignerAcknowledged: true,
@@ -144,7 +150,11 @@ class FixtureCompute implements StrictComputeTransport {
       provider: PROVIDER,
       model: MODEL,
       requestId: "fixture-request-1",
-      body: { model: MODEL, choices: [{ message: { role: "assistant", content } }] },
+      body: {
+        model: MODEL,
+        choices: [{ message: { role: "assistant", content } }],
+        usage: { completion_tokens: 12, prompt_tokens: 10, total_tokens: 22 },
+      },
     };
   }
 
@@ -302,6 +312,7 @@ type ManifestFixture =
   | "v1"
   | "v2"
   | "v3"
+  | "v5"
   | "malformed-v2"
   | "owner-tampered-v1"
   | "unknown";
@@ -313,6 +324,14 @@ function manifestFixture(
   if (fixture === "v2") return manifest;
   if (fixture === "v3") {
     return buildManifestV3({
+      templateId: "market-pulse",
+      name: manifest.name,
+      description: manifest.description,
+      ownerWallet: manifest.ownerWallet,
+    });
+  }
+  if (fixture === "v5") {
+    return buildManifestV5({
       templateId: "market-pulse",
       name: manifest.name,
       description: manifest.description,
@@ -485,6 +504,7 @@ function fixtureAdapter(
       request: StorageVerificationRequest,
       signal: AbortSignal,
     ) => Promise<StorageVerificationResult>;
+    langchain?: boolean;
   } = {},
 ): {
   adapter: StrictA3Adapter;
@@ -515,6 +535,14 @@ function fixtureAdapter(
         storageIndexerUrl: INDEXER,
         compute,
         storage,
+        chatModel: options.langchain
+          ? new ZeroGStrictChatModel({
+            expectedSigner: signer.address.toLowerCase(),
+            model: MODEL,
+            provider: PROVIDER,
+            transport: compute,
+          })
+          : undefined,
         verifier: options.verifierOverride ??
           fixtureVerifier(content, options.verifierFailure ?? "none", verifier),
       },
@@ -929,6 +957,134 @@ test("catalog-derived v3 binds MCP context into the Compute request and refuses 
   }
 });
 
+test("schema V5 exact LangChain policy reaches verified readback", async () => {
+  const database = await startDisposableDatabase("a3-manifest-v5");
+  try {
+    const agentVersionId = await setupKernel(database, "v5", " V5");
+    const versions = await database.sql<{ manifest: AgentManifest }[]>`
+      SELECT manifest FROM agent_versions WHERE id = ${agentVersionId}::uuid
+    `;
+    const manifest = versions[0]?.manifest;
+    assert.equal(manifest?.schemaVersion, 5);
+    if (!manifest || manifest.schemaVersion !== 5) throw new Error("A3_TEST_V5_MANIFEST_MISSING");
+    assert.deepEqual(manifest.runtimePolicy, {
+      deadlineMs: 300000,
+      framework: "langchain-v1",
+      maxMcpCalls: 4,
+      maxOutputTokens: 768,
+      modelCalls: 1,
+    });
+    const seeded = await seedContextBearingJob(
+      database,
+      agentVersionId,
+      "a3-v5-runtime-policy",
+      "Bounded V5 LangChain fixture context.",
+      BASE_TIME,
+    );
+    const fixture = fixtureAdapter(database, { langchain: true });
+    await runWorkerOnce({
+      ownerId: "a3-v5-worker",
+      concurrency: 1,
+      leaseSeconds: 30,
+      adapter: fixture.adapter,
+      authority: fixture.ens.runtime,
+      sql: database.sql,
+      now: BASE_TIME,
+    });
+    const snapshot = await terminalSnapshot(database, seeded.jobId);
+    assert.equal(snapshot.job_state, "SUCCEEDED");
+    assert.equal(snapshot.journal_stage, "READBACK_VERIFIED");
+    assert.equal(snapshot.receipts, 1);
+  } finally {
+    await database.close();
+  }
+});
+
+test("production runtime rechecks the exact reservation before Compute dispatch", async () => {
+  const database = await startDisposableDatabase("a3-reservation-recheck");
+  try {
+    const agentVersionId = await setupKernel(database);
+    const releaseSha = "b".repeat(40);
+    await database.sql`
+      INSERT INTO og_spend_budgets (release_sha, chain_id, asset, limit_atomic, created_at)
+      VALUES (${releaseSha}, 16602, 'A0GI', 1000, ${BASE_TIME})
+    `;
+    for (const [index, state] of (["AMBIGUOUS", "RELEASED"] as const).entries()) {
+      const now = new Date(BASE_TIME.getTime() + index * 1_000);
+      const submitted = await submit(database, agentVersionId, `a3-reservation-${state}`, now);
+      const reservationEffectIdentity = domainHash("reservation-recheck", {
+        effectId: submitted.effectId,
+        state,
+      });
+      await database.sql`
+        INSERT INTO og_spend_reservations (
+          release_sha, effect_identity, amount_atomic, state, created_at, updated_at
+        ) VALUES (
+          ${releaseSha}, ${reservationEffectIdentity}, 100, 'RESERVED', ${now}, ${now}
+        )
+      `;
+      let chatCalls = 0;
+      const chatModel: StrictA3ChatModel = {
+        invokeStrict: async () => {
+          chatCalls += 1;
+          throw new Error("A3_TEST_COMPUTE_MUST_NOT_RUN");
+        },
+      };
+      const compute = new FixtureCompute("reservation recheck");
+      const storage = new FixtureStorage();
+      const ens = createEnsAuthorityFixture({ now });
+      const adapter = new StrictA3Adapter({
+        authority: ens.runtime,
+        hooks: {
+          afterPrepared: async () => {
+            await database.sql`
+              UPDATE og_spend_reservations SET state = ${state}, updated_at = ${now}
+              WHERE effect_identity = ${reservationEffectIdentity}
+            `;
+          },
+        },
+        now,
+        productionRuntime: {
+          budgetExpiresAt: new Date(now.getTime() + 60_000),
+          chatModel,
+          compute,
+          effectId: submitted.effectId,
+          maxCostAtomic: "100",
+          model: MODEL,
+          provider: PROVIDER,
+          releaseSha,
+          reservationAmountAtomic: "100",
+          reservationEffectIdentity,
+          storage,
+          storageIndexerUrl: INDEXER,
+          verifier: fixtureVerifier("reservation recheck", "none", { calls: 0 }),
+        },
+        sql: database.sql,
+      });
+      await runWorkerOnce({
+        ownerId: "a3-reservation-worker",
+        concurrency: 1,
+        leaseSeconds: 30,
+        adapter,
+        authority: ens.runtime,
+        sql: database.sql,
+        now,
+      });
+      assert.equal(chatCalls, 0, state);
+      assert.equal(compute.calls.send, 0, state);
+      const snapshot = await terminalSnapshot(database, submitted.jobId);
+      assert.equal(snapshot.job_state, "FAILED", state);
+      assert.equal(
+        snapshot.last_error_code,
+        state === "AMBIGUOUS" ? "A3_AMBIGUOUS_RESERVATION" : "A3_BUDGET_NOT_ADMITTED",
+        state,
+      );
+    }
+  } finally {
+    await database.close();
+  }
+});
+
 test("all Compute, Storage, receipt, and verifier failures produce no delivery or side effect", async () => {
   const database = await startDisposableDatabase("a3-failures");
   try {
@@ -1282,6 +1438,7 @@ test("READBACK_VERIFIED recovers in-process and finalizes without a second adapt
     `;
     let crashed = false;
     const fixture = fixtureAdapter(database, {
+      langchain: true,
       hooks: {
         afterReadbackVerified: async () => {
           if (crashed) return;
@@ -1321,6 +1478,27 @@ test("READBACK_VERIFIED recovers in-process and finalizes without a second adapt
     assert.equal(snapshot.settlements, 1);
     assert.equal(snapshot.commissions, 1);
     assert.equal(snapshot.refunds, 0);
+    const effects = await database.sql<{ result: Record<string, unknown> }[]>`
+      SELECT result FROM effects WHERE job_id = ${submitted.jobId}::uuid
+    `;
+    const result = effects[0]?.result;
+    assert.deepEqual(result?.compute, {
+      actualCostAtomic: "56",
+      completionTokens: 12,
+      inputTokens: 10,
+      teeSignature: (result?.compute as { teeSignature?: string } | undefined)?.teeSignature,
+      totalTokens: 22,
+    });
+    assert.match(
+      (result?.compute as { teeSignature?: string } | undefined)?.teeSignature ?? "",
+      /^0x[0-9a-fA-F]{130}$/,
+    );
+    assert.deepEqual(result?.readback, {
+      digest: sha256("deterministic verified fixture output"),
+      root: `0x${sha256("deterministic verified fixture output")}`,
+      size: Buffer.byteLength("deterministic verified fixture output", "utf8"),
+      verified: true,
+    });
   } finally {
     await database.close();
   }

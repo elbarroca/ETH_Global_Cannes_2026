@@ -81,6 +81,7 @@ interface A3VerifiedJournalRow {
   model: string;
   request_hash: string;
   request_id: string | null;
+  request_signature: string | null;
   signer_address: string | null;
   response_content: string | null;
   response_hash: string | null;
@@ -94,6 +95,10 @@ interface A3VerifiedJournalRow {
   readback_root: string | null;
   readback_digest: string | null;
   readback_size: number | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  actual_cost_atomic: string | null;
   result: unknown;
   proof_hash: string | null;
 }
@@ -230,7 +235,7 @@ export function deriveA3VerifiedJournalPayload(
     return { ok: false, errorCode: "A3_STORAGE_RECEIPT_BINDING_MISMATCH" };
   }
 
-  const result: CanonicalValue = {
+  const baseResult: Record<string, CanonicalValue> = {
     content: journal.response_content,
     effectId: journal.effect_id,
     model: journal.model,
@@ -243,6 +248,43 @@ export function deriveA3VerifiedJournalPayload(
       size: journal.expected_size,
     },
   };
+  const usageValues = [
+    journal.prompt_tokens,
+    journal.completion_tokens,
+    journal.total_tokens,
+    journal.actual_cost_atomic,
+    journal.request_signature,
+  ];
+  const hasUsageEvidence = usageValues.some((value) => value !== null);
+  if (hasUsageEvidence && (
+    !journal.request_signature || !/^0x[0-9a-fA-F]{130}$/.test(journal.request_signature) ||
+    journal.request_signature !== computeReceipt.signature ||
+    journal.prompt_tokens === null || !Number.isSafeInteger(journal.prompt_tokens) || journal.prompt_tokens < 0 ||
+    journal.completion_tokens === null || !Number.isSafeInteger(journal.completion_tokens) || journal.completion_tokens < 0 ||
+    journal.total_tokens === null || !Number.isSafeInteger(journal.total_tokens) ||
+    journal.total_tokens !== journal.prompt_tokens + journal.completion_tokens ||
+    journal.actual_cost_atomic === null || !/^(0|[1-9][0-9]*)$/.test(journal.actual_cost_atomic)
+  )) {
+    return { ok: false, errorCode: "A3_COMPUTE_EVIDENCE_MISMATCH" };
+  }
+  const result: CanonicalValue = hasUsageEvidence
+    ? {
+      ...baseResult,
+      compute: {
+        actualCostAtomic: journal.actual_cost_atomic!,
+        completionTokens: journal.completion_tokens!,
+        inputTokens: journal.prompt_tokens!,
+        teeSignature: journal.request_signature!,
+        totalTokens: journal.total_tokens!,
+      },
+      readback: {
+        digest: journal.expected_digest,
+        root: journal.expected_root,
+        size: journal.expected_size,
+        verified: requireReadback,
+      },
+    }
+    : baseResult;
   const proofHash = domainHash("a3-proof", {
     computeReceiptDigest: journal.compute_receipt_digest,
     effectId: journal.effect_id,

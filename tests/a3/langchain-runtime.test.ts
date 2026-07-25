@@ -21,9 +21,9 @@ const MODEL = "fixture-tee-model-v1";
 const SIGNER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const signer = privateKeyToAccount(SIGNER_KEY);
 
-function service(): StrictComputeService {
+function service(expectedSigner = signer.address.toLowerCase()): StrictComputeService {
   return {
-    additionalInfo: { TargetSeparated: true, TargetTeeAddress: signer.address.toLowerCase() },
+    additionalInfo: { TargetSeparated: true, TargetTeeAddress: expectedSigner },
     baseUrl: "https://compute.invalid",
     endpoint: "https://compute.invalid/v1/proxy",
     inputPriceAtomic: "2",
@@ -31,7 +31,7 @@ function service(): StrictComputeService {
     outputPriceAtomic: "3",
     provider: PROVIDER,
     teeSignerAcknowledged: true,
-    teeSignerAddress: signer.address.toLowerCase(),
+    teeSignerAddress: expectedSigner,
     verifiability: "TeeML",
   };
 }
@@ -58,11 +58,12 @@ class ComputeFixture implements StrictComputeTransport {
     private readonly completionTokens = 12,
     private readonly responseProvider = PROVIDER,
     private readonly validSignature = true,
+    private readonly resolvedSigner = signer.address.toLowerCase(),
   ) {}
 
   async resolveService(): Promise<StrictComputeService> {
     this.calls.resolve += 1;
-    return service();
+    return service(this.resolvedSigner);
   }
 
   async getRequestHeaders(): Promise<Record<string, string>> {
@@ -248,7 +249,12 @@ test("ambiguous reservation remains held and admits only verified provider metad
 
 test("LangChain model makes one bounded call and exposes verified usage evidence", async () => {
   const compute = new ComputeFixture();
-  const model = new ZeroGStrictChatModel({ model: MODEL, provider: PROVIDER, transport: compute });
+  const model = new ZeroGStrictChatModel({
+    expectedSigner: signer.address.toLowerCase(),
+    model: MODEL,
+    provider: PROVIDER,
+    transport: compute,
+  });
   const operations: string[] = [];
   const result = await model.invokeStrict(
     requestBytes(),
@@ -267,11 +273,36 @@ test("LangChain model rejects metadata mismatch, output overflow, and invalid si
     [new ComputeFixture(769), "A3_COMPUTE_USAGE_MALFORMED"],
     [new ComputeFixture(12, PROVIDER, false), "A3_COMPUTE_SIGNATURE_INVALID"],
   ] as const) {
-    const model = new ZeroGStrictChatModel({ model: MODEL, provider: PROVIDER, transport: compute });
+    const model = new ZeroGStrictChatModel({
+      expectedSigner: signer.address.toLowerCase(),
+      model: MODEL,
+      provider: PROVIDER,
+      transport: compute,
+    });
     await assert.rejects(
       model.invokeStrict(requestBytes(), new AbortController().signal, async () => undefined),
       new RegExp(code),
     );
     assert.equal(compute.calls.send, 1);
   }
+});
+
+test("LangChain model rejects signer drift before request headers or dispatch", async () => {
+  const compute = new ComputeFixture(
+    12,
+    PROVIDER,
+    true,
+    "0x7777777777777777777777777777777777777777",
+  );
+  const model = new ZeroGStrictChatModel({
+    expectedSigner: signer.address.toLowerCase(),
+    model: MODEL,
+    provider: PROVIDER,
+    transport: compute,
+  });
+  await assert.rejects(
+    model.invokeStrict(requestBytes(), new AbortController().signal, async () => undefined),
+    /A3_PROVIDER_SIGNER_MISMATCH/,
+  );
+  assert.deepEqual(compute.calls, { headers: 0, resolve: 1, send: 0, signature: 0 });
 });
