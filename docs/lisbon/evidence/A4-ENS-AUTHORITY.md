@@ -132,9 +132,9 @@ The host initially had no Go executable. C0 authorized one official `https://go.
 - Remediation result: `PASS_TO_AUDIT_REMEDIATION; PASS_FIXTURE; PASS_INTEGRATION; LOCAL_ONLY`
 - Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
 
-The authority binding is now a strict internal discriminated union. With no ENSv2 policy, derivation emits the exact pre-`091a657` schema-v1 object and no schema-v2-only key; an existing binding still must match its original canonical bytes and SHA-256 and is never rewritten. With ENSv2 configured, derivation emits only the strict schema-v2 shape and resolution accepts only schema-v2 evidence, so the repair introduces no schema fallback.
+The authority binding is now a strict internal discriminated union. With no ENSv2 policy, derivation emits the pre-`091a657` schema-v1 object shape and no schema-v2-only key; the covered ASCII `.eth` binding must match its original canonical bytes and SHA-256 and is never rewritten. With ENSv2 configured, derivation emits only the strict schema-v2 shape and resolution accepts only schema-v2 evidence, so the repair introduces no schema fallback. The later audit found that name preparation still applies new ENSv2-only ASCII restrictions to schema-v1 before this byte comparison.
 
-A regression seeds the exact pre-owner-layer schema-v1 canonical bytes/hash directly into `ens_authority_bindings` before execution. Both normal execution and a simulated crash after proof-enabled readback followed by lease-takeover recovery succeed with one unchanged binding, one effect, one receipt/settlement/commission, no refund, no replacement, and zero recovery-adapter calls. This proves existing immutable bytes remain usable through the normal and recovered delivery paths.
+A regression seeds one exact pre-owner-layer ASCII `.eth` schema-v1 canonical bytes/hash directly into `ens_authority_bindings` before execution. Both normal execution and a simulated crash after proof-enabled readback followed by lease-takeover recovery succeed with one unchanged binding, one effect, one receipt/settlement/commission, no refund, no replacement, and zero recovery-adapter calls. This proves only that covered binding remains usable through the normal and recovered delivery paths.
 
 ENSv2 policy validation now requires at least one `CONTRACT` role and one `NAME` role in addition to existing uniqueness and structural checks. All-`CONTRACT` and all-`NAME` policies are refused both before execution and after A3 readback but before delivery. Pre-execution refusal creates zero Compute, Storage, and verifier calls; pre-delivery refusal leaves one A3 effect but creates no receipt, settlement, commission, or replacement and refunds exactly once.
 
@@ -157,14 +157,27 @@ ENSv2 policy validation now requires at least one `CONTRACT` role and one `NAME`
 
 The authorized Go archive again matched SHA-256 `25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5` and exact `go1.23.10 darwin/arm64`; its task-specific archive/toolchain was deleted. No ENS, 0G, sponsor, API, shared/managed database, signature, transaction, deployment, push, form, funding, upload, spend, public identifier, live proof, or claim-promotion effect was attempted.
 
+## ENSv2 owner-layer remediation audit
+
+- Audit SHA: `a22bbb3b7d049c0a9827b87fb4ce7cb634a43d82`
+- Audited remediation SHA: `c0bef991bb1bfce4b804eeb9513bcc6a4fc65732`
+- Tree: `1999a782dedd25d6474face942884262e5f44a4a`
+- Result: `FIX; LOCAL_ONLY`
+
+The independent disposable-clone audit confirmed the strict schema-v1/schema-v2 evidence split, schema-v2 refusal of schema-v1 fallback, and the requirement for both `CONTRACT` and `NAME` scopes. All-CONTRACT and all-NAME policies refuse before A3 with zero Compute/Storage/verifier calls and refuse after readback but before delivery with no receipt, settlement, commission, or replacement.
+
+One HIGH compatibility defect remains. Before `091a657`, schema-v1 accepted any ENSIP-15-normalized parent/descendant pair. At the audit SHA, `validateRuntime()` invokes the new ASCII/single-label ENSv2 name preparation before persisted binding comparison. A pre-seeded exact schema-v1 binding for `créateur.eth` and `research.créateur.eth` therefore fails with zero resolver calls, no authority check or delivery, one terminal refund, and unchanged stored binding bytes. Normal execution fails, so READBACK recovery for this prior-valid class is also not proven. The required repair is bounded: retain the pre-owner-layer normalized parent/descendant validation when `runtime.ensv2` is absent and keep the stricter product policy only for schema-v2, with normal and READBACK regression coverage.
+
+The complete immutable-clone floor otherwise passed: both migration lanes; lint with zero errors and 23 inherited warnings; typecheck; foundation 9/9; auth 9/9; kernel 13/13; Go verifier; A3 12/12; A4 16/16; A5 3/3; integration 33/33 plus migrations; e2e 4/4; resilience 1/1; redaction 3/3; boot; secret scan; shell syntax; build 31/31; and loopback HTTP 200. The initial bare Prisma check failed only because `DIRECT_URL` was unset and passed with non-connecting placeholders; the initial A3 run failed only because Go was absent and passed with the checksum-pinned temporary toolchain. Temporary audit and Go files were deleted.
+
 ## Remaining blocks
 
 - The independent pinned-SHA re-audit accepted exact unchanged remediation SHA
   `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9`; the subsequent A5 writer ledger
   records that acceptance before its start. This accepts only the stable A4
-  base. The first ENSv2 hierarchy owner layer is `AUDIT_FIX`; its local
-  remediation now returns `PASS_TO_AUDIT_REMEDIATION`. Independent exact-SHA audit and the sequential
-  Kernel draft/name/write/readback/publication gate remain required before
+  base. The first ENSv2 hierarchy owner layer and its local remediation are
+  `AUDIT_FIX`. Narrowed schema-v1 compatibility remediation, independent
+  exact-SHA re-audit, and the sequential Kernel draft/name/write/readback/publication gate remain required before
   current `A4_ACCEPTED` can open.
 - `PASS_LIVE` is `NOT_RUN` and `LIVE_EFFECT_BLOCKED`; no live ENS write/readback or public identifier exists.
 - Production A3 live execution remains intentionally unavailable. Rights/license/team/owner records, event-window classification, sponsor access/caps, inherited dependency findings, README claim drift, deployment, push, forms, and release audit remain unresolved.

@@ -3,6 +3,55 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-A4-REMEDIATION-AUDIT-RECONCILIATION-20260725
+task_instance_id: C0-A4-REMEDIATION-AUDIT-RECONCILIATION-20260725:A22BBB3
+generation: 1
+sprint: A4_audit_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: 0c1ebaf4dd574e7e6e75f50000271f1444f63409
+control_sha: 0c1ebaf4dd574e7e6e75f50000271f1444f63409
+audit_sha: a22bbb3b7d049c0a9827b87fb4ce7cb634a43d82
+audited_remediation_sha: c0bef991bb1bfce4b804eeb9513bcc6a4fc65732
+token: C0-A4-AUDIT-RECONCILE-A22BBB3-047CEF67-7FCF-41EB-9930-F26DCD795397
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T00:30:08Z
+expires_at: 2026-07-25T01:30:08Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T00:30:08Z
+deadline: 2026-07-25T01:30:08Z
+expected_exit: canonically record the independent immutable-SHA A4 remediation audit FIX without modifying implementation or opening a later gate
+acceptance_items:
+  - record the reproduced schema-v1 Unicode compatibility regression and exact failure boundary
+  - retain the proven strict schema split and CONTRACT plus NAME role-scope results
+  - preserve the unrelated consumed 0G transfer and A5 UI commit without promotion or staging
+  - leave A4_ACCEPTED Kernel live ENS sponsor release and claim gates closed
+external_effect_authority: safe local control files deterministic checks and one atomic commit only; no implementation repair push deploy managed migration live call signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T00:33:19Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - immutable audit SHA a22bbb3b7d049c0a9827b87fb4ce7cb634a43d82 returned FIX with one HIGH schema-v1 Unicode compatibility regression
+  - canonical ledgers retain the proven strict schema split covered ASCII binding and both required ENSv2 role scopes without promoting A4 acceptance
+  - narrowed repair must restore pre-owner-layer normalized parent and descendant validation only when ENSv2 policy is absent and add normal plus READBACK coverage
+  - git diff check secret scan lint typecheck tests and production build passed; lint retained 23 inherited warnings and zero errors
+remaining_blocks:
+  - narrowed ENS-owner remediation and independent immutable-SHA re-audit
+  - sequential Kernel publication handoff live ENS sponsor qualification and every release gate
+external_effects_attempted: none
+result: PASS_AUDIT_FIX_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-A4-AUDIT-RECONCILE-A22BBB3-047CEF67-7FCF-41EB-9930-F26DCD795397 after the containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: Frontend Builder /root/a5_taste_audit
 task_id: A5-UI-TASTE-REMEDIATION-20260725
 task_instance_id: A5-UI-TASTE-REMEDIATION-20260725:W1:A22BBB3
