@@ -4982,3 +4982,36 @@ status: complete
 ```
 
 Read-only probes/auditors may overlap but must not edit, install, format, commit, push, deploy, sign, transact, submit forms, or spend.
+
+```yaml
+owner: 0G Integrator /root/graph_a3_recovery
+task_id: GRAPH-A3-RECOVERY-R1
+task_instance_id: GRAPH-A3-RECOVERY-R1:R1:744EB96
+generation: 1
+sprint: N/A - local judge-flow recovery evidence reconciliation
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 744eb9659e16e5460a5bdb78a59371a51e85bf57
+control_sha: 744eb9659e16e5460a5bdb78a59371a51e85bf57
+token: GRAPH-A3-RECOVERY-R1-G1-744EB96-20260725T232617Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T23:27:33Z
+expires_at: 2026-07-26T02:45:00Z
+allowed_paths:
+  - tests/a3/recovery-payload.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T23:26:17Z
+deadline: 2026-07-26T02:45:00Z
+expected_exit: contain deterministic READBACK_VERIFIED recovery evidence without promoting iNFT provenance to 0G proof
+external_effect_authority: local file checks and one atomic local commit only; no network live 0G call signature transaction upload spend push deploy migration or claim
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T23:27:33Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+evidence: scoped eslint PASS; typecheck PASS; focused recovery payload 1 of 1 PASS; secret scan PASS; diff check PASS; exact result equality retains LangChain usage actual cost TEE signature proof-enabled Storage readback and proof hash with no iNFT provenance field
+remaining_dirt: pre-existing unstaged docs/lisbon/EXTERNAL-EFFECTS.md preserved and excluded
+remaining_block: exact-SHA independent audit; live 0G effects and all release claims remain unauthorized
+verdict: PASS_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token GRAPH-A3-RECOVERY-R1-G1-744EB96-20260725T232617Z after the task-owned containing commit
+status: completed
+```
