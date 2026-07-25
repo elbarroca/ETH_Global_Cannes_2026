@@ -3,6 +3,56 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-A4-W7-AUDIT-RECONCILIATION-20260725
+task_instance_id: C0-A4-W7-AUDIT-RECONCILIATION-20260725:79C7A96
+generation: 1
+sprint: A4_publication_block_normalization_audit_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: 79c7a96b8f63607261325ef413d182239816e53b
+control_sha: 79c7a96b8f63607261325ef413d182239816e53b
+audit_sha: 79c7a96b8f63607261325ef413d182239816e53b
+token: C0-A4-W7-AUDIT-RECONCILE-79C7A96-6F0C991C-2E4D-4840-83E9-C0D17536F472
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T06:01:23Z
+expires_at: 2026-07-25T07:01:23Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T06:01:23Z
+deadline: 2026-07-25T07:01:23Z
+expected_exit: record exact W7 immutable audit FIX and open only W8 upgrade preflight
+acceptance_items:
+  - bind audit to target 79c7a96 tree 052818e parent 045945e
+  - record one MEDIUM pre-W7 noncanonical durable-state upgrade finding
+  - distinguish proven fresh-state normalization from unproven upgrade robustness and audit Go limitation
+  - keep Kernel A4_ACCEPTED A5 A6 live sponsor push release and claims closed
+external_effect_authority: safe local control files deterministic checks and one atomic local commit only; no product change push deploy managed migration live call signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T06:03:51Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - audit bound exact target 79c7a96 tree 052818e parent 045945e and returned FIX
+  - fresh-state normalization proven; one MEDIUM pre-W7 durable-state upgrade finding remains
+  - audit Go-dependent rerun limitation recorded without erasing writer checksum-pinned evidence
+  - reconciliation diff check lint zero errors with 23 inherited warnings typecheck foundation 9 of 9 secret scan and 31-page build passed
+  - Kernel A4_ACCEPTED A5 A6 live sponsor push release and claims remain closed
+remaining_blocks:
+  - W8 fail-closed canonical-key preflight plus canonical/noncanonical W6 upgrade tests
+  - immutable W8 audit then sequential Kernel remediation and audit
+  - every live ENS sponsor push release and public claim gate
+external_effects_attempted: none
+result: A4_W7_AUDIT_FIX_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-A4-W7-AUDIT-RECONCILE-79C7A96-6F0C991C-2E4D-4840-83E9-C0D17536F472 after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: ENS Integrator /root/a4_ensv2_gap_inventory
 task_id: A4-ENS-PUBLICATION-BLOCK-NORMALIZATION-20260725
 task_instance_id: A4-ENS-PUBLICATION-BLOCK-NORMALIZATION-20260725:W7:045945E

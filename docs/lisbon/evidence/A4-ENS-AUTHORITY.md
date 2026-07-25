@@ -598,7 +598,19 @@ ENS/0G/Uniswap/sponsor call, shared or managed database effect, migration deploy
 wallet signature, transaction, push, deployment, form, funding, upload, spend,
 public identifier, live proof, or claim promotion was attempted.
 
-W7 requires a new immutable-SHA audit. Until it passes, the sequential Kernel
-owner may not consume publication decisions. `A4_ACCEPTED`, A5 acceptance,
-mandatory A6 entry, live ENS, sponsor qualification, push, release, and public
-claims remain closed.
+## W7 immutable normalization audit
+
+- Audit SHA: `79c7a96b8f63607261325ef413d182239816e53b`
+- Tree: `052818e9f6346b7fb1d614536fd6997ac53ed4fc`
+- Audited range: `045945e3b1c7ce0081c061a8b769d7b085687d9f..79c7a96b8f63607261325ef413d182239816e53b`
+- Result: `FIX; LOCAL_ONLY`
+
+The audit proved fresh-state block normalization: integer, scale, scientific, leading-zero, negative-zero, maximum-value, hostile-session, and 35-way concurrent aliases behave canonically; fractional, negative, overflow, NaN, and infinities refuse without new decision or commerce rows. W6 policy, roles, windows, UTC, bounds, function signature, ACLs, and search path remain intact.
+
+One MEDIUM upgrade defect remains. An exact W6 database can contain a decision whose key used scale-sensitive `12345.0` while durable storage normalized the block to `12345`. W7 installs without inspecting existing rows; later canonical replay derives the new key and collides with the semantic-evidence unique index. Immutable evidence remains unchanged, but admission fails.
+
+The smallest safe repair is a pre-replacement migration check that recomputes canonical keys for all existing decisions and aborts before W7/W8 admission installation if any noncanonical row exists. Add canonical and scale-alias W6 upgrade tests. Do not rewrite append-only evidence without a separate explicit review.
+
+All non-Go independent lanes passed, including both nine-migration lanes, A4 22/22, restricted numeric probes, concurrency, lint/typecheck, foundation/auth/Kernel/A5, e2e/resilience/redaction, boot, secret/shell/diff, build 31 pages, and HTTP 200. The audit host lacked Go; W7 writer evidence records checksum-pinned Go/A3/aggregate integration passes. Cleanup completed and no external effect occurred.
+
+W7 is `AUDIT_FIX`. Until W8 and immutable re-audit pass, the sequential Kernel owner may not consume publication decisions. `A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor qualification, push, release, and public claims remain closed.

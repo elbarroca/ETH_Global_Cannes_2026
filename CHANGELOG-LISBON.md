@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W7 normalization immutable audit
+
+- Reconciled independent verdict `FIX` for exact SHA `79c7a96b8f63607261325ef413d182239816e53b`, tree `052818e9f6346b7fb1d614536fd6997ac53ed4fc`, and range `045945e3b1c7ce0081c061a8b769d7b085687d9f..79c7a96b8f63607261325ef413d182239816e53b`.
+- The audit proved fresh-state integer/alias convergence, invalid refusal, concurrency, session-setting invariance, ACL/search-path preservation, old-function removal, and nine-migration replay.
+- Recorded one MEDIUM: W7 has no preflight for a pre-existing W6 scale-alias decision, so canonical post-upgrade replay can fail on the semantic-evidence unique index. The audit host lacked Go; W7 writer checksum-pinned full-floor evidence remains recorded without promotion.
+- Kept Kernel consumption, `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS, sponsor, push, release, and claims closed pending only W8 fail-closed upgrade preflight and re-audit.
+
 ## 2026-07-25 - W7 publication block-number normalization
 
 - Reproduced the exact W6 audit defect through the real restricted login: after `12345` admitted, `12345.0` derived a different key and failed on `uniq_ens_publication_decision_evidence`.
