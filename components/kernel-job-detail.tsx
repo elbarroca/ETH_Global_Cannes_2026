@@ -127,24 +127,25 @@ export function KernelJobDetailView({
   const cancelable = !isTerminalKernelJob(job) && !job.cancelRequestedAt;
 
   return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardBody className="space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="min-w-0 space-y-4" data-proof-workbench={mode === "verify" ? "true" : undefined}>
+      <Card className="min-w-0 overflow-hidden border-dawg-500/25">
+        <CardBody className="space-y-5">
+        <div className="flex flex-col gap-4 border-b border-void-800 pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-void-600">
-              {mode === "verify" ? "Protected job verification" : mode === "embedded" ? "Expanded job" : "Protected job"}
+            <p className="instrument-label">
+              {mode === "verify" ? "Proof workbench" : mode === "embedded" ? "Expanded job" : "Protected job"}
             </p>
             {mode === "embedded" ? (
               <h4 className="mt-1 text-lg font-bold text-void-100">
                 {job.agent.name} <span className="text-void-500">v{job.agent.version}</span>
               </h4>
             ) : (
-              <h1 className="mt-1 text-lg font-bold text-void-100">
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-void-100">
                 {job.agent.name} <span className="text-void-500">v{job.agent.version}</span>
               </h1>
             )}
             <p className="mt-1 text-xs text-void-500">
-              Updated {job.updatedAt} · attempt {job.attempts}/{job.maxAttempts}
+              Updated {job.updatedAt} | attempt {job.attempts}/{job.maxAttempts}
             </p>
           </div>
           <EvidenceStatus state={stateEvidence(job)} label={job.state} />
@@ -174,6 +175,12 @@ export function KernelJobDetailView({
 
         <ProofRail job={job} />
 
+        </CardBody>
+      </Card>
+
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_21rem]">
+        <Card className="min-w-0 overflow-hidden">
+          <CardBody className="space-y-5">
         <section className="space-y-3" aria-labelledby={`receipt-${job.jobId}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id={`receipt-${job.jobId}`} className="text-sm font-semibold text-void-100">
@@ -206,7 +213,7 @@ export function KernelJobDetailView({
           )}
         </section>
 
-        <section className="rounded-xl border border-void-800 bg-void-950/45 p-3" aria-label="Financial evidence">
+        <section className="rounded-xl border border-void-800 bg-void-950/45 p-4" aria-label="Financial evidence">
           <p className="text-xs font-semibold uppercase tracking-wider text-void-500">Financial evidence</p>
           <p className="mt-2 text-sm text-void-200">
             {settlement
@@ -217,7 +224,7 @@ export function KernelJobDetailView({
           </p>
         </section>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 border-t border-void-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row">
             <Link href={`/dashboard/compute/${job.jobId}`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-void-700 px-4 text-sm font-semibold text-void-200 hover:bg-void-800">
               Compute view
@@ -237,8 +244,31 @@ export function KernelJobDetailView({
             </button>
           )}
         </div>
-      </CardBody>
-    </Card>
+          </CardBody>
+        </Card>
+
+        <aside className="space-y-3 xl:sticky xl:top-20 xl:self-start" aria-label="Job contract">
+          <div className="instrument-panel p-4">
+            <p className="instrument-label">Job contract</p>
+            <dl className="mt-4 space-y-3 text-xs">
+              <div className="flex items-start justify-between gap-3"><dt className="text-void-600">Creator parent</dt><dd className="min-w-0 break-all text-right font-mono text-void-300">{job.agent.creatorParent ?? "Unavailable"}</dd></div>
+              <div className="flex items-start justify-between gap-3"><dt className="text-void-600">Agent subname</dt><dd className="min-w-0 break-all text-right font-mono text-dawg-300">{job.agent.fullSubname ?? "Unavailable"}</dd></div>
+              <div className="flex items-start justify-between gap-3"><dt className="text-void-600">Authority</dt><dd className="min-w-0 break-all text-right font-mono text-void-300">{job.agent.authorityOwner ?? "Unavailable"}</dd></div>
+              <div className="flex items-start justify-between gap-3"><dt className="text-void-600">Delegate</dt><dd className="min-w-0 break-all text-right font-mono text-void-300">{job.agent.authorityDelegate ?? "Unavailable"}</dd></div>
+              <div className="flex items-start justify-between gap-3"><dt className="text-void-600">Price</dt><dd className="text-right font-mono text-void-300">{job.agent.priceAtomic} {job.agent.asset}</dd></div>
+              <div className="flex items-start justify-between gap-3"><dt className="text-void-600">Eligibility</dt><dd className="text-right font-mono text-void-300">{job.agent.canonicalState === "CANONICAL" ? "Canonical version" : "Not canonical"}</dd></div>
+              <div className="flex items-start justify-between gap-3"><dt className="text-void-600">Release SHA</dt><dd className="min-w-0 break-all text-right font-mono text-void-300">{job.agent.authorityReleaseSha ?? "Unavailable"}</dd></div>
+            </dl>
+          </div>
+          <div className="rounded-xl border border-void-800 bg-black p-4">
+            <p className="instrument-label">Exact refusal</p>
+            <p className={`mt-3 break-words font-mono text-xs leading-relaxed ${job.agent.refusalReason ? "text-blood-300" : "text-void-500"}`}>
+              {job.agent.refusalReason ?? "No refusal was recorded for this published version."}
+            </p>
+          </div>
+        </aside>
+      </div>
+    </div>
   );
 }
 

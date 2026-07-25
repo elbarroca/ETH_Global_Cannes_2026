@@ -7,6 +7,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { XIcon } from "@phosphor-icons/react";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -136,7 +137,7 @@ export function Dialog({
             aria-label="Close dialog"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-void-800 bg-void-950 text-xl leading-none text-void-400 transition-colors hover:border-void-700 hover:text-void-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            ×
+            <XIcon size={20} aria-hidden />
           </button>
         </header>
         <div className="px-4 py-5 sm:px-5">{children}</div>

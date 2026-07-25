@@ -18,10 +18,10 @@ export default function HistoryPage() {
   const cycles = history.map((record) => mapEnrichedResponseToCycle(record));
 
   return (
-    <main className="max-w-7xl mx-auto px-5 py-5 space-y-4">
+    <main className="mx-auto max-w-[90rem] space-y-5 px-4 py-6 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-        <h1 className="text-lg font-bold text-void-100">Hunt log</h1>
+      <div className="flex flex-col gap-3 border-b border-void-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div><p className="instrument-label">Recorded activity</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-void-100">Hunt log</h1></div>
         <p className="text-sm text-void-500">
           Legacy cycle records with proof links shown only when present
         </p>
@@ -56,7 +56,7 @@ export default function HistoryPage() {
       )}
 
       {!loading && !error && cycles.length === 0 && (
-        <div className="bg-void-900 border border-void-800 rounded-2xl px-6 py-12 text-center">
+        <div className="rounded-xl border border-void-800 bg-black px-6 py-12 text-center">
           <p className="text-void-400 text-sm">
             No hunts recorded yet. Start your first hunt from the dashboard.
           </p>

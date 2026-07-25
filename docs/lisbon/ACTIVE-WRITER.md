@@ -3,6 +3,60 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/ui_design_spec
+task_id: A5-OPTIMAL-UI-REVAMP-20260725
+task_instance_id: A5-OPTIMAL-UI-REVAMP-20260725:W1:C98F0B8
+generation: 1
+sprint: A5_ui_only_visual_revamp
+mode: sole_mutating_frontend_writer
+branch: Eth_global_lisbon_
+start_sha: c98f0b837373d7a42b1eb6b722ec71963df93fb7
+control_sha: c98f0b837373d7a42b1eb6b722ec71963df93fb7
+token: A5-UI-FE-W1-C98F0B8-019F98C2-79C4-7E62
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T10:37:45Z
+expires_at: 2026-07-25T17:30:00Z
+allowed_paths:
+  - app/** except app/api/**
+  - components/**
+  - contexts/**
+  - hooks/**
+  - client-only helpers under lib/**
+  - public/**
+  - tests/a5/**
+  - tests/playwright/**
+  - playwright.config.ts
+  - package.json
+  - package-lock.json
+  - design-qa.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T10:37:45Z
+deadline: 2026-07-25T17:30:00Z
+expected_exit: deliver the approved UI-only revamp with exact reference comparison and no authority changes
+acceptance_items:
+  - shared black graphite cream gold product system with Phosphor icons and generated raster art
+  - reference-led landing creation flow proof workbench and whole-route reskin
+  - exact current handlers route slugs lifecycle and fail-closed truth preserved
+  - desktop mobile keyboard reduced-motion overflow long-content and state coverage
+  - design QA passed against all four references before one local commit
+external_effect_authority: safe local allowed paths image generation local browser and processes verification outputs and one local commit only; no API schema backend authority deploy push managed migration sponsor live call signature transaction form funding upload spend public claim or claim promotion
+completed_at: 2026-07-25T11:18:32Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - reference-led black graphite cream and gold landing publication proof and product-route surfaces implemented with seven generated raster assets and Phosphor icons
+  - five visible Define Capabilities Instructions Review Publish steps preserve the exact protected draft bind plan publish API order and lost-response unknown state
+  - proof workbench exposes owner creator parent agent subname version price authority delegate eligibility job 0G Compute Storage receipt release SHA and exact refusal without promoting missing evidence
+  - desktop 1440 mobile 390 five-width overflow keyboard focus Escape reduced motion long identity empty loading offline refusal and cut states are covered by the A5 Playwright contract
+  - direct reference and rendered-state review passed in design-qa.md with post-fix screenshot evidence
+  - temporary impeccable 3.3.1 detector passed after its one inherited easing finding was removed
+  - lint zero errors with 23 inherited warnings typecheck foundation 10 of 10 A5 3 of 3 Playwright 13 of 13 secret scan diff check and production build passed
+external_effects_attempted: official npm registry package metadata and temporary npx impeccable download within exact local verification authority plus local image generation; no API schema backend deploy push managed migration sponsor live call signature transaction form funding upload spend public ID proof or claim effect
+verdict: PASS_TO_AUDIT
+lock_release: release only matching token A5-UI-FE-W1-C98F0B8-019F98C2-79C4-7E62 after containing commit and clean verification
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/kernel_publication_remediation
 task_id: A4-KERNEL-ACTION-INTEGRITY-20260725
 task_instance_id: A4-KERNEL-ACTION-INTEGRITY-20260725:W5:06B62A2

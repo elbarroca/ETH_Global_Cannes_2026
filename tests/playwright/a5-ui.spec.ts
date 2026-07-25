@@ -15,7 +15,20 @@ const OWNER_AGENT = {
   priceAtomic: "1000",
   asset: "USDC_ATOMIC",
   proofPolicy: "verified-receipt-required",
+  lifecycleState: "PUBLISHED",
+  hireable: true,
   ownedByViewer: true,
+  creatorParent: "maker.eth",
+  agentLabel: "evidence-researcher",
+  fullSubname: "evidence-researcher.maker.eth",
+  writePlanHash: "e".repeat(64),
+  canonicalState: "CANONICAL",
+  authorityOwner: "0x1111111111111111111111111111111111111111",
+  authorityDelegate: null,
+  authorityPolicyVersion: "1",
+  refusalReason: null,
+  authorityReleaseSha: "f".repeat(40),
+  publicationDecisionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   publishedAt: "2026-07-24T14:00:00.000Z",
 } as const;
 
@@ -106,6 +119,14 @@ const JOB_LIST_ITEM = {
     priceAtomic: AVAILABLE_AGENT.priceAtomic,
     asset: AVAILABLE_AGENT.asset,
     proofPolicy: AVAILABLE_AGENT.proofPolicy,
+    creatorParent: AVAILABLE_AGENT.creatorParent,
+    fullSubname: AVAILABLE_AGENT.fullSubname,
+    canonicalState: AVAILABLE_AGENT.canonicalState,
+    authorityOwner: AVAILABLE_AGENT.authorityOwner,
+    authorityDelegate: AVAILABLE_AGENT.authorityDelegate,
+    authorityPolicyVersion: AVAILABLE_AGENT.authorityPolicyVersion,
+    refusalReason: AVAILABLE_AGENT.refusalReason,
+    authorityReleaseSha: AVAILABLE_AGENT.authorityReleaseSha,
   },
   evidence: {
     owner: "verified",
@@ -307,7 +328,26 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}): Promis
 
     if (path === "/api/kernel/agents") {
       if (request.method() === "POST") {
-        await fulfillJson(route, { agent: OWNER_AGENT }, 201);
+        const requestBody = request.postDataJSON() as { action?: string };
+        await fulfillJson(route, {
+          action: requestBody.action ?? "UNKNOWN",
+          version: OWNER_AGENT,
+          plan: requestBody.action === "PREPARE_ENS_WRITE" ? {
+            schemaVersion: 1,
+            kind: "LOCAL_ONLY_UNAUTHORIZED",
+            agentVersionId: OWNER_AGENT.versionId,
+            manifestHash: OWNER_AGENT.manifestHash,
+            creatorParent: OWNER_AGENT.creatorParent,
+            agentLabel: OWNER_AGENT.agentLabel,
+            fullSubname: OWNER_AGENT.fullSubname,
+            creatorDnsName: "maker.eth",
+            agentDnsName: "evidence-researcher.maker.eth",
+            operations: ["CREATE_OR_UPDATE_SUBNAME", "SET_IMMUTABLE_MANIFEST_BINDING"],
+            requiresAuthorization: true,
+            requiresWalletSignature: true,
+          } : undefined,
+          planHash: OWNER_AGENT.writePlanHash,
+        }, 201);
         return;
       }
       await fulfillJson(route, { agents: [OWNER_AGENT, AVAILABLE_AGENT] });
@@ -431,7 +471,7 @@ test("preserves the product shell without horizontal overflow", async ({ page })
 test("keeps navigation compact, active, and keyboard operable", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/dashboard");
-  const activeDashboard = page.getByRole("link", { name: "Dashboard", exact: true }).first();
+  const activeDashboard = page.getByRole("link", { name: "Workspace", exact: true }).first();
   await expect(activeDashboard).toHaveAttribute("aria-current", "page");
   await expect(activeDashboard.locator(".brand-hairline")).toBeVisible();
 
@@ -441,7 +481,7 @@ test("keeps navigation compact, active, and keyboard operable", async ({ page })
   await page.keyboard.press("Enter");
   const mobileNav = page.getByRole("navigation", { name: "Mobile primary" });
   await expect(mobileNav).toBeVisible();
-  await expect(mobileNav.getByRole("link")).toHaveCount(6);
+  await expect(mobileNav.getByRole("link")).toHaveCount(7);
   await page.keyboard.press("Escape");
   await expect(mobileNav).toBeHidden();
   await expect(menuButton).toBeFocused();
@@ -491,8 +531,8 @@ test("keeps long identity evidence contained", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/dashboard");
   await page.getByRole("button", { name: "Connect Wallet" }).click();
-  await page.getByText("Identity", { exact: true }).click();
-  await expect(page.getByRole("link", { name: new RegExp(`Connected wallet ${TEST_WALLET}`) })).toBeVisible();
+  await page.locator("details").filter({ hasText: "Account" }).locator("summary").click();
+  await expect(page.getByRole("link", { name: /Connected wallet 0x1111/ })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
@@ -503,7 +543,7 @@ test("presents one fail-closed agent-commerce story on the landing page", async 
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Hire agents. Verify every outcome." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open dashboard" })).toHaveAttribute("href", "/dashboard");
+  await expect(page.getByRole("link", { name: "Open workspace" }).first()).toHaveAttribute("href", "/dashboard");
   await expect(page.getByRole("link", { name: "Browse agents" })).toHaveAttribute("href", "/marketplace");
   await expect(page.getByText(/Local product capture with fixture data/)).toBeVisible();
   await expect(page.getByText(/Drafts, fixtures, caches, and HTTP 200 responses/)).toBeVisible();
@@ -615,12 +655,20 @@ test("supports keyboard dialog flow and immutable publication copy", async ({ pa
   await expect(dialog).toBeVisible();
   await page.getByLabel("Agent name").fill("Manual Evidence Agent");
   await page.getByLabel("What should this agent do?").fill("Analyze bounded evidence without inventing execution claims.");
+  await page.getByRole("button", { name: "Choose capabilities" }).click();
+  await page.screenshot({ path: "test-results/visual/a5-create-capabilities-desktop-1440x900.png" });
+  await page.getByRole("button", { name: "Write instructions", exact: true }).click();
   await page.getByRole("button", { name: "Write instructions manually" }).click();
   await expect(dialog).toContainText("Manual draft");
-  await page.getByLabel("Instructions").fill("Inspect the supplied evidence, state uncertainty, and return a concise result.");
+  await page.getByRole("textbox", { name: "Instructions" }).fill("Inspect the supplied evidence, state uncertainty, and return a concise result.");
+  await page.getByRole("button", { name: "Review manifest" }).click();
+  await page.getByLabel("Your ENS name (creator parent)").fill("maker.eth");
+  await dialog.evaluate((element) => element.scrollTo({ top: 0 }));
+  await page.screenshot({ path: "test-results/visual/a5-create-review-desktop-1440x900.png" });
+  await page.getByRole("button", { name: "Continue to publish" }).click();
   await page.getByRole("button", { name: "Publish immutable version" }).click();
-  await expect(dialog).toContainText("Immutable version 1 is published");
-  await expect(dialog).not.toContainText(/deployed|minted|sealed/i);
+  await expect(dialog).toContainText("Publication receipt");
+  await expect(dialog).not.toContainText(/deployed agent|minted agent|sealed execution/i);
   await page.getByRole("button", { name: "Close dialog" }).click();
 
   await publishButton.click();
@@ -664,6 +712,11 @@ test("shows verified delivery only with matching receipt and storage evidence", 
     "Settled 1000 USDC_ATOMIC",
   );
   await expect(page.locator("body")).not.toContainText(/deployed agent|minted agent|sealed execution/i);
+
+  await page.goto(`/verify?jobId=${JOB_ID}`);
+  await expect(page.getByRole("heading", { name: "Proof workbench" })).toBeVisible();
+  await expect(page.getByLabel("Job contract")).toContainText("Release SHA");
+  await page.screenshot({ path: "test-results/visual/a5-proof-workbench-desktop-1440x900.png", fullPage: true });
 });
 
 test("renders an idempotent replay as the original job without a second submission", async ({ page }) => {
@@ -729,7 +782,7 @@ test("remains operable at 200 percent zoom", async ({ page }) => {
 test("honors reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const duration = await page.getByRole("link", { name: "Open dashboard" }).evaluate((element) =>
+  const duration = await page.getByRole("link", { name: "Open workspace" }).first().evaluate((element) =>
     getComputedStyle(element).transitionDuration,
   );
   expect(Number.parseFloat(duration)).toBeLessThanOrEqual(0.00001);

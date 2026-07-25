@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { WalletIcon } from "@phosphor-icons/react";
 import { useUser } from "@/contexts/user-context";
 import { deposit, withdraw } from "@/lib/api";
 import { useConnection, useWalletClient } from "wagmi";
@@ -138,37 +139,38 @@ export default function DepositPage() {
         : loading ? "Processing..." : null;
 
   return (
-    <main className="max-w-screen-2xl mx-auto px-5 py-5">
-      <div className="max-w-xl mx-auto space-y-4">
+    <main className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-2xl space-y-4">
         <h1 className="sr-only">Fund or withdraw from the agent wallet</h1>
 
-        {/* Hero — Nasdaq LED balance display */}
-        <div className="nasdaq-led nasdaq-scanlines nasdaq-dot-matrix rounded-2xl px-6 py-8 border border-dawg-500/20 glow-card text-center">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-void-600 mb-2">Agent Wallet Balance</p>
-          <p className="font-pixel text-[56px] leading-none tabular-nums glow-dawg-strong text-[#FFE066]">
+        {/* Wallet balance instrument */}
+        <div className="relative overflow-hidden rounded-xl border border-dawg-500/25 bg-black px-6 py-8 text-center">
+          <div className="brand-hairline absolute inset-x-0 top-0 h-0.5" aria-hidden="true" />
+          <p className="instrument-label mb-2">Agent wallet balance</p>
+          <p className="font-mono text-[48px] font-semibold leading-none tabular-nums tracking-[-0.06em] text-dawg-300 sm:text-[56px]">
             ${deposited.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
-          <p className="font-pixel text-[16px] text-void-500 mt-2">USDC on Arc Testnet</p>
+          <p className="mt-2 font-mono text-xs uppercase tracking-wider text-void-500">USDC on Arc Testnet</p>
 
           {/* Stats strip */}
           <div className="flex items-center justify-center gap-6 mt-6 pt-4 border-t border-dawg-500/10">
             <div className="text-center">
-              <p className="font-pixel text-[13px] text-void-600 uppercase tracking-wider">NAV</p>
-              <p className="font-pixel text-[22px] tabular-nums text-[#FFCC00] glow-dawg">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-void-600">NAV</p>
+              <p className="font-mono text-xl tabular-nums text-dawg-300">
                 ${nav.toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </p>
             </div>
             <div className="w-px h-8 bg-dawg-500/20" />
             <div className="text-center">
-              <p className="font-pixel text-[13px] text-void-600 uppercase tracking-wider">P&L</p>
-              <p className={`font-pixel text-[22px] tabular-nums ${pnl >= 0 ? "text-[#39FF7A] glow-green" : "text-[#FF5A5A] glow-red"}`}>
+              <p className="font-mono text-[10px] uppercase tracking-wider text-void-600">P&amp;L</p>
+              <p className={`font-mono text-xl tabular-nums ${pnl >= 0 ? "text-emerald-300" : "text-blood-300"}`}>
                 {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
               </p>
             </div>
             <div className="w-px h-8 bg-dawg-500/20" />
             <div className="text-center">
-              <p className="font-pixel text-[13px] text-void-600 uppercase tracking-wider">Shares</p>
-              <p className="font-pixel text-[22px] tabular-nums text-[#FFCC00] glow-dawg">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-void-600">Shares</p>
+              <p className="font-mono text-xl tabular-nums text-dawg-300">
                 {shares.toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </p>
             </div>
@@ -179,8 +181,8 @@ export default function DepositPage() {
         {(inftTokenId != null || proxyAddress) && (
           <div className="flex items-center justify-between gap-3 px-4 py-3 bg-void-900 border border-void-800 rounded-xl flex-wrap">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-dawg-500/10 border border-dawg-500/30 flex items-center justify-center">
-                <span className="text-lg">🐺</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-dawg-500/30 bg-dawg-500/10">
+                <WalletIcon size={18} className="text-dawg-400" aria-hidden />
               </div>
               <div>
                 <p className="text-sm font-semibold text-void-200">Lead Dawg</p>
@@ -397,7 +399,7 @@ export default function DepositPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <StatCell label="Status" value={user?.agent.active ? "Active" : "Paused"} accent={user?.agent.active ? "emerald" : "void"} />
-            <StatCell label="Risk" value={user?.agent.riskProfile ?? "—"} accent="dawg" />
+            <StatCell label="Risk" value={user?.agent.riskProfile ?? "Unavailable"} accent="dawg" />
             <StatCell label="Hunts" value={String(user?.agent.lastCycleId ?? 0)} accent="dawg" />
             <StatCell label="P&L %" value={`${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%`} accent={pnl >= 0 ? "green" : "red"} />
           </div>

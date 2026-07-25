@@ -6,6 +6,7 @@ import {
   useConnectors,
   useDisconnect,
 } from "wagmi";
+import { PlugsConnectedIcon, SignOutIcon } from "@phosphor-icons/react";
 import { arcTestnet } from "@/lib/arc-chain";
 
 export function WalletConnectButton() {
@@ -36,6 +37,7 @@ export function WalletConnectButton() {
           }}
           className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl bg-dawg-500 px-4 py-2 text-sm font-bold text-void-950 transition-[background-color,transform] hover:bg-dawg-400 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
         >
+          <PlugsConnectedIcon size={18} aria-hidden />
           {label}
         </button>
         {connect.error && (
@@ -70,7 +72,7 @@ export function WalletConnectButton() {
         }}
         className="flex h-11 w-11 items-center justify-center rounded-xl border border-void-700 bg-void-800 text-void-300 transition-[background-color,color,transform] hover:bg-void-700 hover:text-void-100 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <span aria-hidden="true">×</span>
+        <SignOutIcon size={19} aria-hidden="true" />
       </button>
       {disconnect.error && (
         <p

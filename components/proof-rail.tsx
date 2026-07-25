@@ -1,4 +1,13 @@
 import type { ReactNode } from "react";
+import {
+  CpuIcon,
+  CubeIcon,
+  DatabaseIcon,
+  IdentificationCardIcon,
+  ReceiptIcon,
+  ShieldCheckIcon,
+  type Icon,
+} from "@phosphor-icons/react";
 import { CopyableIdentifier, EvidenceStatus } from "@/components/ui/evidence";
 import type { EvidenceState, KernelJobDetail } from "@/src/kernel/types";
 
@@ -15,30 +24,33 @@ function RailStage({
   state,
   detail,
   children,
+  icon: StageIcon,
 }: {
   index: number;
   title: string;
   state: EvidenceState;
   detail: string;
   children?: ReactNode;
+  icon: Icon;
 }) {
   return (
-    <li className="relative grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-3 pb-4 last:pb-0 lg:block lg:pb-0">
+    <li className="relative grid min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] gap-3 pb-4 last:pb-0 xl:block xl:pb-0">
       <div className="relative flex justify-center">
-        <span className="relative z-10 grid h-8 w-8 place-items-center rounded-full border border-void-700 bg-void-950 font-mono text-xs text-void-300">
-          {index}
+        <span className={`relative z-10 grid h-10 w-10 place-items-center rounded-lg border bg-black ${state === "verified" ? "border-dawg-500 text-dawg-400" : state === "failed" ? "border-blood-500/50 text-blood-300" : "border-void-700 text-void-500"}`}>
+          <StageIcon size={18} aria-hidden />
+          <span className="sr-only">Stage {index}</span>
         </span>
         {index < 6 && (
           <span
-            className="absolute bottom-[-1rem] left-1/2 top-8 w-px bg-void-800 lg:bottom-auto lg:left-[calc(50%+1rem)] lg:right-[-0.75rem] lg:top-4 lg:h-px lg:w-auto"
+            className="absolute bottom-[-1rem] left-1/2 top-10 w-px bg-void-800 xl:bottom-auto xl:left-[calc(50%+1.25rem)] xl:right-[-0.75rem] xl:top-5 xl:h-px xl:w-auto"
             aria-hidden="true"
           />
         )}
       </div>
-      <div className="min-w-0 rounded-xl border border-void-800 bg-void-950/45 p-3 lg:mt-3">
-        <div className="flex flex-wrap items-start justify-between gap-2 lg:block">
+      <div className="min-w-0 rounded-lg border border-void-800 bg-black p-3 xl:mt-3">
+        <div className="flex flex-wrap items-start justify-between gap-2 xl:block">
           <h3 className="text-sm font-semibold text-void-100">{title}</h3>
-          <EvidenceStatus state={state} className="lg:mt-2" />
+          <EvidenceStatus state={state} className="xl:mt-2" />
         </div>
         <p className="mt-2 text-xs leading-relaxed text-void-500">{detail}</p>
         {children && <div className="mt-3 min-w-0 space-y-2">{children}</div>}
@@ -56,9 +68,17 @@ export function ProofRail({ job }: { job: KernelJobDetail }) {
 
   return (
     <div className="min-w-0 space-y-4">
-      <ol aria-label="Protected job evidence" className="grid min-w-0 gap-3 lg:grid-cols-6">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="instrument-label">Proof sequence</p>
+          <h2 className="mt-2 text-lg font-semibold text-void-100">Six gates. One canonical receipt.</h2>
+        </div>
+        <span className="hidden font-mono text-[10px] uppercase tracking-wider text-void-600 sm:block">Fail closed</span>
+      </div>
+      <ol aria-label="Protected job evidence" className="grid min-w-0 gap-3 xl:grid-cols-6">
         <RailStage
           index={1}
+          icon={IdentificationCardIcon}
           title="Owner"
           state={job.evidence.owner}
           detail="Authenticated owner recorded on the published agent."
@@ -68,6 +88,7 @@ export function ProofRail({ job }: { job: KernelJobDetail }) {
 
         <RailStage
           index={2}
+          icon={CubeIcon}
           title="Version"
           state={job.evidence.version}
           detail={`Immutable published version ${job.agent.version}.`}
@@ -77,6 +98,7 @@ export function ProofRail({ job }: { job: KernelJobDetail }) {
 
         <RailStage
           index={3}
+          icon={ShieldCheckIcon}
           title="ENS authority"
           state={job.evidence.ens}
           detail={ens
@@ -88,6 +110,7 @@ export function ProofRail({ job }: { job: KernelJobDetail }) {
 
         <RailStage
           index={4}
+          icon={CpuIcon}
           title="0G Compute"
           state={job.evidence.compute}
           detail={execution
@@ -101,6 +124,7 @@ export function ProofRail({ job }: { job: KernelJobDetail }) {
 
         <RailStage
           index={5}
+          icon={DatabaseIcon}
           title="Storage"
           state={job.evidence.storage}
           detail={storage
@@ -116,6 +140,7 @@ export function ProofRail({ job }: { job: KernelJobDetail }) {
 
         <RailStage
           index={6}
+          icon={ReceiptIcon}
           title="Receipt"
           state={job.evidence.receipt}
           detail={receipt

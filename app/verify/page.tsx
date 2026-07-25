@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
+import { ArrowSquareOutIcon, CheckIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardBody, CodeBlock } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,20 +34,20 @@ const SPECIALIST_MARKETPLACE_NAMES: Partial<Record<string, string>> = {
 
 type AgentKey = "SentimentBot" | "WhaleEye" | "MomentumX" | "MemecoinHunter" | "TwitterAlpha" | "DeFiYield" | "NewsScanner" | "OnChainForensics" | "OptionsFlow" | "MacroCorrelator" | "Alpha" | "Risk" | "Executor";
 
-const AGENT_META: Record<AgentKey, { emoji: string; type: "Specialist" | "Adversarial"; skill: string }> = {
-  SentimentBot: { emoji: "🧠", type: "Specialist", skill: "Twitter + Reddit sentiment" },
-  WhaleEye: { emoji: "🐋", type: "Specialist", skill: "Whale wallet movements" },
-  MomentumX: { emoji: "📈", type: "Specialist", skill: "RSI, MACD, volume analysis" },
-  MemecoinHunter: { emoji: "🎰", type: "Specialist", skill: "DexScreener new pairs + rug detection" },
-  TwitterAlpha: { emoji: "🐦", type: "Specialist", skill: "CT narrative + influencer sentiment" },
-  DeFiYield: { emoji: "🌾", type: "Specialist", skill: "DeFi Llama APY + TVL tracking" },
-  NewsScanner: { emoji: "📰", type: "Specialist", skill: "Breaking news + regulatory signals" },
-  OnChainForensics: { emoji: "🔍", type: "Specialist", skill: "Wallet flows + smart money tracking" },
-  OptionsFlow: { emoji: "📊", type: "Specialist", skill: "Deribit options + IV analysis" },
-  MacroCorrelator: { emoji: "🌍", type: "Specialist", skill: "DXY/SPX/VIX correlation + regime detection" },
-  Alpha: { emoji: "🟢", type: "Adversarial", skill: "Argues FOR the trade" },
-  Risk: { emoji: "🔴", type: "Adversarial", skill: "Argues AGAINST the trade" },
-  Executor: { emoji: "🟡", type: "Adversarial", skill: "Makes the final call" },
+const AGENT_META: Record<AgentKey, { code: string; type: "Specialist" | "Adversarial"; skill: string }> = {
+  SentimentBot: { code: "SB", type: "Specialist", skill: "Twitter + Reddit sentiment" },
+  WhaleEye: { code: "WE", type: "Specialist", skill: "Whale wallet movements" },
+  MomentumX: { code: "MX", type: "Specialist", skill: "RSI, MACD, volume analysis" },
+  MemecoinHunter: { code: "MH", type: "Specialist", skill: "DexScreener new pairs + rug detection" },
+  TwitterAlpha: { code: "TA", type: "Specialist", skill: "CT narrative + influencer sentiment" },
+  DeFiYield: { code: "DY", type: "Specialist", skill: "DeFi Llama APY + TVL tracking" },
+  NewsScanner: { code: "NS", type: "Specialist", skill: "Breaking news + regulatory signals" },
+  OnChainForensics: { code: "OF", type: "Specialist", skill: "Wallet flows + smart money tracking" },
+  OptionsFlow: { code: "OP", type: "Specialist", skill: "Deribit options + IV analysis" },
+  MacroCorrelator: { code: "MC", type: "Specialist", skill: "DXY/SPX/VIX correlation + regime detection" },
+  Alpha: { code: "AL", type: "Adversarial", skill: "Argues for the trade" },
+  Risk: { code: "RK", type: "Adversarial", skill: "Argues against the trade" },
+  Executor: { code: "EX", type: "Adversarial", skill: "Makes the final call" },
 };
 
 const AGENT_KEYS: AgentKey[] = ["SentimentBot", "WhaleEye", "MomentumX", "MemecoinHunter", "TwitterAlpha", "DeFiYield", "NewsScanner", "OnChainForensics", "OptionsFlow", "MacroCorrelator", "Alpha", "Risk", "Executor"];
@@ -84,7 +85,7 @@ function getAttestationForAgent(
   cycle: CycleDetail | null,
   actions: AgentActionRecord[],
 ): string {
-  if (!cycle) return "—";
+  if (!cycle) return "Unavailable";
 
   const action = getActionForAgent(key, actions);
   if (action?.attestationHash) return action.attestationHash;
@@ -106,12 +107,12 @@ function getAttestationForAgent(
         : [];
       const specName = SPECIALIST_MARKETPLACE_NAMES[key];
       const spec = specs.find((s) => s.name === specName);
-      return spec?.attestationHash ?? spec?.attestation ?? "—";
+      return spec?.attestationHash ?? spec?.attestation ?? "Unavailable";
     }
-    case "Alpha": return cycle.alphaAttestation ?? "—";
-    case "Risk": return cycle.riskAttestation ?? "—";
-    case "Executor": return cycle.execAttestation ?? "—";
-    default: return "—";
+    case "Alpha": return cycle.alphaAttestation ?? "Unavailable";
+    case "Risk": return cycle.riskAttestation ?? "Unavailable";
+    case "Executor": return cycle.execAttestation ?? "Unavailable";
+    default: return "Unavailable";
   }
 }
 
@@ -138,7 +139,15 @@ function VerifyContent() {
   const jobId = searchParams.get("jobId");
   if (jobId && UUID_PATTERN.test(jobId)) {
     return (
-      <main className="mx-auto max-w-7xl space-y-4 px-5 py-5">
+      <main className="mx-auto max-w-[90rem] space-y-5 px-4 py-6 sm:px-6 lg:px-8">
+        <header className="flex flex-col gap-3 border-b border-void-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="instrument-label">AlphaDawg proof system</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-void-100">Proof workbench</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-void-500">Inspect the protected job from canonical owner through receipt. Missing evidence remains explicitly unavailable.</p>
+          </div>
+          <Badge variant="amber">Protected authority</Badge>
+        </header>
         <KernelJobDetail jobId={jobId} mode="verify" />
       </main>
     );
@@ -222,7 +231,7 @@ function LegacyCycleVerifyContent() {
   const selectedAction = getActionForAgent(selected, actions);
   const attestation = getAttestationForAgent(selected, cycle, actions);
   const teeVerified = getTeeVerified(selected, actions);
-  const hasVerifiedTeeEvidence = teeVerified && attestation !== "—";
+  const hasVerifiedTeeEvidence = teeVerified && attestation !== "Unavailable";
 
   if (loading) {
     return (
@@ -254,7 +263,7 @@ function LegacyCycleVerifyContent() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-lg font-bold text-void-100">
-            Legacy cycle evidence — hunt #{cycle.cycleNumber}
+            Legacy cycle evidence | hunt #{cycle.cycleNumber}
           </h1>
           <p className="text-sm text-void-500 mt-0.5">
             Select an action to inspect only the evidence recorded for that action.
@@ -276,7 +285,7 @@ function LegacyCycleVerifyContent() {
                 : "bg-void-900 border-void-800 text-void-500 hover:border-void-700"
             }`}
           >
-            <span className="text-xl">{AGENT_META[key].emoji}</span>
+            <span className="grid h-8 w-8 place-items-center rounded-md border border-void-700 bg-black font-mono text-[10px] text-dawg-300">{AGENT_META[key].code}</span>
             <span className="text-xs font-medium leading-tight">{key}</span>
             <span className="text-xs text-void-500">{AGENT_META[key].type}</span>
           </button>
@@ -289,7 +298,7 @@ function LegacyCycleVerifyContent() {
           {/* Card header */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">{agent.emoji}</span>
+              <span className="grid h-11 w-11 place-items-center rounded-lg border border-dawg-500/40 bg-black font-mono text-xs text-dawg-300">{agent.code}</span>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-void-200">{selected}</span>
@@ -309,34 +318,34 @@ function LegacyCycleVerifyContent() {
             <div className="space-y-3">
               <DetailBlock label="Action type">
                 <span className="font-mono text-sm text-void-200">
-                  {selectedAction?.actionType ?? "—"}
+                  {selectedAction?.actionType ?? "Unavailable"}
                 </span>
               </DetailBlock>
               <DetailBlock label="Action status">
                 <span className="font-mono text-sm text-void-200">
-                  {selectedAction?.status ?? "—"}
+                  {selectedAction?.status ?? "Unavailable"}
                 </span>
               </DetailBlock>
               <DetailBlock label="Recorded agent name">
                 <span className="font-mono text-sm text-void-200">
-                  {selectedAction?.agentName ?? "—"}
+                  {selectedAction?.agentName ?? "Unavailable"}
                 </span>
               </DetailBlock>
               <DetailBlock label="Recorded payment">
                 <span className="font-mono text-sm text-void-200">
                   {selectedAction?.paymentAmount && selectedAction.paymentNetwork
                     ? `${selectedAction.paymentAmount} · ${selectedAction.paymentNetwork}`
-                    : "—"}
+                    : "Unavailable"}
                 </span>
               </DetailBlock>
               <DetailBlock label="Recorded duration">
                 <span className="font-mono text-sm text-void-200">
-                  {selectedAction?.durationMs != null ? `${selectedAction.durationMs} ms` : "—"}
+                  {selectedAction?.durationMs != null ? `${selectedAction.durationMs} ms` : "Unavailable"}
                 </span>
               </DetailBlock>
               <DetailBlock label="Decision">
                 <span className="text-sm text-void-200">
-                  {cycle.decision ?? "—"}
+                  {cycle.decision ?? "Unavailable"}
                   {cycle.decisionPct != null ? ` ${cycle.decisionPct}%` : ""}
                   {cycle.asset ? ` ${cycle.asset}` : ""}
                 </span>
@@ -351,7 +360,7 @@ function LegacyCycleVerifyContent() {
                     Attestation hash
                   </div>
                   <div className={`break-all ${hasVerifiedTeeEvidence ? "text-emerald-300" : "text-void-500"}`}>
-                    {attestation === "—" ? "No attestation hash recorded" : attestation}
+                    {attestation === "Unavailable" ? "No attestation hash recorded" : attestation}
                   </div>
                 </div>
                 <hr className="border-void-800" />
@@ -451,12 +460,12 @@ function LegacyCycleVerifyContent() {
                   #{cycle.hcsSeqNum} <span className="text-[10px]">↗ on Hashscan</span>
                 </a>
               ) : (
-                <span className="font-mono text-sm text-void-600">—</span>
+                <span className="font-mono text-sm text-void-600">Unavailable</span>
               )}
             </DetailBlock>
             <DetailBlock label="Recorded total cost">
               <span className="text-sm text-void-200">
-                {cycle.totalCostUsd != null ? `$${cycle.totalCostUsd.toFixed(3)} USDC` : "—"}
+                {cycle.totalCostUsd != null ? `$${cycle.totalCostUsd.toFixed(3)} USDC` : "Unavailable"}
               </span>
             </DetailBlock>
           </div>
@@ -582,9 +591,9 @@ function VerifyRatingButton({
             ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-[0_0_14px_rgba(52,211,153,0.35)] cursor-default"
             : "bg-void-900/80 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70"
         } ${submitting ? "opacity-60" : ""}`}
-        title="I checked this TEE attestation and endorse this specialist — records a verified-rating on HCS."
+        title="I checked this TEE attestation and endorse this specialist. This records a verified rating on HCS."
       >
-        {verified ? "✓ Verified" : submitting ? "Signing…" : "Verify ✓"}
+        {verified ? <><CheckIcon size={14} aria-hidden /> Verified</> : submitting ? <><SpinnerGapIcon className="animate-spin" size={14} aria-hidden /> Signing</> : <><CheckIcon size={14} aria-hidden /> Verify</>}
       </button>
       {verified && reputation != null && (
         <span className="font-pixel text-[13px] tabular-nums text-gold-400 glow-dawg">
@@ -597,9 +606,9 @@ function VerifyRatingButton({
           target="_blank"
           rel="noopener noreferrer"
           className="font-mono text-[11px] text-teal-300 hover:text-teal-200 underline decoration-dotted"
-          title="View this verified-rating on Hashscan — the before/after ELO is logged to HCS as proof."
+          title="View this verified rating on Hashscan. The before and after ELO is logged to HCS as proof."
         >
-          HCS ↗
+          HCS <ArrowSquareOutIcon size={13} aria-hidden />
         </a>
       )}
       {error && (

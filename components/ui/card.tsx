@@ -9,7 +9,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`bg-void-900 border border-void-800 rounded-2xl ${className}`}
+      className={`rounded-xl border border-void-800 bg-void-900 shadow-[inset_0_1px_0_rgba(245,241,230,0.035)] ${className}`}
     >
       {children}
     </div>
@@ -42,33 +42,6 @@ export function CardBody({
   return <div className={`p-4 ${className}`}>{children}</div>;
 }
 
-export function MetricCard({
-  emoji,
-  label,
-  value,
-  sub,
-  subColor = "text-void-500",
-}: {
-  emoji: string;
-  label: string;
-  value: string;
-  sub?: string;
-  subColor?: string;
-}) {
-  return (
-    <div className="bg-void-900 border border-void-800 rounded-xl p-3.5">
-      <div className="flex items-center gap-1.5 text-void-600 text-[11px] mb-2">
-        <span>{emoji}</span>
-        <span className="uppercase tracking-wider">{label}</span>
-      </div>
-      <div className="text-[22px] font-bold text-void-100">
-        {value}
-      </div>
-      {sub && <div className={`text-xs mt-0.5 ${subColor}`}>{sub}</div>}
-    </div>
-  );
-}
-
 export function CodeBlock({
   children,
   className = "",
@@ -78,7 +51,7 @@ export function CodeBlock({
 }) {
   return (
     <div
-      className={`bg-void-950 border border-void-800 rounded-[10px] p-3 text-xs font-mono text-void-400 leading-relaxed ${className}`}
+      className={`rounded-lg border border-void-800 bg-void-950 p-3 font-mono text-xs leading-relaxed text-void-400 ${className}`}
     >
       {children}
     </div>

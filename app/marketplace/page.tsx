@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { PlusIcon, ShieldCheckIcon } from "@phosphor-icons/react";
 import { Card, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CopyableIdentifier, EvidenceStatus } from "@/components/ui/evidence";
@@ -267,13 +268,15 @@ export default function MarketplacePage() {
     .slice(0, 5);
 
   return (
-    <main className="max-w-7xl mx-auto px-5 py-6 space-y-6">
+    <main className="mx-auto max-w-[90rem] space-y-8 px-4 py-6 sm:px-6 lg:px-8">
       <section className="space-y-4" aria-labelledby="protected-agent-registry-title">
-        <div className="rounded-2xl border border-dawg-500/30 bg-void-900 p-4 sm:p-5">
+        <div className="relative overflow-hidden rounded-xl border border-dawg-500/30 bg-black p-5 sm:p-8">
+          <div className="brand-hairline absolute inset-x-0 top-0 h-0.5" aria-hidden="true" />
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 id="protected-agent-registry-title" className="text-xl font-bold text-void-100">
+                <ShieldCheckIcon size={22} className="text-dawg-400" aria-hidden />
+                <h1 id="protected-agent-registry-title" className="text-3xl font-semibold tracking-[-0.035em] text-void-100 sm:text-4xl">
                   Protected agent registry
                 </h1>
                 <Badge variant="amber">Immutable versions</Badge>
@@ -285,9 +288,9 @@ export default function MarketplacePage() {
             <button
               type="button"
               onClick={() => setShowCreateAgent(true)}
-              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-dawg-500 px-4 text-sm font-bold text-black transition-colors hover:bg-dawg-400"
+              className="instrument-button instrument-button-primary shrink-0"
             >
-              + Publish agent
+              <PlusIcon size={16} weight="bold" aria-hidden /> Publish agent
             </button>
           </div>
         </div>
@@ -327,9 +330,18 @@ export default function MarketplacePage() {
         )}
       </section>
 
+      <div className="flex items-end justify-between gap-4 border-t border-void-800 pt-8">
+        <div>
+          <p className="instrument-label">Legacy surface</p>
+          <h2 className="mt-2 text-xl font-semibold text-void-100">Observed hunt-pack marketplace</h2>
+          <p className="mt-1 text-sm text-void-500">Non-authoritative historical and community data, separated from protected publication.</p>
+        </div>
+        <Badge variant="gray">Legacy</Badge>
+      </div>
+
       {/* ── HERO — Nasdaq LED marketplace board ─────────────────────── */}
       <section
-        className="nasdaq-led nasdaq-scanlines relative overflow-hidden rounded-2xl border-2 border-dawg-500/60 shadow-[0_0_0_1px_rgba(0,0,0,0.9),0_10px_50px_-10px_rgba(255,199,0,0.35)]"
+        className="nasdaq-led relative overflow-hidden rounded-xl border border-void-800"
         aria-label="Legacy AlphaDawg hunt-pack marketplace board"
       >
         <div className="h-[3px] w-full bg-gradient-to-r from-transparent via-dawg-500 to-transparent" />
@@ -382,7 +394,7 @@ export default function MarketplacePage() {
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <LedMarketTile
                 label="YOUR PACK"
-                value={loadingPack ? "—" : String(packSize)}
+                value={loadingPack ? "Unavailable" : String(packSize)}
                 sub="SPECIALISTS HIRED"
                 tone="bright"
               />
@@ -390,7 +402,7 @@ export default function MarketplacePage() {
                 label="PACK EARNED"
                 value={
                   loadingPack
-                    ? "—"
+                    ? "Unavailable"
                     : packEarningsUsd > 0
                       ? `$${packEarningsUsd.toFixed(3)}`
                       : "$0.000"
@@ -400,13 +412,13 @@ export default function MarketplacePage() {
               />
               <LedMarketTile
                 label="SWARM ONLINE"
-                value={swarmTotal > 0 ? `${swarmOnline}/${swarmTotal}` : "—"}
+                value={swarmTotal > 0 ? `${swarmOnline}/${swarmTotal}` : "Unavailable"}
                 sub="OBSERVED HEALTH"
                 tone={swarmOnline === swarmTotal && swarmTotal > 0 ? "green" : "bright"}
               />
               <LedMarketTile
                 label="AVAILABLE"
-                value={loadingMarketplace ? "—" : String(availableCount)}
+                value={loadingMarketplace ? "Unavailable" : String(availableCount)}
                 sub="TO HIRE NOW"
                 tone="bright"
               />
@@ -613,7 +625,7 @@ function ProtectedAgentCard({
   onRun: () => void;
 }) {
   return (
-    <Card className="min-w-0 overflow-hidden">
+    <Card className="min-w-0 overflow-hidden border-dawg-500/20">
       <CardBody className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -628,7 +640,7 @@ function ProtectedAgentCard({
             <p className="mt-2 text-sm leading-relaxed text-void-400">{agent.description}</p>
           </div>
           <div className="shrink-0 text-right">
-            <div className="font-pixel text-2xl leading-none text-dawg-300">V{agent.version}</div>
+            <div className="font-mono text-xl font-semibold leading-none text-dawg-300">V{agent.version}</div>
             <div className="mt-1 font-mono text-[10px] text-void-500">
               {agent.priceAtomic} {agent.asset}
             </div>
@@ -935,7 +947,7 @@ function ActiveAgentCard({
           <Stat label="hires" value={String(agent.timesHired)} />
           <Stat
             label="earned"
-            value={earningsUsd != null ? `$${earningsUsd.toFixed(3)}` : "—"}
+            value={earningsUsd != null ? `$${earningsUsd.toFixed(3)}` : "Unavailable"}
             tone="emerald"
           />
         </div>
@@ -1095,7 +1107,7 @@ function CommunityAgentCard({
                 {walletShort}
               </a>
             ) : (
-              <span className="text-void-700">—</span>
+              <span className="text-void-700">Unavailable</span>
             )}
             {lastHire && <span>{lastHire}</span>}
           </div>

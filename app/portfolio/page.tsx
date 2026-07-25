@@ -87,14 +87,14 @@ export default function PortfolioPage() {
   }
 
   return (
-    <main className="max-w-screen-2xl mx-auto px-5 py-6 space-y-6">
-      <header className="rounded-2xl border border-void-800/90 bg-void-950/70 px-5 py-6 sm:px-8 sm:py-7">
+    <main className="mx-auto max-w-[90rem] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="rounded-xl border border-dawg-500/25 bg-black px-5 py-6 sm:px-8 sm:py-8">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
-            <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-void-600">
+            <p className="instrument-label">
               Portfolio
             </p>
-            <h1 className="font-pixel text-[26px] sm:text-[30px] leading-tight text-dawg-400/95 uppercase tracking-wide">
+            <h1 className="text-3xl font-semibold leading-tight tracking-[-0.035em] text-void-100 sm:text-4xl">
               Holdings &amp; hunts
             </h1>
             <p className="text-sm text-void-500 leading-relaxed">
@@ -195,7 +195,7 @@ export default function PortfolioPage() {
                         <td className="px-4 py-2">{new Date(point.timestamp).toLocaleString()}</td>
                         <td className="px-4 py-2">{point.action} {point.pct}% {point.asset}</td>
                         <td className="px-4 py-2 font-mono">${point.navAfter.toFixed(2)}</td>
-                        <td className="px-4 py-2 font-mono">{point.swapTxHash ? `${point.swapTxHash.slice(0, 10)}…` : "—"}</td>
+                        <td className="px-4 py-2 font-mono">{point.swapTxHash ? `${point.swapTxHash.slice(0, 10)}...` : "Unavailable"}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { MotionConfig, motion, useReducedMotion } from "motion/react";
+import { ChatCenteredTextIcon, CheckIcon, PlusIcon, WalletIcon, WarningIcon, XIcon } from "@phosphor-icons/react";
 import { Card, CardHeader, CardBody, CodeBlock } from "@/components/ui/card";
 import { NasdaqHeader } from "@/components/nasdaq-header";
 import { Badge, SealedBadge, LiveBadge, ZeroGBadge } from "@/components/ui/badge";
@@ -336,7 +337,7 @@ export default function DashboardPage() {
     timestamp: new Date().toISOString(),
     specialists: pendingCycle.specialists.map((s) => ({
       name: s.name,
-      emoji: s.name === "sentiment" ? "🧠" : s.name === "whale" ? "🐋" : "📈",
+      emoji: s.name === "sentiment" ? "SB" : s.name === "whale" ? "WE" : "MX",
       analysis: s.reasoning
         ? `${s.reasoning}\n${s.signal} (${s.confidence}% confidence)`
         : `${s.signal} (${s.confidence}% confidence)`,
@@ -398,7 +399,7 @@ export default function DashboardPage() {
     <MotionConfig reducedMotion="user" transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}>
     <>
       <DashboardOnboardingModal open={showOnboarding} onDismiss={() => setShowOnboarding(false)} />
-      <main className="max-w-screen-2xl mx-auto px-5 py-5">
+      <main className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
       {/* Unskippable Telegram verification modal */}
       {user && !telegramVerified && (
         <TelegramModal linkCode={linkCode} onRefresh={refreshLinkCode} />
@@ -443,11 +444,11 @@ export default function DashboardPage() {
         {...sectionReveal}
         data-testid="protected-work-hero"
         aria-labelledby="protected-work-title"
-        className="relative overflow-hidden rounded-2xl border border-dawg-500/30 bg-void-950 px-5 py-7 sm:px-7 sm:py-9"
+        className="relative overflow-hidden rounded-xl border border-dawg-500/30 bg-black px-5 py-8 sm:px-8 sm:py-10"
       >
         <div className="brand-hairline absolute inset-x-0 top-0 h-0.5" aria-hidden="true" />
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-300">Protected commerce kernel</p>
-        <h1 id="protected-work-title" className="text-gradient-brand mt-3 max-w-4xl text-3xl font-bold tracking-[-0.035em] sm:text-5xl">
+        <p className="instrument-label text-dawg-400">Protected commerce kernel</p>
+        <h1 id="protected-work-title" className="mt-3 max-w-4xl text-4xl font-semibold tracking-[-0.045em] text-void-100 sm:text-6xl">
           Hire immutable agents. Inspect exact proof.
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-void-400 sm:text-base">
@@ -512,21 +513,21 @@ export default function DashboardPage() {
       </div>
 
       {/* Shared immutable agent publication entry point. */}
-      <Card>
+      <Card className="border-dawg-500/25">
         <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-xs text-void-500 uppercase tracking-wider">
               Build Your Specialist
             </span>
             <span className="text-xs text-void-400 truncate">
-              Define instructions · review the immutable version · publish to the protected registry.
+              Define instructions, review the immutable version, then publish to the protected registry.
             </span>
           </div>
           <button
             onClick={() => setShowCreateAgent(true)}
-            className="inline-flex items-center gap-2 px-4 py-1.5 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-xs font-bold rounded-lg transition-colors shrink-0"
+            className="instrument-button instrument-button-primary shrink-0"
           >
-            <span className="text-base leading-none">+</span>
+            <PlusIcon size={16} weight="bold" aria-hidden />
             <span>Create Agent</span>
           </button>
         </div>
@@ -547,7 +548,7 @@ export default function DashboardPage() {
                 Persists across cycles · {huntGoal.length}/280
               </span>
               {goalSavedAt != null && (
-                <span className="text-[10px] text-emerald-400">Saved ✓</span>
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400"><CheckIcon size={11} aria-hidden /> Saved</span>
               )}
             </div>
             <button
@@ -717,7 +718,7 @@ export default function DashboardPage() {
         </div>
         {manualError && (
           <div className="px-4 pb-3 -mt-1">
-            <span className="text-[11px] text-blood-300">⚠ {manualError}</span>
+            <span className="inline-flex items-center gap-2 text-[11px] text-blood-300"><WarningIcon size={14} aria-hidden /> {manualError}</span>
           </div>
         )}
       </Card>
@@ -830,10 +831,8 @@ export default function DashboardPage() {
             {/* Agent wallet row */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blood-900/50 border border-blood-600/30 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-blood-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
-                  </svg>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-dawg-500/30 bg-dawg-900/20">
+                  <WalletIcon size={16} className="text-dawg-400" aria-hidden />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -848,7 +847,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <p className={`text-lg font-bold font-mono ${(agentBalance ?? 0) > 0 ? "text-gold-400" : "text-void-600"}`}>
-                    {agentBalance != null ? `$${agentBalance.toFixed(4)}` : "—"}
+                    {agentBalance != null ? `$${agentBalance.toFixed(4)}` : "Unavailable"}
                   </p>
                   <p className="text-[10px] text-void-600">
                     {agentBalance != null ? "Arc RPC · observed" : "Arc balance unavailable"}
@@ -915,7 +914,7 @@ export default function DashboardPage() {
         onClick={() => setChatOpen((prev) => !prev)}
         className="fixed bottom-6 left-6 z-50 w-14 h-14 bg-dawg-500 hover:bg-dawg-400 text-void-950 text-2xl rounded-full shadow-lg shadow-dawg-500/30 transition-all flex items-center justify-center"
       >
-        {chatOpen ? "✕" : "🐺"}
+        {chatOpen ? <XIcon size={20} aria-hidden /> : <ChatCenteredTextIcon size={20} aria-hidden />}
       </button>
 
       {/* Chat panel — opens from bottom-left, adjacent to FAB */}
@@ -1153,21 +1152,21 @@ function ChallengeColumn({ cycle, onVerify }: { cycle: Cycle; onVerify: () => vo
 
   const agents = [
     {
-      emoji: "🟢",
+      emoji: "AL",
       name: "Alpha",
       role: "alpha" as const,
       data: cycle.adversarial.alpha,
       recColor: "text-green-400",
     },
     {
-      emoji: "🔴",
+      emoji: "RK",
       name: "Risk",
       role: "risk" as const,
       data: cycle.adversarial.risk,
       recColor: "text-blood-300",
     },
     {
-      emoji: "🟡",
+      emoji: "EX",
       name: "Executor",
       role: "executor" as const,
       data: cycle.adversarial.executor,
@@ -1302,7 +1301,7 @@ function EmptyHuntsState() {
         <p className="text-void-500 text-xs max-w-md mx-auto leading-relaxed">
           Your pack is idle. Set an <span className="text-gold-400">AUTO-HUNT</span> cycle count
           above to schedule hunts, or send <code className="px-1 py-0.5 bg-void-800 text-void-300 rounded text-[10px]">/run</code>
-          to your Telegram bot to trigger a one-shot hunt. Every hunt — regardless of source —
+          to your Telegram bot to trigger a one-shot hunt. Every hunt, regardless of source,
           will appear in this feed.
         </p>
       </CardBody>
