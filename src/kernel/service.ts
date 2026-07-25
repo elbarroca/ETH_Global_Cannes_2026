@@ -38,6 +38,13 @@ interface AgentVersionRow {
   asset: "USDC_ATOMIC";
   proof_policy: "verified-receipt-required";
   published_at: Date;
+  lifecycle_state?: string | null;
+  hireable?: boolean | null;
+  creator_parent?: string | null;
+  agent_label?: string | null;
+  full_subname?: string | null;
+  canonical_state?: "UNVERIFIED" | "CANONICAL" | "REFUSED" | null;
+  authority_owner?: string | null;
 }
 
 interface SubmissionRow {
@@ -185,7 +192,14 @@ function mapPublishedAgent(row: AgentVersionRow, viewerUserId: string): Publishe
     priceAtomic: row.price_atomic,
     asset: row.asset,
     proofPolicy: row.proof_policy,
+    lifecycleState: (row.lifecycle_state as PublishedAgent["lifecycleState"]) ?? "PUBLISHED",
+    hireable: row.hireable ?? true,
     ownedByViewer: row.owner_user_id === viewerUserId,
+    creatorParent: row.creator_parent ?? null,
+    agentLabel: row.agent_label ?? null,
+    fullSubname: row.full_subname ?? null,
+    canonicalState: row.canonical_state ?? "UNVERIFIED",
+    authorityOwner: row.authority_owner ?? null,
     publishedAt: new Date(row.published_at).toISOString(),
   };
 }

@@ -10,7 +10,12 @@ export type KernelErrorCode =
   | "KERNEL_IMMUTABLE_VERSION"
   | "KERNEL_ENS_AUTHORITY_REQUIRED"
   | "KERNEL_ENS_AUTHORITY_DENIED"
-  | "A3_NOT_CONFIGURED";
+  | "A3_NOT_CONFIGURED"
+  | "A6_CHAIN_NOT_AUTHORIZED"
+  | "A6_TOKEN_NOT_ALLOWLISTED"
+  | "A6_RECEIPT_IMMUTABLE"
+  | "A6_QUOTE_EXPIRED"
+  | "A6_CONFIRMATION_REQUIRED";
 
 export class KernelError extends Error {
   readonly code: KernelErrorCode;

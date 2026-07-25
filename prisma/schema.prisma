@@ -809,3 +809,32 @@ model EnsPublicationAuthorityPolicy {
   @@unique([releaseSha, bindingHash], map: "ens_publication_authority_policy_release_binding_key")
   @@map("ens_publication_authority_policies")
 }
+
+model UniswapToolReceipt {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId           String    @unique @map("job_id") @db.Uuid
+  buyerAddress    String    @map("buyer_address")
+  agentVersionId  String    @map("agent_version_id") @db.Uuid
+  quoteRequestId  String    @unique @map("quote_request_id")
+  chainId         Int       @map("chain_id")
+  tokenIn         String    @map("token_in")
+  tokenOut        String    @map("token_out")
+  amountIn        BigInt    @map("amount_in")
+  amountOut       BigInt?   @map("amount_out")
+  slippageBps     Int       @map("slippage_bps")
+  deadline        Int
+  spender         String
+  calldataHash    String    @map("calldata_hash")
+  txHash          String?   @map("tx_hash")
+  txStatus        String    @default("QUOTED") @map("tx_status")
+  balanceDelta    BigInt?   @map("balance_delta")
+  failureReason   String?   @map("failure_reason")
+  confirmationSig String?   @map("confirmation_sig")
+  releaseSha      String    @map("release_sha")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([jobId], map: "idx_uniswap_receipts_job")
+  @@index([agentVersionId, createdAt], map: "idx_uniswap_receipts_version")
+  @@map("uniswap_tool_receipts")
+}

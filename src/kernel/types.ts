@@ -127,7 +127,14 @@ export interface PublishedAgent {
   priceAtomic: string;
   asset: "USDC_ATOMIC";
   proofPolicy: "verified-receipt-required";
+  lifecycleState: AgentLifecycleState;
+  hireable: boolean;
   ownedByViewer: boolean;
+  creatorParent: string | null;
+  agentLabel: string | null;
+  fullSubname: string | null;
+  canonicalState: "UNVERIFIED" | "CANONICAL" | "REFUSED";
+  authorityOwner: string | null;
   publishedAt: string;
 }
 

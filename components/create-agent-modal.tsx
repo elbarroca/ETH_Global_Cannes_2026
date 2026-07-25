@@ -4,10 +4,13 @@ import { useState } from "react";
 import { Dialog } from "@/components/ui/dialog";
 import { CopyableIdentifier, EvidenceStatus } from "@/components/ui/evidence";
 import {
+  createAgentDraft,
+  bindAgentName,
+  prepareAgentEnsWrite,
+  publishAgentVersion,
   generateAgentInstructions,
-  publishKernelAgent,
+  type AgentLifecycleVersion,
   type GeneratedInstructions,
-  type PublishedAgent,
 } from "@/lib/api";
 
 const CAPABILITIES = [
@@ -33,7 +36,7 @@ type Step = "define" | "generating" | "review" | "publishing" | "published";
 
 interface CreateAgentModalProps {
   onClose: () => void;
-  onCreated?: (agent: PublishedAgent) => void;
+  onCreated?: (agent: AgentLifecycleVersion) => void;
 }
 
 function generationEvidence(
@@ -52,19 +55,30 @@ function generationEvidence(
   return { state: "unavailable", label: "Unverified generation" };
 }
 
+function slugifyLabel(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "agent";
+}
+
 export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) {
   const [step, setStep] = useState<Step>("define");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [creatorParent, setCreatorParent] = useState("");
   const [generated, setGenerated] = useState<GeneratedInstructions | null>(null);
   const [instructionsEdited, setInstructionsEdited] = useState(false);
   const [selectedCapabilities, setSelectedCapabilities] = useState<Set<Capability>>(
     () => new Set<Capability>(["research"]),
   );
-  const [publishedAgent, setPublishedAgent] = useState<PublishedAgent | null>(null);
+  const [publishedAgent, setPublishedAgent] = useState<AgentLifecycleVersion | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [publicationUncertain, setPublicationUncertain] = useState(false);
+  const [publishStep, setPublishStep] = useState<string | null>(null);
+
+  const agentLabel = slugifyLabel(name);
+  const fullSubnamePreview = creatorParent.trim()
+    ? `${agentLabel}.${creatorParent.trim().toLowerCase().replace(/\.eth$/, "")}.eth`
+    : null;
 
   const isBusy = step === "generating" || step === "publishing";
   const canGenerate =
@@ -77,6 +91,7 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
   const canPublish =
     instructions.trim().length >= 20 &&
     instructions.trim().length <= 4_000 &&
+    creatorParent.trim().length >= 3 &&
     selectedCapabilities.size >= 1 &&
     selectedCapabilities.size <= 3;
 
@@ -119,19 +134,37 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
     setErrorMessage(null);
     setPublicationUncertain(false);
     setStep("publishing");
+    const ikey = Date.now().toString(36);
     try {
-      const agent = await publishKernelAgent({
-        name: name.trim(),
-        description: description.trim(),
-        instructions: instructions.trim(),
-        capabilities: Array.from(selectedCapabilities).sort(),
-      });
-      setPublishedAgent(agent);
+      setPublishStep("Creating draft…");
+      const draft = await createAgentDraft(
+        {
+          name: name.trim(),
+          description: description.trim(),
+          instructions: instructions.trim(),
+          capabilities: Array.from(selectedCapabilities).sort(),
+        },
+        `${ikey}-draft`,
+      );
+      setPublishStep("Binding ENS name…");
+      const bound = await bindAgentName(
+        draft.versionId,
+        creatorParent.trim(),
+        agentLabel,
+        `${ikey}-bind`,
+      );
+      setPublishStep("Preparing ENS write plan…");
+      await prepareAgentEnsWrite(bound.versionId, `${ikey}-prep`);
+      setPublishStep("Publishing immutable version…");
+      const published = await publishAgentVersion(bound.versionId, `${ikey}-pub`);
+      setPublishedAgent(published);
+      setPublishStep(null);
       setStep("published");
-      onCreated?.(agent);
+      onCreated?.(published);
     } catch (error) {
       const responseWasLost = error instanceof TypeError;
       setPublicationUncertain(responseWasLost);
+      setPublishStep(null);
       setErrorMessage(responseWasLost
         ? "The publication response was unavailable, so registry state is unknown. Close and refresh the registry before trying this draft again."
         : error instanceof Error
@@ -274,6 +307,30 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
           )}
 
           <div className="space-y-1.5">
+            <label htmlFor="creator-parent" className="text-xs font-semibold text-void-300">
+              Your ENS name (creator parent)
+            </label>
+            <input
+              id="creator-parent"
+              value={creatorParent}
+              onChange={(event) => setCreatorParent(event.target.value)}
+              placeholder="creator.eth"
+              disabled={isBusy}
+              className="min-h-11 w-full rounded-xl border border-void-800 bg-void-950 px-3 text-sm text-void-100 placeholder:text-void-600 focus:border-dawg-500 focus:outline-none"
+            />
+            {fullSubnamePreview && (
+              <p className="font-mono text-[11px] text-dawg-400">
+                Agent subname: <span className="text-dawg-300">{fullSubnamePreview}</span>
+              </p>
+            )}
+            {!fullSubnamePreview && (
+              <p className="text-[11px] text-void-600">
+                Enter your ENS name to derive the agent subname (e.g. {`${agentLabel}.creator.eth`}).
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
             <label htmlFor="agent-instructions" className="text-xs font-semibold text-void-300">
               Instructions
             </label>
@@ -309,7 +366,7 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
             <button type="button" onClick={handlePublish} disabled={!canPublish || isBusy || publicationUncertain} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-dawg-500 px-5 text-sm font-bold text-black hover:bg-dawg-400 disabled:cursor-not-allowed disabled:opacity-45">
               {step === "publishing" && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" aria-hidden="true" />}
               {step === "publishing"
-                ? "Publishing version…"
+                ? (publishStep ?? "Publishing version…")
                 : publicationUncertain
                   ? "Refresh registry before retry"
                   : "Publish immutable version"}
@@ -324,6 +381,9 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-lg font-bold text-void-100">{publishedAgent.name}</p>
+                {publishedAgent.fullSubname && (
+                  <p className="mt-0.5 font-mono text-sm text-dawg-300">{publishedAgent.fullSubname}</p>
+                )}
                 <p className="mt-1 text-sm text-void-400">Immutable version {publishedAgent.version} is published.</p>
               </div>
               <EvidenceStatus state="verified" label="Published" />
@@ -337,8 +397,18 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
             </div>
             <div>
               <dt className="uppercase tracking-wider text-void-600">Published at</dt>
-              <dd className="mt-1 text-void-200">{new Date(publishedAgent.publishedAt).toLocaleString()}</dd>
+              <dd className="mt-1 text-void-200">{publishedAgent.publishedAt ? new Date(publishedAgent.publishedAt).toLocaleString() : "—"}</dd>
             </div>
+            <div>
+              <dt className="uppercase tracking-wider text-void-600">ENS state</dt>
+              <dd className="mt-1 font-mono text-void-200">{publishedAgent.canonicalState}</dd>
+            </div>
+            {publishedAgent.fullSubname && (
+              <div>
+                <dt className="uppercase tracking-wider text-void-600">Agent subname</dt>
+                <dd className="mt-1 font-mono text-dawg-300">{publishedAgent.fullSubname}</dd>
+              </div>
+            )}
           </dl>
 
           <div className="grid min-w-0 gap-2 sm:grid-cols-2">

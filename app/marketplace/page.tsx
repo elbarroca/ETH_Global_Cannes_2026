@@ -619,9 +619,12 @@ function ProtectedAgentCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-bold text-void-100">{agent.name}</h3>
-              <EvidenceStatus state="verified" label="Published" />
+              <EvidenceStatus state={agent.canonicalState === "CANONICAL" ? "verified" : "pending"} label={agent.canonicalState === "CANONICAL" ? "Canonical" : "Published"} />
               {agent.ownedByViewer && <Badge variant="gray">Yours</Badge>}
             </div>
+            {agent.fullSubname && (
+              <p className="mt-0.5 font-mono text-xs text-dawg-400">{agent.fullSubname}</p>
+            )}
             <p className="mt-2 text-sm leading-relaxed text-void-400">{agent.description}</p>
           </div>
           <div className="shrink-0 text-right">

@@ -1,5 +1,7 @@
 import type { CycleNarrative } from "@/src/agents/narrative";
 import type {
+  AgentLifecycleVersion,
+  AgentEnsWritePlan,
   KernelJobDetail,
   KernelJobListItem,
   JobSnapshot,
@@ -9,6 +11,8 @@ import type {
 import type { TokenPick } from "@/src/types/index";
 
 export type {
+  AgentLifecycleVersion,
+  AgentEnsWritePlan,
   KernelJobDetail,
   KernelJobListItem,
   JobSnapshot,
@@ -328,29 +332,98 @@ export async function getAuthSession(): Promise<AuthSessionResponse | null> {
   );
 }
 
-export interface PublishKernelAgentInput {
+export interface CreateAgentDraftInput {
   name: string;
   description: string;
   instructions: string;
   capabilities: readonly string[];
+  agentId?: string;
 }
 
 export async function getPublishedAgents(signal?: AbortSignal): Promise<PublishedAgent[]> {
-  const response = await apiFetch<{ agents: PublishedAgent[] }>("/api/kernel/agents", {
+  const response = await apiFetch<{ agents: PublishedAgent[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
     cache: "no-store",
     signal,
   });
   return response.agents;
 }
 
-export async function publishKernelAgent(
-  input: PublishKernelAgentInput,
-): Promise<PublishedAgent> {
-  const response = await apiFetch<{ agent: PublishedAgent }>("/api/kernel/agents", {
-    method: "POST",
-    body: JSON.stringify(input),
+export async function getAgentLifecycle(signal?: AbortSignal): Promise<{ agents: PublishedAgent[]; drafts: AgentLifecycleVersion[] }> {
+  return apiFetch<{ agents: PublishedAgent[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
+    cache: "no-store",
+    signal,
   });
-  return response.agent;
+}
+
+function kernelIdempotencyKey(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export async function createAgentDraft(
+  input: CreateAgentDraftInput,
+  idempotencyKey?: string,
+): Promise<AgentLifecycleVersion> {
+  const response = await apiFetch<{ action: string; version: AgentLifecycleVersion }>("/api/kernel/agents", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey ?? kernelIdempotencyKey() },
+    body: JSON.stringify({
+      action: "CREATE_DRAFT",
+      name: input.name,
+      description: input.description,
+      instructions: input.instructions,
+      capabilities: input.capabilities,
+      ...(input.agentId ? { agentId: input.agentId } : {}),
+    }),
+  });
+  return response.version;
+}
+
+export async function bindAgentName(
+  versionId: string,
+  creatorParent: string,
+  agentLabel: string,
+  idempotencyKey?: string,
+): Promise<AgentLifecycleVersion> {
+  const response = await apiFetch<{ action: string; version: AgentLifecycleVersion }>("/api/kernel/agents", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey ?? kernelIdempotencyKey() },
+    body: JSON.stringify({ action: "BIND_NAME", versionId, creatorParent, agentLabel }),
+  });
+  return response.version;
+}
+
+export async function prepareAgentEnsWrite(
+  versionId: string,
+  idempotencyKey?: string,
+): Promise<{ version: AgentLifecycleVersion; plan: AgentEnsWritePlan; planHash: string }> {
+  const response = await apiFetch<{ action: string; version: AgentLifecycleVersion; plan: AgentEnsWritePlan; planHash: string }>("/api/kernel/agents", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey ?? kernelIdempotencyKey() },
+    body: JSON.stringify({ action: "PREPARE_ENS_WRITE", versionId }),
+  });
+  return { version: response.version, plan: response.plan, planHash: response.planHash };
+}
+
+export async function publishAgentVersion(
+  versionId: string,
+  idempotencyKey?: string,
+): Promise<AgentLifecycleVersion> {
+  const response = await apiFetch<{ action: string; version: AgentLifecycleVersion }>("/api/kernel/agents", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey ?? kernelIdempotencyKey() },
+    body: JSON.stringify({ action: "PUBLISH_VERSION", versionId }),
+  });
+  return response.version;
+}
+
+export async function publishKernelAgent(
+  input: CreateAgentDraftInput & { creatorParent: string; agentLabel: string },
+): Promise<AgentLifecycleVersion> {
+  const ikey = kernelIdempotencyKey();
+  const draft = await createAgentDraft(input, `${ikey}-draft`);
+  const bound = await bindAgentName(draft.versionId, input.creatorParent, input.agentLabel, `${ikey}-bind`);
+  await prepareAgentEnsWrite(bound.versionId, `${ikey}-prep`);
+  return publishAgentVersion(bound.versionId, `${ikey}-pub`);
 }
 
 export async function getKernelJobs(signal?: AbortSignal): Promise<KernelJobListItem[]> {

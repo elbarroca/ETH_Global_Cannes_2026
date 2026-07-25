@@ -20,6 +20,7 @@
     "test:a3": "tsx --test tests/a3/*.test.ts",
     "test:a4": "tsx --test tests/a4/*.test.ts",
     "test:a5": "tsx --test tests/a5/*.test.ts",
+    "test:a6": "tsx --test tests/a6/*.test.ts",
     "test:playwright": "npm run build && playwright test",
     "test:go": "cd tools/0g-storage-verifier && go test ./... && go build -o /tmp/alphadawg-0g-storage-verifier ./cmd/verify",
     "test:e2e": "tsx --test tests/e2e/*.test.ts",
