@@ -3,6 +3,7 @@ import type { CanonicalValue } from "./canonical";
 export const JOB_STATES = [
   "QUEUED",
   "RUNNING",
+  "DELIVERY_READY",
   "SUCCEEDED",
   "FAILED",
   "CANCELED",
@@ -10,14 +11,13 @@ export const JOB_STATES = [
 ] as const;
 
 export type JobState = (typeof JOB_STATES)[number];
-export type TerminalJobState = Exclude<JobState, "QUEUED" | "RUNNING">;
+export type TerminalJobState = Exclude<JobState, "QUEUED" | "RUNNING" | "DELIVERY_READY">;
 
 export interface KernelJobInput {
   prompt: string;
 }
 
-export interface AgentManifest extends Record<string, CanonicalValue> {
-  schemaVersion: 1;
+interface AgentManifestBase extends Record<string, CanonicalValue> {
   name: string;
   description: string;
   instructions: string;
@@ -26,12 +26,41 @@ export interface AgentManifest extends Record<string, CanonicalValue> {
   endpoint: null;
   connectorKey: null;
   ownerWallet: string;
-  payoutAddress: null;
   priceAtomic: string;
   asset: "USDC_ATOMIC";
   proofPolicy: "verified-receipt-required";
   ensBinding: AgentEnsBinding | null;
 }
+
+export interface AgentManifestV1 extends AgentManifestBase {
+  schemaVersion: 1;
+  payoutAddress: null;
+}
+
+export interface PinnedAgentSkill extends Record<string, CanonicalValue> {
+  id: "research" | "market-analysis" | "risk-analysis" | "uniswap-swap";
+  source: string;
+  reviewedHash: string;
+  policy: "metadata-only-never-execute";
+}
+
+export interface AgentNativeConnection extends Record<string, CanonicalValue> {
+  id: "zero-g-compute" | "zero-g-storage" | "uniswap-api";
+  required: true;
+}
+
+export interface AgentManifestV2 extends AgentManifestBase {
+  schemaVersion: 2;
+  reviewedPromptHash: string;
+  reviewedConfigHash: string;
+  skills: readonly PinnedAgentSkill[];
+  nativeConnections: readonly AgentNativeConnection[];
+  mcp: readonly [];
+  payoutAddress: string;
+  ensBindingHash: string | null;
+}
+
+export type AgentManifest = AgentManifestV1 | AgentManifestV2;
 
 export const AGENT_LIFECYCLE_STATES = [
   "DRAFT",

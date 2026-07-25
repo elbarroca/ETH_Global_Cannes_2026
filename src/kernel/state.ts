@@ -3,7 +3,8 @@ import type { JobState } from "./types";
 
 const TRANSITIONS: Readonly<Record<JobState, readonly JobState[]>> = {
   QUEUED: ["RUNNING", "CANCELED", "FAILED"],
-  RUNNING: ["QUEUED", "SUCCEEDED", "FAILED", "CANCELED", "A3_NOT_CONFIGURED"],
+  RUNNING: ["QUEUED", "DELIVERY_READY", "FAILED", "CANCELED", "A3_NOT_CONFIGURED"],
+  DELIVERY_READY: ["SUCCEEDED"],
   SUCCEEDED: [],
   FAILED: [],
   CANCELED: [],

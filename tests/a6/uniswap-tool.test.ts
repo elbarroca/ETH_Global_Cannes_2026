@@ -15,6 +15,94 @@ import {
   type DisposableDatabase,
 } from "../helpers/postgres";
 
+async function seedUniswapContext(
+  database: DisposableDatabase,
+  buyerAddress: string,
+): Promise<{ jobId: string; agentVersionId: string }> {
+  const ids = {
+    userId: `buyer-${randomUUID()}`,
+    agentId: randomUUID(),
+    agentVersionId: randomUUID(),
+    quoteId: randomUUID(),
+    intentId: randomUUID(),
+    orderId: randomUUID(),
+    jobId: randomUUID(),
+  };
+  await database.sql.begin(async (tx) => {
+    const sql = tx as unknown as DisposableDatabase["sql"];
+    await sql`SET LOCAL session_replication_role = replica`;
+    await sql`INSERT INTO users (id, wallet_address) VALUES (${ids.userId}, ${buyerAddress})`;
+    await sql`
+      INSERT INTO kernel_agents (id, owner_user_id, name)
+      VALUES (${ids.agentId}::uuid, ${ids.userId}, 'A6 Fixture')
+    `;
+    await sql`
+      INSERT INTO agent_versions (
+        id, agent_id, version, manifest, manifest_hash, prompt_hash, config_hash,
+        capabilities, adapter_key, owner_wallet, payout_address, price_atomic,
+        asset, proof_policy, lifecycle_state, canonical_state, published
+      ) VALUES (
+        ${ids.agentVersionId}::uuid, ${ids.agentId}::uuid, 1,
+        ${sql.json({
+          schemaVersion: 1,
+          name: "A6 Fixture",
+          description: "Disposable A6 relational fixture",
+          instructions: "Return one deterministic fixture result.",
+          capabilities: ["research"],
+          adapterKey: "protected-a3",
+          endpoint: null,
+          connectorKey: null,
+          ownerWallet: buyerAddress,
+          payoutAddress: null,
+          priceAtomic: "1000",
+          asset: "USDC_ATOMIC",
+          proofPolicy: "verified-receipt-required",
+          ensBinding: null,
+        })},
+        ${"1".repeat(64)}, ${"2".repeat(64)}, ${"3".repeat(64)},
+        ARRAY['research'], 'protected-a3', ${buyerAddress}, ${buyerAddress},
+        1000, 'USDC_ATOMIC', 'verified-receipt-required', 'DRAFT', 'UNVERIFIED', false
+      )
+    `;
+    await sql`
+      INSERT INTO quotes (
+        id, buyer_user_id, agent_version_id, idempotency_key, input_hash,
+        amount_atomic, asset, expires_at
+      ) VALUES (
+        ${ids.quoteId}::uuid, ${ids.userId}, ${ids.agentVersionId}::uuid,
+        ${`quote-${ids.jobId}`}, ${"4".repeat(64)}, 1000, 'USDC_ATOMIC',
+        clock_timestamp() + interval '5 minutes'
+      )
+    `;
+    await sql`
+      INSERT INTO job_intents (
+        id, buyer_user_id, agent_version_id, idempotency_key, input, input_hash
+      ) VALUES (
+        ${ids.intentId}::uuid, ${ids.userId}, ${ids.agentVersionId}::uuid,
+        ${`intent-${ids.jobId}`}, ${sql.json({ prompt: "fixture" })}, ${"4".repeat(64)}
+      )
+    `;
+    await sql`
+      INSERT INTO kernel_orders (
+        id, buyer_user_id, agent_version_id, intent_id, quote_id, amount_atomic, asset
+      ) VALUES (
+        ${ids.orderId}::uuid, ${ids.userId}, ${ids.agentVersionId}::uuid,
+        ${ids.intentId}::uuid, ${ids.quoteId}::uuid, 1000, 'USDC_ATOMIC'
+      )
+    `;
+    await sql`
+      INSERT INTO jobs (
+        id, order_id, intent_id, buyer_user_id, agent_version_id, state,
+        version, attempts, max_attempts
+      ) VALUES (
+        ${ids.jobId}::uuid, ${ids.orderId}::uuid, ${ids.intentId}::uuid,
+        ${ids.userId}, ${ids.agentVersionId}::uuid, 'DELIVERY_READY', 2, 1, 3
+      )
+    `;
+  });
+  return { jobId: ids.jobId, agentVersionId: ids.agentVersionId };
+}
+
 // ── Unit: chain guard ────────────────────────────────────────────────────────
 
 test("A6 chain guard rejects Ethereum mainnet (chainId 1)", () => {
@@ -125,6 +213,8 @@ test("DB rejects UniswapToolReceipt with non-Unichain chain_id", async () => {
             slippageBps: 50,
             deadline: Math.floor(Date.now() / 1000) + 120,
             spender: UNICHAIN_SEPOLIA.swapRouter,
+            requestHash: "1".repeat(64),
+            routeHash: "2".repeat(64),
             calldataHash: "a".repeat(64),
             releaseSha: "test-sha",
             txStatus: "QUOTED",
@@ -153,6 +243,14 @@ test("DB rejects duplicate quoteRequestId (UNIQUE constraint)", async () => {
     });
 
     const quoteRequestId = randomUUID();
+    const first = await seedUniswapContext(
+      database,
+      "0x2222222222222222222222222222222222222222",
+    );
+    const second = await seedUniswapContext(
+      database,
+      "0x2222222222222222222222222222222222222223",
+    );
     const baseData = {
       buyerAddress: "0x2222222222222222222222222222222222222222",
       chainId: 1301,
@@ -163,6 +261,8 @@ test("DB rejects duplicate quoteRequestId (UNIQUE constraint)", async () => {
       slippageBps: 50,
       deadline: Math.floor(Date.now() / 1000) + 120,
       spender: UNICHAIN_SEPOLIA.swapRouter,
+      requestHash: "3".repeat(64),
+      routeHash: "4".repeat(64),
       calldataHash: "b".repeat(64),
       releaseSha: "test-sha",
       txStatus: "QUOTED",
@@ -171,8 +271,8 @@ test("DB rejects duplicate quoteRequestId (UNIQUE constraint)", async () => {
     await prisma.uniswapToolReceipt.create({
       data: {
         ...baseData,
-        jobId: randomUUID(),
-        agentVersionId: randomUUID(),
+        jobId: first.jobId,
+        agentVersionId: first.agentVersionId,
         quoteRequestId,
       },
     });
@@ -182,8 +282,9 @@ test("DB rejects duplicate quoteRequestId (UNIQUE constraint)", async () => {
         prisma.uniswapToolReceipt.create({
           data: {
             ...baseData,
-            jobId: randomUUID(), // different job
-            agentVersionId: randomUUID(),
+            jobId: second.jobId,
+            buyerAddress: "0x2222222222222222222222222222222222222223",
+            agentVersionId: second.agentVersionId,
             quoteRequestId, // same quoteRequestId — must fail
           },
         }),
@@ -210,11 +311,15 @@ test("DB allows advancing UniswapToolReceipt from QUOTED to SUBMITTED", async ()
     });
 
     const quoteRequestId = randomUUID();
+    const context = await seedUniswapContext(
+      database,
+      "0x3333333333333333333333333333333333333333",
+    );
     await prisma.uniswapToolReceipt.create({
       data: {
-        jobId: randomUUID(),
+        jobId: context.jobId,
         buyerAddress: "0x3333333333333333333333333333333333333333",
-        agentVersionId: randomUUID(),
+        agentVersionId: context.agentVersionId,
         quoteRequestId,
         chainId: 1301,
         tokenIn: UNICHAIN_SEPOLIA.tokens.USDC,
@@ -224,6 +329,8 @@ test("DB allows advancing UniswapToolReceipt from QUOTED to SUBMITTED", async ()
         slippageBps: 50,
         deadline: Math.floor(Date.now() / 1000) + 120,
         spender: UNICHAIN_SEPOLIA.swapRouter,
+        requestHash: "5".repeat(64),
+        routeHash: "6".repeat(64),
         calldataHash: "c".repeat(64),
         releaseSha: "test-sha",
         txStatus: "QUOTED",

@@ -12,6 +12,7 @@ import {
   createEnsPublicationAuthority,
   createEnsPublicationPolicyDocument,
 } from "../src/ens/authority";
+import { bindManifestEns } from "../src/kernel/agent-catalog";
 import { domainHash } from "../src/kernel/canonical";
 import { parseAgentInput, parseEnsBinding } from "../src/kernel/policy";
 import { createEnsPublicationAuthorityFixture } from "../tests/helpers/ens";
@@ -31,6 +32,8 @@ const A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION = "20260725062500_a4_publicat
 const A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION = "20260725064000_a4_publication_upgrade_preflight";
 const A4_KERNEL_PUBLICATION_INTEGRITY_MIGRATION = "20260725072000_a4_kernel_publication_integrity";
 const A4_KERNEL_ACTION_INTEGRITY_MIGRATION = "20260725082000_a4_kernel_action_integrity";
+const A6_UNISWAP_TOOL_RECEIPT_MIGRATION = "20260725100000_a6_uniswap_tool_receipt";
+const A5_A6_KERNEL_FOUNDATION_MIGRATION = "20260725113000_a5_a6_kernel_foundation";
 const PRE_HARDENING_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -408,7 +411,7 @@ async function seedW6PublicationDecision(
     capabilities: ["research", "market-analysis"],
   }, UPGRADE_CREATOR_WALLET).manifest;
   const nameBinding = parseEnsBinding({ creatorParent: "creator.eth", agentLabel: "research" });
-  const boundManifest = { ...manifest, ensBinding: nameBinding };
+  const boundManifest = bindManifestEns(manifest, nameBinding);
   const manifestHash = domainHash("agent-manifest", boundManifest);
   const promptHash = domainHash("agent-prompt", boundManifest.instructions);
   const configHash = domainHash("agent-config", {
@@ -450,7 +453,7 @@ async function seedW6PublicationDecision(
     ) VALUES (
       ${agent.id}::uuid, 1, ${sql.json(boundManifest)}, ${manifestHash}, ${promptHash},
       ${configHash}, ${boundManifest.capabilities}, ${boundManifest.adapterKey}, NULL, NULL,
-      ${UPGRADE_CREATOR_WALLET}, NULL, ${boundManifest.priceAtomic}::bigint,
+      ${UPGRADE_CREATOR_WALLET}, ${UPGRADE_CREATOR_WALLET}, ${boundManifest.priceAtomic}::bigint,
       ${boundManifest.asset}, ${boundManifest.proofPolicy}, 'WRITE_PREPARED',
       ${nameBinding.creatorParent}, ${nameBinding.agentLabel}, ${nameBinding.fullSubname},
       ${sql.json(plan)}, ${domainHash("ens-write-plan", plan)}, false, NULL, ${now}
@@ -756,6 +759,11 @@ async function verifyDatabase(
       a4_kernel_action_index_count: string;
       receipt_authority_nullable: string;
       lifecycle_action_nullable: string;
+      uniswap_tool_receipts: string | null;
+      x402_payment_receipts: string | null;
+      a6_uniswap_tool_receipt_count: string;
+      a5_a6_kernel_foundation_count: string;
+      a5_a6_kernel_constraint_count: string;
       sequence_type: string;
       sequence_start: string;
       sequence_min: string;
@@ -865,7 +873,14 @@ async function verifyDatabase(
             'agent_version_events_publication_integrity',
             'agent_lifecycle_actions_event_integrity',
             'agent_version_events_action_integrity',
-            'agent_versions_action_integrity'
+            'agent_versions_action_integrity',
+            'agent_versions_manifest_v2_publication',
+            'x402_payment_receipts_lineage',
+            'x402_payment_receipts_immutable',
+            'x402_payment_receipts_no_truncate',
+            'uniswap_tool_receipts_legal_transitions',
+            'uniswap_tool_receipts_append_only',
+            'uniswap_tool_receipts_no_truncate'
           )
         ) AS invariant_trigger_count,
         (
@@ -1057,6 +1072,35 @@ async function verifyDatabase(
           WHERE table_schema = 'public' AND table_name = 'agent_version_events'
             AND column_name = 'lifecycle_action_id'
         ) AS lifecycle_action_nullable,
+        to_regclass('public.uniswap_tool_receipts')::text AS uniswap_tool_receipts,
+        to_regclass('public.x402_payment_receipts')::text AS x402_payment_receipts,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A6_UNISWAP_TOOL_RECEIPT_MIGRATION} AND finished_at IS NOT NULL
+        ) AS a6_uniswap_tool_receipt_count,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A5_A6_KERNEL_FOUNDATION_MIGRATION} AND finished_at IS NOT NULL
+        ) AS a5_a6_kernel_foundation_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'agent_versions_manifest_schema_check',
+            'agent_versions_manifest_v2_shape_check',
+            'x402_receipts_exact_payment_check',
+            'x402_receipts_address_check',
+            'x402_receipts_hash_check',
+            'x402_receipts_finality_check',
+            'uniswap_receipts_job_fk',
+            'uniswap_receipts_version_fk',
+            'uniswap_receipts_amount_check',
+            'uniswap_receipts_slippage_check',
+            'uniswap_receipts_status_check',
+            'uniswap_receipts_hash_check',
+            'uniswap_receipts_terminal_shape_check',
+            'uniswap_receipts_chain_is_unichain_sepolia'
+          )
+        ) AS a5_a6_kernel_constraint_count,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
         seq.min_value::text AS sequence_min,
@@ -1085,7 +1129,7 @@ async function verifyDatabase(
       result.agent_version_events !== "agent_version_events" ||
       result.agent_lifecycle_actions !== "agent_lifecycle_actions" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 12 ||
+      Number(result.migration_count) !== 14 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1098,7 +1142,7 @@ async function verifyDatabase(
       Number(result.a4_publication_upgrade_preflight_count) !== 1 ||
       Number(result.a4_kernel_publication_integrity_count) !== 1 ||
       Number(result.a4_kernel_action_integrity_count) !== 1 ||
-      Number(result.invariant_trigger_count) !== 25 ||
+      Number(result.invariant_trigger_count) !== 32 ||
       Number(result.a4_constraint_count) !== 14 ||
       Number(result.a4_publication_constraint_count) !== 7 ||
       Number(result.a4_publication_authority_constraint_count) !== 3 ||
@@ -1114,6 +1158,11 @@ async function verifyDatabase(
       Number(result.a4_kernel_publication_constraint_count) !== 19 ||
       Number(result.a4_kernel_publication_function_count) !== 5 ||
       Number(result.a4_kernel_action_index_count) !== 3 ||
+      result.uniswap_tool_receipts !== "uniswap_tool_receipts" ||
+      result.x402_payment_receipts !== "x402_payment_receipts" ||
+      Number(result.a6_uniswap_tool_receipt_count) !== 1 ||
+      Number(result.a5_a6_kernel_foundation_count) !== 1 ||
+      Number(result.a5_a6_kernel_constraint_count) !== 14 ||
       result.receipt_authority_nullable !== "NO" ||
       result.lifecycle_action_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||

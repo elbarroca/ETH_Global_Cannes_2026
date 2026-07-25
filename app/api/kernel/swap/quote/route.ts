@@ -38,6 +38,27 @@ export async function POST(request: Request): Promise<NextResponse> {
     const prisma = getPrisma();
     const deadline = Math.floor(Date.now() / 1000) + UNICHAIN_SEPOLIA.quoteDeadlineSeconds;
     const quoteRequestId = randomUUID();
+    const requestHash = createHash("sha256")
+      .update(JSON.stringify({
+        jobId,
+        buyerAddress: principal.walletAddress.toLowerCase(),
+        chainId: UNICHAIN_SEPOLIA.chainId,
+        tokenIn,
+        tokenOut,
+        amountIn: amountIn.toString(),
+        slippageBps,
+        deadline,
+      }))
+      .digest("hex");
+    const routeHash = createHash("sha256")
+      .update(JSON.stringify({
+        chainId: UNICHAIN_SEPOLIA.chainId,
+        tokenIn,
+        tokenOut,
+        feeTier: UNICHAIN_SEPOLIA.defaultFeeTier,
+        spender: UNICHAIN_SEPOLIA.swapRouter,
+      }))
+      .digest("hex");
 
     // Compute a deterministic calldata hash from quote parameters.
     // Live calldata is derived from the Uniswap SwapRouter ABI on-chain;
@@ -75,6 +96,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         slippageBps,
         deadline,
         spender: UNICHAIN_SEPOLIA.swapRouter,
+        requestHash,
+        routeHash,
         calldataHash,
         txStatus: "QUOTED",
         releaseSha: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",

@@ -1,4 +1,5 @@
 import { getDb } from "../config/database";
+import { deriveManifestHashes } from "./agent-catalog";
 import { canonicalJson, domainHash, type CanonicalValue } from "./canonical";
 import { KernelError } from "./errors";
 import {
@@ -384,16 +385,7 @@ export async function publishAgent(
 ): Promise<PublishedAgent> {
   const sql = options.sql ?? getDb();
   const now = options.now ?? new Date();
-  const manifestHash = domainHash("agent-manifest", manifest);
-  const promptHash = domainHash("agent-prompt", manifest.instructions);
-  const configHash = domainHash("agent-config", {
-    adapterKey: manifest.adapterKey,
-    capabilities: manifest.capabilities,
-    connectorKey: manifest.connectorKey,
-    endpoint: manifest.endpoint,
-    priceAtomic: manifest.priceAtomic,
-    proofPolicy: manifest.proofPolicy,
-  });
+  const hashes = deriveManifestHashes(manifest);
   try {
     return await sql.begin(async (transaction) => {
       const tx = transaction as unknown as DatabaseClient;
@@ -411,9 +403,9 @@ export async function publishAgent(
           payout_address, price_atomic, asset, proof_policy, published,
           published_at, created_at
         ) VALUES (
-          ${agent.id}::uuid, 1, ${tx.json(manifest)}, ${manifestHash}, ${promptHash},
-          ${configHash}, ${manifest.capabilities}, ${manifest.adapterKey}, NULL, NULL,
-          ${owner.walletAddress}, NULL, ${manifest.priceAtomic}::bigint, ${manifest.asset},
+          ${agent.id}::uuid, 1, ${tx.json(manifest)}, ${hashes.manifestHash}, ${hashes.promptHash},
+          ${hashes.configHash}, ${manifest.capabilities}, ${manifest.adapterKey}, NULL, NULL,
+          ${owner.walletAddress}, ${manifest.payoutAddress}, ${manifest.priceAtomic}::bigint, ${manifest.asset},
           ${manifest.proofPolicy}, true, ${now}, ${now}
         )
         RETURNING
@@ -807,7 +799,7 @@ export async function getBuyerJobDetail(
         : null,
       storage,
       receipt,
-      delivery: receipt && effect?.result_hash && effect.terminal_at
+      delivery: base.state === "SUCCEEDED" && receipt && effect?.result_hash && effect.terminal_at
         ? {
             resultHash: effect.result_hash,
             result: toCanonicalValue(effect.result),

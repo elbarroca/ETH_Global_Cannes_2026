@@ -3,6 +3,72 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/kernel_a5_a6_foundation
+task_id: A5-A6-KERNEL-FOUNDATION-20260725
+task_instance_id: A5-A6-KERNEL-FOUNDATION-20260725:W1:574323E
+generation: 1
+sprint: A5_A6_kernel_manifest_delivery_foundation
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 574323eed5d6312cc95df04ab298e3255ee0bef4
+control_sha: 574323eed5d6312cc95df04ab298e3255ee0bef4
+token: A5-A6-KERNEL-FOUNDATION-W1-574323E-EFB32255-823F-4393-B294-FF3E8A59C009
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T11:22:39Z
+expires_at: 2026-07-25T20:00:00Z
+allowed_paths:
+  - prisma/schema.prisma
+  - prisma/migrations/20260725*_a5_a6_kernel_foundation/**
+  - src/kernel/**
+  - src/worker/** only where needed for DELIVERY_READY and result redaction
+  - app/api/kernel/**
+  - app/api/marketplace/skills/route.ts delete only
+  - scripts/test-migrations.ts
+  - tests/kernel/**
+  - tests/foundation/** only disposable PostgreSQL harness changes
+  - tests/helpers/postgres.ts only disposable PostgreSQL serialization and short socket-path repair per C0 amendment
+  - tests/a6/** only harness and schema constraint coverage
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - docs/lisbon/evidence/A6-UNISWAP-TOOL.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T11:22:39Z
+deadline: 2026-07-25T20:00:00Z
+expected_exit: add the authenticated manifest-v2 recommendation and delivery-ready payment-receipt foundation without opening live A5 A6 or release gates
+acceptance_items:
+  - serialize the disposable PostgreSQL harness around one short macOS-safe socket path
+  - discover and assert the actual migration set in canonical and fresh lanes
+  - preserve manifest schema-v1 reads while requiring reviewed immutable schema-v2 publications
+  - replace the public marketplace skills endpoint with authenticated deterministic Kernel recommendations
+  - admit DELIVERY_READY only from verified canonical 0G evidence with zero money and redacted result
+  - add immutable replay-safe x402 receipt and hardened Uniswap receipt database constraints
+  - pass focused and full local checks then create one atomic local commit
+external_effect_authority: local filesystem disposable loopback PostgreSQL local processes dependency inspection and one local commit only; no managed migration deploy push network sponsor or live API call wallet signature transaction funding upload form spend public claim or claim promotion
+path_amendment: C0 added exactly tests/helpers/postgres.ts for the shared harness root fix; no other path or authority changed
+verification_toolchain_amendment: C0 authorized only https://go.dev/dl/go1.23.10.darwin-arm64.tar.gz in a task-specific /tmp directory with SHA-256 25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5; require exact checksum and go version go1.23.10 darwin/arm64 before use; no system install or PATH persistence; delete archive extracted toolchain module cache and verifier before closeout
+verification_toolchain_retry_amendment: after the first transfer was truncated at 65777664 bytes and deleted unexecuted C0 authorized exactly one fresh retry under a new /tmp path; require curl success exact size 71659701 exact SHA-256 25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5 and exact go version go1.23.10 darwin/arm64; delete and block on any failure with no further retry
+verification_toolchain_resumable_authorization: project owner authorized exactly one logical resumable transfer of https://go.dev/dl/go1.23.10.darwin-arm64.tar.gz into a new task-specific /tmp directory using curl --continue-at - with at most three bounded transport attempts; before use require exact size 71659701 SHA-256 25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5 and go version go1.23.10 darwin/arm64; no system install PATH persistence alternate target version or checksum; delete archive toolchain module cache verifier and disposable artifacts after use
+completed_at: 2026-07-25T12:48:02Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - manifest-v2 draft and reachable direct publication persist payoutAddress and shared reviewed manifest prompt and config hashes while malformed review hashes fail closed
+  - verified delivery reaches DELIVERY_READY with zero settlement refund or commission before matching payment evidence
+  - foundation 10 of 10 auth 9 of 9 Kernel 26 of 26 A6 19 of 19 typecheck lint and fourteen-migration canonical fresh and W6 upgrade lanes passed locally
+remaining_blocks:
+  - 0G-owned strict A3 manifest reader accepts schema v1 only and caused test:a3 to stop at 3 of 12
+  - frontend-owned A5 read-model test expects legacy SUCCEEDED instead of intentional DELIVERY_READY and caused test:a5 to stop at 2 of 3
+  - immutable-SHA audit full floor live release and claim gates remain closed
+external_effects_attempted: checksum-pinned official Go toolchain downloads only under exact owner authorization; two truncated attempts were deleted unexecuted and one resumable transfer passed exact size hash and version before local test use; all archives toolchains caches verifier and disposable artifacts were deleted
+dirty_handoff_exception: project owner authorized one serialized Kernel to 0G to Frontend dirty-tree handoff preserving components/kernel-jobs-panel.tsx byte-for-byte
+verdict: HANDOFF_TO_0G
+lock_release: release only matching token A5-A6-KERNEL-FOUNDATION-W1-574323E-EFB32255-823F-4393-B294-FF3E8A59C009 immediately after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Frontend Builder /root/ui_design_spec
 task_id: A5-OPTIMAL-UI-REVAMP-20260725
 task_instance_id: A5-OPTIMAL-UI-REVAMP-20260725:W1:C98F0B8

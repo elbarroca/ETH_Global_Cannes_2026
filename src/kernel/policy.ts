@@ -5,9 +5,12 @@ import type {
   AgentManifest,
   KernelJobInput,
 } from "./types";
+import {
+  buildManifestV2,
+  isSupportedAgentSkill,
+  type SupportedAgentSkill,
+} from "./agent-catalog";
 
-const ALLOWED_CAPABILITIES = new Set(["market-analysis", "risk-analysis", "research"]);
-const AGENT_PRICE_ATOMIC = 1_000n;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isKernelUuid(value: unknown): value is string {
@@ -78,30 +81,21 @@ export function parseAgentInput(
   if (!Array.isArray(input.capabilities) || input.capabilities.length < 1 || input.capabilities.length > 3) {
     throw new KernelError("KERNEL_INVALID_REQUEST", "capabilities must contain 1-3 entries", 400);
   }
-  const capabilities = [...new Set(input.capabilities.map((entry) => {
-    if (typeof entry !== "string" || !ALLOWED_CAPABILITIES.has(entry)) {
+  const capabilities = [...new Set(input.capabilities.map((entry): SupportedAgentSkill => {
+    if (typeof entry !== "string" || !isSupportedAgentSkill(entry)) {
       throw new KernelError("KERNEL_INVALID_REQUEST", "Unsupported capability", 400);
     }
     return entry;
   }))].sort();
   return {
     name,
-    manifest: {
-      schemaVersion: 1,
+    manifest: buildManifestV2({
       name,
       description,
       instructions,
-      capabilities,
-      adapterKey: "protected-a3",
-      endpoint: null,
-      connectorKey: null,
+      skills: capabilities,
       ownerWallet,
-      payoutAddress: null,
-      priceAtomic: AGENT_PRICE_ATOMIC.toString(),
-      asset: "USDC_ATOMIC",
-      proofPolicy: "verified-receipt-required",
-      ensBinding: null,
-    },
+    }),
   };
 }
 

@@ -20,10 +20,11 @@ test("job state graph accepts only the explicit optimistic lifecycle", () => {
     "QUEUED->CANCELED",
     "QUEUED->FAILED",
     "RUNNING->QUEUED",
-    "RUNNING->SUCCEEDED",
+    "RUNNING->DELIVERY_READY",
     "RUNNING->FAILED",
     "RUNNING->CANCELED",
     "RUNNING->A3_NOT_CONFIGURED",
+    "DELIVERY_READY->SUCCEEDED",
   ]);
   for (const from of JOB_STATES) {
     for (const to of JOB_STATES) {

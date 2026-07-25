@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - A5/A6 Kernel manifest and delivery foundation
+
+- Added reviewed manifest-v2 recommendations and exact shared manifest/prompt/config hash persistence while preserving schema-v1 reads.
+- Added the verified-result `DELIVERY_READY` payment gate, immutable Base Sepolia x402 receipt lineage, and hardened Uniswap receipt constraints without creating settlement, commission, or UI success before payment.
+- Passed Kernel 26/26, foundation 10/10, auth 9/9, A6 19/19, typecheck, lint, and fourteen-migration canonical/fresh plus W6 upgrade lanes. The full floor remains blocked at the sequential 0G schema-v2 reader handoff; A5 also retains one frontend-owned legacy `SUCCEEDED` expectation.
+- Performed no managed migration, sponsor/live API call, wallet action, transaction, push, deployment, funding, upload, form, spend, public identifier, or claim promotion.
+
 ## 2026-07-25 - A5 ENS lifecycle wizard + A6 Uniswap swap tooling (local floor)
 
 - Wired the four-step kernel lifecycle into `lib/api.ts` as individual exported helpers (`createAgentDraft`, `bindAgentName`, `prepareAgentEnsWrite`, `publishAgentVersion`). Each step is idempotency-key-bound and returns an `AgentLifecycleVersion` object.

@@ -405,6 +405,8 @@ model AgentVersion {
   lifecycleActions AgentLifecycleAction[] @relation("ActionResultVersion")
   targetedLifecycleActions AgentLifecycleAction[] @relation("ActionTargetVersion")
   publicationAction AgentLifecycleAction? @relation("PublishedByLifecycleAction", fields: [publicationActionId], references: [id], onDelete: Restrict)
+  x402PaymentReceipts X402PaymentReceipt[]
+  uniswapToolReceipts UniswapToolReceipt[]
 
   @@unique([agentId, version], map: "uniq_agent_versions_agent_version")
   @@index([published, createdAt], map: "idx_agent_versions_published_created")
@@ -518,6 +520,8 @@ model Job {
   lastErrorCode      String?   @map("last_error_code")
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  x402PaymentReceipt X402PaymentReceipt?
+  uniswapToolReceipts UniswapToolReceipt[]
 
   @@index([state, availableAt], map: "idx_jobs_state_available")
   @@index([buyerUserId, createdAt], map: "idx_jobs_buyer_created")
@@ -568,6 +572,7 @@ model Receipt {
   proofHash        String   @map("proof_hash")
   resultHash       String   @map("result_hash")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  x402PaymentReceipt X402PaymentReceipt?
 
   @@map("receipts")
 }
@@ -810,12 +815,44 @@ model EnsPublicationAuthorityPolicy {
   @@map("ens_publication_authority_policies")
 }
 
+model X402PaymentReceipt {
+  id                         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId                      String       @unique @map("job_id") @db.Uuid
+  deliveryReceiptId          String       @unique @map("delivery_receipt_id") @db.Uuid
+  agentVersionId             String       @map("agent_version_id") @db.Uuid
+  payerAddress               String       @map("payer_address")
+  creatorRecipient           String       @map("creator_recipient")
+  network                    String
+  chainId                    Int          @map("chain_id")
+  assetAddress               String       @map("asset_address")
+  amountAtomic               BigInt       @map("amount_atomic")
+  facilitatorPayload         Json         @map("facilitator_payload")
+  facilitatorPayloadHash     String       @unique @map("facilitator_payload_hash")
+  transactionHash            String       @unique @map("transaction_hash")
+  finalityBlock              BigInt       @map("finality_block")
+  finalityBlockHash          String       @map("finality_block_hash")
+  finalizedAt                DateTime     @map("finalized_at") @db.Timestamptz(6)
+  payerBalanceDeltaAtomic    BigInt       @map("payer_balance_delta_atomic")
+  creatorBalanceDeltaAtomic  BigInt       @map("creator_balance_delta_atomic")
+  requestHash                String       @unique @map("request_hash")
+  releaseHash                String       @map("release_hash")
+  releaseSha                 String       @map("release_sha")
+  createdAt                  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  job                        Job          @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  deliveryReceipt            Receipt      @relation(fields: [deliveryReceiptId], references: [id], onDelete: Restrict)
+  agentVersion               AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+
+  @@index([agentVersionId, createdAt], map: "idx_x402_receipts_version")
+  @@map("x402_payment_receipts")
+}
+
 model UniswapToolReceipt {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  jobId           String    @unique @map("job_id") @db.Uuid
+  jobId           String    @map("job_id") @db.Uuid
   buyerAddress    String    @map("buyer_address")
   agentVersionId  String    @map("agent_version_id") @db.Uuid
   quoteRequestId  String    @unique @map("quote_request_id")
+  apiRequestId    String?   @unique @map("api_request_id")
   chainId         Int       @map("chain_id")
   tokenIn         String    @map("token_in")
   tokenOut        String    @map("token_out")
@@ -824,15 +861,22 @@ model UniswapToolReceipt {
   slippageBps     Int       @map("slippage_bps")
   deadline        Int
   spender         String
+  requestHash     String    @map("request_hash")
+  routeHash       String    @map("route_hash")
   calldataHash    String    @map("calldata_hash")
   txHash          String?   @map("tx_hash")
   txStatus        String    @default("QUOTED") @map("tx_status")
   balanceDelta    BigInt?   @map("balance_delta")
+  finalityBlock   BigInt?   @map("finality_block")
+  finalityBlockHash String? @map("finality_block_hash")
+  finalizedAt     DateTime? @map("finalized_at") @db.Timestamptz(6)
   failureReason   String?   @map("failure_reason")
   confirmationSig String?   @map("confirmation_sig")
   releaseSha      String    @map("release_sha")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  job             Job       @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  agentVersion    AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
 
   @@index([jobId], map: "idx_uniswap_receipts_job")
   @@index([agentVersionId, createdAt], map: "idx_uniswap_receipts_version")

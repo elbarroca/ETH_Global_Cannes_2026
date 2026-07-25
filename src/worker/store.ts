@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { getDb } from "../config/database";
 import { canonicalJson, domainHash, type CanonicalValue } from "../kernel/canonical";
-import { commissionAmount, type DatabaseClient } from "../kernel/service";
+import type { DatabaseClient } from "../kernel/service";
 import type { JobState } from "../kernel/types";
 
 export const KERNEL_WORKER_LEASE_KEY = "kernel-worker";
@@ -874,7 +874,7 @@ async function terminalizeLockedEffect(
     if (!context.receipt_id) throw new Error("WORKER_VERIFIED_RECEIPT_MISSING");
     const jobs = await tx<{ id: string }[]>`
       UPDATE jobs
-      SET state = 'SUCCEEDED', version = ${nextVersion}, lease_owner = NULL,
+      SET state = 'DELIVERY_READY', version = ${nextVersion}, lease_owner = NULL,
           lease_expires_at = NULL, updated_at = ${now}
       WHERE id = ${context.job_id}::uuid AND state = 'RUNNING' AND version = ${context.version}
       RETURNING id
@@ -883,30 +883,11 @@ async function terminalizeLockedEffect(
     await tx`
       INSERT INTO job_events (job_id, version, event_type, from_state, to_state, payload, created_at)
       VALUES (
-        ${context.job_id}::uuid, ${nextVersion}, 'JOB_SUCCEEDED',
-        'RUNNING', 'SUCCEEDED', ${tx.json({})}, ${now}
+        ${context.job_id}::uuid, ${nextVersion}, 'JOB_DELIVERY_READY',
+        'RUNNING', 'DELIVERY_READY', ${tx.json({})}, ${now}
       )
     `;
-    const settlements = await tx<{ id: string }[]>`
-      INSERT INTO settlements (job_id, receipt_id, amount_atomic, asset, created_at)
-      VALUES (
-        ${context.job_id}::uuid, ${context.receipt_id}::uuid,
-        ${context.amount_atomic}::bigint, ${context.asset}, ${now}
-      )
-      RETURNING id
-    `;
-    const settlement = settlements[0];
-    if (!settlement) throw new Error("WORKER_SETTLEMENT_CREATE_FAILED");
-    const commission = commissionAmount(BigInt(context.amount_atomic));
-    await tx`
-      INSERT INTO commissions (
-        job_id, settlement_id, recipient_user_id, amount_atomic, asset, created_at
-      ) VALUES (
-        ${context.job_id}::uuid, ${settlement.id}::uuid, ${context.owner_user_id},
-        ${commission.toString()}::bigint, ${context.asset}, ${now}
-      )
-    `;
-    return "SUCCEEDED";
+    return "DELIVERY_READY";
   }
   if (context.effect_state === "FAILED") {
     const terminalState: JobState = context.error_code === "A3_NOT_CONFIGURED"

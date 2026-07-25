@@ -3,6 +3,7 @@ import type { EnsPublicationAuthority } from "../ens/authority";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { domainHash, type CanonicalValue } from "./canonical";
+import { bindManifestEns, deriveManifestHashes } from "./agent-catalog";
 import { KernelError } from "./errors";
 import type { DatabaseClient } from "./service";
 import type {
@@ -388,26 +389,6 @@ async function publicationActionClaim(
   }
 }
 
-function manifestHashes(manifest: AgentManifest): {
-  manifestHash: string;
-  promptHash: string;
-  configHash: string;
-} {
-  return {
-    manifestHash: domainHash("agent-manifest", manifest),
-    promptHash: domainHash("agent-prompt", manifest.instructions),
-    configHash: domainHash("agent-config", {
-      adapterKey: manifest.adapterKey,
-      capabilities: manifest.capabilities,
-      connectorKey: manifest.connectorKey,
-      endpoint: manifest.endpoint,
-      ensBinding: manifest.ensBinding,
-      priceAtomic: manifest.priceAtomic,
-      proofPolicy: manifest.proofPolicy,
-    }),
-  };
-}
-
 function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVersion {
   return {
     agentId: row.agent_id,
@@ -545,7 +526,7 @@ export async function createAgentDraft(
     agentId: options.agentId ?? null,
     manifest,
   });
-  const hashes = manifestHashes(manifest);
+  const hashes = deriveManifestHashes(manifest);
   return sql.begin(async (transaction) => {
     const tx = transaction as unknown as DatabaseClient;
     const claim = await claimLifecycleAction(
@@ -600,7 +581,7 @@ export async function createAgentDraft(
       ) VALUES (
         ${agentId}::uuid, ${version}, ${tx.json(manifest)}, ${hashes.manifestHash},
         ${hashes.promptHash}, ${hashes.configHash}, ${manifest.capabilities},
-        ${manifest.adapterKey}, NULL, NULL, ${owner.walletAddress}, NULL,
+        ${manifest.adapterKey}, NULL, NULL, ${owner.walletAddress}, ${manifest.payoutAddress},
         ${manifest.priceAtomic}::bigint, ${manifest.asset}, ${manifest.proofPolicy},
         'DRAFT', false, NULL, ${now}
       )
@@ -665,8 +646,8 @@ export async function bindAgentName(
     if (current.lifecycle_state !== "DRAFT") {
       throw new KernelError("KERNEL_IMMUTABLE_VERSION", "Create a new draft version to change this binding", 409);
     }
-    const manifest: AgentManifest = { ...current.manifest, ensBinding: binding };
-    const hashes = manifestHashes(manifest);
+    const manifest = bindManifestEns(current.manifest, binding);
+    const hashes = deriveManifestHashes(manifest);
     const rows = await tx<LifecycleRow[]>`
       UPDATE agent_versions
       SET manifest = ${tx.json(manifest)}, manifest_hash = ${hashes.manifestHash},
@@ -908,6 +889,16 @@ export async function publishAgentVersion(
       await markLifecycleActionRetryable(sql, claim, "KERNEL_CONFLICT");
       throw new KernelError("KERNEL_CONFLICT", "Prepare the ENS write before publication", 409);
     }
+    if (current.manifest.schemaVersion !== 2) {
+      throw await completePublicationDenial(
+        sql,
+        claim,
+        ownerUserId,
+        versionId,
+        "MANIFEST_SCHEMA_V2_REQUIRED",
+        now,
+      );
+    }
   } catch (error) {
     if (error instanceof KernelError) throw error;
     await markLifecycleActionRetryable(sql, claim, "KERNEL_NOT_FOUND");
@@ -1069,6 +1060,7 @@ export async function publishAgentVersion(
             publication_action_id = ${claim.actionId}::uuid
         FROM ens_publication_decisions d
         WHERE v.id = ${versionId}::uuid AND v.lifecycle_state = 'WRITE_PREPARED'
+          AND v.manifest->>'schemaVersion' = '2'
           AND v.published = false AND d.id = ${decision.decision_id}::uuid
         RETURNING
           v.agent_id, v.id AS version_id, v.version, ${locked.name}::text AS name,

@@ -234,6 +234,10 @@ export async function runLifecycleCases(
     assert.equal(prepared.plan.fullSubname, binding.fullSubname);
     assert.equal(prepared.plan.requiresAuthorization, true);
     assert.equal(prepared.plan.requiresWalletSignature, true);
+    const persisted = await database.sql<{ manifest: { payoutAddress: string }; payout_address: string | null }[]>`
+      SELECT manifest, payout_address FROM agent_versions WHERE id = ${draft.versionId}::uuid
+    `;
+    assert.equal(persisted[0]?.payout_address, persisted[0]?.manifest.payoutAddress);
 
     const ownerView = await listAgentLifecycle(CREATOR_ID, { sql: database.sql });
     const buyerView = await listAgentLifecycle(BUYER_ID, { sql: database.sql });

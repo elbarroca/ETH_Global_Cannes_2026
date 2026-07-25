@@ -5,6 +5,7 @@ import test from "node:test";
 import { NextRequest } from "next/server";
 import { domainHash } from "../../src/kernel/canonical";
 import { KernelError } from "../../src/kernel/errors";
+import { deriveManifestHashes } from "../../src/kernel/agent-catalog";
 import { parseAgentInput } from "../../src/kernel/policy";
 import {
   cancelBuyerJob,
@@ -120,6 +121,31 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
       { now: BASE_TIME, sql: database.sql },
     );
     const ens = createEnsAuthorityFixture({ now: BASE_TIME });
+
+    await t.test("v2 publications persist reviewed hashes and reject malformed review hashes", async () => {
+      const expected = deriveManifestHashes(agentInput.manifest);
+      const rows = await database.sql<{
+        manifest_hash: string;
+        prompt_hash: string;
+        config_hash: string;
+      }[]>`
+        SELECT manifest_hash, prompt_hash, config_hash
+        FROM agent_versions WHERE id = ${agent.versionId}::uuid
+      `;
+      assert.deepEqual(rows[0], {
+        manifest_hash: expected.manifestHash,
+        prompt_hash: expected.promptHash,
+        config_hash: expected.configHash,
+      });
+      await assert.rejects(
+        publishAgent(
+          { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
+          { ...agentInput.manifest, reviewedConfigHash: "0".repeat(64) },
+          { now: BASE_TIME, sql: database.sql },
+        ),
+        (error: unknown) => error instanceof KernelError && error.code === "KERNEL_INVALID_REQUEST",
+      );
+    });
 
     await t.test("published versions are immutable and transitions are DB-enforced", async () => {
       await assert.rejects(database.sql`
@@ -285,7 +311,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
           (SELECT state FROM jobs WHERE id = ${submitted.jobId}::uuid) AS state,
           (SELECT count(*)::text FROM settlements WHERE job_id = ${submitted.jobId}::uuid) AS settlements
       `;
-      assert.deepEqual(rows[0], { effects: "1", state: "SUCCEEDED", settlements: "1" });
+      assert.deepEqual(rows[0], { effects: "1", state: "DELIVERY_READY", settlements: "0" });
     });
 
     await t.test("restart after terminal effect persistence reconciles without adapter replay", async () => {
@@ -331,10 +357,10 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
           (SELECT count(*)::text FROM effects WHERE job_id = ${submitted.jobId}::uuid) AS effects,
           (SELECT count(*)::text FROM settlements WHERE job_id = ${submitted.jobId}::uuid) AS settlements
       `;
-      assert.deepEqual(recovered[0], { state: "SUCCEEDED", effects: "1", settlements: "1" });
+      assert.deepEqual(recovered[0], { state: "DELIVERY_READY", effects: "1", settlements: "0" });
     });
 
-    await t.test("settlement and refund remain exclusive under concurrent finalization", async () => {
+    await t.test("delivery-ready excludes settlement and refund before payment", async () => {
       const now = new Date(BASE_TIME.getTime() + 88_000);
       const submitted = await submitJob(BUYER_ID, {
         agentVersionId: agent.versionId,
@@ -383,7 +409,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
           (SELECT count(*)::text FROM refunds WHERE job_id = ${job.jobId}::uuid) AS refund,
           (SELECT count(*)::text FROM commissions WHERE job_id = ${job.jobId}::uuid) AS commission
       `;
-      assert.deepEqual(outcome[0], { settlement: "1", refund: "0", commission: "1" });
+      assert.deepEqual(outcome[0], { settlement: "0", refund: "0", commission: "0" });
     });
 
     await t.test("queued and running cancellation paths are durable", async () => {
