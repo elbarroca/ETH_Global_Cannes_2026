@@ -3,6 +3,57 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/worker_shutdown_w1
+task_id: A5-RUNTIME-LIFECYCLE-REGRESSION-20260725
+task_instance_id: A5-RUNTIME-LIFECYCLE-REGRESSION-20260725:W2:E5FA4C3
+generation: 2
+sprint: Add the smallest durable regression coverage for audited protected runtime lifecycle fixes
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: e5fa4c3336bb45cfd386c0f61a670a91b1ef308c
+control_sha: e5fa4c3336bb45cfd386c0f61a670a91b1ef308c
+token: A5-RUNTIME-TEST-W2-E5FA4C3-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T16:10:21Z
+expires_at: 2026-07-25T17:30:00Z
+allowed_paths:
+  - tests/kernel/**
+  - tests/integration/worker-fencing.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T16:06:59Z
+deadline: 2026-07-25T17:30:00Z
+expected_exit: durable non-timing regression coverage for strict goal runner bounds coherent protected runtime ownership restart idempotent stop and redacted shutdown failure
+external_effect_authority: local files existing dependencies local tests smoke and loopback state and one local commit only; no network push deploy managed migration live API webhook signature transaction funding form spend release or claim
+completed_at: 2026-07-25T16:10:21Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - focused runtime lifecycle PASS 3 of 3 with synchronous numeric refusal coherent concurrent smoke boot configuration conflict identical stop Promise clean restart and redacted handled shutdown rejection
+  - existing focused worker-fencing PASS 3 of 3 including active worker drain and no later heartbeat; unchanged
+  - npm run test:kernel PASS 38 of 38
+  - npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm test PASS 10 of 10
+  - npm run test:auth PASS 9 of 9
+  - npm run test:a5 PASS 3 of 3
+  - npm run test:e2e PASS 4 of 4
+  - npm run test:redaction PASS 3 of 3
+  - npm run test:boot PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+  - npm run build PASS 35 generated pages
+source_defects_reproduced: none
+remaining_blocks:
+  - aggregate integration inheritance remains ten missing-Go A3 hook failures
+  - immutable exact-SHA audit remains required
+  - push deploy managed migration live APIs webhooks signatures transactions funding forms spend release and claims remain unauthorized
+external_effects_attempted: none
+claim_changes: none
+verdict: PASS_TO_AUDIT
+lock_release: release only exact token A5-RUNTIME-TEST-W2-E5FA4C3-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Cycle Wirer /root/runtime_goal_runner_w1
 task_id: A5-GOAL-RUNTIME-REMEDIATION-20260725
 task_instance_id: A5-GOAL-RUNTIME-REMEDIATION-20260725:W2:C2CC89E
