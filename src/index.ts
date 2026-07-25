@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import dotenv from "dotenv";
 import { startGoalRunner } from "./agents/goal-runner";
+import { startWorkerHealth } from "./agents/worker-health";
 import { validateEnvironment } from "./config/env";
 import { startKernelWorker } from "./worker/runner";
 
@@ -37,6 +38,19 @@ interface ProtectedRuntimeUnit {
 }
 
 let protectedRuntime: ProtectedRuntimeUnit | null = null;
+let protectedBoot: { configuration: string; promise: Promise<RuntimeHandle> } | null = null;
+
+export interface RuntimeDependencies {
+  startGoalRunner: typeof startGoalRunner;
+  startKernelWorker: typeof startKernelWorker;
+  startWorkerHealth: typeof startWorkerHealth;
+}
+
+const RUNTIME_DEPENDENCIES: RuntimeDependencies = {
+  startGoalRunner,
+  startKernelWorker,
+  startWorkerHealth,
+};
 
 function runtimeErrorCode(error: unknown, fallback: string): string {
   return error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
@@ -65,7 +79,10 @@ async function bootLegacyRuntime(source: NodeJS.ProcessEnv): Promise<RuntimeHand
   return { stop: async () => undefined };
 }
 
-export async function bootRuntime(source: NodeJS.ProcessEnv = process.env): Promise<RuntimeHandle> {
+export async function bootRuntime(
+  source: NodeJS.ProcessEnv = process.env,
+  dependencies: RuntimeDependencies = RUNTIME_DEPENDENCIES,
+): Promise<RuntimeHandle> {
   const smoke = source.PROTECTED_BOOT_SMOKE === "true";
   const environment = validateEnvironment(source, { requireDatabase: !smoke });
   if (environment.runtimeMode === "legacy") {
@@ -78,7 +95,15 @@ export async function bootRuntime(source: NodeJS.ProcessEnv = process.env): Prom
     workersEnabled ? "workers" : "idle",
     environment.kernelWorkerConcurrency,
     environment.kernelWorkerLeaseSeconds,
+    source.PORT ?? "3000",
+    source.RAILWAY_GIT_COMMIT_SHA ?? "local",
   ].join(":");
+  if (protectedBoot) {
+    if (protectedBoot.configuration !== configuration) {
+      throw new Error("PROTECTED_RUNTIME_CONFIGURATION_CONFLICT");
+    }
+    return protectedBoot.promise;
+  }
   if (protectedRuntime) {
     if (protectedRuntime.stopPromise) throw new Error("PROTECTED_RUNTIME_STOPPING");
     if (protectedRuntime.shutdownFailed) throw new Error("PROTECTED_RUNTIME_SHUTDOWN_FAILED");
@@ -94,51 +119,81 @@ export async function bootRuntime(source: NodeJS.ProcessEnv = process.env): Prom
     return protectedRuntime.handle;
   }
 
-  const goalRunner = workersEnabled
-    ? startGoalRunner({ leaseSeconds: environment.kernelWorkerLeaseSeconds })
-    : null;
-  const kernelWorker = workersEnabled
-    ? startKernelWorker({
-        concurrency: environment.kernelWorkerConcurrency,
-        leaseSeconds: environment.kernelWorkerLeaseSeconds,
-      })
-    : null;
-  const unit: ProtectedRuntimeUnit = {
-    configuration,
-    shutdownFailed: false,
-    stopPromise: null,
-    handle: {
-      stop: () => {
-        if (unit.stopPromise) return unit.stopPromise;
-        const drain = (async () => {
-          await goalRunner?.stop();
-          await kernelWorker?.stop();
-        })();
-        unit.stopPromise = drain.then(
-          () => {
-            if (protectedRuntime === unit) protectedRuntime = null;
-          },
-          (error: unknown) => {
-            unit.shutdownFailed = true;
-            unit.stopPromise = null;
-            throw error;
-          },
-        );
-        return unit.stopPromise;
+  const boot = (async (): Promise<RuntimeHandle> => {
+    const goalRunner = workersEnabled
+      ? dependencies.startGoalRunner({ leaseSeconds: environment.kernelWorkerLeaseSeconds })
+      : null;
+    const kernelWorker = workersEnabled
+      ? dependencies.startKernelWorker({
+          concurrency: environment.kernelWorkerConcurrency,
+          leaseSeconds: environment.kernelWorkerLeaseSeconds,
+        })
+      : null;
+    let health = null;
+    try {
+      health = workersEnabled
+        ? await dependencies.startWorkerHealth({
+            goalRunnerOwnerId: goalRunner?.ownerId ?? "",
+            kernelWorkerOwnerId: kernelWorker?.ownerId ?? "",
+            leaseSeconds: environment.kernelWorkerLeaseSeconds,
+            environment: source,
+          })
+        : null;
+    } catch (error) {
+      await Promise.allSettled([goalRunner?.stop(), kernelWorker?.stop()]);
+      throw error;
+    }
+    const unit: ProtectedRuntimeUnit = {
+      configuration,
+      shutdownFailed: false,
+      stopPromise: null,
+      handle: {
+        stop: () => {
+          if (unit.stopPromise) return unit.stopPromise;
+          const drain = (async () => {
+            const healthStop = health?.stop();
+            const results = await Promise.allSettled([
+              healthStop,
+              goalRunner?.stop(),
+              kernelWorker?.stop(),
+            ]);
+            if (results.some((result) => result.status === "rejected")) {
+              throw new Error("PROTECTED_RUNTIME_SHUTDOWN_FAILED");
+            }
+          })();
+          unit.stopPromise = drain.then(
+            () => {
+              if (protectedRuntime === unit) protectedRuntime = null;
+            },
+            (error: unknown) => {
+              unit.shutdownFailed = true;
+              unit.stopPromise = null;
+              throw error;
+            },
+          );
+          return unit.stopPromise;
+        },
       },
-    },
-  };
-  protectedRuntime = unit;
-  console.log(JSON.stringify({
-    level: "info",
-    context: "runtime.boot",
-    mode: "protected",
-    kernelWorker: workersEnabled,
-    goalRunner: workersEnabled,
-    reused: false,
-    smoke,
-  }));
-  return unit.handle;
+    };
+    protectedRuntime = unit;
+    console.log(JSON.stringify({
+      level: "info",
+      context: "runtime.boot",
+      mode: "protected",
+      kernelWorker: workersEnabled,
+      goalRunner: workersEnabled,
+      healthPort: health?.port ?? null,
+      reused: false,
+      smoke,
+    }));
+    return unit.handle;
+  })();
+  protectedBoot = { configuration, promise: boot };
+  try {
+    return await boot;
+  } finally {
+    if (protectedBoot?.promise === boot) protectedBoot = null;
+  }
 }
 
 export async function shutdownRuntime(

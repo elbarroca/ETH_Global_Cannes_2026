@@ -3,6 +3,57 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Cycle Wirer /root/railway_worker_foundation
+task_id: RAILWAY-WORKER-FOUNDATION-W1
+task_instance_id: RAILWAY-WORKER-FOUNDATION-W1:W1:5F81392
+generation: 1
+sprint: Establish one protected Railway worker service
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 5f81392a09c6a8a0237d18ab5bb2c18d0772bb56
+control_sha: 5f81392a09c6a8a0237d18ab5bb2c18d0772bb56
+token: RAILWAY-WORKER-FOUNDATION-W1-5F81392-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T19:53:58Z
+expires_at: 2026-07-25T21:16:04Z
+allowed_paths:
+  - src/agents/worker-health.ts
+  - src/index.ts
+  - Dockerfile
+  - docker-entrypoint.sh
+  - railway.toml
+  - .env.example
+  - tests/kernel/runtime-lifecycle.test.ts
+  - tests/e2e/railway-worker.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T19:46:04Z
+deadline: 2026-07-25T21:16:04Z
+expected_exit: one protected durable process with goal runner kernel worker fresh lease health and minimal Railway packaging
+external_effect_authority: local files existing dependencies local deterministic tests and one atomic local commit only; no deploy push managed migration Railway mutation webhook sponsor or API call signature transaction form funding spend or claim
+completed_at: 2026-07-25T19:53:58Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - one protected process starts exactly one goal runner one kernel worker and one bounded Node standard-library health server
+  - health returns 200 only for both current fresh database leases and a valid Railway release SHA and otherwise returns redacted bounded 503 JSON
+  - health boot failure drains started units and shutdown makes health unavailable while both workers drain
+  - Docker uses Node 22 lockfile-managed tsx Prisma generate one port and the real health endpoint without OpenClaw or specialist ports
+  - Railway config uses one always-on replica Dockerfile health timeout ALWAYS restart no sleep cron predeploy or external call
+  - focused runtime lifecycle PASS 5 of 5 and focused Railway plus protected boot PASS 3 of 3
+  - npm test PASS 10 of 10 test auth PASS 9 of 9 and test kernel PASS 49 of 49
+  - lint PASS with zero errors and 23 inherited warnings typecheck PASS bash syntax PASS and git diff check PASS
+remaining_blocks:
+  - immutable exact-SHA independent audit remains required
+  - npm run test integration remains host-Go blocked with 11 inherited strict-A3 hook failures before task-owned execution because no Go binary is installed
+  - per explicit C0 stop instruction remaining broad lanes were not run after the deterministic host-Go blocker
+  - deploy push managed migration Railway mutation webhook sponsor API signature transaction form funding spend and claim gates remain closed
+external_effects_attempted: local deterministic tests only; no deploy push managed migration Railway mutation webhook sponsor or API call signature transaction form funding spend or claim
+claim_changes: none
+verdict: PASS_FOCUSED_WITH_INHERITED_HOST_GO_BLOCKER; LOCAL_ONLY
+lock_release: release only exact token RAILWAY-WORKER-FOUNDATION-W1-5F81392-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/kernel_schema_readiness_g2
 task_id: KERNEL-SCHEMA-READINESS-G2
 task_instance_id: KERNEL-SCHEMA-READINESS-G2:G2:A3E21BD

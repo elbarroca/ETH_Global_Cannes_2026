@@ -7,8 +7,10 @@ import {
 import {
   bootRuntime,
   shutdownRuntime,
+  type RuntimeDependencies,
   type RuntimeHandle,
 } from "../../src/index";
+import { startWorkerHealth } from "../../src/agents/worker-health";
 
 const MAX_NODE_TIMEOUT_MS = 2_147_483_647;
 
@@ -24,6 +26,81 @@ function smokeEnvironment(overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.Pr
   };
   return Object.assign(environment, overrides);
 }
+
+async function healthRequest(port: number): Promise<{ status: number; text: string }> {
+  const response = await fetch(`http://127.0.0.1:${port}/health`);
+  return { status: response.status, text: await response.text() };
+}
+
+test("worker health requires both current leases and a valid Railway release", async () => {
+  const releaseSha = "a".repeat(40);
+  const owners = {
+    "goal-loop": "private-goal-owner",
+    "kernel-worker": "private-kernel-owner",
+  } as const;
+  const ready = new Set<keyof typeof owners>(["goal-loop", "kernel-worker"]);
+  const health = await startWorkerHealth({
+    goalRunnerOwnerId: owners["goal-loop"],
+    kernelWorkerOwnerId: owners["kernel-worker"],
+    leaseSeconds: 30,
+    port: 0,
+    host: "127.0.0.1",
+    environment: {
+      NODE_ENV: "test",
+      RAILWAY_PROJECT_ID: "project-valid",
+      RAILWAY_SERVICE_ID: "service-valid",
+      RAILWAY_ENVIRONMENT_ID: "environment-valid",
+      RAILWAY_GIT_COMMIT_SHA: releaseSha,
+      DATABASE_URL: "postgresql://private-user:private-password@private-host/private-db",
+    },
+    now: () => new Date("2026-07-25T12:00:00.000Z"),
+    leaseReady: async (key, ownerId) => ready.has(key) && ownerId === owners[key],
+  });
+  try {
+    const healthy = await healthRequest(health.port);
+    assert.equal(healthy.status, 200);
+    assert.ok(Buffer.byteLength(healthy.text) < 512);
+    assert.deepEqual(JSON.parse(healthy.text), {
+      mode: "protected",
+      goalRunnerReady: true,
+      kernelWorkerReady: true,
+      releaseSha,
+      serviceId: "service-valid",
+      environmentId: "environment-valid",
+    });
+    assert.doesNotMatch(healthy.text, /private|password|owner|postgres/i);
+
+    ready.delete("kernel-worker");
+    const stale = await healthRequest(health.port);
+    assert.equal(stale.status, 503);
+    assert.equal(JSON.parse(stale.text).kernelWorkerReady, false);
+  } finally {
+    await health.stop();
+  }
+  await assert.rejects(fetch(`http://127.0.0.1:${health.port}/health`));
+
+  const invalidRelease = await startWorkerHealth({
+    goalRunnerOwnerId: "goal-owner",
+    kernelWorkerOwnerId: "kernel-owner",
+    leaseSeconds: 30,
+    port: 0,
+    host: "127.0.0.1",
+    environment: {
+      NODE_ENV: "test",
+      RAILWAY_SERVICE_ID: "service-valid",
+      RAILWAY_GIT_COMMIT_SHA: "NOT-A-RELEASE-secret-value-that-must-not-escape",
+    },
+    leaseReady: async () => true,
+  });
+  try {
+    const response = await healthRequest(invalidRelease.port);
+    assert.equal(response.status, 503);
+    assert.equal(JSON.parse(response.text).releaseSha, null);
+    assert.doesNotMatch(response.text, /NOT-A-RELEASE|secret-value/);
+  } finally {
+    await invalidRelease.stop();
+  }
+});
 
 test("goal runner rejects unsafe numeric bounds before starting", () => {
   const cases: readonly { code: string; options: GoalRunnerOptions }[] = [
@@ -99,6 +176,34 @@ test("protected runtime owns one configuration, shares stop, and restarts cleanl
     await fresh?.stop();
     await first?.stop();
   }
+});
+
+test("health boot failure drains already-started protected workers", async () => {
+  let goalStops = 0;
+  let kernelStops = 0;
+  const dependencies: RuntimeDependencies = {
+    startGoalRunner: () => ({
+      ownerId: "goal-owner",
+      stop: async () => { goalStops += 1; },
+    }),
+    startKernelWorker: () => ({
+      ownerId: "kernel-owner",
+      stop: async () => { kernelStops += 1; },
+    }),
+    startWorkerHealth: async () => {
+      throw new Error("WORKER_HEALTH_LISTEN_FAILED");
+    },
+  };
+  await assert.rejects(
+    bootRuntime(smokeEnvironment({
+      PROTECTED_BOOT_SMOKE: undefined,
+      DATABASE_URL: "postgresql://user:password@localhost/runtime",
+      DIRECT_URL: "postgresql://user:password@localhost/runtime",
+    }), dependencies),
+    /WORKER_HEALTH_LISTEN_FAILED/,
+  );
+  assert.equal(goalStops, 1);
+  assert.equal(kernelStops, 1);
 });
 
 test("shutdown failure is awaited, redacted, and handled", async () => {
