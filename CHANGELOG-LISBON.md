@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W9 Kernel immutable audit
+
+- Reconciled verdict `FIX` for exact SHA `551876f4e0554654dd1899e1be4181362c9c9c0a`, tree `e47310d84609d21e92ca84d51f3b2bed883168b3`, and parent `9c6e37d169ac6ddee2439602551deaca5347c41a`.
+- Recorded one HIGH: exact decision/event/state can become published and hireable without a completed `PUBLISH_VERSION` action. Recorded three MEDIUM findings: mutable late replay plus repeated authority work; rejected stream cancellation returning 500; and percent-encoded/direct-owner DSN isolation gaps.
+- Five eleven-migration lanes, Kernel 22/22, A4/A5, Playwright 13/13, build, and HTTP smoke passed independently. The audit host lacked Go, so Go-dependent aggregate results were not promoted; writer checksum-pinned evidence remains recorded.
+- Kept `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS, sponsor, push, release, and claims closed pending one narrowed Kernel W5 repair and re-audit.
+
 ## 2026-07-25 - W9 Kernel publication-integrity remediation
 
 - Wired production `PUBLISH_VERSION` through the ENS-owned authority contract keyed only by immutable `agentVersionId`; removed the Kernel summary adapter and added a separately validated restricted publication DSN that remains fail-closed until exact live ENSv2 runtime policy is admitted.

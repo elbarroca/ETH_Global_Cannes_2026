@@ -3,6 +3,56 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-KERNEL-W4-AUDIT-RECONCILIATION-20260725
+task_instance_id: C0-KERNEL-W4-AUDIT-RECONCILIATION-20260725:551876F
+generation: 1
+sprint: A4_kernel_publication_integrity_audit_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: 551876f4e0554654dd1899e1be4181362c9c9c0a
+control_sha: 551876f4e0554654dd1899e1be4181362c9c9c0a
+audit_sha: 551876f4e0554654dd1899e1be4181362c9c9c0a
+token: C0-KERNEL-W4-AUDIT-RECONCILE-551876F-BC572A6D-9936-40E9-8F0F-F992AEF0ACB2
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T07:56:41Z
+expires_at: 2026-07-25T08:56:41Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T07:56:41Z
+deadline: 2026-07-25T08:56:41Z
+expected_exit: record Kernel W4 immutable audit FIX and open only narrowed Kernel W5 remediation
+acceptance_items:
+  - bind audit target 551876f tree e47310d parent 9c6e37d
+  - record one HIGH and three MEDIUM findings plus green independent lanes and Go limitation
+  - keep A4_ACCEPTED A5 A6 live sponsor push release and claims closed
+external_effect_authority: safe local control files deterministic checks and one atomic local commit only; no product change push deploy managed migration live call signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T08:00:30Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - audit bound exact target 551876f tree e47310d parent 9c6e37d and returned FIX
+  - one HIGH actionless publication and three MEDIUM replay stream and DSN findings recorded
+  - green independent lanes and Go-dependent audit limitation are canonical
+  - reconciliation diff check lint zero errors with 23 inherited warnings typecheck foundation 10 of 10 secret scan and 31-page build passed
+  - A4_ACCEPTED A5 A6 live sponsor push release and claims remain closed
+remaining_blocks:
+  - narrowed Kernel W5 completed-action snapshot coordination stream and DSN repair
+  - immutable Kernel re-audit before A4 acceptance
+  - every live ENS sponsor push release and public claim gate
+external_effects_attempted: none
+result: KERNEL_W4_AUDIT_FIX_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-KERNEL-W4-AUDIT-RECONCILE-551876F-BC572A6D-9936-40E9-8F0F-F992AEF0ACB2 after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: Kernel Integrator /root/kernel_publication_remediation
 task_id: A4-KERNEL-PUBLICATION-REMEDIATION-20260725
 task_instance_id: A4-KERNEL-PUBLICATION-REMEDIATION-20260725:W4:9C6E37D

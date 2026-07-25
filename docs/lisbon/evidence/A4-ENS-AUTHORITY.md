@@ -763,6 +763,17 @@ sponsor call; shared or managed database effect; managed migration; signature;
 transaction; push; deployment; form; funding; upload; spend; public identifier;
 live proof; or claim promotion occurred.
 
-W9 is writer evidence only. Independent immutable-SHA audit remains mandatory
-before `A4_ACCEPTED`; A5 acceptance, mandatory A6 entry, live ENS, sponsor,
-push, release, and public claims remain closed.
+## W9 Kernel immutable audit
+
+- Audit SHA: `551876f4e0554654dd1899e1be4181362c9c9c0a`
+- Tree: `e47310d84609d21e92ca84d51f3b2bed883168b3`
+- Parent: `9c6e37d169ac6ddee2439602551deaca5347c41a`
+- Result: `FIX; LOCAL_ONLY`
+
+The audit found one HIGH: the deferred publication trigger validates decision, event, and version, but not the completed lifecycle action. Exact direct state/event mutation using a legitimate W8 decision therefore committed with zero `PUBLISH_VERSION` action rows and became hireable.
+
+Three MEDIUM defects remain. Completed lifecycle actions store no immutable result snapshot, so late replay returns later mutable state; publication claims its idempotency key only after authority resolution, so concurrent identical requests repeat authority/refusal work. Awaiting a rejecting body-stream cancellation converts an oversized request into HTTP 500 rather than 413. DSN isolation compares raw pooled usernames only, allowing percent-encoded identity aliases and omitting `DIRECT_URL` owner comparison.
+
+Green independent evidence included all five eleven-migration checks, lint/typecheck, foundation/auth/Kernel 22/22, A4/A5, integration-only, e2e/resilience/redaction, Playwright 13/13, boot, secret/shell/diff checks, build, and HTTP smoke. The audit host lacked Go, so Go-dependent A3/aggregate checks were not independently promoted; W9 writer evidence records their checksum-pinned pass. No external effect occurred.
+
+W9 is `AUDIT_FIX`. Kernel W5 must add bidirectional completed-action publication integrity, immutable result snapshots and pre-authority coordination, cancellation-independent bounded errors, and canonical pooled/direct DSN plus runtime-role verification, then pass immutable audit. `A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor, push, release, and claims remain closed.

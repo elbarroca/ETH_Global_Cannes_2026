@@ -113,7 +113,9 @@ and request bodies fail closed at a bounded pre-authentication boundary. Its
 full local floor passes and its detailed writer evidence is in
 [`A4-ENS-AUTHORITY.md`](A4-ENS-AUTHORITY.md).
 
-This is `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`, not A5 acceptance. The existing
-UI still requires sequential owner wiring to the repaired four-action API and
-its own browser proof after the immutable Kernel audit passes. Live journey,
-A6, deployment, sponsor, push, release, and claim gates remain closed.
+The immutable audit of exact SHA `551876f4e0554654dd1899e1be4181362c9c9c0a`
+returned `FIX; LOCAL_ONLY`: publication is not bound to a completed action,
+late replay is mutable and duplicates authority work, a rejecting stream cancel
+can return 500, and DSN isolation is incomplete. Kernel W5 and re-audit must
+pass before UI wiring. A5, live journey, A6, deployment, sponsor, push, release,
+and claim gates remain closed.
