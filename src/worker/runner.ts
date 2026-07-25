@@ -31,6 +31,7 @@ export interface WorkerRunOptions {
   sql?: DatabaseClient;
   now?: Date;
   authority?: EnsAuthorityRuntime;
+  signal?: AbortSignal;
   afterTerminalEffectPersisted?: (job: ClaimedJob) => Promise<void>;
 }
 
@@ -60,23 +61,27 @@ async function deliveryAuthority(
 async function finalizeRecoveredJournal(
   job: ClaimedJob,
   options: WorkerRunOptions,
-  leaseLost: () => boolean,
+  mutationFenced: () => boolean,
   signal: AbortSignal,
 ): Promise<boolean> {
   const inspection = await inspectVerifiedA3Effect(job, { now: options.now, sql: options.sql });
+  if (mutationFenced()) return true;
   if (inspection.status === "none") return false;
   let authorityCheckId: string | null = null;
   if (inspection.status === "verified") {
     const decision = await deliveryAuthority(job, options, signal);
+    if (mutationFenced()) return true;
     if (!decision.allowed || !decision.checkId) {
       const persisted = await persistFailedEffect(
         job,
         decision.errorCode ?? "ENS_AUTHORITY_DENIED",
         { now: options.now, sql: options.sql },
       );
-      if (!persisted || leaseLost()) return true;
+      if (!persisted || mutationFenced()) return true;
       await options.afterTerminalEffectPersisted?.(job);
-      if (!leaseLost()) await finalizePersistedEffect(job, { now: options.now, sql: options.sql });
+      if (!mutationFenced()) {
+        await finalizePersistedEffect(job, { now: options.now, sql: options.sql });
+      }
       return true;
     }
     authorityCheckId = decision.checkId;
@@ -87,9 +92,9 @@ async function finalizeRecoveredJournal(
     sql: options.sql,
   });
   if (recovery.status === "none") return false;
-  if (!recovery.persisted || leaseLost()) return true;
+  if (!recovery.persisted || mutationFenced()) return true;
   await options.afterTerminalEffectPersisted?.(job);
-  if (!leaseLost()) {
+  if (!mutationFenced()) {
     await finalizePersistedEffect(job, { now: options.now, sql: options.sql });
   }
   return true;
@@ -98,10 +103,10 @@ async function finalizeRecoveredJournal(
 async function processClaimedJob(
   job: ClaimedJob,
   options: WorkerRunOptions,
-  leaseLost: () => boolean,
+  mutationFenced: () => boolean,
   signal: AbortSignal,
 ): Promise<void> {
-  if (leaseLost()) return;
+  if (mutationFenced()) return;
   const adapter = options.adapter ?? new StrictA3Adapter({
     authority: options.authority,
     sql: options.sql,
@@ -109,7 +114,7 @@ async function processClaimedJob(
   });
   const authority = options.authority ?? adapterAuthority(adapter) ?? undefined;
   const runtimeOptions = authority ? { ...options, authority } : options;
-  if (await finalizeRecoveredJournal(job, runtimeOptions, leaseLost, signal)) return;
+  if (await finalizeRecoveredJournal(job, runtimeOptions, mutationFenced, signal)) return;
   if (adapter.key !== job.adapterKey) throw new Error("WORKER_ADAPTER_POLICY_MISMATCH");
   let result;
   try {
@@ -130,12 +135,12 @@ async function processClaimedJob(
       signal,
     });
   } catch {
-    if (leaseLost()) return;
-    if (await finalizeRecoveredJournal(job, runtimeOptions, leaseLost, signal)) return;
+    if (mutationFenced()) return;
+    if (await finalizeRecoveredJournal(job, runtimeOptions, mutationFenced, signal)) return;
     await requeueAfterTransientFailure(job, { now: options.now, sql: options.sql });
     return;
   }
-  if (leaseLost()) return;
+  if (mutationFenced()) return;
   let persisted = false;
   if (result.ok) {
     if (result.verified !== true) {
@@ -150,6 +155,7 @@ async function processClaimedJob(
       });
     } else {
       const decision = await deliveryAuthority(job, runtimeOptions, signal);
+      if (mutationFenced()) return;
       if (!decision.allowed || !decision.checkId) {
         persisted = await persistFailedEffect(
           job,
@@ -174,9 +180,9 @@ async function processClaimedJob(
       sql: options.sql,
     });
   }
-  if (!persisted || leaseLost()) return;
+  if (!persisted || mutationFenced()) return;
   await options.afterTerminalEffectPersisted?.(job);
-  if (leaseLost()) return;
+  if (mutationFenced()) return;
   await finalizePersistedEffect(job, { now: options.now, sql: options.sql });
 }
 
@@ -191,12 +197,15 @@ export async function runWorkerOnce(options: WorkerRunOptions): Promise<{
   ) {
     throw new Error("WORKER_INVALID_CONCURRENCY");
   }
+  if (options.signal?.aborted) return { leaseAcquired: false, claimed: 0 };
   const lease = await acquireWorkerLease(options.ownerId, options.leaseSeconds, {
     now: options.now,
     sql: options.sql,
   });
   if (!lease.acquired) return { leaseAcquired: false, claimed: 0 };
+  if (options.signal?.aborted) return { leaseAcquired: true, claimed: 0 };
   await reconcileExpiredJobs({ now: options.now, sql: options.sql });
+  if (options.signal?.aborted) return { leaseAcquired: true, claimed: 0 };
   const jobs = await claimJobs(
     options.ownerId,
     options.concurrency,
@@ -206,37 +215,47 @@ export async function runWorkerOnce(options: WorkerRunOptions): Promise<{
   let leaseLost = false;
   const activeJobs = new Map(jobs.map((job) => [job.jobId, job]));
   const controllers = new Map(jobs.map((job) => [job.jobId, new AbortController()]));
+  const abortActiveJobs = (): void => {
+    for (const controller of controllers.values()) controller.abort();
+  };
+  const mutationFenced = (): boolean => leaseLost || options.signal?.aborted === true;
   const markLeaseLost = (code: string): void => {
     if (leaseLost) return;
     leaseLost = true;
-    for (const controller of controllers.values()) controller.abort();
+    abortActiveJobs();
     console.error(JSON.stringify({
       level: "error",
       context: "kernel.worker.heartbeat",
       code,
     }));
   };
+  options.signal?.addEventListener("abort", abortActiveJobs, { once: true });
+  if (options.signal?.aborted) abortActiveJobs();
   const heartbeatMs = Math.max(1_000, Math.floor(options.leaseSeconds * 1_000 / 3));
+  let heartbeatInFlight: Promise<void> | null = null;
   const heartbeat = options.now || jobs.length === 0
     ? null
     : setInterval(() => {
+        if (mutationFenced() || heartbeatInFlight) return;
         const heartbeatJobs = [...activeJobs.values()];
         if (heartbeatJobs.length === 0) return;
-        void heartbeatClaimedJobs(
+        heartbeatInFlight = heartbeatClaimedJobs(
           options.ownerId,
           heartbeatJobs,
           options.leaseSeconds,
           { sql: options.sql },
         ).then((renewed) => {
           if (!renewed) markLeaseLost("WORKER_CLAIM_LOST");
-        }).catch(() => markLeaseLost("WORKER_HEARTBEAT_FAILED"));
+        }).catch(() => markLeaseLost("WORKER_HEARTBEAT_FAILED")).finally(() => {
+          heartbeatInFlight = null;
+        });
       }, heartbeatMs);
   try {
     await Promise.all(jobs.map(async (job) => {
       try {
         const controller = controllers.get(job.jobId);
         if (!controller) throw new Error("WORKER_ABORT_CONTROLLER_MISSING");
-        await processClaimedJob(job, options, () => leaseLost, controller.signal);
+        await processClaimedJob(job, options, mutationFenced, controller.signal);
       } finally {
         activeJobs.delete(job.jobId);
         controllers.delete(job.jobId);
@@ -244,6 +263,8 @@ export async function runWorkerOnce(options: WorkerRunOptions): Promise<{
     }));
   } finally {
     if (heartbeat) clearInterval(heartbeat);
+    await heartbeatInFlight;
+    options.signal?.removeEventListener("abort", abortActiveJobs);
   }
   return { leaseAcquired: true, claimed: jobs.length };
 }
@@ -252,44 +273,54 @@ export function startKernelWorker(options: {
   concurrency: number;
   leaseSeconds: number;
   pollIntervalMs?: number;
-}): { ownerId: string; stop: () => void } {
+}): { ownerId: string; stop: () => Promise<void> } {
   const ownerId = randomUUID();
   const pollIntervalMs = options.pollIntervalMs ?? 1_000;
   let stopped = false;
-  let running = false;
-  const tick = async (): Promise<void> => {
-    if (stopped || running) return;
-    running = true;
-    try {
-      await runWorkerOnce({
-        ownerId,
-        concurrency: options.concurrency,
-        leaseSeconds: options.leaseSeconds,
-      });
-      const renewed = await heartbeatWorkerLease(ownerId, options.leaseSeconds);
-      if (!renewed) {
-        console.error(JSON.stringify({
-          level: "error",
-          context: "kernel.worker",
-          code: "WORKER_LEASE_LOST",
-        }));
+  let inFlight: Promise<void> | null = null;
+  let activeController: AbortController | null = null;
+  const tick = (): void => {
+    if (stopped || inFlight) return;
+    const controller = new AbortController();
+    activeController = controller;
+    inFlight = (async () => {
+      try {
+        await runWorkerOnce({
+          ownerId,
+          concurrency: options.concurrency,
+          leaseSeconds: options.leaseSeconds,
+          signal: controller.signal,
+        });
+        if (stopped || controller.signal.aborted) return;
+        const renewed = await heartbeatWorkerLease(ownerId, options.leaseSeconds);
+        if (!renewed) {
+          console.error(JSON.stringify({
+            level: "error",
+            context: "kernel.worker",
+            code: "WORKER_LEASE_LOST",
+          }));
+        }
+      } catch (error) {
+        if (stopped && controller.signal.aborted) return;
+        const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
+          ? error.message
+          : "WORKER_TICK_FAILED";
+        console.error(JSON.stringify({ level: "error", context: "kernel.worker", code }));
       }
-    } catch (error) {
-      const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
-        ? error.message
-        : "WORKER_TICK_FAILED";
-      console.error(JSON.stringify({ level: "error", context: "kernel.worker", code }));
-    } finally {
-      running = false;
-    }
+    })().finally(() => {
+      if (activeController === controller) activeController = null;
+      inFlight = null;
+    });
   };
-  const timer = setInterval(() => void tick(), pollIntervalMs);
-  void tick();
+  const timer = setInterval(tick, pollIntervalMs);
+  tick();
   return {
     ownerId,
-    stop: () => {
+    stop: async () => {
       stopped = true;
       clearInterval(timer);
+      activeController?.abort();
+      await inFlight;
     },
   };
 }

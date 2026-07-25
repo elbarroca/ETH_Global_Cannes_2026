@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getDb } from "../../src/config/database";
 import { domainHash } from "../../src/kernel/canonical";
 import { checkFreshEnsAuthority } from "../../src/ens/authority";
 import { parseAgentInput } from "../../src/kernel/policy";
@@ -14,7 +15,7 @@ import type {
   AdapterExecutionResult,
   KernelAdapter,
 } from "../../src/worker/adapter";
-import { runWorkerOnce } from "../../src/worker/runner";
+import { runWorkerOnce, startKernelWorker } from "../../src/worker/runner";
 import {
   acquireWorkerLease,
   claimJobs,
@@ -340,6 +341,94 @@ test("heartbeat lease loss prevents terminal persistence and finalization", asyn
       refunds: 0,
     });
   } finally {
+    await database.close();
+  }
+});
+
+test("worker stop waits for the active tick and prevents later polling", async () => {
+  const database = await startDisposableDatabase("worker-stop");
+  configureDatabaseEnvironment(database.url);
+  let releaseTableLock = (): void => undefined;
+  let blocker: Promise<void> | null = null;
+  let worker: ReturnType<typeof startKernelWorker> | null = null;
+  try {
+    const agentVersionId = await createAgent(database);
+    const submitted = await submitJob(BUYER_ID, {
+      agentVersionId,
+      idempotencyKey: "stop-before-claim",
+      task: { prompt: "remain queued when shutdown begins before claim" },
+    }, { sql: database.sql });
+    let markTableLocked = (): void => undefined;
+    const tableLocked = new Promise<void>((resolve) => {
+      markTableLocked = resolve;
+    });
+    const tableLockReleased = new Promise<void>((resolve) => {
+      releaseTableLock = resolve;
+    });
+    blocker = database.sql.begin(async (transaction) => {
+      const sql = transaction as unknown as DatabaseClient;
+      await sql`LOCK TABLE worker_leases IN ACCESS EXCLUSIVE MODE`;
+      markTableLocked();
+      await tableLockReleased;
+    });
+    await tableLocked;
+
+    worker = startKernelWorker({ concurrency: 1, leaseSeconds: 30, pollIntervalMs: 5 });
+    let blocked = false;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const rows = await database.sql<{ blocked: boolean }[]>`
+        SELECT EXISTS (
+          SELECT 1
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND pid <> pg_backend_pid()
+            AND wait_event_type = 'Lock'
+            AND query ILIKE '%INSERT INTO worker_leases%'
+        ) AS blocked
+      `;
+      blocked = rows[0]?.blocked === true;
+      if (blocked) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(blocked, true);
+
+    let stopped = false;
+    const firstStop = worker.stop().then(() => {
+      stopped = true;
+    });
+    const repeatedStop = worker.stop();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(stopped, false);
+
+    releaseTableLock();
+    await blocker;
+    await Promise.all([firstStop, repeatedStop]);
+    const leases = await database.sql<{ owner_id: string; updated_at: Date }[]>`
+      SELECT owner_id, updated_at
+      FROM worker_leases
+      WHERE key = ${KERNEL_WORKER_LEASE_KEY}
+    `;
+    assert.equal(leases[0]?.owner_id, worker.ownerId);
+    const jobs = await database.sql<{ attempts: number; effect_state: string; state: string }[]>`
+      SELECT j.attempts, e.state AS effect_state, j.state
+      FROM jobs j
+      JOIN effects e ON e.job_id = j.id
+      WHERE j.id = ${submitted.jobId}::uuid
+    `;
+    assert.deepEqual(jobs[0], { attempts: 0, effect_state: "PENDING", state: "QUEUED" });
+    const stoppedHeartbeat = leases[0]?.updated_at.getTime();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const afterStop = await database.sql<{ updated_at: Date }[]>`
+      SELECT updated_at
+      FROM worker_leases
+      WHERE key = ${KERNEL_WORKER_LEASE_KEY}
+    `;
+    assert.equal(afterStop[0]?.updated_at.getTime(), stoppedHeartbeat);
+  } finally {
+    releaseTableLock();
+    await blocker?.catch(() => undefined);
+    await worker?.stop();
+    await getDb().end({ timeout: 1 }).catch(() => undefined);
     await database.close();
   }
 });
