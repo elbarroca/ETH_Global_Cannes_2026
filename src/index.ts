@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 import dotenv from "dotenv";
+import { startGoalRunner } from "./agents/goal-runner";
 import { validateEnvironment } from "./config/env";
 import { startKernelWorker } from "./worker/runner";
 
@@ -24,7 +25,11 @@ function validateLegacyEnvironment(source: NodeJS.ProcessEnv): void {
   }
 }
 
-async function bootLegacyRuntime(source: NodeJS.ProcessEnv): Promise<void> {
+export interface RuntimeHandle {
+  stop: () => Promise<void>;
+}
+
+async function bootLegacyRuntime(source: NodeJS.ProcessEnv): Promise<RuntimeHandle> {
   validateLegacyEnvironment(source);
   const [registry, specialists, bot, heartbeat, timeoutChecker, inference] = await Promise.all([
     import("./marketplace/registry"),
@@ -42,38 +47,61 @@ async function bootLegacyRuntime(source: NodeJS.ProcessEnv): Promise<void> {
   heartbeat.startHeartbeatLoop();
   timeoutChecker.startTimeoutChecker();
   console.log(JSON.stringify({ level: "info", context: "runtime.boot", mode: "legacy" }));
+  return { stop: async () => undefined };
 }
 
-export async function bootRuntime(source: NodeJS.ProcessEnv = process.env): Promise<void> {
+export async function bootRuntime(source: NodeJS.ProcessEnv = process.env): Promise<RuntimeHandle> {
   const smoke = source.PROTECTED_BOOT_SMOKE === "true";
   const environment = validateEnvironment(source, { requireDatabase: !smoke });
   if (environment.runtimeMode === "legacy") {
-    await bootLegacyRuntime(source);
-    return;
+    return bootLegacyRuntime(source);
   }
   if (environment.enableBackgroundWorkers) throw new Error("PROTECTED_LEGACY_WORKERS_FORBIDDEN");
-  if (environment.enableKernelWorker && !smoke) {
-    startKernelWorker({
-      concurrency: environment.kernelWorkerConcurrency,
-      leaseSeconds: environment.kernelWorkerLeaseSeconds,
-    });
-  }
+  const kernelWorker = environment.enableKernelWorker && !smoke
+    ? startKernelWorker({
+        concurrency: environment.kernelWorkerConcurrency,
+        leaseSeconds: environment.kernelWorkerLeaseSeconds,
+      })
+    : null;
+  const goalRunner = environment.enableKernelWorker && !smoke
+    ? startGoalRunner({ leaseSeconds: environment.kernelWorkerLeaseSeconds })
+    : null;
   console.log(JSON.stringify({
     level: "info",
     context: "runtime.boot",
     mode: "protected",
     kernelWorker: environment.enableKernelWorker && !smoke,
+    goalRunner: environment.enableKernelWorker && !smoke,
     smoke,
   }));
+  return {
+    stop: async () => {
+      const goalRunnerStopped = goalRunner?.stop();
+      kernelWorker?.stop();
+      await goalRunnerStopped;
+    },
+  };
 }
 
 const entrypoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
 if (import.meta.url === entrypoint) {
-  bootRuntime().catch((error: unknown) => {
-    const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
-      ? error.message
-      : "RUNTIME_BOOT_FAILED";
-    console.error(JSON.stringify({ level: "error", context: "runtime.boot", code }));
-    process.exitCode = 1;
-  });
+  bootRuntime()
+    .then((runtime) => {
+      let stopping = false;
+      const shutdown = async (signal: "SIGINT" | "SIGTERM"): Promise<void> => {
+        if (stopping) return;
+        stopping = true;
+        console.log(JSON.stringify({ level: "info", context: "runtime.shutdown", signal }));
+        await runtime.stop();
+      };
+      process.once("SIGINT", () => void shutdown("SIGINT"));
+      process.once("SIGTERM", () => void shutdown("SIGTERM"));
+    })
+    .catch((error: unknown) => {
+      const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
+        ? error.message
+        : "RUNTIME_BOOT_FAILED";
+      console.error(JSON.stringify({ level: "error", context: "runtime.boot", code }));
+      process.exitCode = 1;
+    });
 }

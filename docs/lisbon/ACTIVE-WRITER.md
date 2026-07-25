@@ -3,6 +3,55 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Cycle Wirer /root/runtime_goal_runner_w1
+task_id: A5-GOAL-RUNTIME-WIRING-20260725
+task_instance_id: A5-GOAL-RUNTIME-WIRING-20260725:W1:17BADB3
+generation: 1
+sprint: Durable protected goal-runner lifecycle wiring into the existing canonical runtime
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 17badb3b177a58bddcae1439f7497f804a624c29
+control_sha: 17badb3b177a58bddcae1439f7497f804a624c29
+token: A5-GOAL-RUNTIME-W1-17BADB3-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T15:32:25Z
+expires_at: 2026-07-25T17:30:00Z
+allowed_paths:
+  - src/agents/**
+  - src/index.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T15:32:25Z
+deadline: 2026-07-25T17:30:00Z
+expected_exit: one idempotently started protected goal runner in the canonical durable runtime with bounded polling failure backoff and graceful stop
+external_effect_authority: local files existing dependencies local tests and one local commit only; no live API webhook registration managed migration signature transaction deployment push funding form spend or claim
+completed_at: 2026-07-25T15:36:55Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - repeated start returned one process-local runner and graceful stop completed after an observable bounded failure against an intentionally unreachable loopback database
+  - focused protected goal-loop PASS 9 of 9
+  - npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm test PASS 10 of 10
+  - npm run test:auth PASS 9 of 9
+  - npm run test:kernel PASS 35 of 35
+  - npm run test:a5 PASS 3 of 3
+  - npm run test:e2e PASS 4 of 4
+  - npm run test:redaction PASS 3 of 3
+  - npm run test:boot PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+  - npm run build PASS 35 generated pages and three protected goal API routes
+remaining_blocks:
+  - npm run test:integration PASS 31 of 41; ten inherited A3 tests hook-fail only because the host has no local Go toolchain
+  - immutable exact-SHA audit remains required
+  - push deployment managed migration live APIs webhook registration signatures transactions funding forms spend release and claims remain unauthorized
+external_effects_attempted: none
+verdict: PASS_TO_AUDIT
+lock_release: release only exact token A5-GOAL-RUNTIME-W1-17BADB3-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/goal_loop_kernel
 task_id: A5-GOAL-LOOP-KERNEL-REMEDIATION-20260725
 task_instance_id: A5-GOAL-LOOP-KERNEL-REMEDIATION-20260725:W3:074CAAC
