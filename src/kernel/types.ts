@@ -122,7 +122,25 @@ export interface AgentManifestV3 extends AgentManifestBase {
   ensBindingHash: string | null;
 }
 
-export type AgentManifest = AgentManifestV1 | AgentManifestV2 | AgentManifestV3;
+export const RISK_LANES = ["LOW", "MID", "HIGH"] as const;
+export type RiskLane = (typeof RISK_LANES)[number];
+
+export interface AgentManifestV4 extends AgentManifestBase {
+  schemaVersion: 4;
+  catalogTemplateId: string;
+  catalogSelectionHash: string;
+  reviewedPromptHash: string;
+  reviewedConfigHash: string;
+  skills: readonly AgentSkillSnapshotV1[];
+  reviewedSources: readonly ReviewedSourceV1[];
+  nativeConnections: readonly AgentNativeConnection[];
+  mcp: readonly McpBindingV1[];
+  payoutAddress: string;
+  ensBindingHash: string | null;
+  riskTiers: readonly RiskLane[];
+}
+
+export type AgentManifest = AgentManifestV1 | AgentManifestV2 | AgentManifestV3 | AgentManifestV4;
 
 export interface AgentReviewedSourceSummary {
   repository: string;
@@ -203,7 +221,8 @@ export interface AgentLifecycleVersion {
   authorityReleaseSha: string | null;
   publicationDecisionId: string | null;
   publishedAt: string | null;
-  manifestSchemaVersion: 1 | 2 | 3;
+  manifestSchemaVersion: 1 | 2 | 3 | 4;
+  riskTiers: readonly RiskLane[] | null;
   reviewedSources: readonly AgentReviewedSourceSummary[] | null;
   skillSummary: readonly AgentSkillSummary[] | null;
   mcpSummary: readonly AgentMcpSummary[] | null;
@@ -256,7 +275,7 @@ export const GOAL_RUN_STATES = [
 ] as const;
 export type GoalRunState = (typeof GOAL_RUN_STATES)[number];
 
-export interface GoalPolicy extends Record<string, CanonicalValue> {
+export interface GoalPolicyV1 extends Record<string, CanonicalValue> {
   cadenceMinutes: 5 | 15 | 30 | 60;
   runMode: "BOUNDED" | "CONTINUOUS";
   executionMode: "RESEARCH_ONLY" | "PROPOSE_SWAP";
@@ -264,6 +283,20 @@ export interface GoalPolicy extends Record<string, CanonicalValue> {
   maxAgents: number;
   perRunCapAtomic: string;
   dailyCapAtomic: string | null;
+}
+
+export interface GoalPolicyV2 extends GoalPolicyV1 {
+  schemaVersion: 2;
+  orchestrationMode: "TRI_RISK_V1";
+  maxAgents: 3;
+}
+
+export type GoalPolicy = GoalPolicyV1 | GoalPolicyV2;
+
+export interface AugmentedLayerPolicySnapshot extends Record<string, CanonicalValue> {
+  policy: GoalPolicyV2;
+  policyHash: string;
+  updatedAt: string;
 }
 
 export interface SwapProposalV1 extends Record<string, CanonicalValue> {
@@ -296,6 +329,46 @@ export interface GoalRunReportV1 extends Record<string, CanonicalValue> {
   swapProposal: SwapProposalV1 | null;
 }
 
+export type RiskStance = "BUY" | "SELL" | "HOLD";
+
+export interface RiskLaneResultV1 extends Record<string, CanonicalValue> {
+  schemaVersion: 1;
+  riskLane: RiskLane;
+  stance: RiskStance;
+  summary: string;
+  conclusion: string;
+  swapProposal: SwapProposalV1 | null;
+}
+
+export interface TriRiskLaneReportV1 extends Record<string, CanonicalValue> {
+  riskLane: RiskLane;
+  stance: RiskStance;
+  summary: string;
+  conclusion: string;
+  jobId: string;
+  agentVersionId: string;
+  resultHash: string;
+  receiptId: string;
+}
+
+export interface TriRiskGoalRunReportV1 extends Record<string, CanonicalValue> {
+  schemaVersion: 1;
+  orchestrationMode: "TRI_RISK_V1";
+  goalId: string;
+  runId: string;
+  status: "READY" | "PARTIAL";
+  objective: string;
+  summary: string;
+  conclusion: string;
+  agreement: "AGREEMENT" | "DISAGREEMENT";
+  consensusStance: RiskStance | null;
+  lanes: readonly TriRiskLaneReportV1[];
+  evidence: readonly GoalRunEvidenceV1[];
+  swapProposal: SwapProposalV1 | null;
+}
+
+export type GoalRunReport = GoalRunReportV1 | TriRiskGoalRunReportV1;
+
 export interface GoalSnapshot extends Record<string, CanonicalValue> {
   goalId: string;
   objective: string;
@@ -313,6 +386,7 @@ export interface GoalRunJobSnapshot {
   agentVersionId: string;
   jobId: string | null;
   role: "ANALYSIS" | "SYNTHESIS";
+  riskLane: RiskLane | null;
   selectionRank: number;
   coveredCapabilities: readonly string[];
   priceAtomic: string;
@@ -348,7 +422,7 @@ export interface GoalRunSnapshot {
   effectIdentity: string;
   totalPriceAtomic: string;
   costReservedAt: string | null;
-  report: GoalRunReportV1 | null;
+  report: GoalRunReport | null;
   reportHash: string | null;
   errorCode: string | null;
   startedAt: string | null;

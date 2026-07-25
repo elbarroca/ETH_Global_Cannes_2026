@@ -6,6 +6,7 @@ import type {
   AgentManifest,
   AgentManifestV2,
   AgentManifestV3,
+  AgentManifestV4,
   AgentNativeConnection,
   AgentSkillSnapshotV1,
   McpBindingV1,
@@ -13,7 +14,9 @@ import type {
   McpProviderId,
   PinnedAgentSkill,
   ReviewedSourceV1,
+  RiskLane,
 } from "./types";
+import { RISK_LANES } from "./types";
 
 export const SUPPORTED_AGENT_SKILLS = [
   "research",
@@ -132,6 +135,13 @@ function manifestConfigV3(manifest: Omit<AgentManifestV3, "reviewedConfigHash">)
   };
 }
 
+function manifestConfigV4(manifest: Omit<AgentManifestV4, "reviewedConfigHash">): CanonicalValue {
+  return {
+    ...(manifestConfigV3(manifest) as Record<string, CanonicalValue>),
+    riskTiers: manifest.riskTiers,
+  };
+}
+
 function foundingTemplate(templateId: string) {
   const template = FOUNDING_PACK.templates.find((entry) => entry.id === templateId);
   if (!template) throw new KernelError("KERNEL_INVALID_REQUEST", "Unknown founding template", 400);
@@ -233,6 +243,18 @@ function withV3EnsBinding(manifest: AgentManifestV3, ensBinding: AgentEnsBinding
   };
 }
 
+function withV4EnsBinding(manifest: AgentManifestV4, ensBinding: AgentEnsBinding): AgentManifestV4 {
+  const updated = {
+    ...manifest,
+    ensBinding,
+    ensBindingHash: domainHash("agent-ens-binding", ensBinding),
+  };
+  return {
+    ...updated,
+    reviewedConfigHash: domainHash("agent-config", manifestConfigV4(updated)),
+  };
+}
+
 export function buildManifestV3(input: {
   templateId: string;
   name: string;
@@ -267,6 +289,46 @@ export function buildManifestV3(input: {
   return {
     ...manifest,
     reviewedConfigHash: domainHash("agent-config", manifestConfigV3(manifest)),
+  };
+}
+
+export function parseRiskTiers(value: unknown): readonly RiskLane[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > RISK_LANES.length) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "riskTiers must contain 1-3 entries", 400);
+  }
+  const tiers = value.map((entry): RiskLane => {
+    if (typeof entry !== "string" || !(RISK_LANES as readonly string[]).includes(entry)) {
+      throw new KernelError("KERNEL_INVALID_REQUEST", "Unsupported risk tier", 400);
+    }
+    return entry as RiskLane;
+  });
+  const stable = RISK_LANES.filter((tier) => tiers.includes(tier));
+  if (stable.length !== tiers.length || stable.some((tier, index) => tier !== tiers[index])) {
+    throw new KernelError(
+      "KERNEL_INVALID_REQUEST",
+      "riskTiers must be unique and ordered LOW, MID, HIGH",
+      400,
+    );
+  }
+  return stable;
+}
+
+export function buildManifestV4(input: {
+  templateId: string;
+  name: string;
+  description: string;
+  ownerWallet: string;
+  riskTiers: readonly RiskLane[];
+}): AgentManifestV4 {
+  const v3 = buildManifestV3(input);
+  const manifest = {
+    ...v3,
+    schemaVersion: 4,
+    riskTiers: parseRiskTiers(input.riskTiers),
+  } as const;
+  return {
+    ...manifest,
+    reviewedConfigHash: domainHash("agent-config", manifestConfigV4(manifest)),
   };
 }
 
@@ -351,6 +413,7 @@ export function buildManifestV2(input: {
 export function bindManifestEns(manifest: AgentManifest, bindingValue: AgentEnsBinding): AgentManifest {
   if (manifest.schemaVersion === 1) return { ...manifest, ensBinding: bindingValue };
   if (manifest.schemaVersion === 3) return withV3EnsBinding(manifest, bindingValue);
+  if (manifest.schemaVersion === 4) return withV4EnsBinding(manifest, bindingValue);
   const updated = {
     ...manifest,
     ensBinding: bindingValue,
@@ -375,6 +438,20 @@ function assertCatalogManifestV3(manifest: AgentManifestV3): void {
   }
 }
 
+function assertCatalogManifestV4(manifest: AgentManifestV4): void {
+  let expected = buildManifestV4({
+    templateId: manifest.catalogTemplateId,
+    name: manifest.name,
+    description: manifest.description,
+    ownerWallet: manifest.ownerWallet,
+    riskTiers: manifest.riskTiers,
+  });
+  if (manifest.ensBinding) expected = withV4EnsBinding(expected, manifest.ensBinding);
+  if (canonicalJson(manifest) !== canonicalJson(expected)) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "Catalog manifest does not match its reviewed template", 400);
+  }
+}
+
 export function deriveManifestHashes(manifest: AgentManifest): {
   manifestHash: string;
   promptHash: string;
@@ -393,7 +470,9 @@ export function deriveManifestHashes(manifest: AgentManifest): {
       })
     : manifest.schemaVersion === 2
       ? domainHash("agent-config", manifestConfigV2(manifest))
-      : domainHash("agent-config", manifestConfigV3(manifest));
+      : manifest.schemaVersion === 3
+        ? domainHash("agent-config", manifestConfigV3(manifest))
+        : domainHash("agent-config", manifestConfigV4(manifest));
   if (
     manifest.schemaVersion !== 1 &&
     (manifest.reviewedPromptHash !== promptHash || manifest.reviewedConfigHash !== configHash)
@@ -401,6 +480,7 @@ export function deriveManifestHashes(manifest: AgentManifest): {
     throw new KernelError("KERNEL_INVALID_REQUEST", "Manifest review hashes do not match", 400);
   }
   if (manifest.schemaVersion === 3) assertCatalogManifestV3(manifest);
+  if (manifest.schemaVersion === 4) assertCatalogManifestV4(manifest);
   return {
     manifestHash: domainHash("agent-manifest", manifest),
     promptHash,

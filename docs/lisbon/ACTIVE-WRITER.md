@@ -3,6 +3,67 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/tri_risk_kernel_w1
+task_id: TRI-RISK-V1-W1
+task_instance_id: TRI-RISK-V1-W1:W1:00147DD
+generation: 1
+sprint: Add the protected TRI_RISK_V1 augmented layer
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 00147dd019ccd1c50b5de6b4cc8288a365c51c5f
+control_sha: 00147dd019ccd1c50b5de6b4cc8288a365c51c5f
+token: TRI-RISK-V1-W1-00147DD-20260725T195842Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T20:24:48Z
+expires_at: 2026-07-25T22:58:42Z
+allowed_paths:
+  - src/kernel/types.ts
+  - src/kernel/agent-catalog.ts
+  - src/kernel/policy.ts
+  - src/kernel/lifecycle.ts
+  - src/kernel/service.ts
+  - src/kernel/goals.ts
+  - src/kernel/augmented-layer-policy.ts
+  - app/api/kernel/augmented-layer-policy/route.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260725203000_tri_risk_augmented_layer/**
+  - scripts/test-migrations.ts
+  - tests/kernel/founding-mcp.test.ts
+  - tests/kernel/lifecycle.cases.ts
+  - tests/kernel/goal-loop.test.ts
+  - tests/kernel/augmented-layer-policy.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T19:58:42Z
+deadline: 2026-07-25T22:58:42Z
+expected_exit: immutable schema-v4 tri-risk manifests, durable per-user V2 policy, exactly three evidence-gated risk lanes, and deterministic immutable reports
+external_effect_authority: local files existing dependencies local deterministic tests disposable local migration databases and one atomic local commit only; no environment read managed migration network call push deploy signature payment funding transaction or claim
+completed_at: 2026-07-25T20:24:48Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - manifest schema V4 preserves exact V1 V2 and V3 hashes while adding only server-validated stable LOW MID HIGH risk tiers
+  - per-user GoalPolicyV2 storage is tenant-scoped canonically hashed and backed by an append-only durably idempotent mutation ledger
+  - TRI_RISK_V1 selects exactly one distinct published external V4 agent per LOW MID HIGH lane with deterministic ranking capability coverage and budget refusal before job insertion
+  - selected jobs retain immutable lane version manifest ENS pricing and policy snapshots with exact lane-bound idempotency identities and no synthesis job
+  - report admission requires verified matching effect receipt x402 payment settlement and commission evidence and forbids partial swap proposals
+  - Prisma validate and generate PASS and disposable migration verification PASS all fresh Cannes populated goal-loop canonical W6 and noncanonical W6 lanes across 18 migrations
+  - test kernel PASS 52 of 52 test auth PASS 9 of 9 npm test PASS 10 of 10 test e2e PASS 5 of 5 worker fencing PASS 3 of 3 test boot PASS and test redaction PASS 3 of 3
+  - lint PASS with zero errors and 23 inherited warnings typecheck PASS scan secrets PASS and git diff check PASS
+  - aggregate test integration PARTIAL with 32 passing and 11 inherited strict-A3 hook failures because no host Go binary is installed
+remaining_blocks:
+  - immutable exact-SHA independent audit remains required
+  - strict protected A3 currently admits only manifest schemas 1 2 and 3 in src/og/strict-a3.ts so selected V4 jobs cannot reach protected execution until the 0G owner adds schema V4 admission and tests
+  - end-to-end paid tri-risk report execution remains gated by that cross-domain A3 change and by the existing payments proof flow; this writer created no payment execution path
+  - npm run build was not run because the explicit dispatch forbids reading .env.local and concurrent disjoint UI mutations were outside this writer lease
+  - concurrent disjoint UI and auth worktree mutations were preserved and never staged or modified by this writer
+  - managed migration network push deploy signature payment funding transaction spend and public claim gates remain closed
+external_effects_attempted: local deterministic tests Prisma generation and disposable loopback migration databases only; no .env.local read managed migration network push deploy signature payment funding transaction spend or claim
+claim_changes: none
+verdict: PASS_TO_AUDIT_WITH_INHERITED_HOST_GO_AND_CROSS_DOMAIN_A3_BLOCKERS; LOCAL_ONLY
+lock_release: release only exact token TRI-RISK-V1-W1-00147DD-20260725T195842Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Cycle Wirer /root/railway_worker_foundation
 task_id: RAILWAY-WORKER-FOUNDATION-W1
 task_instance_id: RAILWAY-WORKER-FOUNDATION-W1:W1:5F81392

@@ -7,8 +7,10 @@ import type {
 } from "./types";
 import {
   buildManifestV3,
+  buildManifestV4,
   buildManifestV2,
   isSupportedAgentSkill,
+  parseRiskTiers,
   type SupportedAgentSkill,
 } from "./agent-catalog";
 
@@ -105,13 +107,21 @@ export function parseCatalogAgentInput(
   ownerWallet: string,
 ): { name: string; manifest: AgentManifest } {
   const input = objectRecord(value);
-  rejectUnexpectedKeys(input, ["templateId", "name", "description"]);
+  rejectUnexpectedKeys(input, ["templateId", "name", "description", "riskTiers"]);
   const templateId = boundedString(input.templateId, "templateId", 2, 80);
   const name = boundedString(input.name, "name", 2, 80);
   const description = boundedString(input.description, "description", 10, 800);
   return {
     name,
-    manifest: buildManifestV3({ templateId, name, description, ownerWallet }),
+    manifest: input.riskTiers === undefined
+      ? buildManifestV3({ templateId, name, description, ownerWallet })
+      : buildManifestV4({
+          templateId,
+          name,
+          description,
+          ownerWallet,
+          riskTiers: parseRiskTiers(input.riskTiers),
+        }),
   };
 }
 
@@ -156,13 +166,14 @@ export function parseAgentAction(value: unknown, ownerWallet: string): ParsedAge
     }
     const catalogDraft = body.templateId !== undefined;
     rejectUnexpectedKeys(body, catalogDraft
-      ? ["action", "agentId", "templateId", "name", "description"]
+      ? ["action", "agentId", "templateId", "name", "description", "riskTiers"]
       : ["action", "agentId", "name", "description", "instructions", "capabilities"]);
     const { manifest } = catalogDraft
       ? parseCatalogAgentInput({
           templateId: body.templateId,
           name: body.name,
           description: body.description,
+          riskTiers: body.riskTiers,
         }, ownerWallet)
       : parseAgentInput({
           name: body.name,

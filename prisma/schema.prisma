@@ -29,6 +29,8 @@ model User {
   goals              Goal[]                 @relation("GoalOwner")
   goalRuns           GoalRun[]              @relation("GoalRunOwner")
   goalMutations      GoalMutation[]          @relation("GoalMutationOwner")
+  augmentedLayerPolicy AugmentedLayerPolicy? @relation("AugmentedLayerPolicyOwner")
+  augmentedLayerPolicyMutations AugmentedLayerPolicyMutation[] @relation("AugmentedLayerPolicyMutationOwner")
 
   @@index([walletAddress], map: "idx_users_wallet")
   @@map("users")
@@ -544,6 +546,8 @@ model Goal {
   lastMutationHash     String?   @map("last_mutation_hash")
   objective            String    @db.Text
   requiredCapabilities String[]  @map("required_capabilities")
+  policySchemaVersion  Int       @default(1) @map("policy_schema_version")
+  orchestrationMode    String?   @map("orchestration_mode")
   cadenceMinutes       Int       @map("cadence_minutes")
   runMode              String    @map("run_mode")
   executionMode        String    @map("execution_mode")
@@ -625,6 +629,7 @@ model GoalRunJob {
   agentVersionId        String       @map("agent_version_id") @db.Uuid
   jobId                 String?      @unique @map("job_id") @db.Uuid
   role                  String
+  riskLane              String?      @map("risk_lane")
   selectionRank         Int          @map("selection_rank")
   coveredCapabilities   String[]     @map("covered_capabilities")
   priceAtomicSnapshot   BigInt       @map("price_atomic_snapshot")
@@ -639,6 +644,32 @@ model GoalRunJob {
   @@unique([goalRunId, role, agentVersionId], map: "uniq_goal_run_jobs_role_version")
   @@index([goalRunId, selectionRank], map: "idx_goal_run_jobs_rank")
   @@map("goal_run_jobs")
+}
+
+model AugmentedLayerPolicy {
+  ownerUserId String   @id @map("owner_user_id")
+  policy      Json
+  policyHash  String   @map("policy_hash")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  owner       User     @relation("AugmentedLayerPolicyOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+
+  @@map("augmented_layer_policies")
+}
+
+model AugmentedLayerPolicyMutation {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerUserId    String   @map("owner_user_id")
+  idempotencyKey String   @map("idempotency_key")
+  payloadHash    String   @map("payload_hash")
+  resultSnapshot Json     @map("result_snapshot")
+  resultHash     String   @map("result_hash")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  owner          User     @relation("AugmentedLayerPolicyMutationOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+
+  @@unique([ownerUserId, idempotencyKey], map: "uniq_augmented_layer_policy_mutations_owner_key")
+  @@index([ownerUserId, createdAt], map: "idx_augmented_layer_policy_mutations_owner_created")
+  @@map("augmented_layer_policy_mutations")
 }
 
 model AgentVersionProvenance {

@@ -159,12 +159,18 @@ const LIFECYCLE_VERSION_V3_KEYS = [
   "manifestSchemaVersion", "reviewedSources", "skillSummary", "mcpSummary", "mcpAvailability",
 ] as const;
 
+const LIFECYCLE_VERSION_CURRENT_KEYS = [
+  ...LIFECYCLE_VERSION_V3_KEYS,
+  "riskTiers",
+] as const;
+
 function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
   const row = object(value);
   const legacySnapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_KEYS);
-  const currentSnapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_V3_KEYS);
+  const v3Snapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_V3_KEYS);
+  const currentSnapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_CURRENT_KEYS);
   if (
-    !row || (!legacySnapshot && !currentSnapshot) ||
+    !row || (!legacySnapshot && !v3Snapshot && !currentSnapshot) ||
     typeof row.agentId !== "string" || !UUID.test(row.agentId) ||
     typeof row.versionId !== "string" || !UUID.test(row.versionId) ||
     !Number.isInteger(row.version) || (row.version as number) < 1 ||
@@ -194,14 +200,27 @@ function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
       ...(row as unknown as Omit<AgentLifecycleVersion,
         "manifestSchemaVersion" | "reviewedSources" | "skillSummary" | "mcpSummary" | "mcpAvailability">),
       manifestSchemaVersion: 2,
+      riskTiers: null,
       reviewedSources: null,
       skillSummary: null,
       mcpSummary: null,
       mcpAvailability: "NOT_REQUIRED",
     };
   }
+  if (v3Snapshot) {
+    return {
+      ...(row as unknown as Omit<AgentLifecycleVersion, "riskTiers">),
+      riskTiers: null,
+    };
+  }
   if (
-    ![1, 2, 3].includes(Number(row.manifestSchemaVersion)) ||
+    ![1, 2, 3, 4].includes(Number(row.manifestSchemaVersion)) ||
+    (row.riskTiers !== null && (
+      !Array.isArray(row.riskTiers) || row.riskTiers.length < 1 || row.riskTiers.length > 3 ||
+      row.riskTiers.some((tier) => !["LOW", "MID", "HIGH"].includes(String(tier))) ||
+      new Set(row.riskTiers).size !== row.riskTiers.length
+    )) ||
+    ((row.manifestSchemaVersion === 4) !== (row.riskTiers !== null)) ||
     (row.reviewedSources !== null && !Array.isArray(row.reviewedSources)) ||
     (row.skillSummary !== null && !Array.isArray(row.skillSummary)) ||
     (row.mcpSummary !== null && !Array.isArray(row.mcpSummary)) ||
@@ -430,18 +449,21 @@ async function publicationActionClaim(
 }
 
 function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVersion {
-  const reviewedSources = row.manifest.schemaVersion === 3
-    ? row.manifest.reviewedSources.map((source) => ({
+  const catalogManifest = row.manifest.schemaVersion === 3 || row.manifest.schemaVersion === 4
+    ? row.manifest
+    : null;
+  const reviewedSources = catalogManifest
+    ? catalogManifest.reviewedSources.map((source) => ({
         repository: source.repository,
         revision: source.revision,
         use: source.use,
       }))
     : null;
-  const skillSummary = row.manifest.schemaVersion === 3
-    ? row.manifest.skills.map((skill) => ({ id: skill.id, category: skill.category }))
+  const skillSummary = catalogManifest
+    ? catalogManifest.skills.map((skill) => ({ id: skill.id, category: skill.category }))
     : null;
-  const mcpSummary = row.manifest.schemaVersion === 3
-    ? row.manifest.mcp.map((binding) => ({
+  const mcpSummary = catalogManifest
+    ? catalogManifest.mcp.map((binding) => ({
         bindingId: binding.id,
         provider: binding.provider,
         capability: binding.capability,
@@ -479,6 +501,7 @@ function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVe
     publicationDecisionId: row.publication_decision_id,
     publishedAt: row.published_at?.toISOString() ?? null,
     manifestSchemaVersion: row.manifest.schemaVersion,
+    riskTiers: row.manifest.schemaVersion === 4 ? row.manifest.riskTiers : null,
     reviewedSources,
     skillSummary,
     mcpSummary,
@@ -983,7 +1006,10 @@ export async function publishAgentVersion(
       await markLifecycleActionRetryable(sql, claim, "KERNEL_CONFLICT");
       throw new KernelError("KERNEL_CONFLICT", "Prepare the ENS write before publication", 409);
     }
-    if (current.manifest.schemaVersion !== 2 && current.manifest.schemaVersion !== 3) {
+    if (
+      current.manifest.schemaVersion !== 2 && current.manifest.schemaVersion !== 3 &&
+      current.manifest.schemaVersion !== 4
+    ) {
       throw await completePublicationDenial(
         sql,
         claim,
@@ -1154,7 +1180,7 @@ export async function publishAgentVersion(
             publication_action_id = ${claim.actionId}::uuid
         FROM ens_publication_decisions d
         WHERE v.id = ${versionId}::uuid AND v.lifecycle_state = 'WRITE_PREPARED'
-          AND v.manifest->>'schemaVersion' IN ('2', '3')
+          AND v.manifest->>'schemaVersion' IN ('2', '3', '4')
           AND v.published = false AND d.id = ${decision.decision_id}::uuid
         RETURNING
           v.agent_id, v.id AS version_id, v.version, ${locked.name}::text AS name,

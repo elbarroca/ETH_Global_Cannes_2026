@@ -39,6 +39,7 @@ const A5_A6_KERNEL_FOUNDATION_MIGRATION = "20260725113000_a5_a6_kernel_foundatio
 const PROTECTED_GOAL_LOOP_MIGRATION = "20260725163000_protected_goal_loop";
 const GOAL_LOOP_HARDENING_MIGRATION = "20260725173000_goal_loop_hardening";
 const AGENT_MANIFEST_V3_MCP_EVIDENCE_MIGRATION = "20260725190000_agent_manifest_v3_mcp_evidence";
+const TRI_RISK_AUGMENTED_LAYER_MIGRATION = "20260725203000_tri_risk_augmented_layer";
 const GOAL_LOOP_PREDECESSOR_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -884,6 +885,8 @@ async function verifyDatabase(
       agent_version_provenance: string | null;
       goal_mutations: string | null;
       mcp_invocations: string | null;
+      augmented_layer_policies: string | null;
+      augmented_layer_policy_mutations: string | null;
       cost_reserved_at: string | null;
       user_count: string;
       migration_count: string;
@@ -931,6 +934,12 @@ async function verifyDatabase(
       agent_manifest_v3_mcp_evidence_count: string;
       agent_manifest_v3_mcp_constraint_count: string;
       agent_manifest_v3_mcp_trigger_count: string;
+      tri_risk_augmented_layer_count: string;
+      tri_risk_constraint_count: string;
+      tri_risk_trigger_count: string;
+      tri_risk_index_count: string;
+      manifest_v4_function_count: string;
+      mcp_v4_function_count: string;
       sequence_type: string;
       sequence_start: string;
       sequence_min: string;
@@ -961,6 +970,8 @@ async function verifyDatabase(
         to_regclass('public.agent_version_provenance')::text AS agent_version_provenance,
         to_regclass('public.goal_mutations')::text AS goal_mutations,
         to_regclass('public.mcp_invocations')::text AS mcp_invocations,
+        to_regclass('public.augmented_layer_policies')::text AS augmented_layer_policies,
+        to_regclass('public.augmented_layer_policy_mutations')::text AS augmented_layer_policy_mutations,
         (
           SELECT is_nullable FROM information_schema.columns
           WHERE table_schema = 'public' AND table_name = 'goal_runs'
@@ -1359,6 +1370,54 @@ async function verifyDatabase(
             'mcp_invocations_no_truncate'
           )
         ) AS agent_manifest_v3_mcp_trigger_count,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${TRI_RISK_AUGMENTED_LAYER_MIGRATION}
+            AND finished_at IS NOT NULL
+        ) AS tri_risk_augmented_layer_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'agent_versions_manifest_v4_shape_check',
+            'goals_policy_version_check',
+            'goal_runs_policy_shape_check',
+            'augmented_layer_policies_hash_check',
+            'augmented_layer_policies_policy_check',
+            'augmented_layer_policy_mutations_key_check',
+            'augmented_layer_policy_mutations_hash_check',
+            'augmented_layer_policy_mutations_result_check',
+            'goal_run_jobs_risk_lane_check',
+            'goal_runs_tri_risk_report_check'
+          )
+        ) AS tri_risk_constraint_count,
+        (
+          SELECT count(*)::text FROM pg_trigger
+          WHERE NOT tgisinternal AND tgname IN (
+            'augmented_layer_policies_integrity',
+            'augmented_layer_policy_mutations_append_only',
+            'augmented_layer_policy_mutations_no_truncate'
+          )
+        ) AS tri_risk_trigger_count,
+        (
+          SELECT count(*)::text FROM pg_indexes
+          WHERE schemaname = 'public' AND indexname IN (
+            'uniq_goal_run_jobs_risk_lane',
+            'uniq_augmented_layer_policy_mutations_owner_key',
+            'idx_augmented_layer_policy_mutations_owner_created'
+          )
+        ) AS tri_risk_index_count,
+        (
+          SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'enforce_manifest_v2_publication'
+            AND position($needle$NEW.manifest->>'schemaVersion' IN ('3', '4')$needle$ in p.prosrc) > 0
+            AND position($needle$jsonb_build_object('riskTiers', NEW.manifest->'riskTiers')$needle$ in p.prosrc) > 0
+            AND position($needle$NOT IN ('2', '3', '4')$needle$ in p.prosrc) > 0
+        ) AS manifest_v4_function_count,
+        (
+          SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'enforce_mcp_invocation_lineage'
+            AND position($needle$NOT IN ('3', '4')$needle$ in p.prosrc) > 0
+        ) AS mcp_v4_function_count,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
         seq.min_value::text AS sequence_min,
@@ -1392,9 +1451,11 @@ async function verifyDatabase(
       result.agent_version_provenance !== "agent_version_provenance" ||
       result.goal_mutations !== "goal_mutations" ||
       result.mcp_invocations !== "mcp_invocations" ||
+      result.augmented_layer_policies !== "augmented_layer_policies" ||
+      result.augmented_layer_policy_mutations !== "augmented_layer_policy_mutations" ||
       result.cost_reserved_at !== "YES" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 17 ||
+      Number(result.migration_count) !== 18 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1437,6 +1498,12 @@ async function verifyDatabase(
       Number(result.agent_manifest_v3_mcp_evidence_count) !== 1 ||
       Number(result.agent_manifest_v3_mcp_constraint_count) !== 7 ||
       Number(result.agent_manifest_v3_mcp_trigger_count) !== 3 ||
+      Number(result.tri_risk_augmented_layer_count) !== 1 ||
+      Number(result.tri_risk_constraint_count) !== 10 ||
+      Number(result.tri_risk_trigger_count) !== 3 ||
+      Number(result.tri_risk_index_count) !== 3 ||
+      Number(result.manifest_v4_function_count) !== 1 ||
+      Number(result.mcp_v4_function_count) !== 1 ||
       result.receipt_authority_nullable !== "NO" ||
       result.lifecycle_action_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||

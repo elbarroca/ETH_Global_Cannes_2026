@@ -3,6 +3,7 @@ import test from "node:test";
 import { FOUNDING_PACK } from "../../src/agents/founding-pack";
 import {
   buildManifestV3,
+  buildManifestV4,
   deriveManifestHashes,
   foundingCatalogProjection,
 } from "../../src/kernel/agent-catalog";
@@ -65,6 +66,55 @@ test("manifest v2 bytes remain stable and all founding templates derive determin
     assert.ok(first.mcp.length >= 2 && first.mcp.length <= 4);
     assert.ok(first.skills.every((skill) => /^[0-9a-f]{64}$/.test(skill.snapshotHash)));
   }
+});
+
+test("manifest v4 adds only stable server-validated risk tiers", () => {
+  const input = {
+    templateId: "market-pulse",
+    name: "Tri Risk Market Pulse",
+    description: "A deterministic catalog manifest for the tri-risk layer.",
+    ownerWallet: CREATOR_WALLET,
+  };
+  const v3 = buildManifestV3(input);
+  const v4 = buildManifestV4({ ...input, riskTiers: ["LOW", "HIGH"] });
+  assert.equal(v4.schemaVersion, 4);
+  assert.deepEqual(v4.riskTiers, ["LOW", "HIGH"]);
+  assert.notEqual(deriveManifestHashes(v4).manifestHash, deriveManifestHashes(v3).manifestHash);
+  assert.deepEqual(
+    deriveManifestHashes(buildManifestV4({ ...input, riskTiers: ["LOW", "HIGH"] })),
+    deriveManifestHashes(v4),
+  );
+  assert.throws(() => deriveManifestHashes({
+    ...v4,
+    riskTiers: ["LOW", "MID"],
+  }), (error: unknown) => error instanceof KernelError && error.code === "KERNEL_INVALID_REQUEST");
+
+  const action = parseAgentAction({
+    action: "CREATE_DRAFT",
+    templateId: "market-pulse",
+    name: input.name,
+    description: input.description,
+    riskTiers: ["LOW", "MID", "HIGH"],
+  }, CREATOR_WALLET);
+  assert.equal(action.action, "CREATE_DRAFT");
+  if (action.action !== "CREATE_DRAFT") {
+    throw new Error("Expected a CREATE_DRAFT action");
+  }
+  assert.equal(action.manifest.schemaVersion, 4);
+  assert.throws(() => parseAgentAction({
+    action: "CREATE_DRAFT",
+    templateId: "market-pulse",
+    name: input.name,
+    description: input.description,
+    riskTiers: ["HIGH", "LOW"],
+  }, CREATOR_WALLET), /ordered LOW, MID, HIGH/);
+  assert.throws(() => parseAgentAction({
+    action: "CREATE_DRAFT",
+    templateId: "market-pulse",
+    name: input.name,
+    description: input.description,
+    riskTiers: ["LOW", "LOW"],
+  }, CREATOR_WALLET), /unique/);
 });
 
 test("catalog draft admission rejects all client-owned manifest fields and catalog projection is sanitized", () => {

@@ -1,6 +1,7 @@
 import { getDb } from "../config/database";
 import { isAllowlistedToken } from "../config/unichain-sepolia";
 import { isSupportedAgentSkill, type SupportedAgentSkill } from "./agent-catalog";
+import { getAugmentedLayerPolicy, parseGoalPolicyV2 } from "./augmented-layer-policy";
 import { canonicalJson, domainHash, type CanonicalValue } from "./canonical";
 import { KernelError } from "./errors";
 import {
@@ -10,8 +11,12 @@ import {
 } from "./mcp-context";
 import { isKernelUuid } from "./policy";
 import { submitJob, type DatabaseClient } from "./service";
+import { RISK_LANES } from "./types";
 import type {
   GoalPolicy,
+  GoalPolicyV1,
+  GoalPolicyV2,
+  GoalRunReport,
   GoalRunEvidenceV1,
   GoalRunJobSnapshot,
   GoalRunReportV1,
@@ -20,7 +25,12 @@ import type {
   GoalSnapshot,
   GoalState,
   AgentManifest,
+  RiskLane,
+  RiskLaneResultV1,
+  RiskStance,
   SwapProposalV1,
+  TriRiskGoalRunReportV1,
+  TriRiskLaneReportV1,
 } from "./types";
 
 const GOAL_LOOP_LEASE_KEY = "goal-loop";
@@ -33,6 +43,10 @@ const TERMINAL_RUN_STATES = new Set<GoalRunState>([
   "READY", "PARTIAL", "BLOCKED", "FAILED", "CANCELED",
 ]);
 
+function isTriRiskPolicy(policy: GoalPolicy): policy is GoalPolicyV2 {
+  return "schemaVersion" in policy && policy.schemaVersion === 2;
+}
+
 interface GoalRow {
   goal_id: string;
   owner_user_id: string;
@@ -41,6 +55,8 @@ interface GoalRow {
   last_mutation_hash?: string | null;
   objective: string;
   required_capabilities: string[];
+  policy_schema_version: number;
+  orchestration_mode: "TRI_RISK_V1" | null;
   cadence_minutes: number;
   run_mode: "BOUNDED" | "CONTINUOUS";
   execution_mode: "RESEARCH_ONLY" | "PROPOSE_SWAP";
@@ -95,6 +111,7 @@ interface GoalRunJobRow {
   agent_version_id: string;
   job_id: string | null;
   role: "ANALYSIS" | "SYNTHESIS";
+  risk_lane: RiskLane | null;
   selection_rank: number;
   covered_capabilities: string[];
   price_atomic_snapshot: string;
@@ -109,6 +126,7 @@ interface CandidateRow {
   manifest_hash: string;
   full_subname: string;
   verified_external_hires: string;
+  risk_tiers: RiskLane[];
 }
 
 interface JobResultRow extends GoalRunJobRow {
@@ -119,6 +137,10 @@ interface JobResultRow extends GoalRunJobRow {
   receipt_id: string | null;
   receipt_verified: boolean | null;
   receipt_result_hash: string | null;
+  payment_receipt_id: string | null;
+  settlement_id: string | null;
+  commission_id: string | null;
+  version_capabilities: string[];
   mcp_failed_count: number;
   mcp_error_code: string | null;
 }
@@ -202,6 +224,7 @@ function capabilities(value: unknown): readonly SupportedAgentSkill[] {
 
 export function parseGoalPolicy(value: unknown): GoalPolicy {
   const policy = objectRecord(value);
+  if (policy.schemaVersion === 2) return parseGoalPolicyV2(policy);
   exactKeys(policy, [
     "cadenceMinutes", "runMode", "executionMode", "runLimit", "maxAgents",
     "perRunCapAtomic", "dailyCapAtomic",
@@ -232,7 +255,7 @@ export function parseGoalPolicy(value: unknown): GoalPolicy {
     }
     positiveAtomic(policy.dailyCapAtomic, "dailyCapAtomic");
   }
-  return {
+  const parsed: GoalPolicyV1 = {
     cadenceMinutes: Number(policy.cadenceMinutes) as GoalPolicy["cadenceMinutes"],
     runMode: policy.runMode,
     executionMode: policy.executionMode,
@@ -241,12 +264,13 @@ export function parseGoalPolicy(value: unknown): GoalPolicy {
     perRunCapAtomic,
     dailyCapAtomic: policy.runMode === "CONTINUOUS" ? String(policy.dailyCapAtomic) : null,
   };
+  return parsed;
 }
 
 export function parseGoalCreate(value: unknown): {
   objective: string;
   requiredCapabilities: readonly SupportedAgentSkill[];
-  policy: GoalPolicy;
+  policy: GoalPolicy | null;
   state: "DRAFT" | "ACTIVE";
 } {
   const body = objectRecord(value);
@@ -257,7 +281,7 @@ export function parseGoalCreate(value: unknown): {
   return {
     objective: boundedString(body.objective, "objective", 10, 2_000),
     requiredCapabilities: capabilities(body.requiredCapabilities),
-    policy: parseGoalPolicy(body.policy),
+    policy: body.policy === undefined ? null : parseGoalPolicy(body.policy),
     state: body.state,
   };
 }
@@ -304,7 +328,7 @@ export function parseGoalIdempotencyKey(value: string | null): string {
 }
 
 function policyFromGoal(row: GoalRow): GoalPolicy {
-  return {
+  const policy: GoalPolicyV1 = {
     cadenceMinutes: row.cadence_minutes as GoalPolicy["cadenceMinutes"],
     runMode: row.run_mode,
     executionMode: row.execution_mode,
@@ -313,6 +337,15 @@ function policyFromGoal(row: GoalRow): GoalPolicy {
     perRunCapAtomic: row.per_run_cap_atomic,
     dailyCapAtomic: row.daily_cap_atomic,
   };
+  if (row.policy_schema_version === 1 && row.orchestration_mode === null) return policy;
+  if (row.policy_schema_version === 2 && row.orchestration_mode === "TRI_RISK_V1") {
+    return parseGoalPolicyV2({
+      schemaVersion: 2,
+      orchestrationMode: "TRI_RISK_V1",
+      ...policy,
+    });
+  }
+  throw new Error("GOAL_POLICY_COLUMNS_INVALID");
 }
 
 function mapGoal(row: GoalRow): GoalSnapshot {
@@ -387,6 +420,7 @@ function mapGoalRunJob(row: GoalRunJobRow): GoalRunJobSnapshot {
     agentVersionId: row.agent_version_id,
     jobId: row.job_id,
     role: row.role,
+    riskLane: row.risk_lane,
     selectionRank: row.selection_rank,
     coveredCapabilities: row.covered_capabilities,
     priceAtomic: row.price_atomic_snapshot,
@@ -399,12 +433,37 @@ function parseReport(
   value: unknown,
   row: GoalRunRow,
   results: readonly JobResultRow[],
-): GoalRunReportV1 | null {
+): GoalRunReport | null {
   if (value === null) {
     if (row.report_hash !== null) throw new Error("GOAL_RUN_REPORT_INVALID");
     return null;
   }
   try {
+    const policy = parseGoalPolicy(row.policy_snapshot);
+    if (isTriRiskPolicy(policy)) {
+      const report = objectRecord(value);
+      const admittedResults = results.filter((result) => admitted(result, policy));
+      const parsedResults = admittedResults.flatMap((result) => {
+        try {
+          return [{ row: result, result: parseRiskLaneResult(result.effect_result, result, policy) }];
+        } catch {
+          return [];
+        }
+      });
+      const expected = triRiskReportFor(
+        row,
+        row.state === "READY" ? "READY" : "PARTIAL",
+        parsedResults,
+        policy,
+      );
+      if (
+        canonicalJson(report as CanonicalValue) !== canonicalJson(expected) ||
+        !row.report_hash || domainHash("tri-risk-goal-run-report-v1", expected) !== row.report_hash
+      ) {
+        throw new Error("GOAL_TRI_RISK_REPORT_INVALID");
+      }
+      return expected;
+    }
     const report = objectRecord(value);
     exactKeys(report, [
       "schemaVersion", "goalId", "runId", "status", "objective", "summary",
@@ -440,7 +499,7 @@ function parseReport(
     if (new Set(parsedEvidence.map((item) => item.jobId)).size !== parsedEvidence.length) {
       throw new Error("GOAL_REPORT_EVIDENCE_DUPLICATE");
     }
-    const expectedEvidence = new Map(results.filter(admitted).map((result) => [result.job_id, result]));
+    const expectedEvidence = new Map(results.filter((result) => admitted(result, policy)).map((result) => [result.job_id, result]));
     if (parsedEvidence.length !== expectedEvidence.size) throw new Error("GOAL_REPORT_EVIDENCE_INCOMPLETE");
     for (const item of parsedEvidence) {
       const expected = expectedEvidence.get(item.jobId);
@@ -451,7 +510,6 @@ function parseReport(
         throw new Error("GOAL_REPORT_EVIDENCE_MISMATCH");
       }
     }
-    const policy = parseGoalPolicy(row.policy_snapshot);
     if (report.status === "PARTIAL" && report.swapProposal !== null) {
       throw new Error("GOAL_PARTIAL_SWAP_PROPOSAL_FORBIDDEN");
     }
@@ -506,6 +564,7 @@ async function mapGoalRun(sql: DatabaseClient, row: GoalRunRow): Promise<GoalRun
 function goalSelect(sql: DatabaseClient, ownerUserId: string, goalId: string): Promise<GoalRow[]> {
   return sql<GoalRow[]>`
     SELECT id AS goal_id, owner_user_id, definition_hash, objective, required_capabilities,
+      policy_schema_version, orchestration_mode,
       cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
       per_run_cap_atomic::text, daily_cap_atomic::text, state, next_run_at,
       completed_runs, created_at, updated_at
@@ -535,6 +594,7 @@ export async function listGoals(
   }
   const rows = await sql<GoalRow[]>`
     SELECT id AS goal_id, owner_user_id, definition_hash, objective, required_capabilities,
+      policy_schema_version, orchestration_mode,
       cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
       per_run_cap_atomic::text, daily_cap_atomic::text, state, next_run_at,
       completed_runs, created_at, updated_at
@@ -562,45 +622,70 @@ export async function createGoal(
 ): Promise<{ goal: GoalSnapshot; replayed: boolean }> {
   const sql = options.sql ?? getDb();
   const now = options.now ?? new Date();
-  const definition = {
-    objective: input.objective,
-    policy: input.policy,
-    requiredCapabilities: input.requiredCapabilities,
-    state: input.state,
-  };
-  const definitionHash = domainHash("goal-definition", definition);
   const lockKey = domainHash("goal-create-lock", { idempotencyKey, ownerUserId });
   return sql.begin(async (transaction) => {
     const tx = transactionClient(transaction);
     await tx`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
     const existing = await tx<GoalRow[]>`
       SELECT id AS goal_id, owner_user_id, definition_hash, objective, required_capabilities,
+        policy_schema_version, orchestration_mode,
         cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
         per_run_cap_atomic::text, daily_cap_atomic::text, state, next_run_at,
         completed_runs, created_at, updated_at
       FROM goals WHERE owner_user_id = ${ownerUserId} AND idempotency_key = ${idempotencyKey}
     `;
     if (existing[0]) {
+      const replayPolicy = input.policy ?? policyFromGoal(existing[0]);
+      const definitionHash = domainHash("goal-definition", {
+        objective: input.objective,
+        policy: replayPolicy,
+        requiredCapabilities: input.requiredCapabilities,
+        state: input.state,
+      });
       if (existing[0].definition_hash !== definitionHash) {
         throw new KernelError("KERNEL_IDEMPOTENCY_MISMATCH", "Idempotency key was used for another goal", 409);
       }
       return { goal: mapGoal(existing[0]), replayed: true };
     }
+    let policy = input.policy;
+    if (policy === null || isTriRiskPolicy(policy)) {
+      const stored = await getAugmentedLayerPolicy(ownerUserId, { sql: tx });
+      if (!stored) {
+        throw new KernelError(
+          "KERNEL_CONFLICT",
+          "TRI_RISK_V1 requires an augmented-layer policy",
+          409,
+        );
+      }
+      policy ??= stored.policy;
+    }
+    if (!policy) throw new Error("GOAL_POLICY_RESOLUTION_FAILED");
+    const policySchemaVersion = isTriRiskPolicy(policy) ? 2 : 1;
+    const orchestrationMode = isTriRiskPolicy(policy) ? policy.orchestrationMode : null;
+    const definitionHash = domainHash("goal-definition", {
+      objective: input.objective,
+      policy,
+      requiredCapabilities: input.requiredCapabilities,
+      state: input.state,
+    });
     const rows = await tx<GoalRow[]>`
       INSERT INTO goals (
         owner_user_id, idempotency_key, definition_hash, objective, required_capabilities,
+        policy_schema_version, orchestration_mode,
         cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
         per_run_cap_atomic, daily_cap_atomic, state, next_run_at,
         completed_runs, created_at, updated_at
       ) VALUES (
         ${ownerUserId}, ${idempotencyKey}, ${definitionHash}, ${input.objective},
-        ${[...input.requiredCapabilities]}, ${input.policy.cadenceMinutes},
-        ${input.policy.runMode}, ${input.policy.executionMode}, ${input.policy.runLimit},
-        ${input.policy.maxAgents}, ${input.policy.perRunCapAtomic}::bigint,
-        ${input.policy.dailyCapAtomic}::bigint, ${input.state},
+        ${[...input.requiredCapabilities]}, ${policySchemaVersion},
+        ${orchestrationMode},
+        ${policy.cadenceMinutes}, ${policy.runMode}, ${policy.executionMode}, ${policy.runLimit},
+        ${policy.maxAgents}, ${policy.perRunCapAtomic}::bigint,
+        ${policy.dailyCapAtomic}::bigint, ${input.state},
         ${input.state === "ACTIVE" ? now : null}, 0, ${now}, ${now}
       ) RETURNING
         id AS goal_id, owner_user_id, definition_hash, objective, required_capabilities,
+        policy_schema_version, orchestration_mode,
         cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
         per_run_cap_atomic::text, daily_cap_atomic::text, state, next_run_at,
         completed_runs, created_at, updated_at
@@ -648,6 +733,7 @@ export async function patchGoal(
     }
     const rows = await tx<GoalRow[]>`
       SELECT id AS goal_id, owner_user_id, definition_hash, objective, required_capabilities,
+        policy_schema_version, orchestration_mode,
         cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
         per_run_cap_atomic::text, daily_cap_atomic::text, state, next_run_at,
         completed_runs, created_at, updated_at
@@ -664,10 +750,14 @@ export async function patchGoal(
         throw new KernelError("KERNEL_ILLEGAL_TRANSITION", "Pause the goal before editing it", 409);
       }
       const policy = input.policy ?? policyFromGoal(goal);
+      const policySchemaVersion = isTriRiskPolicy(policy) ? 2 : 1;
+      const orchestrationMode = isTriRiskPolicy(policy) ? policy.orchestrationMode : null;
       await tx`
         UPDATE goals SET
           objective = ${input.objective ?? goal.objective},
           required_capabilities = ${input.requiredCapabilities ? [...input.requiredCapabilities] : goal.required_capabilities},
+          policy_schema_version = ${policySchemaVersion},
+          orchestration_mode = ${orchestrationMode},
           cadence_minutes = ${policy.cadenceMinutes}, run_mode = ${policy.runMode},
           execution_mode = ${policy.executionMode}, run_limit = ${policy.runLimit},
           max_agents = ${policy.maxAgents}, per_run_cap_atomic = ${policy.perRunCapAtomic}::bigint,
@@ -690,6 +780,13 @@ export async function patchGoal(
         const allowed = input.action === "ACTIVATE" ? goal.state === "DRAFT" : goal.state === "PAUSED";
         if (!allowed) {
           throw new KernelError("KERNEL_ILLEGAL_TRANSITION", `Cannot ${input.action.toLowerCase()} this goal`, 409);
+        }
+        if (policyFromGoal(goal).schemaVersion === 2 && !(await getAugmentedLayerPolicy(ownerUserId, { sql: tx }))) {
+          throw new KernelError(
+            "KERNEL_CONFLICT",
+            "TRI_RISK_V1 requires an augmented-layer policy",
+            409,
+          );
         }
         await tx`
           UPDATE goals SET state = 'ACTIVE', next_run_at = ${now}, updated_at = ${now}
@@ -796,6 +893,7 @@ export async function createGoalRun(
     }
     const goals = await tx<GoalRow[]>`
       SELECT id AS goal_id, owner_user_id, definition_hash, objective, required_capabilities,
+        policy_schema_version, orchestration_mode,
         cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
         per_run_cap_atomic::text, daily_cap_atomic::text, state, next_run_at,
         completed_runs, created_at, updated_at
@@ -895,6 +993,74 @@ function selectCandidates(
   return { selected, missing: [...remaining].sort() };
 }
 
+interface TriRiskAssignment {
+  lane: RiskLane;
+  candidate: CandidateRow;
+  covered: string[];
+}
+
+function selectTriRiskCandidates(
+  candidates: readonly CandidateRow[],
+  requiredCapabilities: readonly string[],
+): { selected: TriRiskAssignment[]; errorCode: string | null } {
+  const byLane = new Map(RISK_LANES.map((lane) => [
+    lane,
+    candidates.filter((candidate) => candidate.risk_tiers.includes(lane)),
+  ]));
+  if (RISK_LANES.some((lane) => (byLane.get(lane)?.length ?? 0) === 0)) {
+    return { selected: [], errorCode: "GOAL_RISK_LANE_UNAVAILABLE" };
+  }
+  const required = new Set(requiredCapabilities);
+  const availableCapabilities = new Set(candidates.flatMap((candidate) => candidate.capabilities));
+  if (requiredCapabilities.some((capability) => !availableCapabilities.has(capability))) {
+    return { selected: [], errorCode: "GOAL_CAPABILITY_UNAVAILABLE" };
+  }
+  const choices: {
+    selected: TriRiskAssignment[];
+    coveredCount: number;
+    hires: bigint;
+    total: bigint;
+  }[] = [];
+  // ponytail: cubic catalog scan; replace with an assignment solver if catalog scale demands it.
+  for (const low of byLane.get("LOW") ?? []) {
+    for (const mid of byLane.get("MID") ?? []) {
+      for (const high of byLane.get("HIGH") ?? []) {
+        if (new Set([low.version_id, mid.version_id, high.version_id]).size !== 3) continue;
+        const selected = ([
+          ["LOW", low], ["MID", mid], ["HIGH", high],
+        ] as const).map(([lane, candidate]) => ({
+          lane,
+          candidate,
+          covered: candidateCoverage(candidate, required),
+        }));
+        const union = new Set(selected.flatMap((item) => item.covered));
+        if (requiredCapabilities.some((capability) => !union.has(capability))) continue;
+        choices.push({
+          selected,
+          coveredCount: selected.reduce((sum, item) => sum + item.covered.length, 0),
+          hires: selected.reduce((sum, item) => sum + BigInt(item.candidate.verified_external_hires), 0n),
+          total: selected.reduce((sum, item) => sum + BigInt(item.candidate.price_atomic), 0n),
+        });
+      }
+    }
+  }
+  choices.sort((left, right) => {
+    if (left.coveredCount !== right.coveredCount) return right.coveredCount - left.coveredCount;
+    if (left.hires !== right.hires) return left.hires > right.hires ? -1 : 1;
+    if (left.total !== right.total) return left.total < right.total ? -1 : 1;
+    for (let index = 0; index < RISK_LANES.length; index += 1) {
+      const order = left.selected[index]!.candidate.version_id.localeCompare(
+        right.selected[index]!.candidate.version_id,
+      );
+      if (order !== 0) return order;
+    }
+    return 0;
+  });
+  return choices[0]
+    ? { selected: choices[0].selected, errorCode: null }
+    : { selected: [], errorCode: "GOAL_RISK_ASSIGNMENT_UNAVAILABLE" };
+}
+
 async function claimHeld(tx: DatabaseClient, claim: GoalRunClaim, now: Date): Promise<boolean> {
   const rows = await tx<{ run_id: string }[]>`
     SELECT run.id AS run_id
@@ -927,11 +1093,16 @@ async function terminalizeRun(
   run: GoalRunRow,
   state: "READY" | "PARTIAL" | "BLOCKED" | "FAILED" | "CANCELED",
   now: Date,
-  input: { report?: GoalRunReportV1 | null; errorCode?: string | null } = {},
+  input: { report?: GoalRunReport | null; errorCode?: string | null } = {},
 ): Promise<void> {
   if (TERMINAL_RUN_STATES.has(run.state)) return;
   const report = input.report ?? null;
-  const reportHash = report ? domainHash("goal-run-report-v1", report) : null;
+  const reportHash = report
+    ? domainHash(
+        "orchestrationMode" in report ? "tri-risk-goal-run-report-v1" : "goal-run-report-v1",
+        report,
+      )
+    : null;
   const errorCode = input.errorCode ?? null;
   if (errorCode && !ERROR_CODE.test(errorCode)) throw new Error("GOAL_ERROR_CODE_INVALID");
   const changed = await tx<{ id: string }[]>`
@@ -947,6 +1118,7 @@ async function terminalizeRun(
     UPDATE goals SET completed_runs = completed_runs + 1, updated_at = ${now}
     WHERE id = ${run.goal_id}::uuid
     RETURNING id AS goal_id, owner_user_id, definition_hash, objective, required_capabilities,
+      policy_schema_version, orchestration_mode,
       cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
       per_run_cap_atomic::text, daily_cap_atomic::text, state, next_run_at,
       completed_runs, created_at, updated_at
@@ -998,9 +1170,13 @@ async function selectRunAgents(
     `;
     run.state = "SELECTING";
     const policy = parseGoalPolicy(run.policy_snapshot);
+    const triRisk = isTriRiskPolicy(policy);
     const candidates = await tx<CandidateRow[]>`
       SELECT v.id AS version_id, v.capabilities, v.price_atomic::text,
         v.manifest_hash, v.full_subname,
+        CASE WHEN v.manifest->>'schemaVersion' = '4' THEN ARRAY(
+          SELECT jsonb_array_elements_text(v.manifest->'riskTiers')
+        ) ELSE ARRAY[]::text[] END AS risk_tiers,
         COALESCE(hires.verified_external_hires, '0') AS verified_external_hires
       FROM agent_versions v
       JOIN kernel_agents agent ON agent.id = v.agent_id
@@ -1017,9 +1193,16 @@ async function selectRunAgents(
       WHERE agent.owner_user_id <> ${ownerUserId}
         AND v.published = true AND v.lifecycle_state = 'PUBLISHED'
         AND v.canonical_state = 'CANONICAL' AND v.price_atomic > 0
+        AND (
+          (${triRisk} AND v.manifest->>'schemaVersion' = '4') OR
+          (${!triRisk} AND v.manifest->>'schemaVersion' IN ('1', '2', '3'))
+        )
         AND v.full_subname IS NOT NULL AND v.publication_decision_id IS NOT NULL
         AND v.publication_action_id IS NOT NULL
-        AND (v.capabilities && ${run.capabilities_snapshot} OR 'research' = ANY(v.capabilities))
+        AND (
+          ${triRisk} OR v.capabilities && ${run.capabilities_snapshot}
+          OR 'research' = ANY(v.capabilities)
+        )
         AND EXISTS (
           SELECT 1 FROM ens_publication_decisions decision
           JOIN agent_lifecycle_actions action ON action.id = v.publication_action_id
@@ -1036,15 +1219,23 @@ async function selectRunAgents(
       ORDER BY v.id ASC
       FOR SHARE OF v
     `;
-    const selection = selectCandidates(candidates, run.capabilities_snapshot, policy.maxAgents);
-    if (selection.missing.length > 0) {
-      await terminalizeRun(tx, run, "BLOCKED", now, { errorCode: "GOAL_CAPABILITY_UNAVAILABLE" });
+    const triSelection = triRisk
+      ? selectTriRiskCandidates(candidates, run.capabilities_snapshot)
+      : null;
+    const legacySelection = triRisk
+      ? null
+      : selectCandidates(candidates, run.capabilities_snapshot, policy.maxAgents);
+    if (triSelection?.errorCode || legacySelection?.missing.length) {
+      await terminalizeRun(tx, run, "BLOCKED", now, {
+        errorCode: triSelection?.errorCode ?? "GOAL_CAPABILITY_UNAVAILABLE",
+      });
       return;
     }
-    const synthesizer = selection.selected.length > 1
-      ? selection.selected.find(({ candidate }) => candidate.capabilities.includes("research"))
+    const selected = triSelection?.selected ?? legacySelection?.selected ?? [];
+    const synthesizer = !triRisk && selected.length > 1
+      ? selected.find(({ candidate }) => candidate.capabilities.includes("research"))
       : null;
-    let total = selection.selected.reduce((sum, item) => sum + BigInt(item.candidate.price_atomic), 0n);
+    let total = selected.reduce((sum, item) => sum + BigInt(item.candidate.price_atomic), 0n);
     if (synthesizer) total += BigInt(synthesizer.candidate.price_atomic);
     if (total > BigInt(policy.perRunCapAtomic)) {
       await terminalizeRun(tx, run, "BLOCKED", now, { errorCode: "GOAL_PER_RUN_CAP_EXCEEDED" });
@@ -1074,13 +1265,15 @@ async function selectRunAgents(
       WHERE id = ${run.run_id}::uuid AND state = 'SELECTING'
     `;
     let rank = 1;
-    for (const item of selection.selected) {
+    for (const item of selected) {
+      const riskLane = "lane" in item ? (item as TriRiskAssignment).lane : null;
       await tx`
         INSERT INTO goal_run_jobs (
-          goal_run_id, agent_version_id, role, selection_rank, covered_capabilities,
+          goal_run_id, agent_version_id, role, risk_lane, selection_rank, covered_capabilities,
           price_atomic_snapshot, manifest_hash_snapshot, full_subname_snapshot, created_at
         ) VALUES (
-          ${run.run_id}::uuid, ${item.candidate.version_id}::uuid, 'ANALYSIS', ${rank},
+          ${run.run_id}::uuid, ${item.candidate.version_id}::uuid, 'ANALYSIS',
+          ${riskLane}, ${rank},
           ${item.covered}, ${item.candidate.price_atomic}::bigint,
           ${item.candidate.manifest_hash}, ${item.candidate.full_subname}, ${now}
         )
@@ -1105,18 +1298,32 @@ async function selectRunAgents(
 async function jobRows(sql: DatabaseClient, runId: string): Promise<JobResultRow[]> {
   return sql<JobResultRow[]>`
     SELECT link.id, link.goal_run_id, link.agent_version_id, link.job_id,
-      link.role, link.selection_rank, link.covered_capabilities,
+      link.role, link.risk_lane, link.selection_rank, link.covered_capabilities,
       link.price_atomic_snapshot::text, link.manifest_hash_snapshot,
       link.full_subname_snapshot, job.state AS job_state, effect.state AS effect_state,
       effect.result AS effect_result, effect.result_hash AS effect_result_hash,
       receipt.id AS receipt_id, receipt.verified AS receipt_verified,
       receipt.result_hash AS receipt_result_hash,
+      payment.id AS payment_receipt_id, settlement.id AS settlement_id,
+      commission.id AS commission_id, version.capabilities AS version_capabilities,
       COALESCE(mcp.failed_count, 0)::int AS mcp_failed_count,
       mcp.error_code AS mcp_error_code
     FROM goal_run_jobs link
+    JOIN agent_versions version ON version.id = link.agent_version_id
+      AND version.manifest_hash = link.manifest_hash_snapshot
     LEFT JOIN jobs job ON job.id = link.job_id
     LEFT JOIN effects effect ON effect.job_id = job.id
     LEFT JOIN receipts receipt ON receipt.job_id = job.id AND receipt.effect_id = effect.id
+    LEFT JOIN x402_payment_receipts payment ON payment.job_id = job.id
+      AND payment.delivery_receipt_id = receipt.id
+      AND payment.agent_version_id = link.agent_version_id
+      AND payment.amount_atomic = link.price_atomic_snapshot
+    LEFT JOIN settlements settlement ON settlement.job_id = job.id
+      AND settlement.receipt_id = receipt.id
+      AND settlement.amount_atomic = link.price_atomic_snapshot
+    LEFT JOIN commissions commission ON commission.job_id = job.id
+      AND commission.settlement_id = settlement.id
+      AND commission.asset = settlement.asset
     LEFT JOIN LATERAL (
       SELECT count(*) FILTER (WHERE invocation.state = 'FAILED')::int AS failed_count,
         min(invocation.error_code) FILTER (WHERE invocation.state = 'FAILED') AS error_code
@@ -1128,20 +1335,25 @@ async function jobRows(sql: DatabaseClient, runId: string): Promise<JobResultRow
   `;
 }
 
-function admitted(row: JobResultRow): boolean {
-  return (row.job_state === "DELIVERY_READY" || row.job_state === "SUCCEEDED") &&
+function admitted(row: JobResultRow, policy?: GoalPolicy): boolean {
+  const paid = policy && isTriRiskPolicy(policy)
+    ? row.job_state === "SUCCEEDED" && !!row.payment_receipt_id &&
+      !!row.settlement_id && !!row.commission_id
+    : row.job_state === "DELIVERY_READY" || row.job_state === "SUCCEEDED";
+  return paid &&
     row.effect_state === "SUCCEEDED" && row.receipt_verified === true &&
     !!row.effect_result_hash && row.effect_result_hash === row.receipt_result_hash &&
     !!row.receipt_id;
 }
 
-function pending(row: JobResultRow): boolean {
+function pending(row: JobResultRow, policy?: GoalPolicy): boolean {
   return (!row.job_id && row.mcp_failed_count === 0) ||
-    row.job_state === "QUEUED" || row.job_state === "RUNNING";
+    row.job_state === "QUEUED" || row.job_state === "RUNNING" ||
+    (!!policy && isTriRiskPolicy(policy) && row.job_state === "DELIVERY_READY");
 }
 
-function evidence(rows: readonly JobResultRow[]): GoalRunEvidenceV1[] {
-  return rows.filter(admitted).map((row) => ({
+function evidence(rows: readonly JobResultRow[], policy?: GoalPolicy): GoalRunEvidenceV1[] {
+  return rows.filter((row) => admitted(row, policy)).map((row) => ({
     jobId: row.job_id as string,
     agentVersionId: row.agent_version_id,
     resultHash: row.effect_result_hash as string,
@@ -1213,6 +1425,94 @@ function synthesisResult(value: unknown, policy: GoalPolicy): {
   };
 }
 
+function parseRiskLaneResult(
+  value: unknown,
+  row: JobResultRow,
+  policy: GoalPolicyV2,
+): RiskLaneResultV1 {
+  const result = objectRecord(value);
+  exactKeys(result, [
+    "schemaVersion", "riskLane", "stance", "summary", "conclusion", "swapProposal",
+  ]);
+  if (
+    result.schemaVersion !== 1 || result.riskLane !== row.risk_lane ||
+    !RISK_LANES.includes(result.riskLane as RiskLane) ||
+    (result.stance !== "BUY" && result.stance !== "SELL" && result.stance !== "HOLD")
+  ) {
+    throw new Error("GOAL_RISK_LANE_RESULT_INVALID");
+  }
+  const swapProposal = result.swapProposal === null ? null : parseSwapProposal(result.swapProposal);
+  if (
+    (policy.executionMode === "RESEARCH_ONLY" && swapProposal !== null) ||
+    (swapProposal !== null && !row.version_capabilities.includes("uniswap-swap"))
+  ) {
+    throw new Error("GOAL_RISK_LANE_SWAP_POLICY_INVALID");
+  }
+  const riskLane = result.riskLane as RiskLane;
+  const stance = result.stance as RiskStance;
+  return {
+    schemaVersion: 1,
+    riskLane,
+    stance,
+    summary: boundedString(result.summary, "summary", 1, 1_000),
+    conclusion: boundedString(result.conclusion, "conclusion", 1, 1_000),
+    swapProposal,
+  };
+}
+
+function triRiskReportFor(
+  run: GoalRunRow,
+  status: "READY" | "PARTIAL",
+  parsed: readonly { row: JobResultRow; result: RiskLaneResultV1 }[],
+  policy: GoalPolicyV2,
+): TriRiskGoalRunReportV1 {
+  const ordered = [...parsed].sort(
+    (left, right) => RISK_LANES.indexOf(left.result.riskLane) - RISK_LANES.indexOf(right.result.riskLane),
+  );
+  const counts = new Map<RiskStance, number>();
+  for (const item of ordered) counts.set(item.result.stance, (counts.get(item.result.stance) ?? 0) + 1);
+  const consensusStance = (["BUY", "SELL", "HOLD"] as const)
+    .find((stance) => (counts.get(stance) ?? 0) >= 2) ?? null;
+  const lanes: TriRiskLaneReportV1[] = ordered.map(({ row, result }) => ({
+    riskLane: result.riskLane,
+    stance: result.stance,
+    summary: result.summary,
+    conclusion: result.conclusion,
+    jobId: row.job_id as string,
+    agentVersionId: row.agent_version_id,
+    resultHash: row.effect_result_hash as string,
+    receiptId: row.receipt_id as string,
+  }));
+  const summary = ordered.map(({ result }) => `${result.riskLane}: ${result.summary}`).join("\n").slice(0, 2_000);
+  const conclusion = consensusStance
+    ? `AGREEMENT: ${consensusStance} (${ordered.filter(({ result }) => result.stance === consensusStance).map(({ result }) => result.riskLane).join(", ")})`
+    : `DISAGREEMENT: ${ordered.map(({ result }) => `${result.riskLane}=${result.stance}`).join(", ")}`;
+  const swapProposal = status === "READY" && policy.executionMode === "PROPOSE_SWAP"
+    ? ordered.find(({ row, result }) =>
+        result.swapProposal !== null && row.version_capabilities.includes("uniswap-swap"))?.result.swapProposal ?? null
+    : null;
+  return {
+    schemaVersion: 1,
+    orchestrationMode: "TRI_RISK_V1",
+    goalId: run.goal_id,
+    runId: run.run_id,
+    status,
+    objective: run.objective_snapshot,
+    summary,
+    conclusion,
+    agreement: consensusStance ? "AGREEMENT" : "DISAGREEMENT",
+    consensusStance,
+    lanes,
+    evidence: ordered.map(({ row }) => ({
+      jobId: row.job_id as string,
+      agentVersionId: row.agent_version_id,
+      resultHash: row.effect_result_hash as string,
+      receiptId: row.receipt_id as string,
+    })),
+    swapProposal,
+  };
+}
+
 function reportFor(
   run: GoalRunRow,
   status: "READY" | "PARTIAL",
@@ -1233,6 +1533,16 @@ function reportFor(
 }
 
 function analysisPrompt(run: GoalRunRow, row: GoalRunJobRow): string {
+  if (row.risk_lane) {
+    return [
+      "Protected TRI_RISK_V1 goal analysis.",
+      `Risk lane: ${row.risk_lane}`,
+      `Objective: ${run.objective_snapshot}`,
+      `Assigned capabilities: ${row.covered_capabilities.join(", ") || "none"}`,
+      "Return exactly JSON: {schemaVersion:1,riskLane:LOW|MID|HIGH,stance:BUY|SELL|HOLD,summary:string,conclusion:string,swapProposal:null|SwapProposalV1}.",
+      "Never sign or broadcast a transaction.",
+    ].join("\n").slice(0, 2_000);
+  }
   return [
     "Protected goal analysis.",
     `Objective: ${run.objective_snapshot}`,
@@ -1289,7 +1599,11 @@ async function ensureJob(
     contextHash: string;
     invocationIds: readonly string[];
   } | undefined;
-  if (version.manifest.schemaVersion === 3 && version.manifest.mcp.length > 0) {
+  if (
+    (version.manifest.schemaVersion === 3 || version.manifest.schemaVersion === 4) &&
+    version.manifest.mcp.length > 0
+  ) {
+    if (version.manifest.schemaVersion === 4 && !mcpProvider) return;
     const context = await collectMcpContext({
       sql,
       goalRunJobId: row.id,
@@ -1329,7 +1643,9 @@ async function ensureJob(
       invocationIds: context.evidence.map((entry) => entry.invocationId),
     };
   }
-  const idempotencyKey = `goal:${run.run_id}:${row.agent_version_id}:${row.role.toLowerCase()}`;
+  const idempotencyKey = row.risk_lane
+    ? `goal:${run.run_id}:${row.risk_lane}:${row.agent_version_id}`
+    : `goal:${run.run_id}:${row.agent_version_id}:${row.role.toLowerCase()}`;
   const submitted = await submitJob(run.owner_user_id, {
     agentVersionId: row.agent_version_id,
     idempotencyKey,
@@ -1382,8 +1698,43 @@ async function reconcileGoalRun(
   }
   rows = await jobRows(sql, runId);
   const analysis = rows.filter((row) => row.role === "ANALYSIS");
-  if (analysis.some(pending)) return;
-  const accepted = analysis.filter(admitted);
+  const policy = parseGoalPolicy(run.policy_snapshot);
+  if (analysis.some((row) => pending(row, policy))) return;
+  if (isTriRiskPolicy(policy)) {
+    const paid = analysis.filter((row) => admitted(row, policy));
+    const parsed = paid.flatMap((row) => {
+      try {
+        return [{ row, result: parseRiskLaneResult(row.effect_result, row, policy) }];
+      } catch {
+        return [];
+      }
+    });
+    const mcpError = analysis.find((row) => row.mcp_failed_count > 0)?.mcp_error_code;
+    const status = parsed.length === 3 ? "READY" : parsed.length > 0 ? "PARTIAL" : null;
+    const errorCode = parsed.length < paid.length
+      ? "GOAL_RISK_LANE_MALFORMED"
+      : paid.length < analysis.length
+        ? "GOAL_PAYMENT_EVIDENCE_MISSING"
+        : null;
+    await sql.begin(async (transaction) => {
+      const tx = transactionClient(transaction);
+      await guardClaim(tx, claim, now);
+      runs = await runSelect(tx, ownerUserId, runId);
+      if (!runs[0]) return;
+      if (status) {
+        await terminalizeRun(tx, runs[0], status, now, {
+          report: triRiskReportFor(runs[0], status, parsed, policy),
+          errorCode: status === "PARTIAL" ? errorCode ?? "GOAL_REQUIRED_OUTPUT_MISSING" : null,
+        });
+      } else {
+        await terminalizeRun(tx, runs[0], mcpError ? "BLOCKED" : "FAILED", now, {
+          errorCode: mcpError ?? errorCode ?? "GOAL_NO_VERIFIED_OUTPUT",
+        });
+      }
+    });
+    return;
+  }
+  const accepted = analysis.filter((row) => admitted(row, policy));
   if (accepted.length === 0) {
     await sql.begin(async (transaction) => {
       const tx = transactionClient(transaction);
@@ -1477,7 +1828,6 @@ async function reconcileGoalRun(
     });
     return;
   }
-  const policy = parseGoalPolicy(run.policy_snapshot);
   let content: ReturnType<typeof synthesisResult>;
   try {
     content = synthesisResult(synthesis.effect_result, policy);
@@ -1629,6 +1979,7 @@ export async function runGoalLoopOnce(options: {
     if (remaining === 0) return claimed;
     const due = await tx<GoalRow[]>`
       SELECT id AS goal_id, owner_user_id, definition_hash, objective, required_capabilities,
+        policy_schema_version, orchestration_mode,
         cadence_minutes, run_mode, execution_mode, run_limit, max_agents,
         per_run_cap_atomic::text, daily_cap_atomic::text, state, next_run_at,
         completed_runs, created_at, updated_at

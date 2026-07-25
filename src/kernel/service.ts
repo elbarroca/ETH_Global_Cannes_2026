@@ -10,6 +10,7 @@ import {
 import type {
   AgentManifest,
   AgentManifestV3,
+  AgentManifestV4,
   EvidenceState,
   KernelJobDetail,
   KernelJobEvidenceSummary,
@@ -584,7 +585,10 @@ export async function submitJob(
     if (agentVersion.owner_user_id === buyerUserId) {
       throw new KernelError("KERNEL_FORBIDDEN", "Creators cannot hire their own agent version", 403);
     }
-    if (agentVersion.manifest.schemaVersion === 3 && agentVersion.manifest.mcp.length > 0) {
+    if (
+      (agentVersion.manifest.schemaVersion === 3 || agentVersion.manifest.schemaVersion === 4) &&
+      agentVersion.manifest.mcp.length > 0
+    ) {
       const context = options.mcpContext;
       if (!context || context.invocationIds.length !== agentVersion.manifest.mcp.length) {
         throw new KernelError(
@@ -618,7 +622,7 @@ export async function submitJob(
           AND invocation.normalized_response IS NOT NULL
       `;
       const byBinding = new Map(invocations.map((row) => [row.binding_id, row]));
-      const contextValue = (agentVersion.manifest as AgentManifestV3).mcp.map((binding) => {
+      const contextValue = (agentVersion.manifest as AgentManifestV3 | AgentManifestV4).mcp.map((binding) => {
         const invocation = byBinding.get(binding.id);
         if (!invocation || !context.invocationIds.includes(invocation.id)) {
           throw new KernelError(

@@ -8,7 +8,8 @@ import {
   type EnsPublicationAuthority,
 } from "../../src/ens/authority";
 import { domainHash, type CanonicalValue } from "../../src/kernel/canonical";
-import { buildManifestV3 } from "../../src/kernel/agent-catalog";
+import { buildManifestV3, buildManifestV4 } from "../../src/kernel/agent-catalog";
+import { patchAugmentedLayerPolicy } from "../../src/kernel/augmented-layer-policy";
 import { KernelError } from "../../src/kernel/errors";
 import {
   createGoal,
@@ -36,7 +37,8 @@ import type {
   AdapterExecutionResult,
   KernelAdapter,
 } from "../../src/worker/adapter";
-import type { GoalRunReportV1, GoalRunState } from "../../src/kernel/types";
+import type { GoalRunReportV1, GoalRunState, RiskLane } from "../../src/kernel/types";
+import type { McpContextProvider } from "../../src/kernel/mcp-context";
 import { runWorkerOnce } from "../../src/worker/runner";
 import {
   configureDatabaseEnvironment,
@@ -70,6 +72,12 @@ class GoalResultAdapter implements KernelAdapter {
       proofHash: domainHash("goal-test-proof", request.effectId),
       verified: true,
     };
+  }
+}
+
+class FixedGoalMcpProvider implements McpContextProvider {
+  async invoke(binding: Parameters<McpContextProvider["invoke"]>[0]): Promise<unknown> {
+    return { bindingId: binding.id, observed: true, value: 42 };
   }
 }
 
@@ -142,17 +150,26 @@ async function publishAgent(
     label: string;
     capabilities: string[];
     templateId?: string;
+    riskTiers?: readonly RiskLane[];
   },
 ): Promise<string> {
   const publishedAt = new Date();
-  const manifest = input.templateId
-    ? buildManifestV3({
+  const manifest = input.templateId && input.riskTiers
+    ? buildManifestV4({
+        templateId: input.templateId,
+        name: input.name,
+        description: "A bounded protected goal-loop specialist for deterministic tests.",
+        ownerWallet: owner.wallet,
+        riskTiers: input.riskTiers,
+      })
+    : input.templateId
+      ? buildManifestV3({
         templateId: input.templateId,
         name: input.name,
         description: "A bounded protected goal-loop specialist for deterministic tests.",
         ownerWallet: owner.wallet,
       })
-    : parseAgentInput({
+      : parseAgentInput({
         name: input.name,
         description: "A bounded protected goal-loop specialist for deterministic tests.",
         instructions: "## Task\n\nReturn a concise evidence-backed goal analysis result.",
@@ -741,6 +758,119 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
             WHERE link.goal_run_id = ${run.run.runId}::uuid) AS jobs
       `;
       assert.deepEqual(counts[0], { invocations: 1, jobs: 0 });
+    });
+
+    await t.test("TRI_RISK_V1 selects exactly three distinct V4 lanes before execution", async () => {
+      const lowVersion = await publishAgent(database, {
+        id: CREATOR_A_ID, wallet: CREATOR_A_WALLET,
+      }, {
+        name: "Tri Low Market", parent: "alice.eth", label: "tri-low",
+        capabilities: ["market-analysis"], templateId: "market-pulse", riskTiers: ["LOW"],
+      });
+      const midVersion = await publishAgent(database, {
+        id: CREATOR_B_ID, wallet: CREATOR_B_WALLET,
+      }, {
+        name: "Tri Mid Volume", parent: "bob.eth", label: "tri-mid",
+        capabilities: ["market-analysis", "risk-analysis"], templateId: "volume-anomaly", riskTiers: ["MID"],
+      });
+      const highVersion = await publishAgent(database, {
+        id: CREATOR_A_ID, wallet: CREATOR_A_WALLET,
+      }, {
+        name: "Tri High Swap", parent: "alice.eth", label: "tri-high",
+        capabilities: ["market-analysis", "risk-analysis", "uniswap-swap"],
+        templateId: "swap-strategist", riskTiers: ["HIGH"],
+      });
+      const selfVersion = await publishAgent(database, {
+        id: BUYER_ID, wallet: BUYER_WALLET,
+      }, {
+        name: "Tri Self All Lanes", parent: "buyer.eth", label: "tri-self",
+        capabilities: ["research", "market-analysis", "risk-analysis"],
+        templateId: "thesis-synthesizer", riskTiers: ["LOW", "MID", "HIGH"],
+      });
+      const triPolicy = {
+        schemaVersion: 2,
+        orchestrationMode: "TRI_RISK_V1",
+        cadenceMinutes: 5,
+        runMode: "BOUNDED",
+        executionMode: "PROPOSE_SWAP",
+        runLimit: 3,
+        maxAgents: 3,
+        perRunCapAtomic: "3000",
+        dailyCapAtomic: null,
+      } as const;
+      await patchAugmentedLayerPolicy(BUYER_ID, triPolicy, "tri-goal-policy-01", {
+        now: at(52_000), sql: database.sql,
+      });
+      const created = await createGoal(BUYER_ID, parseGoalCreate({
+        objective: "Compare low mid and high risk lanes before proposing a bounded swap.",
+        requiredCapabilities: ["market-analysis", "risk-analysis"],
+        policy: triPolicy,
+        state: "ACTIVE",
+      }), "tri-goal-create-01", { now: at(53_000), sql: database.sql });
+      const first = await createGoalRun(BUYER_ID, created.goal.goalId, "tri-goal-run-01", {
+        now: at(54_000), sql: database.sql,
+      });
+      assert.equal(first.run.state, "RUNNING");
+      assert.equal(first.run.jobs.length, 3);
+      assert.equal(first.run.jobs.filter((job) => job.role === "SYNTHESIS").length, 0);
+      assert.deepEqual(first.run.jobs.map((job) => job.riskLane), ["LOW", "MID", "HIGH"]);
+      assert.deepEqual(first.run.jobs.map((job) => job.selectionRank), [1, 2, 3]);
+      assert.equal(new Set(first.run.jobs.map((job) => job.agentVersionId)).size, 3);
+      assert.ok(first.run.jobs.every((job) => job.agentVersionId !== selfVersion));
+      assert.deepEqual(
+        new Set(first.run.jobs.map((job) => job.agentVersionId)),
+        new Set([lowVersion, midVersion, highVersion]),
+      );
+      assert.ok(first.run.jobs.every((job) => job.jobId === null));
+
+      const submitted = await processGoalRun(BUYER_ID, first.run.runId, {
+        now: at(55_000), sql: database.sql, mcpProvider: new FixedGoalMcpProvider(),
+      });
+      assert.ok(submitted.jobs.every((job) => job.jobId));
+      const keys = await database.sql<{ idempotency_key: string }[]>`
+        SELECT intent.idempotency_key
+        FROM goal_run_jobs link JOIN job_intents intent ON intent.id = (
+          SELECT job.intent_id FROM jobs job WHERE job.id = link.job_id
+        )
+        WHERE link.goal_run_id = ${submitted.runId}::uuid
+        ORDER BY link.selection_rank
+      `;
+      assert.deepEqual(keys.map((row) => row.idempotency_key), submitted.jobs.map((job, index) =>
+        `goal:${submitted.runId}:${["LOW", "MID", "HIGH"][index]}:${job.agentVersionId}`));
+
+      const second = await createGoalRun(BUYER_ID, created.goal.goalId, "tri-goal-run-02", {
+        now: at(56_000), sql: database.sql,
+      });
+      assert.deepEqual(
+        second.run.jobs.map((job) => job.agentVersionId),
+        first.run.jobs.map((job) => job.agentVersionId),
+      );
+
+      const budget = await createGoal(BUYER_ID, parseGoalCreate({
+        objective: "Block all tri-risk inserts when the three-lane budget is insufficient.",
+        requiredCapabilities: ["market-analysis", "risk-analysis"],
+        policy: { ...triPolicy, runLimit: 1, perRunCapAtomic: "2000" },
+        state: "ACTIVE",
+      }), "tri-budget-create-01", { now: at(57_000), sql: database.sql });
+      const blockedBudget = await createGoalRun(BUYER_ID, budget.goal.goalId, "tri-budget-run-01", {
+        now: at(58_000), sql: database.sql,
+      });
+      assert.equal(blockedBudget.run.state, "BLOCKED");
+      assert.equal(blockedBudget.run.errorCode, "GOAL_PER_RUN_CAP_EXCEEDED");
+      assert.equal(blockedBudget.run.jobs.length, 0);
+
+      const missing = await createGoal(BUYER_ID, parseGoalCreate({
+        objective: "Block tri-risk selection when external V4 union coverage is missing.",
+        requiredCapabilities: ["research"],
+        policy: { ...triPolicy, runLimit: 1 },
+        state: "ACTIVE",
+      }), "tri-missing-create-01", { now: at(59_000), sql: database.sql });
+      const blockedMissing = await createGoalRun(BUYER_ID, missing.goal.goalId, "tri-missing-run-01", {
+        now: at(60_000), sql: database.sql,
+      });
+      assert.equal(blockedMissing.run.state, "BLOCKED");
+      assert.equal(blockedMissing.run.errorCode, "GOAL_CAPABILITY_UNAVAILABLE");
+      assert.equal(blockedMissing.run.jobs.length, 0);
     });
 
     await t.test("terminal runs are immutable and every persisted report is revalidated on read", async () => {
