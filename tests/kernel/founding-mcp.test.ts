@@ -15,8 +15,8 @@ import {
   McpContextError,
   type McpContextProvider,
 } from "../../src/kernel/mcp-context";
-import { parseAgentAction, parseAgentInput } from "../../src/kernel/policy";
-import { submitJob } from "../../src/kernel/service";
+import { KERNEL_QUOTE_TTL_MS, parseAgentAction, parseAgentInput } from "../../src/kernel/policy";
+import { getBuyerJobDetail, submitJob } from "../../src/kernel/service";
 import {
   configureDatabaseEnvironment,
   startDisposableDatabase,
@@ -34,8 +34,26 @@ class FixedProvider implements McpContextProvider {
 
   async invoke(binding: Parameters<McpContextProvider["invoke"]>[0]): Promise<unknown> {
     this.calls += 1;
-    return { bindingId: binding.id, observed: true, value: 42 };
+    return {
+      bindingId: binding.id,
+      observed: true,
+      value: 42,
+      ...(binding.provider === "the-graph" ? {
+        sourceMetadata: graphSourceMetadata(NOW),
+      } : {}),
+    };
   }
+}
+
+function graphSourceMetadata(completedAt: Date): Record<string, string> {
+  return {
+    subgraphId: "8e4dRt4P4WHXnKbEq7STaQfU2g99WZ5S4w39f2PcUTjD",
+    deploymentId: "QmValidDeployment123456789012345678901234567890",
+    network: "mainnet",
+    blockNumber: "20000000",
+    blockHash: `0x${"a".repeat(64)}`,
+    completedAt: completedAt.toISOString(),
+  };
 }
 
 test("manifest v2 bytes remain stable and all founding templates derive deterministic v3", () => {
@@ -168,6 +186,11 @@ test("catalog draft admission rejects all client-owned manifest fields and catal
   assert.doesNotMatch(projection, /https?:\/\//i);
   assert.doesNotMatch(projection, /credential|apiKey|graphql|execute|toolName/i);
   assert.match(projection, /"availability":"UNAVAILABLE"/);
+  const configured = canonicalJson(foundingCatalogProjection({ theGraph: "CONFIGURED" }));
+  assert.match(configured, /"id":"data.the-graph.read"[^}]*"providerAvailability":"CONFIGURED"/);
+  assert.match(configured, /"id":"data.coingecko.market"[^}]*"providerAvailability":"UNAVAILABLE"/);
+  assert.match(configured, /"availability":"CONFIGURED"[^}]*"provider":"the-graph"/);
+  assert.doesNotMatch(configured, /schema-read|bounded-query/);
 });
 
 test("MCP evidence is immutable, replayed without duplicate calls, and required for v3 hire", async () => {
@@ -179,7 +202,7 @@ test("MCP evidence is immutable, replayed without duplicate calls, and required 
         (${BUYER_ID}, ${BUYER_WALLET}), (${CREATOR_ID}, ${CREATOR_WALLET})
     `;
     const manifest = buildManifestV3({
-      templateId: "market-pulse",
+      templateId: "liquidity-scout",
       name: "MCP Market Pulse",
       description: "A deterministic MCP evidence integration fixture.",
       ownerWallet: CREATOR_WALLET,
@@ -335,6 +358,9 @@ test("MCP evidence is immutable, replayed without duplicate calls, and required 
       now: NOW,
     });
     assert.equal(provider.calls, manifest.mcp.length);
+    assert.ok(context.evidence.every((entry) =>
+      entry.sourceMetadata?.completedAt === entry.completedAt &&
+      entry.sourceMetadata.network === "mainnet"));
     const replay = await collectMcpContext({
       sql: database.sql,
       goalRunJobId,
@@ -376,6 +402,13 @@ test("MCP evidence is immutable, replayed without duplicate calls, and required 
       },
     });
     assert.equal(submitted.replayed, false);
+    await database.sql`
+      UPDATE goal_run_jobs SET job_id = ${submitted.jobId}::uuid
+      WHERE id = ${goalRunJobId}::uuid
+    `;
+    const goalDetail = await getBuyerJobDetail(BUYER_ID, submitted.jobId, { sql: database.sql });
+    assert.equal(goalDetail?.evidenceDetail.mcpInvocations.length, manifest.mcp.length);
+    assert.doesNotMatch(JSON.stringify(goalDetail?.evidenceDetail.mcpInvocations), /observed|normalized_response/);
     const replayedJob = await submitJob(BUYER_ID, {
       agentVersionId: versionId,
       idempotencyKey: "mcp-internal-hire-01",
@@ -487,6 +520,26 @@ test("MCP evidence is immutable, replayed without duplicate calls, and required 
     `;
     assert.equal(postCallEvidence[0]?.count, 0);
 
+    for (const [suffix, completedAt, offsetMs] of [
+      ["future-source", new Date(NOW.getTime() + 1), 360_000],
+      ["stale-source", new Date(NOW.getTime() - KERNEL_QUOTE_TTL_MS - 1), 420_000],
+    ] as const) {
+      const staleLink = await createFailureLink(suffix, offsetMs);
+      await assert.rejects(collectMcpContext({
+        sql: database.sql,
+        goalRunJobId: staleLink,
+        agentVersionId: versionId,
+        manifestHash: hashes.manifestHash,
+        bindings: manifest.mcp,
+        objective: "Reject stale or future source completion metadata.",
+        requiredCapabilities: ["market-analysis"],
+        releaseSha: RELEASE_SHA,
+        provider: { invoke: async () => ({ sourceMetadata: graphSourceMetadata(completedAt) }) },
+        now: NOW,
+      }), (error: unknown) =>
+        error instanceof McpContextError && error.code === "GOAL_MCP_CONTEXT_STALE");
+    }
+
     await assert.rejects(collectMcpContext({
       sql: database.sql,
       goalRunJobId,
@@ -506,6 +559,8 @@ test("MCP evidence is immutable, replayed without duplicate calls, and required 
       FROM mcp_invocations WHERE state = 'FAILED' ORDER BY error_code
     `;
     assert.deepEqual(failures.map((row) => row.code), [
+      "GOAL_MCP_CONTEXT_STALE",
+      "GOAL_MCP_CONTEXT_STALE",
       "GOAL_MCP_CONTEXT_UNAVAILABLE",
       "GOAL_MCP_RESPONSE_MALFORMED",
       "GOAL_MCP_RESPONSE_TOO_LARGE",

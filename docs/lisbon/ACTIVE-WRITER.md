@@ -3,6 +3,57 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/graph_kernel_g1
+task_id: GRAPH-KERNEL-G1-R1
+task_instance_id: GRAPH-KERNEL-G1-R1:R2:1745845
+generation: 2
+sprint: Graph Liquidity Agent Continuity kernel integration
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 17458454933500132dbd2fdc3659bec9e6972491
+control_sha: 17458454933500132dbd2fdc3659bec9e6972491
+token: GRAPH-KERNEL-G1-R1-G2-1745845-20260725T223412Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T23:02:35Z
+expires_at: 2026-07-26T02:30:00Z
+allowed_paths:
+  - src/kernel/production-mcp.ts
+  - src/kernel/mcp-context.ts
+  - src/kernel/goals.ts
+  - src/kernel/agent-catalog.ts
+  - src/kernel/service.ts
+  - src/kernel/types.ts
+  - app/api/kernel/goals/[goalId]/runs/route.ts
+  - app/api/kernel/agent-recommendations/route.ts
+  - tests/kernel/production-mcp.test.ts
+  - tests/kernel/founding-mcp.test.ts
+  - tests/kernel/goal-loop.test.ts
+  - tests/kernel/marketplace-v5.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T22:34:12Z
+deadline: 2026-07-26T02:30:00Z
+expected_exit: fixed fail-closed The Graph MCP evidence integrated into protected goal and hire flows
+external_effect_authority: local files deterministic fake-fetch tests disposable local databases and one atomic local commit only; no live Graph call managed migration push deploy signature transaction spend form upload or public claim
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T23:02:35Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - fixed Graph provider and focused Graph kernel contract PASS 47 of 47 before final source projection hardening
+  - final kernel PASS 86 of 86 auth PASS 9 of 9 base PASS 10 of 10 e2e PASS 5 of 5 redaction PASS 3 of 3 and protected boot PASS
+  - Prisma validate and generate PASS with inert loopback parse-only URLs; plain validate first reported missing DIRECT_URL without schema evaluation
+  - full lint PASS with zero errors and 23 inherited warnings typecheck build secret scan and diff check PASS
+remaining_blocks:
+  - integration aggregate is 30 of 52 with thirteen inherited host-Go fixture hook failures and nine out-of-scope A4 worker evidence failures; migration replay did not run after the short-circuit and schema was not changed
+  - excluded EXTERNAL-EFFECTS and A3 recovery changes remain dirty and unstaged
+  - no live Graph call managed migration push deploy signature transaction spend form upload public claim or release gate was authorized or attempted
+deliberate_fail_closed_limit: indexed-chain lag is not claimed because the fixed Subgraph response proves fetch completion and source block identity but not canonical-chain head lag
+verdict: PASS_TO_AUDIT_WITH_INHERITED_INTEGRATION_RED; LOCAL_ONLY
+lock_release: release only exact token GRAPH-KERNEL-G1-R1-G2-1745845-20260725T223412Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Release Integrator /root
 task_id: AGENT-WALLET-PAYMENTS-R1-LATE
 task_instance_id: AGENT-WALLET-PAYMENTS-R1-LATE:R1:55C69EF

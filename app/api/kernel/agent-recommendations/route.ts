@@ -6,6 +6,7 @@ import {
   recommendationFor,
 } from "@/src/kernel/agent-catalog";
 import { kernelErrorResponse, readBoundedKernelJson } from "@/src/kernel/http";
+import { theGraphProviderAvailability } from "@/src/kernel/production-mcp";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,9 @@ export async function GET(request: Request): Promise<NextResponse> {
         { status: 403 },
       );
     }
-    return NextResponse.json(foundingCatalogProjection());
+    return NextResponse.json(foundingCatalogProjection({
+      theGraph: theGraphProviderAvailability(process.env),
+    }));
   } catch (error) {
     return kernelErrorResponse(error, "kernel.agent-recommendations.catalog");
   }

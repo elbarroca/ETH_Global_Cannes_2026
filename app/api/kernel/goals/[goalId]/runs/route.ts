@@ -8,6 +8,7 @@ import {
 } from "@/src/kernel/goals";
 import { kernelErrorResponse, readBoundedKernelJson } from "@/src/kernel/http";
 import { isKernelUuid } from "@/src/kernel/policy";
+import { createProductionMcpProvider } from "@/src/kernel/production-mcp";
 
 export const runtime = "nodejs";
 
@@ -69,7 +70,10 @@ export async function POST(request: Request, context: Context): Promise<NextResp
     if (!auth.ok) return auth.response;
     const idempotencyKey = parseGoalIdempotencyKey(request.headers.get("idempotency-key"));
     parseRunCreate(await readBoundedKernelJson(request));
-    const result = await createGoalRun(auth.userId, auth.goalId, idempotencyKey);
+    const result = await createGoalRun(auth.userId, auth.goalId, idempotencyKey, {
+      mcpProvider: createProductionMcpProvider(process.env),
+      signal: request.signal,
+    });
     return NextResponse.json(result, { status: result.replayed ? 200 : 201 });
   } catch (error) {
     return kernelErrorResponse(error, "kernel.goal-runs.create");

@@ -1,7 +1,13 @@
 import { canonicalJson, domainHash, type CanonicalValue } from "./canonical";
 import { isMcpBindingAllowlisted } from "./agent-catalog";
+import { KERNEL_QUOTE_TTL_MS } from "./policy";
 import type { DatabaseClient } from "./service";
-import type { McpBindingV1, McpEvidenceV1 } from "./types";
+import type {
+  McpBindingV1,
+  McpEvidenceV1,
+  McpProviderId,
+  McpSourceMetadataV1,
+} from "./types";
 
 export const MAX_MCP_CALLS_PER_JOB = 4;
 export const MCP_CALL_TIMEOUT_MS = 8_000;
@@ -10,6 +16,13 @@ export const MCP_MAX_RESPONSE_BYTES = 32 * 1024;
 const SENSITIVE_KEY = /(?:authorization|cookie|credential|secret|password|session|signature|link.?code|api.?key|private.?key|email|phone)/i;
 const SENSITIVE_VALUE = /(?:\bBearer\s+|-----BEGIN [A-Z ]*PRIVATE KEY-----|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|(?:session|signature|link.?code|api.?key)\s*[:=])/i;
 const ERROR_CODE = /^[A-Z][A-Z0-9_]{2,64}$/;
+const GRAPH_SUBGRAPH_IDS = new Set([
+  "8e4dRt4P4WHXnKbEq7STaQfU2g99WZ5S4w39f2PcUTjD",
+  "AXJd5my1nV3MMeoX2FPoxnE7hqqDHiSYEazARyd4xLMj",
+]);
+const GRAPH_DEPLOYMENT_ID = /^[A-Za-z0-9]{20,128}$/;
+const GRAPH_BLOCK_NUMBER = /^[1-9][0-9]*$/;
+const GRAPH_BLOCK_HASH = /^0x[0-9a-f]{64}$/;
 
 interface InvocationRow {
   id: string;
@@ -83,7 +96,89 @@ function normalizeResponse(value: unknown, depth = 0): CanonicalValue {
   return normalized;
 }
 
-function evidence(row: InvocationRow): McpEvidenceV1 {
+export function projectMcpSourceMetadata(
+  value: unknown,
+  invocationCompletedAt: Date,
+  provider?: McpProviderId,
+): McpSourceMetadataV1 | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const source = (value as Record<string, unknown>).sourceMetadata;
+  if (source === undefined) return null;
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    throw new McpContextError("GOAL_MCP_RESPONSE_MALFORMED");
+  }
+  const metadata = source as Record<string, unknown>;
+  const keys = Object.keys(metadata).sort();
+  const expected = [
+    "blockHash", "blockNumber", "completedAt", "deploymentId", "network", "subgraphId",
+  ];
+  if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
+    throw new McpContextError("GOAL_MCP_RESPONSE_MALFORMED");
+  }
+  if (
+    (provider !== undefined && provider !== "the-graph") ||
+    typeof metadata.subgraphId !== "string" || !GRAPH_SUBGRAPH_IDS.has(metadata.subgraphId) ||
+    typeof metadata.deploymentId !== "string" || !GRAPH_DEPLOYMENT_ID.test(metadata.deploymentId) ||
+    metadata.network !== "mainnet" ||
+    typeof metadata.blockNumber !== "string" || !GRAPH_BLOCK_NUMBER.test(metadata.blockNumber) ||
+    typeof metadata.blockHash !== "string" || !GRAPH_BLOCK_HASH.test(metadata.blockHash) ||
+    /^0x0{64}$/.test(metadata.blockHash) ||
+    typeof metadata.completedAt !== "string"
+  ) {
+    throw new McpContextError("GOAL_MCP_RESPONSE_MALFORMED");
+  }
+  const completedAt = new Date(metadata.completedAt);
+  if (!Number.isFinite(completedAt.getTime()) || completedAt.toISOString() !== metadata.completedAt ||
+    completedAt.getTime() !== invocationCompletedAt.getTime()) {
+    throw new McpContextError("GOAL_MCP_RESPONSE_MALFORMED");
+  }
+  return {
+    subgraphId: metadata.subgraphId,
+    deploymentId: metadata.deploymentId,
+    network: "mainnet",
+    blockNumber: metadata.blockNumber,
+    blockHash: metadata.blockHash,
+    completedAt: metadata.completedAt,
+  };
+}
+
+function admittedSourceMetadata(
+  value: unknown,
+  provider: McpProviderId,
+  startedAt: Date,
+  admittedAt: Date,
+): McpSourceMetadataV1 | null {
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+    !Object.hasOwn(value, "sourceMetadata")) return null;
+  const source = (value as Record<string, unknown>).sourceMetadata;
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    throw new McpContextError("GOAL_MCP_RESPONSE_MALFORMED");
+  }
+  const completedAtValue = (source as Record<string, unknown>).completedAt;
+  if (typeof completedAtValue !== "string") {
+    throw new McpContextError("GOAL_MCP_RESPONSE_MALFORMED");
+  }
+  const completedAt = new Date(completedAtValue);
+  if (!Number.isFinite(completedAt.getTime()) || completedAt.toISOString() !== completedAtValue ||
+    completedAt < startedAt || completedAt > admittedAt ||
+    admittedAt.getTime() - completedAt.getTime() > KERNEL_QUOTE_TTL_MS) {
+    throw new McpContextError("GOAL_MCP_CONTEXT_STALE");
+  }
+  return projectMcpSourceMetadata(value, completedAt, provider);
+}
+
+function evidence(row: InvocationRow, admittedAt?: Date): McpEvidenceV1 {
+  const sourceMetadata = projectMcpSourceMetadata(
+    row.normalized_response,
+    row.completed_at,
+    row.provider,
+  );
+  if (sourceMetadata && admittedAt && (
+    row.completed_at > admittedAt ||
+    admittedAt.getTime() - row.completed_at.getTime() > KERNEL_QUOTE_TTL_MS
+  )) {
+    throw new McpContextError("GOAL_MCP_CONTEXT_STALE");
+  }
   return {
     schemaVersion: 1,
     invocationId: row.id,
@@ -98,6 +193,7 @@ function evidence(row: InvocationRow): McpEvidenceV1 {
     errorCode: row.error_code,
     releaseSha: row.release_sha,
     completedAt: row.completed_at.toISOString(),
+    ...(sourceMetadata ? { sourceMetadata } : {}),
   };
 }
 
@@ -150,6 +246,7 @@ async function invocationForBinding(input: {
   now: Date;
   signal?: AbortSignal;
   mutationGuard?: (sql: DatabaseClient, now: Date) => Promise<boolean>;
+  currentTime: () => Date;
 }): Promise<{ evidence: McpEvidenceV1; response: CanonicalValue }> {
   if ((input.goalRunJobId ? 1 : 0) + (input.hireRequestId ? 1 : 0) !== 1) {
     throw new McpContextError("GOAL_MCP_PARENT_INVALID");
@@ -200,7 +297,7 @@ async function invocationForBinding(input: {
         return { errorCode: existing[0].error_code ?? "GOAL_MCP_CONTEXT_UNAVAILABLE" };
       }
       return {
-        evidence: evidence(existing[0]),
+        evidence: evidence(existing[0], input.currentTime()),
         response: existing[0].normalized_response as CanonicalValue,
       };
     }
@@ -212,10 +309,19 @@ async function invocationForBinding(input: {
     let contextHash: string | null = null;
     let responseBytes = 0;
     let errorCode: string | null = null;
+    let completedAt = input.currentTime();
     try {
       if (!input.provider) throw new McpContextError("GOAL_MCP_CONTEXT_UNAVAILABLE");
       const raw = await invokeBounded(input.provider, input.binding, request, input.signal);
       normalized = normalizeResponse(raw);
+      const admittedAt = input.currentTime();
+      const sourceMetadata = admittedSourceMetadata(
+        normalized,
+        input.binding.provider,
+        input.now,
+        admittedAt,
+      );
+      completedAt = sourceMetadata ? new Date(sourceMetadata.completedAt) : admittedAt;
       const serialized = canonicalJson(normalized);
       responseBytes = Buffer.byteLength(serialized, "utf8");
       if (responseBytes > MCP_MAX_RESPONSE_BYTES) {
@@ -263,7 +369,7 @@ async function invocationForBinding(input: {
         ${idempotencyKey}, ${requestHash}, ${responseHash}, ${contextHash},
         ${normalized === null ? null : tx.json(normalized)}, ${responseBytes},
         ${errorCode === null ? "SUCCEEDED" : "FAILED"}, ${errorCode}, ${input.releaseSha},
-        ${input.now}, ${input.now}, ${input.now}
+        ${input.now}, ${completedAt}, ${input.now}
       )
       RETURNING id::text, binding_id, provider, capability, request_hash, response_hash,
         context_hash, normalized_response, response_bytes, state, error_code,
@@ -311,9 +417,15 @@ export async function collectMcpContext(input: {
     throw new McpContextError("GOAL_MCP_CALL_LIMIT_EXCEEDED");
   }
   const now = input.now ?? new Date();
+  const currentTime = (): Date => {
+    const actual = new Date();
+    return input.now && Math.abs(actual.getTime() - now.getTime()) > KERNEL_QUOTE_TTL_MS
+      ? now
+      : actual;
+  };
   const entries: Array<{ bindingId: string; response: CanonicalValue; evidence: McpEvidenceV1 }> = [];
   for (const binding of input.bindings) {
-    const invocation = await invocationForBinding({ ...input, binding, now });
+    const invocation = await invocationForBinding({ ...input, binding, now, currentTime });
     entries.push({ bindingId: binding.id, response: invocation.response, evidence: invocation.evidence });
   }
   const contextValue = entries.map((entry) => ({

@@ -27,7 +27,7 @@ import {
   parseEnsBinding,
   parseHireRequestInput,
 } from "../../src/kernel/policy";
-import { createOgSpendBudget, reserveOgSpend } from "../../src/kernel/service";
+import { createOgSpendBudget, getBuyerJobDetail, reserveOgSpend } from "../../src/kernel/service";
 import { configureDatabaseEnvironment, startDisposableDatabase } from "../helpers/postgres";
 import { publicationAuthority } from "./lifecycle.cases";
 
@@ -43,7 +43,20 @@ class FixedProvider implements McpContextProvider {
 
   async invoke(binding: Parameters<McpContextProvider["invoke"]>[0]): Promise<unknown> {
     this.calls += 1;
-    return { bindingId: binding.id, observed: true };
+    return {
+      bindingId: binding.id,
+      observed: true,
+      ...(binding.provider === "the-graph" ? {
+        sourceMetadata: {
+          subgraphId: "8e4dRt4P4WHXnKbEq7STaQfU2g99WZ5S4w39f2PcUTjD",
+          deploymentId: "QmValidDeployment123456789012345678901234567890",
+          network: "mainnet",
+          blockNumber: "20000000",
+          blockHash: `0x${"a".repeat(64)}`,
+          completedAt: new Date().toISOString(),
+        },
+      } : {}),
+    };
   }
 }
 
@@ -58,7 +71,7 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
         (${OTHER_ID}, ${OTHER_WALLET})
     `;
     const manifest = buildManifestV5({
-      templateId: "market-pulse",
+      templateId: "liquidity-scout",
       name: "V5 Market Pulse",
       description: "A deterministic protected V5 marketplace fixture.",
       ownerWallet: CREATOR_WALLET,
@@ -88,7 +101,7 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
     const versionId = published.versionId;
 
     const filters = parseAgentListFilters(new URL(
-      "http://localhost/api/kernel/agents?capability=market-analysis&skill=persona.market-analyst&mcpProvider=coingecko&riskTier=LOW&limit=1",
+      "http://localhost/api/kernel/agents?capability=market-analysis&skill=persona.market-analyst&mcpProvider=the-graph&riskTier=LOW&limit=1",
     ));
     const listing = await listAgentLifecycle(BUYER_ID, { filters, sql: database.sql });
     assert.equal(listing.agents[0]?.versionId, versionId);
@@ -138,9 +151,15 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
       mcpProvider: provider,
       sql: database.sql,
     });
-    assert.equal(completed?.state, "JOB_QUEUED");
+    assert.equal(completed?.state, "JOB_QUEUED", completed?.errorCode ?? "missing result");
     assert.ok(completed?.jobId);
     assert.equal(provider.calls, manifest.mcp.length);
+    const hireDetail = await getBuyerJobDetail(BUYER_ID, completed.jobId, { sql: database.sql });
+    assert.equal(hireDetail?.evidenceDetail.mcpInvocations.length, manifest.mcp.length);
+    assert.ok(hireDetail?.evidenceDetail.mcpInvocations.every((entry) =>
+      entry.sourceMetadata?.network === "mainnet" &&
+      entry.sourceMetadata.completedAt === entry.completedAt));
+    assert.doesNotMatch(JSON.stringify(hireDetail?.evidenceDetail.mcpInvocations), /observed|normalized_response/);
     const retries = await Promise.all(Array.from({ length: 10 }, () => processHireRequest({
       hireRequestId: created.hireRequestId,
       workerId: "retry-worker",

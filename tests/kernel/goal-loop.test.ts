@@ -394,7 +394,7 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       assert.equal(first.run.jobs.filter((job) => job.role === "SYNTHESIS").length, 1);
       assert.deepEqual(
         analysis.map((job) => job.agentVersionId),
-        [marketVersion, riskVersion].sort(),
+        [marketVersion, riskVersion],
       );
       assert.ok(analysis.every((job) => job.agentVersionId !== selfVersion && job.jobId));
       assert.equal(first.run.totalPriceAtomic, "3000");
@@ -715,6 +715,65 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
           '0xNOTANADDRESS', '007', ${"b".repeat(64)}, ${at(51_000)}
         )
       `, /agent_version_provenance_address_check|agent_version_provenance_token_check/);
+    });
+
+    await t.test("equal coverage prefers the least-privileged agent before hires and price", async () => {
+      const liquidityVersion = await publishAgent(database, {
+        id: CREATOR_A_ID, wallet: CREATOR_A_WALLET,
+      }, {
+        name: "Least Privilege Liquidity", parent: "alice.eth", label: "least-liquidity",
+        capabilities: ["research", "market-analysis"], templateId: "liquidity-scout",
+      });
+      await publishAgent(database, {
+        id: CREATOR_B_ID, wallet: CREATOR_B_WALLET,
+      }, {
+        name: "Excess Thesis", parent: "bob.eth", label: "excess-thesis",
+        capabilities: ["research", "market-analysis", "risk-analysis"],
+        templateId: "thesis-synthesizer",
+      });
+      const goal = await createGoal(BUYER_ID, activeGoal({
+        objective: "Research the bounded liquidity snapshot with minimum authority.",
+        capabilities: ["research", "market-analysis"],
+        runLimit: 1,
+        maxAgents: 1,
+        perRunCapAtomic: "1000",
+      }), "goal-least-privilege-create-01", { now: at(41_000), sql: database.sql });
+      const run = await createGoalRun(BUYER_ID, goal.goal.goalId, "goal-least-privilege-run-01", {
+        now: at(42_000),
+        sql: database.sql,
+        mcpProvider: new FixedGoalMcpProvider(),
+      });
+      assert.equal(run.run.state, "RUNNING");
+      assert.equal(run.run.jobs.length, 1);
+      assert.equal(run.run.jobs[0]?.agentVersionId, liquidityVersion);
+
+      const failureGoal = await createGoal(BUYER_ID, activeGoal({
+        objective: "Fail closed before job creation when Graph evidence is unavailable.",
+        capabilities: ["research", "market-analysis"],
+        runLimit: 1,
+        maxAgents: 1,
+        perRunCapAtomic: "1000",
+      }), "goal-graph-failure-create-01", { now: at(43_000), sql: database.sql });
+      const failed = await createGoalRun(
+        BUYER_ID,
+        failureGoal.goal.goalId,
+        "goal-graph-failure-run-01",
+        {
+          now: at(44_000),
+          sql: database.sql,
+          mcpProvider: { invoke: async () => { throw new Error("private provider detail"); } },
+        },
+      );
+      assert.equal(failed.run.state, "BLOCKED");
+      assert.equal(failed.run.errorCode, "GOAL_MCP_PROVIDER_FAILED");
+      assert.equal(failed.run.jobs.length, 1);
+      assert.equal(failed.run.jobs[0]?.jobId, null);
+      const jobCount = await database.sql<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM jobs job
+        JOIN goal_run_jobs link ON link.job_id = job.id
+        WHERE link.goal_run_id = ${failed.run.runId}::uuid
+      `;
+      assert.equal(jobCount[0]?.count, 0);
     });
 
     await t.test("catalog v3 publishes through the same lifecycle and blocks without MCP context", async () => {

@@ -450,7 +450,16 @@ export interface GoalRunJobSnapshot {
   fullSubname: string;
 }
 
-export interface McpEvidenceV1 extends Record<string, CanonicalValue> {
+export interface McpSourceMetadataV1 {
+  subgraphId: string;
+  deploymentId: string;
+  network: "mainnet";
+  blockNumber: string;
+  blockHash: string;
+  completedAt: string;
+}
+
+export interface McpEvidenceV1 {
   schemaVersion: 1;
   invocationId: string;
   bindingId: string;
@@ -464,6 +473,7 @@ export interface McpEvidenceV1 extends Record<string, CanonicalValue> {
   errorCode: string | null;
   releaseSha: string;
   completedAt: string;
+  sourceMetadata?: McpSourceMetadataV1;
 }
 
 export interface GoalRunSnapshot {

@@ -2,6 +2,7 @@ import { getDb } from "../config/database";
 import { deriveManifestHashes } from "./agent-catalog";
 import { canonicalJson, domainHash, type CanonicalValue } from "./canonical";
 import { KernelError } from "./errors";
+import { projectMcpSourceMetadata } from "./mcp-context";
 import { KERNEL_QUOTE_TTL_MS } from "./policy";
 import type {
   AgentManifest,
@@ -189,6 +190,7 @@ interface McpInvocationDetailRow {
   error_code: string | null;
   release_sha: string;
   completed_at: Date;
+  normalized_response: unknown;
 }
 
 function mapPublishedAgent(row: AgentVersionRow, viewerUserId: string): PublishedAgent {
@@ -863,14 +865,26 @@ export async function getBuyerJobDetail(
       LIMIT 1
     `,
     sql<McpInvocationDetailRow[]>`
-      SELECT invocation.id::text, invocation.binding_id, invocation.provider,
-        invocation.capability, invocation.state, invocation.request_hash,
-        invocation.response_hash, invocation.context_hash, invocation.response_bytes,
-        invocation.error_code, invocation.release_sha, invocation.completed_at
-      FROM goal_run_jobs link
-      JOIN mcp_invocations invocation ON invocation.goal_run_job_id = link.id
-      WHERE link.job_id = ${jobId}::uuid
-      ORDER BY invocation.binding_id ASC, invocation.id ASC
+      SELECT evidence.* FROM (
+        SELECT invocation.id::text, invocation.binding_id, invocation.provider,
+          invocation.capability, invocation.state, invocation.request_hash,
+          invocation.response_hash, invocation.context_hash, invocation.response_bytes,
+          invocation.error_code, invocation.release_sha, invocation.completed_at,
+          invocation.normalized_response
+        FROM goal_run_jobs link
+        JOIN mcp_invocations invocation ON invocation.goal_run_job_id = link.id
+        WHERE link.job_id = ${jobId}::uuid
+        UNION ALL
+        SELECT invocation.id::text, invocation.binding_id, invocation.provider,
+          invocation.capability, invocation.state, invocation.request_hash,
+          invocation.response_hash, invocation.context_hash, invocation.response_bytes,
+          invocation.error_code, invocation.release_sha, invocation.completed_at,
+          invocation.normalized_response
+        FROM hire_requests hire
+        JOIN mcp_invocations invocation ON invocation.hire_request_id = hire.id
+        WHERE hire.job_id = ${jobId}::uuid
+      ) evidence
+      ORDER BY evidence.binding_id ASC, evidence.id ASC
       LIMIT 4
     `,
   ]);
@@ -984,21 +998,29 @@ export async function getBuyerJobDetail(
             }
           : null,
       },
-      mcpInvocations: mcpInvocations.map((invocation) => ({
-        schemaVersion: 1,
-        invocationId: invocation.id,
-        bindingId: invocation.binding_id,
-        provider: invocation.provider,
-        capability: invocation.capability,
-        state: invocation.state,
-        requestHash: invocation.request_hash,
-        responseHash: invocation.response_hash,
-        contextHash: invocation.context_hash,
-        responseBytes: invocation.response_bytes,
-        errorCode: invocation.error_code,
-        releaseSha: invocation.release_sha,
-        completedAt: invocation.completed_at.toISOString(),
-      })),
+      mcpInvocations: mcpInvocations.map((invocation) => {
+        const sourceMetadata = projectMcpSourceMetadata(
+          invocation.normalized_response,
+          invocation.completed_at,
+          invocation.provider,
+        );
+        return {
+          schemaVersion: 1,
+          invocationId: invocation.id,
+          bindingId: invocation.binding_id,
+          provider: invocation.provider,
+          capability: invocation.capability,
+          state: invocation.state,
+          requestHash: invocation.request_hash,
+          responseHash: invocation.response_hash,
+          contextHash: invocation.context_hash,
+          responseBytes: invocation.response_bytes,
+          errorCode: invocation.error_code,
+          releaseSha: invocation.release_sha,
+          completedAt: invocation.completed_at.toISOString(),
+          ...(sourceMetadata ? { sourceMetadata } : {}),
+        };
+      }),
       errorCode: receiptBindingError
         ? "RECEIPT_EFFECT_HASH_MISMATCH"
         : base.lastErrorCode ?? journal?.error_code ?? ens?.error_code ?? null,

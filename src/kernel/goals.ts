@@ -869,7 +869,12 @@ export async function createGoalRun(
   ownerUserId: string,
   goalId: string,
   idempotencyKey: string,
-  options: { now?: Date; sql?: DatabaseClient } = {},
+  options: {
+    now?: Date;
+    sql?: DatabaseClient;
+    mcpProvider?: McpContextProvider;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<{ run: GoalRunSnapshot; replayed: boolean }> {
   const sql = options.sql ?? getDb();
   const now = options.now ?? new Date();
@@ -910,7 +915,12 @@ export async function createGoalRun(
     }
     return { row: await insertGoalRun(tx, goal, idempotencyKey, now, now), replayed: false };
   });
-  const processed = await processGoalRun(ownerUserId, created.row.run_id, { now, sql });
+  const processed = await processGoalRun(ownerUserId, created.row.run_id, {
+    now,
+    sql,
+    mcpProvider: options.mcpProvider,
+    signal: options.signal,
+  });
   return { run: processed, replayed: created.replayed };
 }
 
@@ -965,6 +975,9 @@ function selectCandidates(
     available.sort((left, right) => {
       const coverage = candidateCoverage(right, remaining).length - candidateCoverage(left, remaining).length;
       if (coverage !== 0) return coverage;
+      const excess = left.capabilities.filter((capability) => !remaining.has(capability)).length -
+        right.capabilities.filter((capability) => !remaining.has(capability)).length;
+      if (excess !== 0) return excess;
       const hires = BigInt(right.verified_external_hires) - BigInt(left.verified_external_hires);
       if (hires !== 0n) return hires > 0n ? 1 : -1;
       const price = BigInt(left.price_atomic) - BigInt(right.price_atomic);
@@ -982,6 +995,8 @@ function selectCandidates(
     const research = available
       .filter((candidate) => candidate.capabilities.includes("research"))
       .sort((left, right) => {
+        const excess = left.capabilities.length - right.capabilities.length;
+        if (excess !== 0) return excess;
         const hires = BigInt(right.verified_external_hires) - BigInt(left.verified_external_hires);
         if (hires !== 0n) return hires > 0n ? 1 : -1;
         const price = BigInt(left.price_atomic) - BigInt(right.price_atomic);

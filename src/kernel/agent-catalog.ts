@@ -71,8 +71,6 @@ const MCP_REGISTRY = {
   ],
   "the-graph": [
     "pinned-deployment-lookup",
-    "schema-read",
-    "bounded-query",
     "liquidity-volume-snapshot",
   ],
 } as const satisfies Readonly<Record<McpProviderId, readonly McpCapability[]>>;
@@ -596,7 +594,10 @@ export function recommendationFor(ids: readonly SupportedAgentSkill[]): {
   };
 }
 
-export function foundingCatalogProjection(): CanonicalValue {
+export function foundingCatalogProjection(
+  configuration: { theGraph?: "CONFIGURED" | "UNAVAILABLE" } = {},
+): CanonicalValue {
+  const graphAvailability = configuration.theGraph ?? "UNAVAILABLE";
   return {
     categories: FOUNDING_PACK.categories,
     skills: Object.values(FOUNDING_PACK.skills).map((skill) => ({
@@ -604,7 +605,9 @@ export function foundingCatalogProjection(): CanonicalValue {
       category: skill.category,
       capabilities: skill.capabilities,
       constraints: skillConstraints(skill),
-      providerAvailability: skill.id.startsWith("data.") ? "UNAVAILABLE" : "NOT_REQUIRED",
+      providerAvailability: skill.id === "data.the-graph.read"
+        ? graphAvailability
+        : skill.id.startsWith("data.") ? "UNAVAILABLE" : "NOT_REQUIRED",
     })),
     templates: FOUNDING_PACK.templates.map((template) => ({
       id: template.id,
@@ -615,7 +618,7 @@ export function foundingCatalogProjection(): CanonicalValue {
     })),
     mcpProviders: Object.entries(MCP_REGISTRY).map(([provider, capabilities]) => ({
       provider,
-      availability: "UNAVAILABLE",
+      availability: provider === "the-graph" ? graphAvailability : "UNAVAILABLE",
       capabilities,
     })),
   };
