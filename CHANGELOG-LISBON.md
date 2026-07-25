@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W4 publication-decision immutable audit
+
+- Reconciled independent verdict `FIX` for exact SHA `3b73c9dd5339ef42549ff5a529ba3dcd10dd68c5`, tree `3be0b139a06e1031c7f5a02bb8a06fe74a68a796`, and range `70307d045d1b1af327ef7a2f4c55fec4b2ff5bc9..3b73c9dd5339ef42549ff5a529ba3dcd10dd68c5`.
+- Recorded one HIGH finding: application-derived decision/release identity is not independently authenticated at the database boundary, so W4 cannot yet authorize Kernel publication consumption.
+- The full local floor otherwise passed, including both six-migration lanes, every test lane, checksum-pinned Go, secret/shell/diff checks, build 31 pages, and loopback HTTP 200. Cleanup completed; no external effect occurred.
+- Kept Kernel consumption, `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS, sponsor, push, release, and claim gates closed. Next work is one narrowed ENS database-authentication repair and immutable re-audit.
+
 ## 2026-07-25 - A4 durable ENS publication decision
 
 - Added an ENS-owned append-only publication decision keyed only by immutable `agentVersionId`, with canonical binding/record bytes and hashes, exact version/manifest/name/DNS/hierarchy/role/resolver/CCIP/block/time/release evidence, and no job/effect/receipt dependency.

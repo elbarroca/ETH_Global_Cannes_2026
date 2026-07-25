@@ -307,4 +307,17 @@ Focused A4 passes 21/21. The new coverage proves exact accepted persistence with
 
 The host initially had no Go executable, so the first integration attempt failed only the A3 Go fixture hook. Under exact W4 authorization, official `go1.23.10.darwin-arm64.tar.gz` was downloaded only to a task-specific `/tmp` tree, matched SHA-256 `25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`, reported exact `go1.23.10 darwin/arm64`, and made the full rerun green. The archive, extracted toolchain/cache/module tree, verifier binary, and HTTP smoke artifacts are deleted at closeout.
 
-W4 repairs only the ENS-owned durable-decision prerequisite. Kernel/API ownership remains untouched. A later sequential Kernel handoff must consume the decision by foreign key, recheck freshness with database time in the same publication transaction, append the matching lifecycle event, repair action idempotency/body bounds, and pass immutable audit. Therefore `A4_ACCEPTED`, frozen `A5_ACCEPTED`, mandatory A6 entry, live ENS, sponsor qualification, release, push, deployment, public identifiers, and claim promotion remain closed.
+## W4 immutable publication-decision audit
+
+- Audit SHA: `3b73c9dd5339ef42549ff5a529ba3dcd10dd68c5`
+- Tree: `3be0b139a06e1031c7f5a02bb8a06fe74a68a796`
+- Audited range: `70307d045d1b1af327ef7a2f4c55fec4b2ff5bc9..3b73c9dd5339ef42549ff5a529ba3dcd10dd68c5`
+- Result: `FIX; LOCAL_ONLY`
+
+The independent detached audit found one HIGH database-integrity defect. Application code derives the convergence key and release identity, but the migration admits those values through shape and cross-field consistency checks rather than an independently trusted database-owned derivation/admission boundary. A normal application-role integrity check therefore proved an `ALLOW` row is not independently authoritative. Existing tests cover duplicate evidence and fixed-clock privilege, but not this authority invariant.
+
+The prescribed floor otherwise passed: environment and Prisma checks; both six-migration lanes; lint with zero errors and 23 inherited warnings; typecheck; every test lane; checksum-pinned Go verifier; secret and shell checks; range diff hygiene; Next 16.2.11 build with 31 pages; protected boot; and loopback HTTP 200. Cleanup completed and no external effect occurred.
+
+Minimum repair: prevent general application-role inserts, derive and validate decision/release identity inside a trusted database-owned boundary, add the missing normal-role regression, and re-audit a new immutable SHA.
+
+W4 is `AUDIT_FIX`, not ready for Kernel consumption. Kernel/API ownership remains untouched. After ENS repair and re-audit, the sequential Kernel handoff must consume the decision by foreign key, recheck freshness with database time in the publication transaction, append the matching lifecycle event, repair action idempotency/body bounds, and pass immutable audit. Therefore `A4_ACCEPTED`, frozen `A5_ACCEPTED`, mandatory A6 entry, live ENS, sponsor qualification, release, push, deployment, public identifiers, and claim promotion remain closed.

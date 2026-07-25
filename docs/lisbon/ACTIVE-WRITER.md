@@ -3,6 +3,56 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-A4-W4-AUDIT-RECONCILIATION-20260725
+task_instance_id: C0-A4-W4-AUDIT-RECONCILIATION-20260725:3B73C9D
+generation: 1
+sprint: A4_publication_decision_audit_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: 3b73c9dd5339ef42549ff5a529ba3dcd10dd68c5
+control_sha: 3b73c9dd5339ef42549ff5a529ba3dcd10dd68c5
+audit_sha: 3b73c9dd5339ef42549ff5a529ba3dcd10dd68c5
+token: C0-A4-W4-AUDIT-RECONCILE-3B73C9D-B45D5753-32EA-4CD7-BDEA-EE01DFBD062C
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T03:49:37Z
+expires_at: 2026-07-25T04:49:37Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T03:49:37Z
+deadline: 2026-07-25T04:49:37Z
+expected_exit: record exact W4 immutable audit FIX without gate promotion and open only narrowed ENS database-authentication remediation
+acceptance_items:
+  - bind audit to exact target 3b73c9d tree 3be0b13 and parent 70307d0
+  - record one HIGH database-authentication finding and otherwise green full floor
+  - keep Kernel consumption A4_ACCEPTED A5 A6 live sponsor push release and claims closed
+  - commit local controls and release only the matching lease
+external_effect_authority: safe local control files deterministic checks and one atomic local commit only; no product change push deploy managed migration live call signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T03:52:16Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - independent detached audit bound to exact target 3b73c9d tree 3be0b13 parent 70307d0 returned FIX
+  - one HIGH database-authentication finding is canonical; no other finding was reported
+  - the prescribed audit floor otherwise passed and cleanup completed with no external effect
+  - reconciliation diff check lint zero errors with 23 inherited warnings typecheck foundation 9 of 9 secret scan and 31-page build passed
+  - Kernel consumption A4_ACCEPTED A5 A6 live sponsor push release and claim gates remain closed
+remaining_blocks:
+  - narrowed ENS database-owned decision/release authentication repair and immutable re-audit
+  - sequential Kernel consumption remediation and immutable re-audit
+  - every live ENS sponsor push release and public claim gate
+external_effects_attempted: none
+result: A4_W4_AUDIT_FIX_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-A4-W4-AUDIT-RECONCILE-3B73C9D-B45D5753-32EA-4CD7-BDEA-EE01DFBD062C after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: ENS Integrator /root/a4_ensv2_gap_inventory
 task_id: A4-ENS-PUBLICATION-DECISION-20260725
 task_instance_id: A4-ENS-PUBLICATION-DECISION-20260725:W4:70307D0
