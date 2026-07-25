@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import postgres from "postgres";
 import { KernelError } from "../../src/kernel/errors";
 import { kernelErrorResponse } from "../../src/kernel/http";
 
@@ -23,7 +24,7 @@ test("undefined PostgreSQL schema objects return a redacted readiness response",
   for (const sqlState of ["42P01", "42703"]) {
     let response: ReturnType<typeof kernelErrorResponse> | undefined;
     const observed = captureErrorLog(() => {
-      response = kernelErrorResponse(Object.assign(new Error(SENSITIVE_MESSAGE), {
+      response = kernelErrorResponse(Object.assign(new postgres.PostgresError(SENSITIVE_MESSAGE), {
         code: sqlState,
         detail: "private-detail",
         query: "private-query",
@@ -44,6 +45,33 @@ test("undefined PostgreSQL schema objects return a redacted readiness response",
       }),
     ]);
     assert.doesNotMatch(observed.join("\n"), /sensitive|private/i);
+  }
+});
+
+test("colliding application error codes remain redacted internal errors", async () => {
+  class ApplicationError extends Error {
+    constructor(readonly code: string) {
+      super(SENSITIVE_MESSAGE);
+    }
+  }
+
+  for (const sqlState of ["42P01", "42703"]) {
+    for (const error of [
+      Object.assign(new Error(SENSITIVE_MESSAGE), { code: sqlState }),
+      new ApplicationError(sqlState),
+    ]) {
+      let response: ReturnType<typeof kernelErrorResponse> | undefined;
+      const observed = captureErrorLog(() => {
+        response = kernelErrorResponse(error, "kernel.goals.list");
+      });
+
+      assert.equal(response?.status, 500);
+      assert.deepEqual(await response?.json(), { error: "Request failed", code: "INTERNAL_ERROR" });
+      assert.deepEqual(observed, [
+        JSON.stringify({ level: "error", context: "kernel.goals.list", code: "INTERNAL_ERROR" }),
+      ]);
+      assert.doesNotMatch(observed.join("\n"), /sensitive|42P01|42703/i);
+    }
   }
 });
 

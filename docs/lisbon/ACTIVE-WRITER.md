@@ -3,6 +3,48 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/kernel_schema_readiness_g2
+task_id: KERNEL-SCHEMA-READINESS-G2
+task_instance_id: KERNEL-SCHEMA-READINESS-G2:G2:A3E21BD
+generation: 2
+sprint: Authenticate protected schema-readiness SQLSTATE errors
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: a3e21bd97bb34d435ed2c4c5b9950281bd13e516
+control_sha: a3e21bd97bb34d435ed2c4c5b9950281bd13e516
+token: KERNEL-SCHEMA-READINESS-G2-A3E21BD-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T19:36:19Z
+expires_at: 2026-07-25T21:06:19Z
+allowed_paths:
+  - src/kernel/http.ts
+  - tests/kernel/http.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T19:36:19Z
+deadline: 2026-07-25T21:06:19Z
+expected_exit: accept schema-readiness SQLSTATEs only from genuine installed postgres PostgresError instances and preserve redacted failures
+external_effect_authority: local files existing dependencies local deterministic tests and one local commit only; no environment read managed database migration provider network push deploy signature transaction claim or other external effect
+completed_at: 2026-07-25T19:41:06Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - schema readiness now requires an installed postgres PostgresError instance before admitting SQLSTATE 42P01 or 42703
+  - focused HTTP regression PASS 4 of 4 for genuine driver errors plain and custom collision errors unchanged KernelError responses bounded context and secret redaction
+  - test:kernel PASS 47 of 47; npm test PASS 10 of 10; test:auth PASS 9 of 9; test:e2e PASS 4 of 4; test:redaction PASS 3 of 3; test:boot PASS
+  - lint PASS with zero errors and 23 inherited warnings; typecheck PASS; scan:secrets PASS; git diff --check PASS
+  - aggregate test:integration PARTIAL with 32 passing and 11 inherited strict-A3 hook failures because no Go toolchain is installed; the guarded migration command did not start
+  - isolated production build PASS with 35 pages from an explicit minimal environment and a clean snapshot containing no .env.local
+remaining_blocks:
+  - immutable exact-SHA independent audit remains required
+  - aggregate integration remains host-Go blocked independently of this HTTP-only repair
+  - managed database migration provider network push deploy signature transaction claim and other external effects remain unauthorized and were not attempted
+external_effects_attempted: local deterministic tests and isolated local build only; no .env.local read managed database migration provider network push deploy signature transaction claim or other external effect
+claim_changes: none
+verdict: PASS_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token KERNEL-SCHEMA-READINESS-G2-A3E21BD-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: C0 /root
 task_id: NEON-PROD-MIGRATE-W2
 task_instance_id: NEON-PROD-MIGRATE-W2:W2:2F67D33

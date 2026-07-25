@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import postgres from "postgres";
 import { KernelError } from "./errors";
 
 const MAX_KERNEL_JSON_BYTES = 8_192;
@@ -6,7 +7,7 @@ const SCHEMA_NOT_READY_SQLSTATES = new Set(["42P01", "42703"]);
 const SAFE_LOG_CONTEXT = /^[a-z][a-z0-9.-]{0,63}$/;
 
 function schemaNotReadySqlState(error: unknown): string | null {
-  if (typeof error !== "object" || error === null || !("code" in error)) return null;
+  if (!(error instanceof postgres.PostgresError)) return null;
   const code = error.code;
   return typeof code === "string" && SCHEMA_NOT_READY_SQLSTATES.has(code) ? code : null;
 }
