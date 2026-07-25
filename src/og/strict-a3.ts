@@ -48,6 +48,8 @@ export interface StrictComputeService {
   teeSignerAddress: string;
   teeSignerAcknowledged: boolean;
   additionalInfo: unknown;
+  inputPriceAtomic?: string;
+  outputPriceAtomic?: string;
 }
 
 export interface StrictComputeResponse {
@@ -132,6 +134,7 @@ export interface StrictA3AdapterOptions {
   productionRuntime?: NonNullable<StrictA3AdapterOptions["fixture"]> & {
     effectId: string;
     budgetExpiresAt: Date;
+    maxCostAtomic: string;
   };
   hooks?: StrictA3Hooks;
   environment?: Record<string, string | undefined>;
@@ -432,6 +435,9 @@ export function validateStrictComputeService(
   if (additionalInfo.TargetSeparated !== true || !ADDRESS_PATTERN.test(targetAddress)) {
     throw new A3TerminalError("A3_TARGET_TEE_INVALID");
   }
+  if (service.teeSignerAddress !== targetAddress) {
+    throw new A3TerminalError("A3_PROVIDER_SIGNER_MISMATCH");
+  }
   return { ...service, expectedSigner: targetAddress };
 }
 
@@ -472,14 +478,12 @@ export function validateStrictComputeResponse(
     const promptTokens = usage.prompt_tokens;
     const completionTokens = usage.completion_tokens;
     const totalTokens = usage.total_tokens;
-    const actualCostAtomic = usage.actual_cost_atomic;
     if (
-      !exactKeys(usage, ["actual_cost_atomic", "completion_tokens", "prompt_tokens", "total_tokens"]) ||
+      !exactKeys(usage, ["completion_tokens", "prompt_tokens", "total_tokens"]) ||
       !Number.isSafeInteger(promptTokens) || Number(promptTokens) < 0 ||
       !Number.isSafeInteger(completionTokens) || Number(completionTokens) < 0 ||
       Number(completionTokens) > MAX_OUTPUT_TOKENS ||
-      !Number.isSafeInteger(totalTokens) || totalTokens !== Number(promptTokens) + Number(completionTokens) ||
-      typeof actualCostAtomic !== "string" || !/^(0|[1-9][0-9]*)$/.test(actualCostAtomic)
+      !Number.isSafeInteger(totalTokens) || totalTokens !== Number(promptTokens) + Number(completionTokens)
     ) {
       throw new A3TerminalError("A3_COMPUTE_USAGE_MALFORMED");
     }
@@ -487,7 +491,7 @@ export function validateStrictComputeResponse(
       promptTokens: Number(promptTokens),
       completionTokens: Number(completionTokens),
       totalTokens: Number(totalTokens),
-      actualCostAtomic,
+      actualCostAtomic: "",
     };
   }
   return { content, requestId: response.requestId, usage: validatedUsage };
@@ -622,6 +626,7 @@ export class StrictA3Adapter implements KernelAdapter {
     chatModel?: StrictA3ChatModel;
     effectId?: string;
     budgetExpiresAt?: Date;
+    maxCostAtomic?: string;
   };
 
   constructor(options: StrictA3AdapterOptions = {}) {
@@ -1195,6 +1200,12 @@ export class StrictA3Adapter implements KernelAdapter {
           ));
         }
         if (!response || !signature) throw new A3TerminalError("A3_COMPUTE_RESPONSE_MALFORMED");
+        if (runtime.maxCostAtomic && (
+          !response.usage || !response.usage.actualCostAtomic ||
+          BigInt(response.usage.actualCostAtomic) > BigInt(runtime.maxCostAtomic)
+        )) {
+          throw new A3TerminalError("A3_BUDGET_EXCEEDED");
+        }
         checkExecutionAbort(request.signal, activeDeadline);
         await this.assertCurrentClaim(job);
         if (!Buffer.from(signature.text, "utf8").equals(Buffer.from(response.content, "utf8"))) {

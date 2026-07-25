@@ -2,6 +2,7 @@ import { BaseChatModel, type BaseChatModelCallOptions } from "@langchain/core/la
 import { AIMessage, HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { ChatResult } from "@langchain/core/outputs";
 import type { EnsAuthorityRuntime, EnsAuthorityOperation } from "../ens/authority";
+import { domainHash } from "../kernel/canonical";
 import type { DatabaseClient } from "../kernel/service";
 import {
   A3TerminalError,
@@ -113,6 +114,16 @@ export class ZeroGStrictChatModel extends BaseChatModel<ZeroGCallOptions> implem
     );
     const response = validateStrictComputeResponse(rawResponse, this.provider, this.model);
     if (!response.usage) throw new A3TerminalError("A3_COMPUTE_USAGE_MISSING");
+    if (
+      typeof service.inputPriceAtomic !== "string" || !/^(0|[1-9][0-9]*)$/.test(service.inputPriceAtomic) ||
+      typeof service.outputPriceAtomic !== "string" || !/^(0|[1-9][0-9]*)$/.test(service.outputPriceAtomic)
+    ) {
+      throw new A3TerminalError("A3_COMPUTE_PRICE_MISSING");
+    }
+    response.usage.actualCostAtomic = (
+      BigInt(response.usage.promptTokens) * BigInt(service.inputPriceAtomic) +
+      BigInt(response.usage.completionTokens) * BigInt(service.outputPriceAtomic)
+    ).toString();
     await options.beforeEffect("COMPUTE_SIGNATURE");
     const signature = validateStrictComputeSignature(
       await this.transport.fetchSignature(service, response.requestId, options.signal ?? new AbortController().signal),
@@ -213,6 +224,17 @@ function validHttps(value: string): boolean {
   }
 }
 
+function reservationIdentity(config: ProductionA3Config): string {
+  return domainHash("og-compute-reservation", {
+    amountAtomic: config.reservationAmountAtomic,
+    budgetExpiresAt: config.budgetExpiresAt.toISOString(),
+    effectId: config.effectId,
+    model: config.model,
+    provider: config.provider,
+    releaseSha: config.releaseSha,
+  });
+}
+
 export async function createProductionStrictA3Runtime(
   options: ProductionA3FactoryOptions,
 ): Promise<StrictA3Adapter> {
@@ -225,6 +247,7 @@ export async function createProductionStrictA3Runtime(
     !ADDRESS_PATTERN.test(config.provider) || !config.model.trim() ||
     !ADDRESS_PATTERN.test(config.expectedSigner) || !HASH_PATTERN.test(config.releaseSha) ||
     !EFFECT_PATTERN.test(config.effectId) || !EFFECT_PATTERN.test(config.reservationEffectIdentity) ||
+    config.reservationEffectIdentity !== reservationIdentity(config) ||
     !/^[1-9][0-9]*$/.test(config.reservationAmountAtomic) ||
     Number.isNaN(config.budgetExpiresAt.getTime()) || config.budgetExpiresAt.getTime() <= now.getTime()
   ) {
@@ -245,10 +268,15 @@ export async function createProductionStrictA3Runtime(
     !budget || budget.chain_id !== CHAIN_ID || budget.asset !== "A0GI" ||
     !budget.reservation_id || budget.effect_identity !== config.reservationEffectIdentity ||
     budget.amount_atomic !== config.reservationAmountAtomic ||
-    (budget.state !== "RESERVED" && budget.state !== "AMBIGUOUS")
+    !/^[1-9][0-9]*$/.test(budget.limit_atomic) ||
+    BigInt(budget.amount_atomic) > BigInt(budget.limit_atomic)
   ) {
     throw new A3TerminalError("A3_BUDGET_NOT_ADMITTED");
   }
+  if (budget.state === "AMBIGUOUS") {
+    throw new A3TerminalError("A3_AMBIGUOUS_RESERVATION");
+  }
+  if (budget.state !== "RESERVED") throw new A3TerminalError("A3_BUDGET_NOT_ADMITTED");
   const service = validateStrictComputeService(
     options.verifiedService,
     config.provider,
@@ -256,6 +284,12 @@ export async function createProductionStrictA3Runtime(
   );
   if (service.expectedSigner !== config.expectedSigner) {
     throw new A3TerminalError("A3_PROVIDER_SIGNER_MISMATCH");
+  }
+  if (
+    typeof service.inputPriceAtomic !== "string" || !/^(0|[1-9][0-9]*)$/.test(service.inputPriceAtomic) ||
+    typeof service.outputPriceAtomic !== "string" || !/^(0|[1-9][0-9]*)$/.test(service.outputPriceAtomic)
+  ) {
+    throw new A3TerminalError("A3_COMPUTE_PRICE_MISSING");
   }
   return new StrictA3Adapter({
     authority: options.authority,
@@ -272,6 +306,7 @@ export async function createProductionStrictA3Runtime(
       compute: options.compute,
       effectId: config.effectId,
       model: config.model,
+      maxCostAtomic: config.reservationAmountAtomic,
       provider: config.provider,
       storage: options.storage,
       storageIndexerUrl: config.storageIndexerUrl,

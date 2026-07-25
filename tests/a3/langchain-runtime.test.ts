@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { verifyMessage, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type { EnsAuthorityRuntime } from "../../src/ens/authority";
+import { domainHash } from "../../src/kernel/canonical";
 import type { DatabaseClient } from "../../src/kernel/service";
 import {
   createProductionStrictA3Runtime,
@@ -25,7 +26,9 @@ function service(): StrictComputeService {
     additionalInfo: { TargetSeparated: true, TargetTeeAddress: signer.address.toLowerCase() },
     baseUrl: "https://compute.invalid",
     endpoint: "https://compute.invalid/v1/proxy",
+    inputPriceAtomic: "2",
     model: MODEL,
+    outputPriceAtomic: "3",
     provider: PROVIDER,
     teeSignerAcknowledged: true,
     teeSignerAddress: signer.address.toLowerCase(),
@@ -74,7 +77,6 @@ class ComputeFixture implements StrictComputeTransport {
         choices: [{ message: { content: "verified", role: "assistant" } }],
         model: MODEL,
         usage: {
-          actual_cost_atomic: "7",
           completion_tokens: this.completionTokens,
           prompt_tokens: 10,
           total_tokens: 10 + this.completionTokens,
@@ -117,7 +119,7 @@ const authority: EnsAuthorityRuntime = {
 };
 
 function config(overrides: Partial<ProductionA3Config> = {}): ProductionA3Config {
-  return {
+  const value: ProductionA3Config = {
     budgetExpiresAt: new Date("2026-07-26T00:00:00.000Z"),
     chainId: 16602,
     databaseSecretPresent: true,
@@ -129,23 +131,37 @@ function config(overrides: Partial<ProductionA3Config> = {}): ProductionA3Config
     railwayService: "alphadawg-production",
     releaseSha: "b".repeat(40),
     reservationAmountAtomic: "100",
-    reservationEffectIdentity: "c".repeat(64),
+    reservationEffectIdentity: "",
     rpcUrl: "https://rpc.invalid",
     storageIndexerUrl: "https://indexer.invalid",
     ...overrides,
   };
+  if (!overrides.reservationEffectIdentity) {
+    value.reservationEffectIdentity = domainHash("og-compute-reservation", {
+      amountAtomic: value.reservationAmountAtomic,
+      budgetExpiresAt: value.budgetExpiresAt.toISOString(),
+      effectId: value.effectId,
+      model: value.model,
+      provider: value.provider,
+      releaseSha: value.releaseSha,
+    });
+  }
+  return value;
 }
 
-function budgetSql(state: "RESERVED" | "AMBIGUOUS" | "MISSING" = "RESERVED") {
+function budgetSql(
+  state: "RESERVED" | "AMBIGUOUS" | "MISSING" = "RESERVED",
+  productionConfig = config(),
+) {
   let calls = 0;
   const sql = (async () => {
     calls += 1;
     if (state === "MISSING") return [];
     return [{
-      amount_atomic: "100",
+      amount_atomic: productionConfig.reservationAmountAtomic,
       asset: "A0GI",
       chain_id: 16602,
-      effect_identity: "c".repeat(64),
+      effect_identity: productionConfig.reservationEffectIdentity,
       limit_atomic: "1000",
       release_sha: "b".repeat(40),
       reservation_id: "11111111-1111-1111-1111-111111111111",
@@ -212,7 +228,10 @@ test("production admission rejects expired or exhausted reservation without a mo
 test("ambiguous reservation remains held and admits only verified provider metadata", async () => {
   const compute = new ComputeFixture();
   const budget = budgetSql("AMBIGUOUS");
-  await createProductionStrictA3Runtime(factoryOptions(compute, budget.sql));
+  await assert.rejects(
+    createProductionStrictA3Runtime(factoryOptions(compute, budget.sql)),
+    /A3_AMBIGUOUS_RESERVATION/,
+  );
   assert.equal(budget.calls, 1);
   assert.equal(compute.calls.resolve, 0);
 
@@ -238,7 +257,7 @@ test("LangChain model makes one bounded call and exposes verified usage evidence
   );
   assert.equal(compute.calls.send, 1);
   assert.equal(result.response.usage.completionTokens, 12);
-  assert.equal(result.response.usage.actualCostAtomic, "7");
+  assert.equal(result.response.usage.actualCostAtomic, "56");
   assert.deepEqual(operations, ["COMPUTE_SERVICE", "COMPUTE_HEADERS", "COMPUTE_REQUEST", "COMPUTE_SIGNATURE"]);
 });
 

@@ -29,7 +29,30 @@ started_at: 2026-07-25T21:14:44Z
 deadline: 2026-07-26T01:14:44Z
 expected_exit: strict production 0G LangChain V5 runtime with release-bound budget fencing and deterministic local evidence
 external_effect_authority: local files exact dependency installation offline fixtures deterministic tests and one atomic local commit only; no environment mutation live network wallet signature upload spend managed migration deployment push claim or public proof
-status: active
+completed_at: 2026-07-25T21:26:22Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - exact dependencies are pinned at langchain 1.5.4 @langchain/core 1.2.3 and @langchain/langgraph 1.4.8 with no MCP SDK addition
+  - the custom LangChain BaseChatModel uses the strict 0G transport for one deterministic no-tools call with 768 maximum output tokens and the inherited 300000ms deadline
+  - production admission is explicit-injection-only and fails closed on any non-16602 chain missing Railway or 0G configuration absent or expired release reservation metadata or signer mismatch
+  - reservation identity is release effect provider model amount and expiry bound; ambiguous reservations remain held and cannot trigger a blind model call
+  - provider usage tokens and installed-SDK per-token prices derive actual atomic cost; request signature provider model request ID Storage root digest size and exact readback remain journal-bound and returned
+  - fresh ENS authority and current claim fencing run before each Compute metadata header request signature Storage write and Storage readback effect
+  - focused LangChain runtime tests PASS 5 of 5; npm test PASS 10 of 10; typecheck scoped lint resilience redaction secret scan dependency pins and diff check PASS
+  - test:a3 reached 8 passes before 11 strict fixture hook failures because the host Go build returned undefined; test:integration reached 37 passes before the same 11 hook failures
+  - test:go is host-blocked with go command not found; no full Go-backed A3 or aggregate integration claim is made
+repository_integrity_observation:
+  - while this exact physical lease remained active an external actor advanced and pushed HEAD from b2eb3d074857f059aefa51bda5031c3cac060a6b to 7460489dd74560fb8ed9de207ea0b5bc55936a04
+  - 7460489 contains in-progress admitted A3 and package files plus unrelated UI and A5 files and is OBSERVED_UNRECONCILED not this writer's commit or release evidence
+  - C0 admitted 7460489 only as the preserved external base and authorized this separate follow-up local candidate; no reset revert amend or push was performed
+remaining_blocks:
+  - no reviewed live transport uploader signer verifier funding adapter or exact external-effect authorization exists; production and every live effect remain blocked
+  - managed schema deployment live sponsor evidence push deployment spend claims and release remain closed
+external_effects_attempted: exact dependency installation local deterministic tests disposable loopback integration fixtures and local commit only; no live network sponsor call wallet signature upload funding transaction managed migration deployment push spend claim or public proof
+claim_changes: none
+verdict: PASS_TO_AUDIT_WITH_HOST_GO_BLOCK; LOCAL_ONLY
+lock_release: release only exact token OG-LANGCHAIN-RUNTIME-V5-W2-B2EB3D0-20260725T211444Z after the task-owned follow-up commit
+status: completed
 ```
 
 ```yaml
