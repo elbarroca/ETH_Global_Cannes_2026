@@ -410,6 +410,7 @@ model AgentVersion {
   lifecycleActions AgentLifecycleAction[] @relation("ActionResultVersion")
   targetedLifecycleActions AgentLifecycleAction[] @relation("ActionTargetVersion")
   publicationAction AgentLifecycleAction? @relation("PublishedByLifecycleAction", fields: [publicationActionId], references: [id], onDelete: Restrict)
+  x402PaymentAttempts X402PaymentAttempt[]
   x402PaymentReceipts X402PaymentReceipt[]
   uniswapToolReceipts UniswapToolReceipt[]
   provenance     AgentVersionProvenance?
@@ -476,6 +477,8 @@ model Quote {
   asset          String
   expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  x402PaymentAttempt X402PaymentAttempt?
+  x402PaymentReceipts X402PaymentReceipt[]
 
   @@unique([buyerUserId, idempotencyKey], map: "uniq_quotes_buyer_idempotency")
   @@index([agentVersionId, createdAt], map: "idx_quotes_version_created")
@@ -529,6 +532,7 @@ model Job {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
   x402PaymentReceipt X402PaymentReceipt?
+  x402PaymentAttempt X402PaymentAttempt?
   uniswapToolReceipts UniswapToolReceipt[]
   goalRunJob        GoalRunJob?
 
@@ -761,6 +765,7 @@ model Receipt {
   resultHash       String   @map("result_hash")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   x402PaymentReceipt X402PaymentReceipt?
+  x402PaymentAttempt X402PaymentAttempt?
 
   @@map("receipts")
 }
@@ -1007,6 +1012,9 @@ model X402PaymentReceipt {
   id                         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   jobId                      String       @unique @map("job_id") @db.Uuid
   deliveryReceiptId          String       @unique @map("delivery_receipt_id") @db.Uuid
+  paymentAttemptId           String?      @unique @map("payment_attempt_id") @db.Uuid
+  quoteId                    String?      @map("quote_id") @db.Uuid
+  challengeHash              String?      @map("challenge_hash")
   agentVersionId             String       @map("agent_version_id") @db.Uuid
   payerAddress               String       @map("payer_address")
   creatorRecipient           String       @map("creator_recipient")
@@ -1016,22 +1024,71 @@ model X402PaymentReceipt {
   amountAtomic               BigInt       @map("amount_atomic")
   facilitatorPayload         Json         @map("facilitator_payload")
   facilitatorPayloadHash     String       @unique @map("facilitator_payload_hash")
-  transactionHash            String       @unique @map("transaction_hash")
-  finalityBlock              BigInt       @map("finality_block")
-  finalityBlockHash          String       @map("finality_block_hash")
-  finalizedAt                DateTime     @map("finalized_at") @db.Timestamptz(6)
-  payerBalanceDeltaAtomic    BigInt       @map("payer_balance_delta_atomic")
-  creatorBalanceDeltaAtomic  BigInt       @map("creator_balance_delta_atomic")
+  settlementKind             String       @default("LEGACY_EVM") @map("settlement_kind")
+  gatewayTransactionId       String?      @unique @map("gateway_transaction_id") @db.Uuid
+  gatewaySettledAt           DateTime?    @map("gateway_settled_at") @db.Timestamptz(6)
+  transactionHash            String?      @unique @map("transaction_hash")
+  finalityBlock              BigInt?      @map("finality_block")
+  finalityBlockHash          String?      @map("finality_block_hash")
+  finalizedAt                DateTime?    @map("finalized_at") @db.Timestamptz(6)
+  payerBalanceDeltaAtomic    BigInt?      @map("payer_balance_delta_atomic")
+  creatorBalanceDeltaAtomic  BigInt?      @map("creator_balance_delta_atomic")
   requestHash                String       @unique @map("request_hash")
   releaseHash                String       @map("release_hash")
   releaseSha                 String       @map("release_sha")
   createdAt                  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   job                        Job          @relation(fields: [jobId], references: [id], onDelete: Restrict)
   deliveryReceipt            Receipt      @relation(fields: [deliveryReceiptId], references: [id], onDelete: Restrict)
+  quote                      Quote?       @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   agentVersion               AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  paymentAttempt             X402PaymentAttempt? @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
 
   @@index([agentVersionId, createdAt], map: "idx_x402_receipts_version")
   @@map("x402_payment_receipts")
+}
+
+model X402PaymentAttempt {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId                    String    @unique @map("job_id") @db.Uuid
+  quoteId                  String    @unique @map("quote_id") @db.Uuid
+  deliveryReceiptId        String    @unique @map("delivery_receipt_id") @db.Uuid
+  agentVersionId           String    @map("agent_version_id") @db.Uuid
+  jobVersion               Int       @map("job_version")
+  payerAddress             String    @map("payer_address")
+  creatorRecipient         String    @map("creator_recipient")
+  network                  String
+  chainId                  Int       @map("chain_id")
+  assetAddress             String    @map("asset_address")
+  asset                    String
+  amountAtomic             BigInt    @map("amount_atomic")
+  effectRequestHash        String    @map("effect_request_hash")
+  releaseSha               String    @map("release_sha")
+  gatewayVerifyingContract String    @map("gateway_verifying_contract")
+  expiresAt                DateTime  @map("expires_at") @db.Timestamptz(6)
+  serverNonce              String    @unique @map("server_nonce")
+  serverNonceHash          String    @unique @map("server_nonce_hash")
+  challenge                Json
+  challengeHash            String    @unique @map("challenge_hash")
+  paymentRequirements      Json?     @map("payment_requirements")
+  signedPayload            Json?     @map("signed_payload")
+  signedPayloadHash        String?   @unique @map("signed_payload_hash")
+  authorizationNonce       String?   @unique @map("authorization_nonce")
+  state                    String    @default("PREPARED")
+  errorCode                String?   @map("error_code")
+  gatewayTransactionId     String?   @unique @map("gateway_transaction_id") @db.Uuid
+  gatewaySettledAt         DateTime? @map("gateway_settled_at") @db.Timestamptz(6)
+  finalizedAt              DateTime? @map("finalized_at") @db.Timestamptz(6)
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  job                      Job       @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  quote                    Quote     @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  deliveryReceipt          Receipt   @relation(fields: [deliveryReceiptId], references: [id], onDelete: Restrict)
+  agentVersion             AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  paymentReceipt           X402PaymentReceipt?
+
+  @@index([state, updatedAt], map: "idx_x402_attempts_state_updated")
+  @@index([agentVersionId, createdAt], map: "idx_x402_attempts_version_created")
+  @@map("x402_payment_attempts")
 }
 
 model UniswapToolReceipt {

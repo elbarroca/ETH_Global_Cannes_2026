@@ -40,6 +40,7 @@ const PROTECTED_GOAL_LOOP_MIGRATION = "20260725163000_protected_goal_loop";
 const GOAL_LOOP_HARDENING_MIGRATION = "20260725173000_goal_loop_hardening";
 const AGENT_MANIFEST_V3_MCP_EVIDENCE_MIGRATION = "20260725190000_agent_manifest_v3_mcp_evidence";
 const TRI_RISK_AUGMENTED_LAYER_MIGRATION = "20260725203000_tri_risk_augmented_layer";
+const X402_LANE_PAYMENTS_MIGRATION = "20260725210000_x402_lane_payments";
 const GOAL_LOOP_PREDECESSOR_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -69,6 +70,12 @@ const PRE_HARDENING_MIGRATIONS = [
 const PRE_W7_MIGRATIONS = [
   ...PRE_HARDENING_MIGRATIONS,
   A4_PUBLICATION_HARDENING_MIGRATION,
+] as const;
+const X402_PREDECESSOR_MIGRATIONS = [
+  ...GOAL_LOOP_PREDECESSOR_MIGRATIONS,
+  GOAL_LOOP_HARDENING_MIGRATION,
+  AGENT_MANIFEST_V3_MCP_EVIDENCE_MIGRATION,
+  TRI_RISK_AUGMENTED_LAYER_MIGRATION,
 ] as const;
 const BASELINE_SQL = resolve(ROOT, "prisma/migrations", BASELINE_MIGRATION, "migration.sql");
 const SENTINEL_ID = "a1-cannes-sentinel";
@@ -854,6 +861,78 @@ async function verifyPreW7UpgradeLane(
   }
 }
 
+async function verifyPopulatedLegacyX402UpgradeLane(
+  adminUrl: string,
+  database: string,
+): Promise<void> {
+  await createDatabase(adminUrl, database);
+  const url = databaseUrl(adminUrl, database);
+  const sql = postgres(url, { max: 1, prepare: false });
+  try {
+    for (const migration of X402_PREDECESSOR_MIGRATIONS) {
+      await applyMigrationSql(sql, migration);
+      run(
+        PRISMA,
+        ["migrate", "resolve", "--applied", migration, "--schema", SCHEMA],
+        prismaEnv(url),
+      );
+    }
+    await sql`SET session_replication_role = replica`;
+    await sql`
+      INSERT INTO x402_payment_receipts (
+        id, job_id, delivery_receipt_id, agent_version_id, payer_address,
+        creator_recipient, network, chain_id, asset_address, amount_atomic,
+        facilitator_payload, facilitator_payload_hash, transaction_hash,
+        finality_block, finality_block_hash, finalized_at,
+        payer_balance_delta_atomic, creator_balance_delta_atomic,
+        request_hash, release_hash, release_sha, created_at
+      ) VALUES (
+        '10000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000002',
+        '10000000-0000-4000-8000-000000000003',
+        '10000000-0000-4000-8000-000000000004',
+        '0x1111111111111111111111111111111111111111',
+        '0x2222222222222222222222222222222222222222',
+        'base-sepolia', 84532,
+        '0x036cbd53842c5426634e7929541ec2318f3dcf7e', 1000,
+        ${sql.json({ legacy: true })}, ${"a".repeat(64)}, ${`0x${"b".repeat(64)}`},
+        1, ${`0x${"c".repeat(64)}`}, '2026-07-25T19:59:59.000Z',
+        -1000, 1000, ${"d".repeat(64)}, ${"e".repeat(64)}, ${"f".repeat(40)},
+        '2026-07-25T20:00:00.000Z'
+      )
+    `;
+    await sql`SET session_replication_role = origin`;
+    run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(url));
+    const rows = await sql<{
+      settlement_kind: string;
+      transaction_hash: string | null;
+      payment_attempt_id: string | null;
+      gateway_transaction_id: string | null;
+      migration_count: number;
+    }[]>`
+      SELECT settlement_kind, transaction_hash, payment_attempt_id::TEXT,
+        gateway_transaction_id::TEXT,
+        (SELECT count(*)::INTEGER FROM _prisma_migrations
+          WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL) AS migration_count
+      FROM x402_payment_receipts
+      WHERE id = '10000000-0000-4000-8000-000000000001'::uuid
+    `;
+    const row = rows[0];
+    if (
+      row?.settlement_kind !== "LEGACY_EVM" ||
+      row.transaction_hash !== `0x${"b".repeat(64)}` ||
+      row.payment_attempt_id !== null ||
+      row.gateway_transaction_id !== null ||
+      row.migration_count !== 19
+    ) {
+      throw new Error("populated legacy x402 receipt did not upgrade exactly");
+    }
+    console.log("Populated legacy x402 receipt preserved through Gateway schema upgrade");
+  } finally {
+    await sql.end({ timeout: 1 });
+  }
+}
+
 async function verifyDatabase(
   url: string,
   expectedUsers: number,
@@ -922,6 +1001,7 @@ async function verifyDatabase(
       lifecycle_action_nullable: string;
       uniswap_tool_receipts: string | null;
       x402_payment_receipts: string | null;
+      x402_payment_attempts: string | null;
       a6_uniswap_tool_receipt_count: string;
       a5_a6_kernel_foundation_count: string;
       a5_a6_kernel_constraint_count: string;
@@ -938,6 +1018,9 @@ async function verifyDatabase(
       tri_risk_constraint_count: string;
       tri_risk_trigger_count: string;
       tri_risk_index_count: string;
+      x402_lane_payments_count: string;
+      x402_lane_constraint_count: string;
+      x402_lane_trigger_count: string;
       manifest_v4_function_count: string;
       mcp_v4_function_count: string;
       sequence_type: string;
@@ -1263,6 +1346,7 @@ async function verifyDatabase(
         ) AS lifecycle_action_nullable,
         to_regclass('public.uniswap_tool_receipts')::text AS uniswap_tool_receipts,
         to_regclass('public.x402_payment_receipts')::text AS x402_payment_receipts,
+        to_regclass('public.x402_payment_attempts')::text AS x402_payment_attempts,
         (
           SELECT count(*)::text FROM "_prisma_migrations"
           WHERE migration_name = ${A6_UNISWAP_TOOL_RECEIPT_MIGRATION} AND finished_at IS NOT NULL
@@ -1407,6 +1491,28 @@ async function verifyDatabase(
           )
         ) AS tri_risk_index_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${X402_LANE_PAYMENTS_MIGRATION}
+            AND finished_at IS NOT NULL
+        ) AS x402_lane_payments_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'x402_attempts_state_check',
+            'x402_attempts_identity_check',
+            'x402_attempts_state_shape_check',
+            'x402_receipts_settlement_kind_check'
+          )
+        ) AS x402_lane_constraint_count,
+        (
+          SELECT count(*)::text FROM pg_trigger
+          WHERE NOT tgisinternal AND tgname IN (
+            'x402_payment_attempts_integrity',
+            'x402_payment_attempts_no_delete',
+            'x402_payment_attempts_no_truncate'
+          )
+        ) AS x402_lane_trigger_count,
+        (
           SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname = 'enforce_manifest_v2_publication'
             AND position($needle$NEW.manifest->>'schemaVersion' IN ('3', '4')$needle$ in p.prosrc) > 0
@@ -1453,9 +1559,10 @@ async function verifyDatabase(
       result.mcp_invocations !== "mcp_invocations" ||
       result.augmented_layer_policies !== "augmented_layer_policies" ||
       result.augmented_layer_policy_mutations !== "augmented_layer_policy_mutations" ||
+      result.x402_payment_attempts !== "x402_payment_attempts" ||
       result.cost_reserved_at !== "YES" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 18 ||
+      Number(result.migration_count) !== 19 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1502,6 +1609,9 @@ async function verifyDatabase(
       Number(result.tri_risk_constraint_count) !== 10 ||
       Number(result.tri_risk_trigger_count) !== 3 ||
       Number(result.tri_risk_index_count) !== 3 ||
+      Number(result.x402_lane_payments_count) !== 1 ||
+      Number(result.x402_lane_constraint_count) !== 4 ||
+      Number(result.x402_lane_trigger_count) !== 3 ||
       Number(result.manifest_v4_function_count) !== 1 ||
       Number(result.mcp_v4_function_count) !== 1 ||
       result.receipt_authority_nullable !== "NO" ||
@@ -1599,6 +1709,7 @@ async function main(): Promise<void> {
   const canonicalUpgradeDatabase = `alphadawg_a4_w6_canonical_${suffix}`;
   const noncanonicalUpgradeDatabase = `alphadawg_a4_w6_noncanonical_${suffix}`;
   const populatedGoalLoopDatabase = `alphadawg_goal_loop_populated_${suffix}`;
+  const populatedLegacyX402Database = `alphadawg_x402_legacy_${suffix}`;
   const emptyUrl = databaseUrl(adminUrl, emptyDatabase);
   const cannesUrl = databaseUrl(adminUrl, cannesDatabase);
 
@@ -1619,6 +1730,7 @@ async function main(): Promise<void> {
     await verifyDatabase(cannesUrl, 1, 43, sentinelBeforeResolution);
     await verifyInheritedRuntimeRoleBlocksHardening(adminUrl, unsafeRoleDatabase);
     await verifyPopulatedGoalLoopUpgradeLane(adminUrl, populatedGoalLoopDatabase);
+    await verifyPopulatedLegacyX402UpgradeLane(adminUrl, populatedLegacyX402Database);
     await verifyPreW7UpgradeLane(adminUrl, canonicalUpgradeDatabase, "canonical");
     await verifyPreW7UpgradeLane(adminUrl, noncanonicalUpgradeDatabase, "scale_alias");
 
@@ -1632,6 +1744,7 @@ async function main(): Promise<void> {
     await dropDatabase(adminUrl, canonicalUpgradeDatabase).catch(() => undefined);
     await dropDatabase(adminUrl, noncanonicalUpgradeDatabase).catch(() => undefined);
     await dropDatabase(adminUrl, populatedGoalLoopDatabase).catch(() => undefined);
+    await dropDatabase(adminUrl, populatedLegacyX402Database).catch(() => undefined);
     await local?.close();
   }
 }

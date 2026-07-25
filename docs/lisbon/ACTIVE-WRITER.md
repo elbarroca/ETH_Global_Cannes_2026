@@ -3,6 +3,49 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Payments Integrator /root/tri_risk_payments_w1
+task_id: TRI-RISK-X402-LANE-W1
+task_instance_id: TRI-RISK-X402-LANE-W1:W1:4933340
+generation: 1
+sprint: Add the protected TRI_RISK_V1 x402 lane payment journal
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 4933340be40e229823347ca26076102cd73166ea
+control_sha: de6abf901f510b937f94c1eea99d68343330a5ab
+token: TRI-RISK-X402-LANE-W1-4933340-20260725T203429Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T20:34:29Z
+expires_at: 2026-07-26T00:34:29Z
+allowed_paths:
+  - src/payments/x402-lane-payment.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260725210000_x402_lane_payments/**
+  - scripts/test-migrations.ts
+  - tests/payments/x402-lane-payment.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T20:34:29Z
+deadline: 2026-07-26T00:34:29Z
+expected_exit: durable challenge-first x402 attempt journal with ambiguous reconciliation and atomic economic finalization
+external_effect_authority: local files existing dependencies offline fakes disposable loopback PostgreSQL local verification and one atomic local commit only; this separately admitted TRI_RISK_V1 infrastructure does not open A4 A5 A6 live release or claim gates; no environment read network Circle Gateway RPC wallet signer funding payment deploy push managed migration spend or public claim
+completed_at: 2026-07-25T20:52:04Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - protected x402 lane payment test PASS 12 of 12 including every identity binding tamper insufficient balance definitive and ambiguous outcomes exact payload replay wrong payer network UUID twenty-way prepare and finalize concurrency and late-transaction rollback
+  - Prisma validate and generate PASS with inert loopback placeholders and typecheck PASS
+  - disposable migration replay PASS all fresh Cannes populated goal-loop populated legacy x402 and canonical/noncanonical W6 lanes across 19 migrations
+  - npm test PASS 10 of 10 and test kernel PASS 52 of 52
+  - scoped ESLint PASS scan secrets PASS and git diff check PASS
+remaining_blocks:
+  - A4_ACCEPTED frozen A5_ACCEPTED mandatory A6 tooling live sponsor push release and claims remain closed
+  - aggregate integration and production build were not rerun under the urgent C0 focused-handoff directive; inherited host Go and concurrent unrelated UI mutations remain outside this lease
+external_effects_attempted: local deterministic tests Prisma generation and disposable loopback PostgreSQL only; no environment read network Circle Gateway RPC wallet signer funding payment deploy push managed migration spend or public claim
+claim_changes: none
+verdict: PASS_FOCUSED_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token TRI-RISK-X402-LANE-W1-4933340-20260725T203429Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: C0 /root
 task_id: GITHUB-BRANCH-CLEANUP-W1
 task_instance_id: GITHUB-BRANCH-CLEANUP-W1:W1:DE6ABF
