@@ -4,6 +4,11 @@ import { runGoalLoopOnce } from "../kernel/goals";
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 const DEFAULT_MAX_BACKOFF_MS = 30_000;
 const MAX_BACKOFF_EXPONENT = 5;
+const MAX_NODE_TIMEOUT_MS = 2_147_483_647;
+const MIN_LEASE_SECONDS = 5;
+const MAX_LEASE_SECONDS = 300;
+const MIN_LIMIT = 1;
+const MAX_LIMIT = 4;
 
 export interface GoalRunnerOptions {
   leaseSeconds: number;
@@ -26,16 +31,36 @@ function errorCode(error: unknown): string {
 }
 
 export function startGoalRunner(options: GoalRunnerOptions): GoalRunner {
-  if (activeRunner) return activeRunner;
-
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const maxBackoffMs = options.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
-  if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 1) {
+  if (
+    !Number.isInteger(options.leaseSeconds) ||
+    options.leaseSeconds < MIN_LEASE_SECONDS ||
+    options.leaseSeconds > MAX_LEASE_SECONDS
+  ) {
+    throw new Error("GOAL_RUNNER_LEASE_SECONDS_INVALID");
+  }
+  if (
+    options.limit !== undefined &&
+    (!Number.isInteger(options.limit) || options.limit < MIN_LIMIT || options.limit > MAX_LIMIT)
+  ) {
+    throw new Error("GOAL_RUNNER_LIMIT_INVALID");
+  }
+  if (
+    !Number.isInteger(pollIntervalMs) ||
+    pollIntervalMs < 1 ||
+    pollIntervalMs > MAX_NODE_TIMEOUT_MS
+  ) {
     throw new Error("GOAL_RUNNER_POLL_INTERVAL_INVALID");
   }
-  if (!Number.isInteger(maxBackoffMs) || maxBackoffMs < pollIntervalMs) {
+  if (
+    !Number.isInteger(maxBackoffMs) ||
+    maxBackoffMs < pollIntervalMs ||
+    maxBackoffMs > MAX_NODE_TIMEOUT_MS
+  ) {
     throw new Error("GOAL_RUNNER_MAX_BACKOFF_INVALID");
   }
+  if (activeRunner) return activeRunner;
 
   const ownerId = randomUUID();
   let stopped = false;

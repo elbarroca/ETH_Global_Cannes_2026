@@ -29,6 +29,21 @@ export interface RuntimeHandle {
   stop: () => Promise<void>;
 }
 
+interface ProtectedRuntimeUnit {
+  configuration: string;
+  handle: RuntimeHandle;
+  shutdownFailed: boolean;
+  stopPromise: Promise<void> | null;
+}
+
+let protectedRuntime: ProtectedRuntimeUnit | null = null;
+
+function runtimeErrorCode(error: unknown, fallback: string): string {
+  return error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
+    ? error.message
+    : fallback;
+}
+
 async function bootLegacyRuntime(source: NodeJS.ProcessEnv): Promise<RuntimeHandle> {
   validateLegacyEnvironment(source);
   const [registry, specialists, bot, heartbeat, timeoutChecker, inference] = await Promise.all([
@@ -57,30 +72,90 @@ export async function bootRuntime(source: NodeJS.ProcessEnv = process.env): Prom
     return bootLegacyRuntime(source);
   }
   if (environment.enableBackgroundWorkers) throw new Error("PROTECTED_LEGACY_WORKERS_FORBIDDEN");
-  const kernelWorker = environment.enableKernelWorker && !smoke
+  const workersEnabled = environment.enableKernelWorker && !smoke;
+  const configuration = [
+    smoke ? "smoke" : "runtime",
+    workersEnabled ? "workers" : "idle",
+    environment.kernelWorkerConcurrency,
+    environment.kernelWorkerLeaseSeconds,
+  ].join(":");
+  if (protectedRuntime) {
+    if (protectedRuntime.stopPromise) throw new Error("PROTECTED_RUNTIME_STOPPING");
+    if (protectedRuntime.shutdownFailed) throw new Error("PROTECTED_RUNTIME_SHUTDOWN_FAILED");
+    if (protectedRuntime.configuration !== configuration) {
+      throw new Error("PROTECTED_RUNTIME_CONFIGURATION_CONFLICT");
+    }
+    console.log(JSON.stringify({
+      level: "info",
+      context: "runtime.boot",
+      mode: "protected",
+      reused: true,
+    }));
+    return protectedRuntime.handle;
+  }
+
+  const goalRunner = workersEnabled
+    ? startGoalRunner({ leaseSeconds: environment.kernelWorkerLeaseSeconds })
+    : null;
+  const kernelWorker = workersEnabled
     ? startKernelWorker({
         concurrency: environment.kernelWorkerConcurrency,
         leaseSeconds: environment.kernelWorkerLeaseSeconds,
       })
     : null;
-  const goalRunner = environment.enableKernelWorker && !smoke
-    ? startGoalRunner({ leaseSeconds: environment.kernelWorkerLeaseSeconds })
-    : null;
+  const unit: ProtectedRuntimeUnit = {
+    configuration,
+    shutdownFailed: false,
+    stopPromise: null,
+    handle: {
+      stop: () => {
+        if (unit.stopPromise) return unit.stopPromise;
+        const drain = (async () => {
+          await goalRunner?.stop();
+          await kernelWorker?.stop();
+        })();
+        unit.stopPromise = drain.then(
+          () => {
+            if (protectedRuntime === unit) protectedRuntime = null;
+          },
+          (error: unknown) => {
+            unit.shutdownFailed = true;
+            unit.stopPromise = null;
+            throw error;
+          },
+        );
+        return unit.stopPromise;
+      },
+    },
+  };
+  protectedRuntime = unit;
   console.log(JSON.stringify({
     level: "info",
     context: "runtime.boot",
     mode: "protected",
-    kernelWorker: environment.enableKernelWorker && !smoke,
-    goalRunner: environment.enableKernelWorker && !smoke,
+    kernelWorker: workersEnabled,
+    goalRunner: workersEnabled,
+    reused: false,
     smoke,
   }));
-  return {
-    stop: async () => {
-      const goalRunnerStopped = goalRunner?.stop();
-      kernelWorker?.stop();
-      await goalRunnerStopped;
-    },
-  };
+  return unit.handle;
+}
+
+export async function shutdownRuntime(
+  runtime: RuntimeHandle,
+  signal: "SIGINT" | "SIGTERM",
+): Promise<void> {
+  console.log(JSON.stringify({ level: "info", context: "runtime.shutdown", signal }));
+  try {
+    await runtime.stop();
+  } catch (error) {
+    console.error(JSON.stringify({
+      level: "error",
+      context: "runtime.shutdown",
+      code: runtimeErrorCode(error, "RUNTIME_SHUTDOWN_FAILED"),
+    }));
+    process.exitCode = 1;
+  }
 }
 
 const entrypoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
@@ -88,19 +163,16 @@ if (import.meta.url === entrypoint) {
   bootRuntime()
     .then((runtime) => {
       let stopping = false;
-      const shutdown = async (signal: "SIGINT" | "SIGTERM"): Promise<void> => {
+      const shutdown = (signal: "SIGINT" | "SIGTERM"): void => {
         if (stopping) return;
         stopping = true;
-        console.log(JSON.stringify({ level: "info", context: "runtime.shutdown", signal }));
-        await runtime.stop();
+        void shutdownRuntime(runtime, signal);
       };
-      process.once("SIGINT", () => void shutdown("SIGINT"));
-      process.once("SIGTERM", () => void shutdown("SIGTERM"));
+      process.once("SIGINT", () => shutdown("SIGINT"));
+      process.once("SIGTERM", () => shutdown("SIGTERM"));
     })
     .catch((error: unknown) => {
-      const code = error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
-        ? error.message
-        : "RUNTIME_BOOT_FAILED";
+      const code = runtimeErrorCode(error, "RUNTIME_BOOT_FAILED");
       console.error(JSON.stringify({ level: "error", context: "runtime.boot", code }));
       process.exitCode = 1;
     });

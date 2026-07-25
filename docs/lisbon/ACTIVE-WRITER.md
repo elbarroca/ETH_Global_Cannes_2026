@@ -3,6 +3,64 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Cycle Wirer /root/runtime_goal_runner_w1
+task_id: A5-GOAL-RUNTIME-REMEDIATION-20260725
+task_instance_id: A5-GOAL-RUNTIME-REMEDIATION-20260725:W2:C2CC89E
+generation: 2
+sprint: Repair immutable audit findings in protected whole-runtime ownership shutdown ordering and runner option bounds
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: c2cc89e340a2fbce02ab6ca4edb1989cf7504aa7
+control_sha: c2cc89e340a2fbce02ab6ca4edb1989cf7504aa7
+token: A5-GOAL-RUNTIME-W2-C2CC89E-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T16:00:06Z
+expires_at: 2026-07-25T17:30:00Z
+allowed_paths:
+  - src/agents/**
+  - src/index.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T16:00:06Z
+deadline: 2026-07-25T17:30:00Z
+expected_exit: one coherent protected runtime owner ordered goal and worker drain strict runner option bounds and redacted signal shutdown failure
+external_effect_authority: local files existing dependencies local tests loopback processes and one local commit only; no push deploy managed migration live API webhook signature transaction funding form spend release or claim
+completed_at: 2026-07-25T16:04:03Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - synchronous option probes reject invalid lease seconds limits fractional values and Node timeout overflows before runner reuse or assignment
+  - concurrent same-configuration boot reuses one protected runtime unit while conflicting and stopping boot attempts fail closed
+  - repeated stop and post-stop restart lifecycle probes PASS
+  - ordered shutdown probe confirms goal drain precedes the awaited Kernel worker drain
+  - shutdown failure probe records only RUNTIME_SHUTDOWN_FAILED sets a failing exit code and contains no rejected payload
+  - focused worker stop barrier PASS 1 of 1
+  - npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm test PASS 10 of 10
+  - npm run test:auth PASS 9 of 9
+  - npm run test:kernel PASS 35 of 35
+  - npm run test:a5 PASS 3 of 3
+  - npm run test:e2e PASS 4 of 4
+  - npm run test:redaction PASS 3 of 3
+  - npm run test:boot PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+  - npm run build PASS 35 generated pages
+recommended_kernel_regression:
+  - tests/integration/protected-runtime-lifecycle.test.ts should block an in-flight goal claim and worker tick then assert duplicate boot creates one owner pair stop waits goal then worker repeated stop is safe no post-stop mutation occurs and restart creates one fresh pair
+  - the same file should table-test lease limit poll and max-backoff boundaries plus redacted signal-stop failure without an unhandled rejection
+remaining_blocks:
+  - durable Kernel-owned integration coverage above requires a sequential C0 dispatch because tests are outside this writer scope
+  - aggregate integration inheritance remains ten missing-Go A3 hook failures
+  - immutable exact-SHA audit remains required
+  - push deploy managed migration live APIs webhooks signatures transactions funding forms spend release and claims remain unauthorized
+external_effects_attempted: none
+claim_changes: none
+verdict: PASS_TO_AUDIT
+lock_release: release only exact token A5-GOAL-RUNTIME-W2-C2CC89E-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/worker_shutdown_w1
 task_id: A5-WORKER-SHUTDOWN-BARRIER-20260725
 task_instance_id: A5-WORKER-SHUTDOWN-BARRIER-20260725:W1:AD0D965
