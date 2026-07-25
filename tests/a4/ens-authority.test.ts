@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { namehash } from "viem/ens";
+import { namehash, normalize } from "viem/ens";
 import { canonicalJson, type CanonicalValue } from "../../src/kernel/canonical";
 import { parseAgentInput } from "../../src/kernel/policy";
 import { publishAgent, submitJob } from "../../src/kernel/service";
@@ -248,6 +248,10 @@ async function seedLegacyBinding(
   agentVersionId: string,
   job: { effectId: string; jobId: string },
   now: Date,
+  names: { creatorName: string; agentName: string } = {
+    creatorName: "creator.alphadawg.eth",
+    agentName: "research.creator.alphadawg.eth",
+  },
 ): Promise<PersistedBinding> {
   const rows = await database.sql<LegacyLineageRow[]>`
     SELECT version, manifest_hash, capabilities, endpoint, adapter_key,
@@ -257,6 +261,8 @@ async function seedLegacyBinding(
   const lineage = rows[0];
   if (!lineage) throw new Error("A4_TEST_LEGACY_LINEAGE_MISSING");
   const payout = lineage.payout_address ?? lineage.owner_wallet;
+  const creatorName = normalize(names.creatorName);
+  const agentName = normalize(names.agentName);
   const binding = {
     schemaVersion: 1,
     effectId: job.effectId,
@@ -268,10 +274,10 @@ async function seedLegacyBinding(
     service: lineage.endpoint ?? lineage.adapter_key,
     payout,
     chainId: 11_155_111,
-    creatorName: "creator.alphadawg.eth",
-    creatorNode: namehash("creator.alphadawg.eth"),
-    agentName: "research.creator.alphadawg.eth",
-    agentNode: namehash("research.creator.alphadawg.eth"),
+    creatorName,
+    creatorNode: namehash(creatorName),
+    agentName,
+    agentNode: namehash(agentName),
     registry: ENS_REGISTRY,
     creatorResolver: ENS_RESOLVER,
     agentResolver: ENS_RESOLVER,
@@ -441,13 +447,17 @@ test("stable ENS authority gates the full A3 path twice and twenty duplicates se
   }
 });
 
-test("persisted pre-ENSv2 schema-1 binding bytes survive normal execution and READBACK recovery", async () => {
+test("persisted Unicode and multi-label schema-1 binding survives normal execution and READBACK recovery", async () => {
   const database = await startDisposableDatabase("a4-v1-upgrade");
   try {
     const version = await setup(database);
+    const legacyNames = {
+      creatorName: "créateur.eth",
+      agentName: "tier.research.créateur.eth",
+    } as const;
     const normal = await submit(database, version, "a4-v1-upgrade-normal");
-    const normalBinding = await seedLegacyBinding(database, version, normal, NOW);
-    const normalRun = fixture(database);
+    const normalBinding = await seedLegacyBinding(database, version, normal, NOW, legacyNames);
+    const normalRun = fixture(database, { runtime: legacyNames });
     assert.deepEqual(await runWorkerOnce({
       ownerId: "a4-v1-upgrade-normal-worker",
       concurrency: 1,
@@ -457,6 +467,8 @@ test("persisted pre-ENSv2 schema-1 binding bytes survive normal execution and RE
       now: NOW,
     }), { leaseAcquired: true, claimed: 1 });
     assert.equal(normalRun.ens.calls[0]?.binding.schemaVersion, 1);
+    assert.equal(normalRun.ens.calls[0]?.binding.creatorName, legacyNames.creatorName);
+    assert.equal(normalRun.ens.calls[0]?.binding.agentName, legacyNames.agentName);
     assert.deepEqual(await persistedBinding(database, normal.effectId), normalBinding);
     assert.deepEqual(await snapshot(database, normal.jobId), {
       authority_allows: 7,
@@ -474,7 +486,7 @@ test("persisted pre-ENSv2 schema-1 binding bytes survive normal execution and RE
 
     const crashTime = new Date(NOW.getTime() + 70_000);
     const recovered = await submit(database, version, "a4-v1-upgrade-recovery", crashTime);
-    const recoveryBinding = await seedLegacyBinding(database, version, recovered, crashTime);
+    const recoveryBinding = await seedLegacyBinding(database, version, recovered, crashTime, legacyNames);
     const firstOwner = "a4-v1-upgrade-recovery-a";
     assert.equal((await acquireWorkerLease(firstOwner, 30, {
       now: crashTime,
@@ -487,6 +499,7 @@ test("persisted pre-ENSv2 schema-1 binding bytes survive normal execution and RE
     if (!claim || claim.jobId !== recovered.jobId) throw new Error("A4_TEST_LEGACY_CLAIM_MISSING");
     const first = fixture(database, {
       now: crashTime,
+      runtime: legacyNames,
       hooks: { afterReadbackVerified: async () => { throw new A3SimulatedCrashError(); } },
     });
     await assert.rejects(first.adapter.execute(requestFromClaim(claim)), /A3_SIMULATED_CRASH/);
@@ -498,7 +511,7 @@ test("persisted pre-ENSv2 schema-1 binding bytes survive normal execution and RE
 
     const takeoverTime = new Date(crashTime.getTime() + 31_000);
     await expireClaim(database, recovered.jobId, takeoverTime);
-    const recoveryAuthority = createEnsAuthorityFixture({ now: takeoverTime });
+    const recoveryAuthority = createEnsAuthorityFixture({ now: takeoverTime, runtime: legacyNames });
     let adapterCalls = 0;
     const recoveryAdapter: KernelAdapter = {
       key: "protected-a3",
@@ -711,6 +724,10 @@ test("ENSv2 name boundary rejects reverse, unsupported, reserved, confusable, co
       {
         name: "confusable",
         runtime: { agentLabel: "rеsearch", agentName: "rеsearch.creator.alphadawg.eth" },
+      },
+      {
+        name: "unicode-creator",
+        runtime: { creatorName: "créateur.eth", agentName: "research.créateur.eth" },
       },
       {
         name: "collision",

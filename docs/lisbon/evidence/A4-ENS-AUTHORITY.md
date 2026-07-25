@@ -170,14 +170,51 @@ One HIGH compatibility defect remains. Before `091a657`, schema-v1 accepted any 
 
 The complete immutable-clone floor otherwise passed: both migration lanes; lint with zero errors and 23 inherited warnings; typecheck; foundation 9/9; auth 9/9; kernel 13/13; Go verifier; A3 12/12; A4 16/16; A5 3/3; integration 33/33 plus migrations; e2e 4/4; resilience 1/1; redaction 3/3; boot; secret scan; shell syntax; build 31/31; and loopback HTTP 200. The initial bare Prisma check failed only because `DIRECT_URL` was unset and passed with non-connecting placeholders; the initial A3 run failed only because Go was absent and passed with the checksum-pinned temporary toolchain. Temporary audit and Go files were deleted.
 
+## Schema-v1 name compatibility remediation
+
+- Task: `A4-ENSV2-SCHEMA1-COMPAT-REMEDIATION-20260725`
+- Task instance: `A4-ENSV2-SCHEMA1-COMPAT-REMEDIATION-20260725:W3:8839D26`
+- Generation: `3`
+- Start/control SHA: `8839d26b0b62824baec2211b4c8767d91e58a0a8`
+- Intermediate exit SHA: `7d9dad522d6ef820e6e4ce646edf7011f8559c3c`
+- Final exit SHA: `DERIVE_FROM_CONTAINING_COMMIT`
+- Result: `PASS_TO_AUDIT_REMEDIATION; PASS_FIXTURE; PASS_INTEGRATION; LOCAL_ONLY`
+- Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
+
+Runtime name preparation is now policy-specific. Without `runtime.ensv2`, the authority applies the exact pre-owner-layer name semantics: ENSIP-15 normalize the creator parent and complete agent descendant, reject equality, and require the normalized descendant to end in the normalized parent. It does not apply the later ASCII namespace, single-label, reserved-label, deterministic product-label, or DNS-encoding restrictions before persisted binding comparison. Binding derivation remains the exact schema-v1 canonical object and existing bytes/hash remain immutable.
+
+With `runtime.ensv2`, the existing strict path is unchanged: normalize the creator and agent label separately; require the admitted ASCII `.eth` namespace and one supported nonreserved agent label; deterministically rebuild the full name; reject confusable, collision, suffix-spoof, reverse, unsupported, Unicode, and multi-label product inputs; DNS-encode names; and require strict schema-v2 hierarchy, role-scope, resolver, CCIP, and freshness evidence with no schema-v1 fallback.
+
+The focused legacy regression pre-seeds the exact canonical schema-v1 bytes/hash for Unicode creator `créateur.eth` and multi-label descendant `tier.research.créateur.eth`. Normal execution and a simulated crash after readback followed by lease takeover both succeed with the original binding unchanged, one effect, one receipt/settlement/commission, no refund or replacement, and zero recovery-adapter calls. The schema-v2 name-refusal matrix uses the same Unicode creator class and stops before every Compute, Storage, and verifier operation. Existing all-`CONTRACT` and all-`NAME` policy refusals and every hierarchy/recovery/takeover case remain green.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| `npm run validate:env` | 0 | Offline protected defaults passed without secrets. |
+| placeholder-bound `npx prisma validate` / `npx prisma generate` | 0 | Schema valid and Prisma Client `6.19.3` generated. |
+| `npx tsx scripts/test-migrations.ts` | 0 | Empty and synthetic Cannes-shaped four-migration lanes passed; sentinel SHA-256 remained exact. |
+| `npm run lint` | 0 | Zero errors and 23 inherited warnings. |
+| `npm run typecheck` | 0 | Strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | 9/9 foundation, 9/9 authentication, and 13/13 kernel tests passed. |
+| checksum-pinned `npm run test:go` | 0 | Official temporary Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`. |
+| checksum-pinned `npm run test:a3` | 0 | 12/12 A3 tests passed. |
+| `npm run test:a4` | 0 | 16/16 focused tests passed, including Unicode/multi-label normal and recovered delivery plus strict schema-v2 refusal. |
+| `npm run test:a5` | 0 | 3/3 A5 tests passed. |
+| checksum-pinned `npm run test:integration` | 0 | 33/33 reported TypeScript tests plus both four-migration lanes passed. |
+| `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 4/4, 1/1, and 3/3 tests passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` | 0 | Protected boot, tracked secret scan, and entrypoint syntax passed. |
+| `npm run build` | 0 | Next `16.2.11` compiled, typechecked, and generated 31/31 static pages. |
+| temporary Go cleanup | 1 then 0 | The first delete met read-only module-cache files; owner-write permission was restored only inside the W3 `/tmp` tree, then the archive, toolchain, module/build caches, and verifier binary were deleted and absence verified. |
+
+Control deviation: while the exact W3 physical lease and mirrored token remained active, an unattributed external actor created and pushed `7d9dad522d6ef820e6e4ce646edf7011f8559c3c` to `origin/Eth_global_lisbon_`. Read-only comparison against `8839d26b0b62824baec2211b4c8767d91e58a0a8` proves that commit contains only `src/ens/authority.ts` and the initial W3 `ACTIVE-WRITER.md` record and exactly matches the applied production patch/mirror. No W3 or C0 command authorized that commit or push, and no repeat, amendment, replacement, or force push is authorized. The remaining local commit contains only regression/evidence/ledger closeout; independent audit must cover the full two-commit range.
+
 ## Remaining blocks
 
 - The independent pinned-SHA re-audit accepted exact unchanged remediation SHA
   `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9`; the subsequent A5 writer ledger
   records that acceptance before its start. This accepts only the stable A4
-  base. The first ENSv2 hierarchy owner layer and its local remediation are
-  `AUDIT_FIX`. Narrowed schema-v1 compatibility remediation, independent
-  exact-SHA re-audit, and the sequential Kernel draft/name/write/readback/publication gate remain required before
+  base. The first ENSv2 hierarchy owner layer and W2 remediation are
+  `AUDIT_FIX`. W3 is only `PASS_TO_AUDIT_REMEDIATION`; independent audit of
+  its exact two-commit range and the sequential Kernel draft/name/write/readback/publication gate remain required before
   current `A4_ACCEPTED` can open.
 - `PASS_LIVE` is `NOT_RUN` and `LIVE_EFFECT_BLOCKED`; no live ENS write/readback or public identifier exists.
 - Production A3 live execution remains intentionally unavailable. Rights/license/team/owner records, event-window classification, sponsor access/caps, inherited dependency findings, README claim drift, deployment, push, forms, and release audit remain unresolved.

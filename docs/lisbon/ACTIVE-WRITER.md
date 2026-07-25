@@ -14,7 +14,7 @@ start_sha: 8839d26b0b62824baec2211b4c8767d91e58a0a8
 control_sha: 8839d26b0b62824baec2211b4c8767d91e58a0a8
 token: A4-ENSV2-W3-8839D26-ADE5E26F-D7BB-4BDD-97F5-5CA014CDA0BB
 lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
-heartbeat_at: 2026-07-25T00:52:19Z
+heartbeat_at: 2026-07-25T01:08:33Z
 expires_at: 2026-07-25T04:30:00Z
 allowed_paths:
   - src/ens/authority.ts
@@ -30,7 +30,28 @@ started_at: 2026-07-25T00:52:19Z
 deadline: 2026-07-25T04:30:00Z
 expected_exit: preserve every pre-owner-layer normalized schema-v1 parent/descendant binding while retaining strict schema-v2 product-name policy and evidence
 external_effect_authority: safe local allowed files, installed-source inspection, tests, loopback/disposable databases, generated ignored output, checksum-pinned temporary Go download, and one atomic commit only
-status: active
+control_deviation:
+  - while the matching W3 physical lease remained active an unattributed external actor created and pushed 7d9dad522d6ef820e6e4ce646edf7011f8559c3c
+  - read-only comparison proves the commit contains only the W3-owned production patch and initial mirrored record and exactly matches the applied W3 changes
+  - no W3 or C0 commit or push command authorized it; origin now points to this partial W3 commit and no repeat amendment replacement or force push is authorized
+intermediate_exit_sha: 7d9dad522d6ef820e6e4ce646edf7011f8559c3c
+completed_at: 2026-07-25T01:08:33Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - schema-v1 uses exact pre-owner-layer ENSIP-15 normalized parent and descendant semantics without schema-v2-only product restrictions
+  - a pre-seeded exact Unicode parent and multi-label descendant binding passes normal and recovered delivery with unchanged bytes and hash one effect and zero replay replacement or refund
+  - schema-v2 retains every ASCII single-label reserved collision DNS hierarchy role-scope resolver CCIP freshness and no-fallback requirement and refuses the same Unicode class before A3
+  - focused A4 passes 16 of 16; A3 passes 12 of 12; combined integration passes 33 of 33 plus both four-migration lanes; the complete local floor passes
+  - official temporary Go 1.23.10 matched the pinned checksum and exact darwin/arm64 version and its archive toolchain module and build caches and verifier binary were deleted
+remaining_blocks:
+  - independent audit of exact range 8839d26b0b62824baec2211b4c8767d91e58a0a8 through the final containing commit
+  - sequential Kernel draft name write readback and publication gate
+  - every live ENS sponsor claim A5 advancement and release gate
+external_effects_attempted: one authorized checksum-pinned official Go toolchain and module download to task-specific temporary storage; no W3 ENS 0G sponsor API shared or managed database signature transaction deployment push form funding upload spend public identifier live proof or claim-promotion effect; the unattributed intermediate commit and push are recorded separately as a control deviation
+result: PASS_TO_AUDIT_REMEDIATION_LOCAL_ONLY
+clean_status: EXPECT_W3_PATHS_CLEAN_AFTER_FINAL_LOCAL_COMMIT; ORIGIN_HAS_UNATTRIBUTED_INTERMEDIATE_W3_COMMIT
+lock_release: release only matching token A4-ENSV2-W3-8839D26-ADE5E26F-D7BB-4BDD-97F5-5CA014CDA0BB after the final local commit and W3-path clean verification
+status: closed
 ```
 
 ```yaml
