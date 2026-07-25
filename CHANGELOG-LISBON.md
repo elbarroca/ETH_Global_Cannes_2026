@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W6 hardening immutable audit
+
+- Reconciled independent verdict `FIX` for exact SHA `b8da4fa76f6bbcce364dd8cc35db459cd2dd0e1d`, tree `1458a6d99e6730ea4b84eb815fe55739af2073bf`, and range `e53cd6d5d8af34298b886812df0fec025eeaa852..b8da4fa76f6bbcce364dd8cc35db459cd2dd0e1d`.
+- The audit proved database-owner policy, direct/nested/effective role denial, finite bounded release windows, UTC timestamp convergence, early evidence bounds, old-function removal, and eight-migration replay.
+- Recorded one MEDIUM: unrestricted-scale block numbers are hashed before `NUMERIC(20,0)` normalization, causing scale-alias conflicts and fractional rounding. The audit host lacked Go, so Go-dependent A3/aggregate reruns remain independently unverified; the W6 writer's checksum-pinned full-floor evidence remains recorded, not promoted.
+- Kept Kernel consumption, `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS, sponsor, push, release, and claims closed pending exact W7 normalization and re-audit.
+
 ## 2026-07-25 - W6 publication-authority audit remediation
 
 - Replaced runtime-supplied publication policy with one immutable database-owner-admitted complete policy per finite release and immutable version. Runtime now supplies only bounded resolver observations to a six-argument function; policy, release, convergence identity, and clock remain database-owned.

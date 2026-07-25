@@ -522,7 +522,17 @@ identity or privilege contract cannot be guaranteed, migration or admission
 must fail. No managed migration, release/policy admission, or live deployment is
 claimed by this fixture-only run.
 
-W6 requires a new immutable-SHA audit. Until that passes, the sequential Kernel
-owner may not consume publication decisions. `A4_ACCEPTED`, A5 acceptance,
-mandatory A6 entry, live ENS, sponsor qualification, push, release, and public
-claims remain closed.
+## W6 immutable hardening audit
+
+- Audit SHA: `b8da4fa76f6bbcce364dd8cc35db459cd2dd0e1d`
+- Tree: `1458a6d99e6730ea4b84eb815fe55739af2073bf`
+- Audited range: `e53cd6d5d8af34298b886812df0fec025eeaa852..b8da4fa76f6bbcce364dd8cc35db459cd2dd0e1d`
+- Result: `FIX; LOCAL_ONLY`
+
+The audit proved every W5 finding repaired: owner-admitted immutable policy; direct/nested/effective role denial; finite non-overlapping windows up to 24 hours; UTC timestamp convergence across session timezones; exact early bounds; old-function removal; and eight-migration replay with sentinel preservation.
+
+One MEDIUM remains. The admission function accepts unrestricted-scale `NUMERIC`, hashes its textual form, then stores into `NUMERIC(20,0)`. Exact restricted-role checks showed integer and scale-alias evidence derive different keys, while fractional evidence can round into a different admitted block. The smallest repair is to reject non-integral or out-of-range values, normalize once to `NUMERIC(20,0)`, use the same normalized text for key material and the same normalized value for insertion, and add `12345`, `12345.0`, and `12345.5` regressions.
+
+All available independent lanes passed, including both eight-migration lanes, lint/typecheck, foundation/auth/Kernel/A4/A5, standalone integration, e2e/resilience/redaction, boot, secret/shell/diff checks, build 31 pages, and HTTP 200. The audit host lacked Go, so Go-dependent A3 and aggregate integration were not independently rerun; W6 writer evidence records their checksum-pinned pass. Cleanup completed and no external effect occurred.
+
+W6 is `AUDIT_FIX`. Until W7 and immutable re-audit pass, the sequential Kernel owner may not consume a publication decision, `A4_ACCEPTED` remains closed, and A5 acceptance, mandatory A6 entry, live ENS, sponsor qualification, push, release, and public claims remain blocked.
