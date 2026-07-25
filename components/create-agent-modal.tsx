@@ -7,7 +7,6 @@ import {
   CheckIcon,
   FileTextIcon,
   ShieldCheckIcon,
-  SparkleIcon,
   SpinnerGapIcon,
 } from "@phosphor-icons/react";
 import { Dialog } from "@/components/ui/dialog";
@@ -15,13 +14,11 @@ import { CopyableIdentifier, EvidenceStatus } from "@/components/ui/evidence";
 import {
   bindAgentName,
   createAgentDraft,
-  generateAgentInstructions,
   getAgentRecommendations,
   prepareAgentEnsWrite,
   publishAgentVersion,
   type AgentLifecycleVersion,
   type AgentRecommendation,
-  type GeneratedInstructions,
 } from "@/lib/api";
 import { agentVersionToYaml } from "@/lib/manifest-yaml";
 
@@ -29,6 +26,7 @@ const CAPABILITIES = [
   { id: "market-analysis", label: "Market analysis", detail: "Analyze supplied market evidence and structure." },
   { id: "risk-analysis", label: "Risk analysis", detail: "Identify constraints, downside, and decision risk." },
   { id: "research", label: "Research", detail: "Synthesize evidence into a concise research response." },
+  { id: "uniswap-swap", label: "Uniswap proposal", detail: "Propose bounded Unichain Sepolia swaps without signing or broadcasting." },
 ] as const;
 
 const STEPS = ["Define", "Review", "Publish"] as const;
@@ -67,8 +65,6 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
   const [creatorParent, setCreatorParent] = useState("");
-  const [generated, setGenerated] = useState<GeneratedInstructions | null>(null);
-  const [instructionsEdited, setInstructionsEdited] = useState(false);
   const [selectedCapabilities, setSelectedCapabilities] = useState<Set<Capability>>(() => new Set(["research"]));
   const [recommendation, setRecommendation] = useState<AgentRecommendation | null>(null);
   const [preparedAgent, setPreparedAgent] = useState<AgentLifecycleVersion | null>(null);
@@ -86,7 +82,7 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
   const canDefine = name.trim().length >= 2 && name.trim().length <= 80
     && description.trim().length >= 10 && description.trim().length <= 800
     && instructions.trim().length >= 20 && instructions.trim().length <= 4_000
-    && capabilities.length >= 1 && capabilities.length <= 3
+    && capabilities.length >= 1 && capabilities.length <= 4
     && recommendation?.readiness === "READY";
   const canPrepare = canDefine && creatorParent.trim().length >= 3;
   const activeStep = step === "define" ? 0 : step === "review" ? 1 : 2;
@@ -110,7 +106,7 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
     setSelectedCapabilities((current) => {
       const next = new Set(current);
       if (next.has(capability)) next.delete(capability);
-      else if (next.size < 3) next.add(capability);
+      else if (next.size < 4) next.add(capability);
       return next;
     });
   }
@@ -126,27 +122,9 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
         return;
       }
       setInstructions(result.reviewedPromptDraft);
-      setGenerated(null);
-      setInstructionsEdited(false);
     } catch (error) {
       setRecommendation(null);
       setErrorMessage(error instanceof Error ? error.message : "Protected recommendations are unavailable.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function generateDraft(): Promise<void> {
-    if (name.trim().length < 2 || description.trim().length < 10) return;
-    setBusy(true);
-    setErrorMessage(null);
-    try {
-      const result = await generateAgentInstructions(name.trim(), description.trim());
-      setGenerated(result);
-      setInstructions(result.markdown);
-      setInstructionsEdited(false);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Instructions could not be generated.");
     } finally {
       setBusy(false);
     }
@@ -194,10 +172,6 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
     }
   }
 
-  const generationEvidence = generated && !instructionsEdited && generated.teeVerified && !generated.fallback
-    ? { state: "verified" as const, label: "Verified generation" }
-    : { state: "unavailable" as const, label: instructionsEdited ? "Edited draft" : generated?.fallback ? "Fallback draft" : "Reviewed draft" };
-
   return (
     <Dialog open title="Publish a protected agent" description="Draft first. Review exact server-owned fields. Publish only after explicit confirmation." onClose={onClose} dismissible={!busy} className="max-w-5xl">
       <StepRail active={activeStep} />
@@ -208,11 +182,11 @@ export function CreateAgentModal({ onClose, onCreated }: CreateAgentModalProps) 
               <div><p className="instrument-label">Step 01</p><h3 id="define-agent-title" className="mt-2 text-2xl font-semibold text-void-100">Define</h3><p className="mt-2 text-sm text-void-500">Bound the role, reviewed capabilities, and Markdown instructions.</p></div>
               <div className="space-y-1.5"><label htmlFor="agent-name" className="text-xs font-semibold text-void-300">Agent name</label><input id="agent-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="min-h-12 w-full rounded-[10px] border border-void-800 bg-black px-3 text-sm text-void-100" /><FieldCount current={name.length} maximum={80} /></div>
               <div className="space-y-1.5"><label htmlFor="agent-description" className="text-xs font-semibold text-void-300">What should this agent do?</label><textarea id="agent-description" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={800} rows={4} className="w-full resize-y rounded-[10px] border border-void-800 bg-black px-3 py-3 text-sm text-void-100" /><FieldCount current={description.length} maximum={800} /></div>
-              <fieldset className="grid gap-2 sm:grid-cols-3"><legend className="mb-2 text-xs font-semibold text-void-300">Capabilities</legend>{CAPABILITIES.map((capability) => { const selected = selectedCapabilities.has(capability.id); return <button key={capability.id} type="button" role="checkbox" aria-checked={selected} onClick={() => toggleCapability(capability.id)} className={`min-h-28 rounded-[10px] border p-3 text-left ${selected ? "border-dawg-500 bg-dawg-500/8" : "border-void-800 bg-black"}`}><span className="flex justify-between gap-2 text-sm font-semibold text-void-100">{capability.label}<CheckIcon size={15} className={selected ? "text-dawg-400" : "text-void-700"} aria-hidden /></span><span className="mt-2 block text-xs leading-relaxed text-void-500">{capability.detail}</span></button>; })}</fieldset>
+              <fieldset className="grid gap-2 sm:grid-cols-2"><legend className="mb-2 text-xs font-semibold text-void-300">Capabilities, select 1 to 4</legend>{CAPABILITIES.map((capability) => { const selected = selectedCapabilities.has(capability.id); return <button key={capability.id} type="button" role="checkbox" aria-checked={selected} onClick={() => toggleCapability(capability.id)} className={`min-h-24 rounded-[10px] border p-3 text-left ${selected ? "border-dawg-500 bg-dawg-500/8" : "border-void-800 bg-black"}`}><span className="flex justify-between gap-2 text-sm font-semibold text-void-100">{capability.label}<CheckIcon size={15} className={selected ? "text-dawg-400" : "text-void-700"} aria-hidden /></span><span className="mt-2 block text-xs leading-relaxed text-void-500">{capability.detail}</span></button>; })}</fieldset>
               <button type="button" onClick={() => void reviewCapabilities()} disabled={busy || capabilities.length === 0} className="instrument-button instrument-button-secondary">{busy ? <SpinnerGapIcon className="animate-spin" size={16} aria-hidden /> : <ShieldCheckIcon size={16} aria-hidden />} Review selected capabilities</button>
               {recommendation && <div className="rounded-xl border border-void-800 bg-void-950 p-3 text-xs text-void-400"><p><span className="font-semibold text-void-200">Deterministic server review:</span> {recommendation.readiness}</p><p className="mt-1">Pinned skills: {recommendation.pinnedSkills.map((skill) => skill.id).join(", ") || "None"}</p><p className="mt-1">Native connections: {recommendation.nativeConnections.map((connection) => connection.id).join(", ") || "None"}</p><p className="mt-1">MCP: none</p></div>}
-              <div className="flex flex-wrap items-center justify-between gap-2"><EvidenceStatus state={generationEvidence.state} label={generationEvidence.label} /><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void generateDraft()} disabled={busy} className="instrument-button instrument-button-secondary"><SparkleIcon size={16} aria-hidden /> Generate draft</button><button type="button" onClick={() => { setGenerated(null); setInstructions(""); setInstructionsEdited(false); }} className="instrument-button instrument-button-secondary"><FileTextIcon size={16} aria-hidden /> Write manually</button></div></div>
-              <div className="space-y-1.5"><label htmlFor="agent-instructions" className="text-xs font-semibold text-void-300">Markdown instructions</label><textarea id="agent-instructions" value={instructions} onChange={(event) => { setInstructions(event.target.value); setInstructionsEdited(true); }} maxLength={4_000} rows={12} className="w-full resize-y rounded-[10px] border border-void-800 bg-black px-3 py-3 font-mono text-xs text-void-200" /><FieldCount current={instructions.length} maximum={4_000} /></div>
+              <div className="flex flex-wrap items-center justify-between gap-2"><EvidenceStatus state={recommendation?.readiness === "READY" && instructions === recommendation.reviewedPromptDraft ? "verified" : "unavailable"} label={recommendation?.readiness === "READY" && instructions === recommendation.reviewedPromptDraft ? "Protected review" : "Unreviewed draft"} /><button type="button" onClick={() => setInstructions("")} className="instrument-button instrument-button-secondary"><FileTextIcon size={16} aria-hidden /> Write manually</button></div>
+              <div className="space-y-1.5"><label htmlFor="agent-instructions" className="text-xs font-semibold text-void-300">Markdown instructions</label><textarea id="agent-instructions" value={instructions} onChange={(event) => setInstructions(event.target.value)} maxLength={4_000} rows={12} className="w-full resize-y rounded-[10px] border border-void-800 bg-black px-3 py-3 font-mono text-xs text-void-200" /><FieldCount current={instructions.length} maximum={4_000} /></div>
               <div className="flex justify-end"><button type="button" onClick={() => setStep("review")} disabled={!canDefine} className="instrument-button instrument-button-primary">Review identity <ArrowRightIcon size={16} aria-hidden /></button></div>
             </section>
           )}

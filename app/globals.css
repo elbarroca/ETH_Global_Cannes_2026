@@ -10,8 +10,8 @@
   --color-void-850: #19191C;
   --color-void-800: #242429;
   --color-void-700: #383840;
-  --color-void-600: #62626E;
-  --color-void-500: #787885;
+  --color-void-600: #73737E;
+  --color-void-500: #8F8F99;
   --color-void-400: #A8A49A;
   --color-void-300: #C4C4CC;
   --color-void-200: #E2E2E6;
@@ -150,6 +150,24 @@ body {
 .instrument-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.goal-control {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 0.5rem;
+  border: 1px solid var(--color-void-700);
+  border-radius: 10px;
+  background: var(--color-void-950);
+  padding-inline: 0.75rem;
+  color: var(--color-void-100);
+  font-family: var(--font-geist), 'Geist', system-ui, sans-serif;
+  font-size: 0.875rem;
+}
+
+summary {
+  overflow-wrap: anywhere;
 }
 
 .dialog-backdrop {
