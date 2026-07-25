@@ -777,3 +777,81 @@ Three MEDIUM defects remain. Completed lifecycle actions store no immutable resu
 Green independent evidence included all five eleven-migration checks, lint/typecheck, foundation/auth/Kernel 22/22, A4/A5, integration-only, e2e/resilience/redaction, Playwright 13/13, boot, secret/shell/diff checks, build, and HTTP smoke. The audit host lacked Go, so Go-dependent A3/aggregate checks were not independently promoted; W9 writer evidence records their checksum-pinned pass. No external effect occurred.
 
 W9 is `AUDIT_FIX`. Kernel W5 must add bidirectional completed-action publication integrity, immutable result snapshots and pre-authority coordination, cancellation-independent bounded errors, and canonical pooled/direct DSN plus runtime-role verification, then pass immutable audit. `A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor, push, release, and claims remain closed.
+
+## W5 Kernel action-integrity audit remediation
+
+- Task: `A4-KERNEL-ACTION-INTEGRITY-20260725:W5:06B62A2`
+- Start/control SHA: `06b62a275650fcb8cf3e4b39fe90999dca6fd41f`
+- Migration: `20260725082000_a4_kernel_action_integrity`
+- Migration SHA-256: `0244cd31f9fc13247182677db964c1245ce24dfb9d7567cd1c1308858b5dcd7f`
+- Result: `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`
+
+W5 adds no authority evidence and backfills nothing. Its migration aborts if
+protected lifecycle actions, events, or non-null lifecycle state already exist,
+requiring explicit owner adjudication instead of guessed action history. On an
+admitted empty protected lane it adds leased attempts, explicit
+`PENDING/SUCCEEDED/DENIED/RETRYABLE` states, bounded canonical result snapshots
+and hashes, target/result version FKs, one successful action per action/version,
+and a mandatory unique action ID on every lifecycle event.
+
+Deferred constraints now prove both directions. A terminal action requires one
+exact state-compatible event whose payload carries that action and result hash;
+publication additionally requires the unique successful owner-matching
+`PUBLISH_VERSION` action, canonical payload/result hashes, exact accepted W8
+decision, exact publication event, exact version authority fields, and fresh
+database-time evidence. Protected hire repeats the action/decision/event/result
+binding, so a legacy flag or an unbound row cannot create a protected effect.
+State-only, event-only, action-only, mismatched, and commit-expired direct SQL
+transactions all roll back.
+
+Every completed action stores the immutable response it originally returned.
+Exact late create/bind/prepare/publish replays parse and return that snapshot
+rather than the later mutable version. Publication claims its durable action
+before authority work. Twenty concurrent exact success requests use one resolver
+call and one publication event; twenty exact semantic denials use one authority
+call, one refusal event, and one terminal denial snapshot. Resolver outages enter
+an explicit retryable state; an expired in-flight claim is taken over by the
+same action at the next attempt, without a duplicate decision, job, or effect.
+
+The body reader keeps the intended bounded error independent of stream cleanup:
+a rejecting `cancel()` cannot replace 413, read errors/abort-like failures and
+invalid UTF-8/JSON map to bounded 400, exactly 8,192 bytes pass, 8,193 fail, and
+the reader lock is always released. Tests prove zero lifecycle mutation at these
+boundaries. No request body, session, signature, URL, login, or secret is logged.
+
+Publication DSN validation percent-decodes and NFC-normalizes explicit PostgreSQL
+usernames before comparison with both pooled `DATABASE_URL` and `DIRECT_URL`.
+Before any publication authority use, the isolated connection attests exact
+`current_user` and `session_user`, a login/nonowner/nonprivileged role, exactly
+one direct `alphadawg_runtime` parent and no other parent, no database/schema/
+authority-table ownership, no effective authority-table or public-schema create
+privilege, and only the admitted function execute capability. Encoded aliases,
+direct-owner reuse, malformed encodings, wrong expected identity, extra parents,
+and direct table privilege fail with bounded non-secret errors; the safe runtime
+cannot insert an authority decision directly.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| `npm run validate:env` / loopback-placeholder Prisma validate/generate | 0 | Offline environment passed; schema valid; Prisma Client `6.19.3` generated. |
+| `npx tsx scripts/test-migrations.ts` | 0 | Fresh, synthetic Cannes, unsafe-role, canonical W6 exact replay, and noncanonical immutable-failure lanes passed at twelve migrations; sentinel SHA-256 remained `fb8aece1677586a330f0cfeb0850b71488849302324eb1d6a079673e35e3829e`. |
+| `npm run lint` / `npm run typecheck` | 0 | Lint has zero errors and 23 inherited warnings; strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | Foundation 10/10, authentication 9/9, and Kernel 25/25 passed. |
+| checksum-pinned `npm run test:go` / `npm run test:a3` | 0 | Official Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`; A3 passed 12/12. The first A3 attempt failed only because the host had no `go` executable; the exact pinned rerun passed. |
+| `npm run test:a4` / checksum-pinned `npm run test:integration` | 0 | A4 passed 22/22; integration passed 39/39 plus all five migration lanes. |
+| `npm run test:a5` / `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 3/3, 4/4, 1/1, and 3/3 passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` / `git diff --check` | 0 | Protected boot, tracked secret scan, shell syntax, and diff hygiene passed. |
+| `npm run build` / loopback `next start` | 0 | Next `16.2.11` generated 31/31 pages; loopback root returned HTTP 200 with a 32,236-byte body. |
+
+The temporary official Go archive matched SHA-256
+`25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`
+and reported exact `go1.23.10 darwin/arm64`. Its task-specific archive,
+toolchain/module/cache tree, verifier binary, and HTTP artifact were deleted.
+All PostgreSQL clusters were disposable loopback fixtures. No live ENS, 0G,
+Uniswap, or sponsor call; shared or managed database effect; managed migration;
+signature; transaction; push; deployment; form; funding; upload; spend; public
+identifier; live proof; or claim promotion occurred.
+
+W5 returns only `PASS_TO_AUDIT_REMEDIATION`. Independent immutable-SHA audit
+must accept the containing commit before `A4_ACCEPTED`, A5 acceptance/UI rewire,
+or mandatory A6 entry can open. Every live, sponsor, push, release, and public
+claim gate remains closed.

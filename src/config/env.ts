@@ -16,6 +16,11 @@ const OPTIONAL_HTTP_URLS = [
 
 type EnvironmentSource = Record<string, string | undefined>;
 
+export interface EnsPublicationDatabaseIdentity {
+  url: string;
+  username: string;
+}
+
 const RETIRED_A3_LIVE_SETTINGS = [
   "A3_0G_LIVE_ENABLED",
   "A3_0G_FUNDING_AUTHORIZED",
@@ -126,6 +131,31 @@ function parseUrl(
   }
 }
 
+function parsePostgresUsername(
+  key: string,
+  value: string,
+  required: boolean,
+  issues: string[],
+): string | undefined {
+  const encoded = new URL(value).username;
+  if (!encoded) {
+    if (required) issues.push(`${key}: URL must include an explicit database login`);
+    return undefined;
+  }
+  try {
+    const username = decodeURIComponent(encoded).normalize("NFC");
+    const bytes = new TextEncoder().encode(username).byteLength;
+    if (!username || bytes > 63 || /[\u0000-\u001f\u007f]/u.test(username)) {
+      issues.push(`${key}: invalid database login`);
+      return undefined;
+    }
+    return username;
+  } catch {
+    issues.push(`${key}: invalid database login encoding`);
+    return undefined;
+  }
+}
+
 export function validateEnvironment(
   source: EnvironmentSource = process.env,
   options: EnvironmentOptions = {},
@@ -157,10 +187,22 @@ export function validateEnvironment(
     false,
     issues,
   );
-  if (databaseUrl && ensPublicationDatabaseUrl) {
-    const kernel = new URL(databaseUrl);
-    const publication = new URL(ensPublicationDatabaseUrl);
-    if (kernel.username === publication.username) {
+  const databaseUsername = databaseUrl
+    ? parsePostgresUsername("DATABASE_URL", databaseUrl, false, issues)
+    : undefined;
+  const directUsername = directUrl
+    ? parsePostgresUsername("DIRECT_URL", directUrl, false, issues)
+    : undefined;
+  const publicationUsername = ensPublicationDatabaseUrl
+    ? parsePostgresUsername(
+        "ENS_PUBLICATION_DATABASE_URL",
+        ensPublicationDatabaseUrl,
+        true,
+        issues,
+      )
+    : undefined;
+  if (publicationUsername) {
+    if (publicationUsername === databaseUsername || publicationUsername === directUsername) {
       issues.push("ENS_PUBLICATION_DATABASE_URL: must use a distinct restricted database login");
     }
   }
@@ -314,6 +356,12 @@ export function requireDatabaseUrl(source: EnvironmentSource = process.env): str
 export function requireEnsPublicationDatabaseUrl(
   source: EnvironmentSource = process.env,
 ): string {
+  return requireEnsPublicationDatabaseIdentity(source).url;
+}
+
+export function requireEnsPublicationDatabaseIdentity(
+  source: EnvironmentSource = process.env,
+): EnsPublicationDatabaseIdentity {
   const issues: string[] = [];
   const publicationUrl = parseUrl(
     "ENS_PUBLICATION_DATABASE_URL",
@@ -329,15 +377,31 @@ export function requireEnsPublicationDatabaseUrl(
     false,
     issues,
   );
-  if (publicationUrl && databaseUrl) {
-    const publication = new URL(publicationUrl);
-    const kernel = new URL(databaseUrl);
-    if (publication.username === kernel.username) {
+  const directUrl = parseUrl(
+    "DIRECT_URL",
+    source.DIRECT_URL,
+    POSTGRES_PROTOCOLS,
+    false,
+    issues,
+  );
+  const publicationUsername = publicationUrl
+    ? parsePostgresUsername("ENS_PUBLICATION_DATABASE_URL", publicationUrl, true, issues)
+    : undefined;
+  const databaseUsername = databaseUrl
+    ? parsePostgresUsername("DATABASE_URL", databaseUrl, false, issues)
+    : undefined;
+  const directUsername = directUrl
+    ? parsePostgresUsername("DIRECT_URL", directUrl, false, issues)
+    : undefined;
+  if (publicationUsername) {
+    if (publicationUsername === databaseUsername || publicationUsername === directUsername) {
       issues.push("ENS_PUBLICATION_DATABASE_URL: must use a distinct restricted database login");
     }
   }
-  if (!publicationUrl || issues.length > 0) throw new EnvironmentValidationError(issues);
-  return publicationUrl;
+  if (!publicationUrl || !publicationUsername || issues.length > 0) {
+    throw new EnvironmentValidationError(issues);
+  }
+  return { url: publicationUrl, username: publicationUsername };
 }
 
 export function withPrismaPoolParameters(databaseUrl: string): string {

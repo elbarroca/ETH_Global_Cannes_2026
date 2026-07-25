@@ -3,6 +3,68 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/kernel_publication_remediation
+task_id: A4-KERNEL-ACTION-INTEGRITY-20260725
+task_instance_id: A4-KERNEL-ACTION-INTEGRITY-20260725:W5:06B62A2
+generation: 5
+sprint: A4_kernel_action_integrity_audit_remediation
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 06b62a275650fcb8cf3e4b39fe90999dca6fd41f
+control_sha: 06b62a275650fcb8cf3e4b39fe90999dca6fd41f
+token: A4-KERNEL-ACTION-W5-06B62A2-3304E6AC-E9EC-414D-B353-5B1154DC19E9
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T08:52:47Z
+expires_at: 2026-07-25T11:00:00Z
+allowed_paths:
+  - src/kernel/**
+  - app/api/kernel/**
+  - tests/kernel/**
+  - tests/foundation/** only env/DB boundary
+  - src/config/env.ts
+  - src/config/database.ts
+  - .env.example only if blank wording needed
+  - prisma/schema.prisma
+  - prisma/migrations/20260725082000_a4_kernel_action_integrity/**
+  - scripts/test-migrations.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T08:04:52Z
+deadline: 2026-07-25T11:00:00Z
+expected_exit: close the W9 action replay stream and restricted DSN audit findings without weakening publication authority
+acceptance_items:
+  - bidirectional deferred decision event state and unique completed owner-matching PUBLISH_VERSION action integrity
+  - immutable bounded canonical action result snapshots hashes late replay and explicit retryable crash recovery
+  - claim or lease action before authority so twenty identical success or denial requests share one call and event
+  - cancellation-independent bounded JSON stream errors with exact 8 KiB boundaries and no pre-auth work
+  - decoded pooled direct and runtime PostgreSQL identity privilege isolation before authority use
+  - one additive twelve-migration repair full local floor atomic commit and clean matching-token release
+external_effect_authority: safe local allowed files disposable loopback PostgreSQL and processes build output checksum-pinned temporary Go and one local commit only; no live ENS 0G Uniswap sponsor shared or managed database migration deploy push signature transaction form funding upload spend public ID claim or mainnet effect
+completed_at: 2026-07-25T08:52:47Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - W5 migration fails closed on existing protected action event or lifecycle state and adds no guessed backfill
+  - every protected lifecycle event binds one unique immutable completed action result and publication also binds the exact W8 decision state freshness and owner action
+  - late replay returns the original snapshot while twenty exact publication successes or denials share one authority call and one terminal event
+  - explicit retryable and expired claim recovery advance the same action attempt without a duplicate protected effect
+  - exact 8192 byte hostile stream and rejected cancellation cases preserve bounded 400 or 413 with zero mutation
+  - decoded normalized pooled direct usernames and runtime current session role membership ownership and privilege attestation fail closed before authority
+  - fresh Cannes unsafe role canonical W6 and noncanonical W6 lanes passed with twelve migrations and sentinel unchanged
+  - foundation 10 of 10 auth 9 of 9 Kernel 25 of 25 A3 12 of 12 A4 22 of 22 A5 3 of 3 integration 39 of 39 and the complete remaining floor passed
+  - lint zero errors with 23 inherited warnings typecheck pinned Go e2e resilience redaction boot secret shell diff build 31 pages and loopback HTTP 200 passed
+  - task-specific Go toolchain module cache verifier binary PostgreSQL and HTTP artifacts were deleted
+external_effects_attempted: official temporary Go archive and module downloads within exact local verification authority only; no product live sponsor shared or managed database signature transaction push deployment form funding upload spend public ID proof or claim effect
+verdict: PASS_TO_AUDIT_REMEDIATION
+lock_release: release only matching token A4-KERNEL-ACTION-W5-06B62A2-3304E6AC-E9EC-414D-B353-5B1154DC19E9 after containing commit and clean verification
+status: completed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-KERNEL-W4-AUDIT-RECONCILIATION-20260725
 task_instance_id: C0-KERNEL-W4-AUDIT-RECONCILIATION-20260725:551876F

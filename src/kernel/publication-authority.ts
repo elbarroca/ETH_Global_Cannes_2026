@@ -8,7 +8,7 @@ export function createProductionEnsPublicationAuthority(): EnsPublicationAuthori
   return async (request, signal) => {
     try {
       return createEnsPublicationAuthority({
-        sql: getEnsPublicationDb(),
+        sql: await getEnsPublicationDb(),
         // Direct ENSv2 production resolution stays closed until its exact
         // deployment policy and resolver are admitted server-side.
         runtime: null,

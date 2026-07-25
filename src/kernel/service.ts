@@ -510,13 +510,26 @@ export async function submitJob(
           (
             v.lifecycle_state = 'PUBLISHED' AND v.canonical_state = 'CANONICAL'
             AND v.write_plan_hash IS NOT NULL AND v.authority_record_hash IS NOT NULL
-            AND v.publication_decision_id IS NOT NULL
+            AND v.publication_decision_id IS NOT NULL AND v.publication_action_id IS NOT NULL
             AND EXISTS (
               SELECT 1
               FROM ens_publication_decisions decision
+              JOIN agent_lifecycle_actions publication_action
+                ON publication_action.id = v.publication_action_id
+               AND publication_action.action = 'PUBLISH_VERSION'
+               AND publication_action.status = 'SUCCEEDED'
+               AND publication_action.owner_user_id = a.owner_user_id
+               AND publication_action.target_agent_version_id = v.id
+               AND publication_action.agent_version_id = v.id
+               AND publication_action.result_hash IS NOT NULL
+               AND publication_action.result_snapshot->>'action' = 'PUBLISH_VERSION'
+               AND publication_action.result_snapshot->>'outcome' = 'SUCCESS'
               JOIN agent_version_events publication_event
                 ON publication_event.agent_version_id = v.id
                AND publication_event.action = 'PUBLISH_VERSION'
+               AND publication_event.lifecycle_action_id = publication_action.id
+               AND publication_event.payload->>'lifecycleActionId' = publication_action.id::text
+               AND publication_event.payload->>'resultHash' = publication_action.result_hash
                AND publication_event.payload->>'publicationDecisionId' = decision.id::text
               WHERE decision.id = v.publication_decision_id
                 AND decision.agent_version_id = v.id

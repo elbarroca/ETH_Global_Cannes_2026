@@ -27,20 +27,39 @@ export async function readBoundedKernelJson(request: Request): Promise<unknown> 
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let length = 0;
+  let failure: KernelError | null = null;
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       length += value.byteLength;
       if (length > MAX_KERNEL_JSON_BYTES) {
-        await reader.cancel();
-        throw new KernelError("KERNEL_PAYLOAD_TOO_LARGE", "Request body is too large", 413);
+        failure = new KernelError(
+          "KERNEL_PAYLOAD_TOO_LARGE",
+          "Request body is too large",
+          413,
+        );
+        break;
       }
       chunks.push(value);
     }
+  } catch {
+    failure = new KernelError("KERNEL_INVALID_REQUEST", "Request body could not be read", 400);
   } finally {
-    reader.releaseLock();
+    if (failure?.code === "KERNEL_PAYLOAD_TOO_LARGE") {
+      try {
+        await reader.cancel();
+      } catch {
+        // Cancellation is best-effort cleanup; it cannot replace the bounded 413.
+      }
+    }
+    try {
+      reader.releaseLock();
+    } catch {
+      failure ??= new KernelError("KERNEL_INVALID_REQUEST", "Request body could not be read", 400);
+    }
   }
+  if (failure) throw failure;
   const bytes = new Uint8Array(length);
   let offset = 0;
   for (const chunk of chunks) {

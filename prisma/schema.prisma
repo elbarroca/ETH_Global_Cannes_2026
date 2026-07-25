@@ -393,6 +393,7 @@ model AgentVersion {
   authorityFreshUntil DateTime? @map("authority_fresh_until") @db.Timestamptz(6)
   authorityReleaseSha String? @map("authority_release_sha")
   publicationDecisionId String? @unique @map("publication_decision_id") @db.Uuid
+  publicationActionId String? @unique @map("publication_action_id") @db.Uuid
   published      Boolean     @default(false)
   publishedAt    DateTime?   @map("published_at") @db.Timestamptz(6)
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -401,7 +402,9 @@ model AgentVersion {
   ensPublicationDecisions EnsPublicationDecision[] @relation("EnsPublicationDecisionLineage")
   publicationDecision EnsPublicationDecision? @relation("PublishedByEnsDecision", fields: [publicationDecisionId], references: [id], onDelete: Restrict)
   ensPublicationAuthorityPolicies EnsPublicationAuthorityPolicy[]
-  lifecycleActions AgentLifecycleAction[]
+  lifecycleActions AgentLifecycleAction[] @relation("ActionResultVersion")
+  targetedLifecycleActions AgentLifecycleAction[] @relation("ActionTargetVersion")
+  publicationAction AgentLifecycleAction? @relation("PublishedByLifecycleAction", fields: [publicationActionId], references: [id], onDelete: Restrict)
 
   @@unique([agentId, version], map: "uniq_agent_versions_agent_version")
   @@index([published, createdAt], map: "idx_agent_versions_published_created")
@@ -414,8 +417,10 @@ model AgentVersionEvent {
   sequence       Int
   action         String
   payload        Json         @default("{}")
+  lifecycleActionId String    @unique @map("lifecycle_action_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   agentVersion   AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  lifecycleAction AgentLifecycleAction @relation("LifecycleActionEvent", fields: [lifecycleActionId], references: [id], onDelete: Restrict)
 
   @@unique([agentVersionId, sequence], map: "uniq_agent_version_events_sequence")
   @@index([agentVersionId, createdAt], map: "idx_agent_version_events_created")
@@ -428,11 +433,23 @@ model AgentLifecycleAction {
   action           String
   idempotencyKey   String       @map("idempotency_key")
   payloadHash      String       @map("payload_hash")
+  targetAgentVersionId String?  @map("target_agent_version_id") @db.Uuid
   agentVersionId   String?      @map("agent_version_id") @db.Uuid
+  status           String       @default("PENDING")
+  attempt          Int          @default(1)
+  leaseToken       String?      @map("lease_token") @db.Uuid
+  leaseExpiresAt   DateTime?    @map("lease_expires_at") @db.Timestamptz(6)
+  resultSnapshot   Json?        @map("result_snapshot")
+  resultHash       String?      @map("result_hash")
+  errorCode        String?      @map("error_code")
   completedAt      DateTime?    @map("completed_at") @db.Timestamptz(6)
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @default(now()) @map("updated_at") @db.Timestamptz(6)
   owner            User         @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
-  agentVersion     AgentVersion? @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  targetAgentVersion AgentVersion? @relation("ActionTargetVersion", fields: [targetAgentVersionId], references: [id], onDelete: Restrict)
+  agentVersion     AgentVersion? @relation("ActionResultVersion", fields: [agentVersionId], references: [id], onDelete: Restrict)
+  publicationFor   AgentVersion? @relation("PublishedByLifecycleAction")
+  event            AgentVersionEvent? @relation("LifecycleActionEvent")
 
   @@unique([ownerUserId, action, idempotencyKey], map: "agent_lifecycle_actions_owner_action_key")
   @@index([agentVersionId, createdAt], map: "idx_agent_lifecycle_actions_version_created")

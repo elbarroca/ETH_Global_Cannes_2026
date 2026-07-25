@@ -30,6 +30,7 @@ const A4_PUBLICATION_HARDENING_MIGRATION = "20260725053000_a4_publication_author
 const A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION = "20260725062500_a4_publication_block_normalization";
 const A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION = "20260725064000_a4_publication_upgrade_preflight";
 const A4_KERNEL_PUBLICATION_INTEGRITY_MIGRATION = "20260725072000_a4_kernel_publication_integrity";
+const A4_KERNEL_ACTION_INTEGRITY_MIGRATION = "20260725082000_a4_kernel_action_integrity";
 const PRE_HARDENING_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -609,7 +610,17 @@ async function verifyPreW7UpgradeLane(
     }
 
     if (kind === "canonical") {
-      run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(url));
+      for (const migration of [
+        A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION,
+        A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION,
+      ]) {
+        await applyMigrationSql(sql, migration);
+        run(
+          PRISMA,
+          ["migrate", "resolve", "--applied", migration, "--schema", SCHEMA],
+          prismaEnv(url),
+        );
+      }
       const replay = await fixture.runtimeSql<{ decision_id: string }[]>`
         SELECT decision_id::text FROM public.admit_ens_publication_decision(
           ${fixture.versionId}::uuid,
@@ -620,6 +631,16 @@ async function verifyPreW7UpgradeLane(
           NULL
         )
       `;
+      // The remaining W9/W5 migrations must not guess action history for this
+      // synthetic W6-only fixture. After the exact W8 replay, return it to the
+      // inherited lane before testing both fail-closed action-integrity migrations.
+      await sql.unsafe("ALTER TABLE agent_versions DISABLE TRIGGER agent_versions_legal_lifecycle");
+      try {
+        await sql`UPDATE agent_versions SET lifecycle_state = NULL WHERE id = ${fixture.versionId}::uuid`;
+      } finally {
+        await sql.unsafe("ALTER TABLE agent_versions ENABLE TRIGGER agent_versions_legal_lifecycle");
+      }
+      run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(url));
       const after = await publicationUpgradeState(sql);
       if (
         replay[0]?.decision_id !== fixture.decisionId || after.decisions !== 1 ||
@@ -716,6 +737,7 @@ async function verifyDatabase(
       a4_publication_block_normalization_count: string;
       a4_publication_upgrade_preflight_count: string;
       a4_kernel_publication_integrity_count: string;
+      a4_kernel_action_integrity_count: string;
       invariant_trigger_count: string;
       a4_constraint_count: string;
       a4_publication_constraint_count: string;
@@ -731,7 +753,9 @@ async function verifyDatabase(
       a5_constraint_count: string;
       a4_kernel_publication_constraint_count: string;
       a4_kernel_publication_function_count: string;
+      a4_kernel_action_index_count: string;
       receipt_authority_nullable: string;
+      lifecycle_action_nullable: string;
       sequence_type: string;
       sequence_start: string;
       sequence_min: string;
@@ -810,6 +834,11 @@ async function verifyDatabase(
             AND finished_at IS NOT NULL
         ) AS a4_kernel_publication_integrity_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A4_KERNEL_ACTION_INTEGRITY_MIGRATION}
+            AND finished_at IS NOT NULL
+        ) AS a4_kernel_action_integrity_count,
+        (
           SELECT count(*)::text FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN (
             'agent_versions_immutable_published',
@@ -833,7 +862,10 @@ async function verifyDatabase(
             'agent_lifecycle_actions_integrity',
             'agent_lifecycle_actions_no_truncate',
             'agent_versions_publication_integrity',
-            'agent_version_events_publication_integrity'
+            'agent_version_events_publication_integrity',
+            'agent_lifecycle_actions_event_integrity',
+            'agent_version_events_action_integrity',
+            'agent_versions_action_integrity'
           )
         ) AS invariant_trigger_count,
         (
@@ -984,22 +1016,47 @@ async function verifyDatabase(
             'agent_lifecycle_actions_action_check',
             'agent_lifecycle_actions_key_check',
             'agent_lifecycle_actions_hash_check',
-            'agent_lifecycle_actions_completion_check',
-            'agent_lifecycle_actions_owner_action_key'
+            'agent_lifecycle_actions_owner_action_key',
+            'agent_lifecycle_actions_target_version_fkey',
+            'agent_lifecycle_actions_status_check',
+            'agent_lifecycle_actions_attempt_check',
+            'agent_lifecycle_actions_result_hash_check',
+            'agent_lifecycle_actions_error_code_check',
+            'agent_lifecycle_actions_target_check',
+            'agent_lifecycle_actions_state_check',
+            'agent_versions_publication_action_fkey',
+            'agent_versions_publication_action_state_check',
+            'agent_version_events_lifecycle_action_fkey'
           )
         ) AS a4_kernel_publication_constraint_count,
         (
           SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname IN (
             'enforce_agent_lifecycle_action',
+            'enforce_agent_action_event_integrity',
+            'canonical_kernel_json',
+            'kernel_lifecycle_hash',
             'enforce_agent_publication_integrity'
           )
         ) AS a4_kernel_publication_function_count,
+        (
+          SELECT count(*)::text FROM pg_indexes
+          WHERE schemaname = 'public' AND indexname IN (
+            'agent_versions_publication_action_key',
+            'agent_lifecycle_actions_success_version_key',
+            'agent_version_events_lifecycle_action_key'
+          ) AND indexdef LIKE 'CREATE UNIQUE INDEX%'
+        ) AS a4_kernel_action_index_count,
         (
           SELECT is_nullable FROM information_schema.columns
           WHERE table_schema = 'public' AND table_name = 'receipts'
             AND column_name = 'authority_check_id'
         ) AS receipt_authority_nullable,
+        (
+          SELECT is_nullable FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'agent_version_events'
+            AND column_name = 'lifecycle_action_id'
+        ) AS lifecycle_action_nullable,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
         seq.min_value::text AS sequence_min,
@@ -1028,7 +1085,7 @@ async function verifyDatabase(
       result.agent_version_events !== "agent_version_events" ||
       result.agent_lifecycle_actions !== "agent_lifecycle_actions" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 11 ||
+      Number(result.migration_count) !== 12 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1040,7 +1097,8 @@ async function verifyDatabase(
       Number(result.a4_publication_block_normalization_count) !== 1 ||
       Number(result.a4_publication_upgrade_preflight_count) !== 1 ||
       Number(result.a4_kernel_publication_integrity_count) !== 1 ||
-      Number(result.invariant_trigger_count) !== 22 ||
+      Number(result.a4_kernel_action_integrity_count) !== 1 ||
+      Number(result.invariant_trigger_count) !== 25 ||
       Number(result.a4_constraint_count) !== 14 ||
       Number(result.a4_publication_constraint_count) !== 7 ||
       Number(result.a4_publication_authority_constraint_count) !== 3 ||
@@ -1053,9 +1111,11 @@ async function verifyDatabase(
       Number(result.a4_publication_upgrade_marker_count) !== 1 ||
       Number(result.a4_publication_old_function_count) !== 0 ||
       Number(result.a5_constraint_count) !== 11 ||
-      Number(result.a4_kernel_publication_constraint_count) !== 10 ||
-      Number(result.a4_kernel_publication_function_count) !== 2 ||
+      Number(result.a4_kernel_publication_constraint_count) !== 19 ||
+      Number(result.a4_kernel_publication_function_count) !== 5 ||
+      Number(result.a4_kernel_action_index_count) !== 3 ||
       result.receipt_authority_nullable !== "NO" ||
+      result.lifecycle_action_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||
       result.sequence_start !== "1" ||
       result.sequence_min !== "1" ||

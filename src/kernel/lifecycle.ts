@@ -1,6 +1,7 @@
 import { getDb } from "../config/database";
 import type { EnsPublicationAuthority } from "../ens/authority";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { domainHash, type CanonicalValue } from "./canonical";
 import { KernelError } from "./errors";
 import type { DatabaseClient } from "./service";
@@ -50,15 +51,41 @@ interface LockedLifecycleRow extends LifecycleRow {
 }
 
 const PUBLICATION_AUTHORITY_TIMEOUT_MS = 5_000;
+const LIFECYCLE_ACTION_LEASE_SECONDS = 10;
+const LIFECYCLE_ACTION_RETRY_DELAY_MS = 100;
+const PUBLICATION_ACTION_WAIT_MS = 6_000;
+const PUBLICATION_ACTION_POLL_MS = 20;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{8,128}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const HASH = /^[0-9a-f]{64}$/;
+const WALLET = /^0x[0-9a-f]{40}$/;
+const ATOMIC = /^(0|[1-9][0-9]{0,77})$/;
 
 type LifecycleAction = "CREATE_DRAFT" | "BIND_NAME" | "PREPARE_ENS_WRITE" | "PUBLISH_VERSION";
 
+type LifecycleActionStatus = "PENDING" | "SUCCEEDED" | "DENIED" | "RETRYABLE";
+
 interface LifecycleActionRow {
+  id: string;
   payload_hash: string;
+  target_agent_version_id: string | null;
   agent_version_id: string | null;
+  status: LifecycleActionStatus;
+  attempt: number;
+  lease_token: string | null;
+  lease_expires_at: Date | null;
+  result_snapshot: unknown;
+  result_hash: string | null;
+  error_code: string | null;
   completed_at: Date | null;
+  claimable: boolean;
 }
+
+type LifecycleActionClaim =
+  | { kind: "EXECUTE"; actionId: string; attempt: number; leaseToken: string }
+  | { kind: "WAIT" }
+  | { kind: "RETRYABLE"; errorCode: string }
+  | { kind: "TERMINAL"; row: LifecycleActionRow };
 
 interface LifecycleMutationOptions {
   idempotencyKey?: string;
@@ -88,22 +115,172 @@ function lifecyclePayloadHash(
   return domainHash("agent-lifecycle-action", { action, ownerUserId, payload });
 }
 
+function object(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+function nullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+const LIFECYCLE_VERSION_KEYS = [
+  "agentId", "versionId", "version", "name", "description", "capabilities",
+  "manifestHash", "promptHash", "configHash", "adapterKey", "ownerWallet",
+  "priceAtomic", "asset", "proofPolicy", "lifecycleState", "hireable",
+  "ownedByViewer", "creatorParent", "agentLabel", "fullSubname", "writePlanHash",
+  "canonicalState", "authorityOwner", "authorityDelegate", "authorityPolicyVersion",
+  "refusalReason", "authorityReleaseSha", "publicationDecisionId", "publishedAt",
+] as const;
+
+function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
+  const row = object(value);
+  if (
+    !row || !exactKeys(row, LIFECYCLE_VERSION_KEYS) ||
+    typeof row.agentId !== "string" || !UUID.test(row.agentId) ||
+    typeof row.versionId !== "string" || !UUID.test(row.versionId) ||
+    !Number.isInteger(row.version) || (row.version as number) < 1 ||
+    typeof row.name !== "string" || typeof row.description !== "string" ||
+    !Array.isArray(row.capabilities) || !row.capabilities.every((entry) => typeof entry === "string") ||
+    typeof row.manifestHash !== "string" || !HASH.test(row.manifestHash) ||
+    typeof row.promptHash !== "string" || !HASH.test(row.promptHash) ||
+    typeof row.configHash !== "string" || !HASH.test(row.configHash) ||
+    row.adapterKey !== "protected-a3" ||
+    typeof row.ownerWallet !== "string" || !WALLET.test(row.ownerWallet) ||
+    typeof row.priceAtomic !== "string" || !ATOMIC.test(row.priceAtomic) ||
+    row.asset !== "USDC_ATOMIC" || row.proofPolicy !== "verified-receipt-required" ||
+    !["DRAFT", "NAME_BOUND", "WRITE_PREPARED", "PUBLISHED"].includes(String(row.lifecycleState)) ||
+    typeof row.hireable !== "boolean" || row.ownedByViewer !== true ||
+    !nullableString(row.creatorParent) || !nullableString(row.agentLabel) ||
+    !nullableString(row.fullSubname) || !nullableString(row.writePlanHash) ||
+    !["UNVERIFIED", "CANONICAL", "REFUSED"].includes(String(row.canonicalState)) ||
+    !nullableString(row.authorityOwner) || !nullableString(row.authorityDelegate) ||
+    !nullableString(row.authorityPolicyVersion) || !nullableString(row.refusalReason) ||
+    !nullableString(row.authorityReleaseSha) || !nullableString(row.publicationDecisionId) ||
+    !nullableString(row.publishedAt)
+  ) {
+    throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+  }
+  return row as unknown as AgentLifecycleVersion;
+}
+
+function parseWritePlanSnapshot(value: unknown): AgentEnsWritePlan {
+  const row = object(value);
+  if (
+    !row || !exactKeys(row, [
+      "schemaVersion", "kind", "agentVersionId", "manifestHash", "creatorParent",
+      "agentLabel", "fullSubname", "creatorDnsName", "agentDnsName", "operations",
+      "requiresAuthorization", "requiresWalletSignature",
+    ]) || row.schemaVersion !== 1 || row.kind !== "LOCAL_ONLY_UNAUTHORIZED" ||
+    typeof row.agentVersionId !== "string" || !UUID.test(row.agentVersionId) ||
+    typeof row.manifestHash !== "string" || !HASH.test(row.manifestHash) ||
+    typeof row.creatorParent !== "string" || typeof row.agentLabel !== "string" ||
+    typeof row.fullSubname !== "string" || typeof row.creatorDnsName !== "string" ||
+    typeof row.agentDnsName !== "string" || !Array.isArray(row.operations) ||
+    row.operations.length !== 2 || row.operations[0] !== "CREATE_OR_UPDATE_SUBNAME" ||
+    row.operations[1] !== "SET_IMMUTABLE_MANIFEST_BINDING" ||
+    row.requiresAuthorization !== true || row.requiresWalletSignature !== true
+  ) {
+    throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+  }
+  return row as unknown as AgentEnsWritePlan;
+}
+
+function successSnapshot(action: LifecycleAction, value: CanonicalValue): CanonicalValue {
+  return { schemaVersion: 1, action, outcome: "SUCCESS", value };
+}
+
+function denialSnapshot(
+  reasonCode: string,
+  code: "KERNEL_ENS_AUTHORITY_REQUIRED" | "KERNEL_ENS_AUTHORITY_DENIED",
+  message: string,
+): CanonicalValue {
+  return {
+    schemaVersion: 1,
+    action: "PUBLISH_VERSION",
+    outcome: "DENIED",
+    error: { code, message, reasonCode, status: 409 },
+  };
+}
+
+function storedResult(row: LifecycleActionRow, action: LifecycleAction): unknown {
+  const snapshot = object(row.result_snapshot);
+  if (
+    !snapshot || row.result_hash === null || !HASH.test(row.result_hash) ||
+    domainHash("agent-lifecycle-result", snapshot as CanonicalValue) !== row.result_hash ||
+    snapshot.schemaVersion !== 1 || snapshot.action !== action ||
+    (row.status !== "SUCCEEDED" && row.status !== "DENIED")
+  ) {
+    throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+  }
+  if (
+    row.status === "SUCCEEDED" && snapshot.outcome === "SUCCESS" &&
+    exactKeys(snapshot, ["action", "outcome", "schemaVersion", "value"])
+  ) {
+    return snapshot.value;
+  }
+  if (
+    row.status === "DENIED" && snapshot.outcome === "DENIED" &&
+    exactKeys(snapshot, ["action", "error", "outcome", "schemaVersion"])
+  ) {
+    const error = object(snapshot.error);
+    if (
+      !error || !exactKeys(error, ["code", "message", "reasonCode", "status"]) ||
+      (error.code !== "KERNEL_ENS_AUTHORITY_REQUIRED" &&
+        error.code !== "KERNEL_ENS_AUTHORITY_DENIED") ||
+      typeof error.message !== "string" || error.message.length > 160 ||
+      error.status !== 409 || typeof error.reasonCode !== "string" ||
+      !/^[A-Z][A-Z0-9_]{2,64}$/.test(error.reasonCode) ||
+      error.reasonCode !== row.error_code
+    ) {
+      throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+    }
+    throw new KernelError(
+      error.code as "KERNEL_ENS_AUTHORITY_REQUIRED" | "KERNEL_ENS_AUTHORITY_DENIED",
+      error.message,
+      error.status,
+    );
+  }
+  throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+}
+
 async function claimLifecycleAction(
   tx: DatabaseClient,
   ownerUserId: string,
   action: LifecycleAction,
   idempotencyKey: string,
   payloadHash: string,
-  now: Date,
-): Promise<string | null> {
-  await tx`
+  targetVersionId: string | null,
+): Promise<LifecycleActionClaim> {
+  const leaseToken = randomUUID();
+  const inserted = await tx<{ id: string; attempt: number }[]>`
     INSERT INTO agent_lifecycle_actions (
-      owner_user_id, action, idempotency_key, payload_hash, created_at
-    ) VALUES (${ownerUserId}, ${action}, ${idempotencyKey}, ${payloadHash}, ${now})
+      owner_user_id, action, idempotency_key, payload_hash, target_agent_version_id,
+      status, attempt, lease_token, lease_expires_at, created_at, updated_at
+    ) VALUES (
+      ${ownerUserId}, ${action}, ${idempotencyKey}, ${payloadHash},
+      ${targetVersionId}::uuid, 'PENDING', 1, ${leaseToken}::uuid,
+      clock_timestamp() + make_interval(secs => ${LIFECYCLE_ACTION_LEASE_SECONDS}),
+      clock_timestamp(), clock_timestamp()
+    )
     ON CONFLICT (owner_user_id, action, idempotency_key) DO NOTHING
+    RETURNING id::text, attempt
   `;
+  if (inserted[0]) {
+    return { kind: "EXECUTE", actionId: inserted[0].id, attempt: inserted[0].attempt, leaseToken };
+  }
   const rows = await tx<LifecycleActionRow[]>`
-    SELECT payload_hash, agent_version_id, completed_at
+    SELECT id::text, payload_hash, target_agent_version_id::text,
+      agent_version_id::text, status, attempt, lease_token::text, lease_expires_at,
+      result_snapshot, result_hash, error_code, completed_at,
+      lease_expires_at <= clock_timestamp() AS claimable
     FROM agent_lifecycle_actions
     WHERE owner_user_id = ${ownerUserId} AND action = ${action}
       AND idempotency_key = ${idempotencyKey}
@@ -111,60 +288,104 @@ async function claimLifecycleAction(
   `;
   const row = rows[0];
   if (!row) throw new Error("KERNEL_LIFECYCLE_ACTION_CLAIM_FAILED");
-  if (row.payload_hash !== payloadHash) {
+  if (row.payload_hash !== payloadHash || row.target_agent_version_id !== targetVersionId) {
     throw new KernelError(
       "KERNEL_IDEMPOTENCY_MISMATCH",
       "Idempotency key was already used for different input",
       409,
     );
   }
-  if ((row.agent_version_id === null) !== (row.completed_at === null)) {
-    throw new Error("KERNEL_LIFECYCLE_ACTION_INVARIANT");
+  if (row.status === "SUCCEEDED" || row.status === "DENIED") {
+    return { kind: "TERMINAL", row };
   }
-  return row.agent_version_id;
-}
-
-async function completedLifecycleAction(
-  sql: DatabaseClient,
-  ownerUserId: string,
-  action: LifecycleAction,
-  idempotencyKey: string,
-  payloadHash: string,
-): Promise<string | null> {
-  const rows = await sql<LifecycleActionRow[]>`
-    SELECT payload_hash, agent_version_id, completed_at
-    FROM agent_lifecycle_actions
-    WHERE owner_user_id = ${ownerUserId} AND action = ${action}
-      AND idempotency_key = ${idempotencyKey}
-  `;
-  const row = rows[0];
-  if (!row) return null;
-  if (row.payload_hash !== payloadHash) {
-    throw new KernelError(
-      "KERNEL_IDEMPOTENCY_MISMATCH",
-      "Idempotency key was already used for different input",
-      409,
-    );
+  if (row.claimable) {
+    const claimed = await tx<{ id: string; attempt: number }[]>`
+      UPDATE agent_lifecycle_actions
+      SET status = 'PENDING', attempt = attempt + 1,
+          lease_token = ${leaseToken}::uuid,
+          lease_expires_at = clock_timestamp() + make_interval(
+            secs => ${LIFECYCLE_ACTION_LEASE_SECONDS}
+          ),
+          error_code = NULL, updated_at = clock_timestamp()
+      WHERE id = ${row.id}::uuid AND status IN ('PENDING', 'RETRYABLE')
+        AND lease_expires_at <= clock_timestamp()
+      RETURNING id::text, attempt
+    `;
+    if (claimed[0]) {
+      return { kind: "EXECUTE", actionId: claimed[0].id, attempt: claimed[0].attempt, leaseToken };
+    }
   }
-  return row.completed_at ? row.agent_version_id : null;
+  if (row.status === "RETRYABLE") {
+    return { kind: "RETRYABLE", errorCode: row.error_code ?? "ENS_AUTHORITY_RESOLVER_OUTAGE" };
+  }
+  return { kind: "WAIT" };
 }
 
 async function completeLifecycleAction(
   tx: DatabaseClient,
-  ownerUserId: string,
-  action: LifecycleAction,
-  idempotencyKey: string,
+  claim: Extract<LifecycleActionClaim, { kind: "EXECUTE" }>,
   versionId: string,
-): Promise<void> {
+  snapshot: CanonicalValue,
+  outcome: "SUCCEEDED" | "DENIED" = "SUCCEEDED",
+  errorCode: string | null = null,
+): Promise<string> {
+  const resultHash = domainHash("agent-lifecycle-result", snapshot);
   const rows = await tx<{ id: string }[]>`
     UPDATE agent_lifecycle_actions
-    SET agent_version_id = ${versionId}::uuid, completed_at = clock_timestamp()
-    WHERE owner_user_id = ${ownerUserId} AND action = ${action}
-      AND idempotency_key = ${idempotencyKey}
-      AND agent_version_id IS NULL AND completed_at IS NULL
+    SET status = ${outcome}, agent_version_id = ${versionId}::uuid,
+        lease_token = NULL, lease_expires_at = NULL,
+        result_snapshot = ${tx.json(snapshot)}, result_hash = ${resultHash},
+        error_code = ${errorCode}, completed_at = clock_timestamp(),
+        updated_at = clock_timestamp()
+    WHERE id = ${claim.actionId}::uuid AND status = 'PENDING'
+      AND attempt = ${claim.attempt} AND lease_token = ${claim.leaseToken}::uuid
+      AND lease_expires_at > clock_timestamp()
     RETURNING id::text
   `;
   if (!rows[0]) throw new Error("KERNEL_LIFECYCLE_ACTION_COMPLETE_FAILED");
+  return resultHash;
+}
+
+async function markLifecycleActionRetryable(
+  sql: DatabaseClient,
+  claim: Extract<LifecycleActionClaim, { kind: "EXECUTE" }>,
+  errorCode: string,
+): Promise<void> {
+  await sql`
+    UPDATE agent_lifecycle_actions
+    SET status = 'RETRYABLE', lease_token = NULL,
+        lease_expires_at = clock_timestamp() + make_interval(
+          secs => ${LIFECYCLE_ACTION_RETRY_DELAY_MS / 1_000}
+        ),
+        error_code = ${errorCode}, updated_at = clock_timestamp()
+    WHERE id = ${claim.actionId}::uuid AND status = 'PENDING'
+      AND attempt = ${claim.attempt} AND lease_token = ${claim.leaseToken}::uuid
+  `;
+}
+
+async function publicationActionClaim(
+  sql: DatabaseClient,
+  ownerUserId: string,
+  versionId: string,
+  idempotencyKey: string,
+  payloadHash: string,
+): Promise<LifecycleActionClaim> {
+  const deadline = Date.now() + PUBLICATION_ACTION_WAIT_MS;
+  while (true) {
+    const claim = await sql.begin(async (transaction) => claimLifecycleAction(
+      transaction as unknown as DatabaseClient,
+      ownerUserId,
+      "PUBLISH_VERSION",
+      idempotencyKey,
+      payloadHash,
+      versionId,
+    )) as LifecycleActionClaim;
+    if (claim.kind !== "WAIT") return claim;
+    if (Date.now() >= deadline) {
+      throw new KernelError("KERNEL_CONFLICT", "Publication attempt is already in progress", 409);
+    }
+    await delay(PUBLICATION_ACTION_POLL_MS);
+  }
 }
 
 function manifestHashes(manifest: AgentManifest): {
@@ -277,16 +498,36 @@ async function loadLifecycle(
   return row;
 }
 
+async function assertLifecycleOwner(
+  sql: DatabaseClient,
+  versionId: string,
+  ownerUserId: string,
+): Promise<void> {
+  const rows = await sql<{ present: number }[]>`
+    SELECT 1::int AS present
+    FROM agent_versions version
+    JOIN kernel_agents agent ON agent.id = version.agent_id
+    WHERE version.id = ${versionId}::uuid
+      AND agent.owner_user_id = ${ownerUserId}
+      AND version.lifecycle_state IS NOT NULL
+  `;
+  if (!rows[0]) throw new KernelError("KERNEL_NOT_FOUND", "Agent version not found", 404);
+}
+
 async function appendLifecycleEvent(
   tx: DatabaseClient,
   versionId: string,
   action: string,
   payload: CanonicalValue,
   now: Date,
+  lifecycleActionId: string,
 ): Promise<void> {
   await tx`
-    INSERT INTO agent_version_events (agent_version_id, sequence, action, payload, created_at)
-    SELECT ${versionId}::uuid, COALESCE(max(sequence), -1) + 1, ${action}, ${tx.json(payload)}, ${now}
+    INSERT INTO agent_version_events (
+      agent_version_id, sequence, action, payload, lifecycle_action_id, created_at
+    )
+    SELECT ${versionId}::uuid, COALESCE(max(sequence), -1) + 1, ${action},
+      ${tx.json(payload)}, ${lifecycleActionId}::uuid, ${now}
     FROM agent_version_events
     WHERE agent_version_id = ${versionId}::uuid
   `;
@@ -307,18 +548,20 @@ export async function createAgentDraft(
   const hashes = manifestHashes(manifest);
   return sql.begin(async (transaction) => {
     const tx = transaction as unknown as DatabaseClient;
-    const replayVersionId = await claimLifecycleAction(
+    const claim = await claimLifecycleAction(
       tx,
       owner.userId,
       "CREATE_DRAFT",
       idempotencyKey,
       payloadHash,
-      now,
+      null,
     );
-    if (replayVersionId) return mapLifecycle(
-      await loadLifecycle(tx, replayVersionId, owner.userId),
-      owner.userId,
-    );
+    if (claim.kind === "TERMINAL") {
+      return parseLifecycleVersionSnapshot(storedResult(claim.row, "CREATE_DRAFT"));
+    }
+    if (claim.kind !== "EXECUTE") {
+      throw new KernelError("KERNEL_CONFLICT", "Lifecycle action is already in progress", 409);
+    }
     let agentId = options.agentId ?? null;
     let version = 1;
     if (agentId) {
@@ -372,18 +615,22 @@ export async function createAgentDraft(
     `;
     const created = versions[0];
     if (!created) throw new Error("KERNEL_AGENT_VERSION_CREATE_FAILED");
+    const result = mapLifecycle(created, owner.userId);
+    const snapshot = successSnapshot("CREATE_DRAFT", result as unknown as CanonicalValue);
+    const resultHash = domainHash("agent-lifecycle-result", snapshot);
     await appendLifecycleEvent(tx, created.version_id, "CREATE_DRAFT", {
+      lifecycleActionId: claim.actionId,
       manifestHash: created.manifest_hash,
+      resultHash,
       version: created.version,
-    }, now);
+    }, now, claim.actionId);
     await completeLifecycleAction(
       tx,
-      owner.userId,
-      "CREATE_DRAFT",
-      idempotencyKey,
+      claim,
       created.version_id,
+      snapshot,
     );
-    return mapLifecycle(created, owner.userId);
+    return result;
   });
 }
 
@@ -397,20 +644,23 @@ export async function bindAgentName(
   const now = options.now ?? new Date();
   const idempotencyKey = lifecycleIdempotencyKey(options);
   const payloadHash = lifecyclePayloadHash(ownerUserId, "BIND_NAME", { binding, versionId });
+  await assertLifecycleOwner(sql, versionId, ownerUserId);
   return sql.begin(async (transaction) => {
     const tx = transaction as unknown as DatabaseClient;
-    const replayVersionId = await claimLifecycleAction(
+    const claim = await claimLifecycleAction(
       tx,
       ownerUserId,
       "BIND_NAME",
       idempotencyKey,
       payloadHash,
-      now,
+      versionId,
     );
-    if (replayVersionId) return mapLifecycle(
-      await loadLifecycle(tx, replayVersionId, ownerUserId),
-      ownerUserId,
-    );
+    if (claim.kind === "TERMINAL") {
+      return parseLifecycleVersionSnapshot(storedResult(claim.row, "BIND_NAME"));
+    }
+    if (claim.kind !== "EXECUTE") {
+      throw new KernelError("KERNEL_CONFLICT", "Lifecycle action is already in progress", 409);
+    }
     const current = await loadLifecycle(tx, versionId, ownerUserId, true);
     if (current.lifecycle_state !== "DRAFT") {
       throw new KernelError("KERNEL_IMMUTABLE_VERSION", "Create a new draft version to change this binding", 409);
@@ -440,20 +690,24 @@ export async function bindAgentName(
     `;
     const updated = rows[0];
     if (!updated) throw new Error("KERNEL_AGENT_BIND_FAILED");
+    const result = mapLifecycle(updated, ownerUserId);
+    const snapshot = successSnapshot("BIND_NAME", result as unknown as CanonicalValue);
+    const resultHash = domainHash("agent-lifecycle-result", snapshot);
     await appendLifecycleEvent(tx, versionId, "BIND_NAME", {
       creatorParent: binding.creatorParent,
       agentLabel: binding.agentLabel,
       fullSubname: binding.fullSubname,
+      lifecycleActionId: claim.actionId,
       manifestHash: hashes.manifestHash,
-    }, now);
+      resultHash,
+    }, now, claim.actionId);
     await completeLifecycleAction(
       tx,
-      ownerUserId,
-      "BIND_NAME",
-      idempotencyKey,
+      claim,
       versionId,
+      snapshot,
     );
-    return mapLifecycle(updated, ownerUserId);
+    return result;
   });
 }
 
@@ -466,25 +720,34 @@ export async function prepareAgentEnsWrite(
   const now = options.now ?? new Date();
   const idempotencyKey = lifecycleIdempotencyKey(options);
   const payloadHash = lifecyclePayloadHash(ownerUserId, "PREPARE_ENS_WRITE", { versionId });
+  await assertLifecycleOwner(sql, versionId, ownerUserId);
   return sql.begin(async (transaction) => {
     const tx = transaction as unknown as DatabaseClient;
-    const replayVersionId = await claimLifecycleAction(
+    const claim = await claimLifecycleAction(
       tx,
       ownerUserId,
       "PREPARE_ENS_WRITE",
       idempotencyKey,
       payloadHash,
-      now,
+      versionId,
     );
-    if (replayVersionId && replayVersionId !== versionId) {
-      throw new Error("KERNEL_LIFECYCLE_ACTION_VERSION_MISMATCH");
+    if (claim.kind === "TERMINAL") {
+      const replay = object(storedResult(claim.row, "PREPARE_ENS_WRITE"));
+      if (!replay || !exactKeys(replay, ["plan", "planHash", "version"])) {
+        throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+      }
+      const version = parseLifecycleVersionSnapshot(replay.version);
+      const plan = parseWritePlanSnapshot(replay.plan);
+      if (typeof replay.planHash !== "string" || !HASH.test(replay.planHash)) {
+        throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+      }
+      return { version, plan, planHash: replay.planHash };
     }
-    const current = await loadLifecycle(tx, replayVersionId ?? versionId, ownerUserId, true);
-    if (
-      replayVersionId
-        ? current.lifecycle_state !== "WRITE_PREPARED"
-        : current.lifecycle_state !== "NAME_BOUND"
-    ) {
+    if (claim.kind !== "EXECUTE") {
+      throw new KernelError("KERNEL_CONFLICT", "Lifecycle action is already in progress", 409);
+    }
+    const current = await loadLifecycle(tx, versionId, ownerUserId, true);
+    if (current.lifecycle_state !== "NAME_BOUND") {
       throw new KernelError("KERNEL_CONFLICT", "Bind the ENS name before preparing a write", 409);
     }
     const binding = current.manifest.ensBinding;
@@ -506,12 +769,6 @@ export async function prepareAgentEnsWrite(
       requiresWalletSignature: true,
     };
     const planHash = domainHash("ens-write-plan", plan);
-    if (replayVersionId) {
-      if (current.write_plan_hash !== planHash) {
-        throw new Error("KERNEL_ENS_WRITE_PLAN_REPLAY_MISMATCH");
-      }
-      return { version: mapLifecycle(current, ownerUserId), plan, planHash };
-    }
     const rows = await tx<LifecycleRow[]>`
       UPDATE agent_versions
       SET lifecycle_state = 'WRITE_PREPARED', write_plan = ${tx.json(plan)},
@@ -528,36 +785,85 @@ export async function prepareAgentEnsWrite(
     `;
     const updated = rows[0];
     if (!updated) throw new Error("KERNEL_ENS_WRITE_PLAN_CREATE_FAILED");
-    await appendLifecycleEvent(tx, versionId, "PREPARE_ENS_WRITE", { planHash }, now);
+    const result = { version: mapLifecycle(updated, ownerUserId), plan, planHash };
+    const snapshot = successSnapshot(
+      "PREPARE_ENS_WRITE",
+      result as unknown as CanonicalValue,
+    );
+    const resultHash = domainHash("agent-lifecycle-result", snapshot);
+    await appendLifecycleEvent(tx, versionId, "PREPARE_ENS_WRITE", {
+      lifecycleActionId: claim.actionId,
+      planHash,
+      resultHash,
+    }, now, claim.actionId);
     await completeLifecycleAction(
       tx,
-      ownerUserId,
-      "PREPARE_ENS_WRITE",
-      idempotencyKey,
+      claim,
       versionId,
+      snapshot,
     );
-    return { version: mapLifecycle(updated, ownerUserId), plan, planHash };
+    return result;
   });
 }
 
-async function recordPublicationRefusal(
+function publicationDenial(reasonCode: string): {
+  code: "KERNEL_ENS_AUTHORITY_REQUIRED" | "KERNEL_ENS_AUTHORITY_DENIED";
+  message: string;
+  reasonCode: string;
+} {
+  const boundedReason = /^[A-Z][A-Z0-9_]{2,64}$/.test(reasonCode)
+    ? reasonCode
+    : "ENS_PUBLICATION_DENIED";
+  return boundedReason === "ENS_PUBLICATION_NOT_CONFIGURED"
+    ? {
+        code: "KERNEL_ENS_AUTHORITY_REQUIRED",
+        message: "Fresh durable A4 publication authority is required",
+        reasonCode: boundedReason,
+      }
+    : {
+        code: "KERNEL_ENS_AUTHORITY_DENIED",
+        message: "A4 publication authority refused",
+        reasonCode: boundedReason,
+      };
+}
+
+async function completePublicationDenial(
   sql: DatabaseClient,
+  claim: Extract<LifecycleActionClaim, { kind: "EXECUTE" }>,
   ownerUserId: string,
   versionId: string,
-  errorCode: string,
+  reasonCode: string,
   now: Date,
-): Promise<void> {
+): Promise<KernelError> {
+  const denial = publicationDenial(reasonCode);
+  const snapshot = denialSnapshot(denial.reasonCode, denial.code, denial.message);
+  const resultHash = domainHash("agent-lifecycle-result", snapshot);
   await sql.begin(async (transaction) => {
     const tx = transaction as unknown as DatabaseClient;
     const current = await loadLifecycle(tx, versionId, ownerUserId, true);
-    if (current.lifecycle_state === "PUBLISHED") return;
+    if (current.lifecycle_state === "PUBLISHED") {
+      throw new KernelError("KERNEL_CONFLICT", "Agent version was already published", 409);
+    }
     await tx`
       UPDATE agent_versions
-      SET canonical_state = 'REFUSED', authority_refusal = ${errorCode}
+      SET canonical_state = 'REFUSED', authority_refusal = ${denial.reasonCode}
       WHERE id = ${versionId}::uuid AND published = false
     `;
-    await appendLifecycleEvent(tx, versionId, "PUBLISH_REFUSED", { errorCode }, now);
+    await appendLifecycleEvent(tx, versionId, "PUBLISH_REFUSED", {
+      errorCode: denial.reasonCode,
+      lifecycleActionId: claim.actionId,
+      resultHash,
+    }, now, claim.actionId);
+    await completeLifecycleAction(
+      tx,
+      claim,
+      versionId,
+      snapshot,
+      "DENIED",
+      denial.reasonCode,
+    );
   });
+  return new KernelError(denial.code, denial.message, 409);
 }
 
 export async function publishAgentVersion(
@@ -573,29 +879,48 @@ export async function publishAgentVersion(
   const now = options.now ?? new Date();
   const idempotencyKey = lifecycleIdempotencyKey(options);
   const payloadHash = lifecyclePayloadHash(ownerUserId, "PUBLISH_VERSION", { versionId });
-  const completedVersionId = await completedLifecycleAction(
+  await assertLifecycleOwner(sql, versionId, ownerUserId);
+  const claim = await publicationActionClaim(
     sql,
     ownerUserId,
-    "PUBLISH_VERSION",
+    versionId,
     idempotencyKey,
     payloadHash,
   );
-  if (completedVersionId) {
-    return asPublished(mapLifecycle(
-      await loadLifecycle(sql, completedVersionId, ownerUserId),
-      ownerUserId,
+  if (claim.kind === "TERMINAL") {
+    return asPublished(parseLifecycleVersionSnapshot(
+      storedResult(claim.row, "PUBLISH_VERSION"),
     ));
   }
-  const current = await loadLifecycle(sql, versionId, ownerUserId);
-  if (current.lifecycle_state !== "WRITE_PREPARED" || !current.write_plan_hash) {
-    throw new KernelError("KERNEL_CONFLICT", "Prepare the ENS write before publication", 409);
+  if (claim.kind === "RETRYABLE") {
+    throw new KernelError(
+      "KERNEL_ENS_AUTHORITY_DENIED",
+      "Publication attempt is retryable",
+      503,
+    );
+  }
+  if (claim.kind !== "EXECUTE") {
+    throw new KernelError("KERNEL_CONFLICT", "Publication attempt is already in progress", 409);
+  }
+  try {
+    const current = await loadLifecycle(sql, versionId, ownerUserId);
+    if (current.lifecycle_state !== "WRITE_PREPARED" || !current.write_plan_hash) {
+      await markLifecycleActionRetryable(sql, claim, "KERNEL_CONFLICT");
+      throw new KernelError("KERNEL_CONFLICT", "Prepare the ENS write before publication", 409);
+    }
+  } catch (error) {
+    if (error instanceof KernelError) throw error;
+    await markLifecycleActionRetryable(sql, claim, "KERNEL_NOT_FOUND");
+    throw error;
   }
   if (!options.authority) {
-    await recordPublicationRefusal(sql, ownerUserId, versionId, "ENS_PUBLICATION_NOT_CONFIGURED", now);
-    throw new KernelError(
-      "KERNEL_ENS_AUTHORITY_REQUIRED",
-      "Fresh durable A4 publication authority is required",
-      409,
+    throw await completePublicationDenial(
+      sql,
+      claim,
+      ownerUserId,
+      versionId,
+      "ENS_PUBLICATION_NOT_CONFIGURED",
+      now,
     );
   }
   let decisionId: string;
@@ -612,29 +937,13 @@ export async function publishAgentVersion(
       options.signal?.removeEventListener("abort", abort);
     }
     if (!decision.allowed || !decision.decisionId) {
-      const concurrentReplayId = await completedLifecycleAction(
+      throw await completePublicationDenial(
         sql,
+        claim,
         ownerUserId,
-        "PUBLISH_VERSION",
-        idempotencyKey,
-        payloadHash,
-      );
-      if (concurrentReplayId) {
-        return asPublished(mapLifecycle(
-          await loadLifecycle(sql, concurrentReplayId, ownerUserId),
-          ownerUserId,
-        ));
-      }
-      const errorCode = decision.errorCode && /^[A-Z][A-Z0-9_]{2,64}$/.test(decision.errorCode)
-        ? decision.errorCode
-        : "ENS_PUBLICATION_DENIED";
-      await recordPublicationRefusal(sql, ownerUserId, versionId, errorCode, now);
-      throw new KernelError(
-        errorCode === "ENS_PUBLICATION_NOT_CONFIGURED"
-          ? "KERNEL_ENS_AUTHORITY_REQUIRED"
-          : "KERNEL_ENS_AUTHORITY_DENIED",
-        "A4 publication authority refused",
-        409,
+        versionId,
+        decision.errorCode ?? "ENS_PUBLICATION_DENIED",
+        now,
       );
     }
     decisionId = decision.decisionId;
@@ -643,24 +952,21 @@ export async function publishAgentVersion(
     const errorCode = error instanceof Error && error.message === "ENS_AUTHORITY_TIMEOUT"
       ? "ENS_AUTHORITY_TIMEOUT"
       : "ENS_AUTHORITY_RESOLVER_OUTAGE";
-    await recordPublicationRefusal(sql, ownerUserId, versionId, errorCode, now);
-    throw new KernelError("KERNEL_ENS_AUTHORITY_DENIED", "A4 authority readback failed", 409);
+    await markLifecycleActionRetryable(sql, claim, errorCode);
+    throw new KernelError("KERNEL_ENS_AUTHORITY_DENIED", "A4 authority readback failed", 503);
   }
   try {
     return await sql.begin(async (transaction) => {
       const tx = transaction as unknown as DatabaseClient;
-      const replayVersionId = await claimLifecycleAction(
-        tx,
-        ownerUserId,
-        "PUBLISH_VERSION",
-        idempotencyKey,
-        payloadHash,
-        now,
-      );
-      if (replayVersionId) return asPublished(mapLifecycle(
-        await loadLifecycle(tx, replayVersionId, ownerUserId),
-        ownerUserId,
-      ));
+      const held = await tx<{ id: string }[]>`
+        SELECT id::text
+        FROM agent_lifecycle_actions
+        WHERE id = ${claim.actionId}::uuid AND status = 'PENDING'
+          AND attempt = ${claim.attempt} AND lease_token = ${claim.leaseToken}::uuid
+          AND lease_expires_at > clock_timestamp()
+        FOR UPDATE
+      `;
+      if (!held[0]) throw new Error("KERNEL_LIFECYCLE_ACTION_CLAIM_LOST");
       const locked = await loadLifecycle(tx, versionId, ownerUserId, true);
       if (locked.lifecycle_state !== "WRITE_PREPARED" || !locked.write_plan_hash) {
         throw new KernelError("KERNEL_CONFLICT", "Agent version changed during authority readback", 409);
@@ -742,13 +1048,13 @@ export async function publishAgentVersion(
         );
       }
       const eventPayload = {
+        lifecycleActionId: claim.actionId,
         manifestHash: locked.manifest_hash,
         policyVersion: decision.policy_version,
         publicationDecisionId: decision.decision_id,
         recordHash: decision.record_hash,
         releaseSha: decision.release_sha,
-      } as const;
-      await appendLifecycleEvent(tx, versionId, "PUBLISH_VERSION", eventPayload, decision.database_now);
+      };
       const rows = await tx<LifecycleRow[]>`
         UPDATE agent_versions v
         SET lifecycle_state = 'PUBLISHED', published = true,
@@ -759,7 +1065,8 @@ export async function publishAgentVersion(
             authority_observed_at = d.observed_at,
             authority_fresh_until = d.fresh_until,
             authority_release_sha = d.release_sha,
-            publication_decision_id = d.id
+            publication_decision_id = d.id,
+            publication_action_id = ${claim.actionId}::uuid
         FROM ens_publication_decisions d
         WHERE v.id = ${versionId}::uuid AND v.lifecycle_state = 'WRITE_PREPARED'
           AND v.published = false AND d.id = ${decision.decision_id}::uuid
@@ -774,42 +1081,56 @@ export async function publishAgentVersion(
       `;
       const published = rows[0];
       if (!published) throw new Error("KERNEL_AGENT_PUBLICATION_FAILED");
+      const result = asPublished(mapLifecycle(published, ownerUserId));
+      const snapshot = successSnapshot(
+        "PUBLISH_VERSION",
+        result as unknown as CanonicalValue,
+      );
+      const resultHash = domainHash("agent-lifecycle-result", snapshot);
+      await appendLifecycleEvent(tx, versionId, "PUBLISH_VERSION", {
+        ...eventPayload,
+        resultHash,
+      }, decision.database_now, claim.actionId);
       await completeLifecycleAction(
         tx,
-        ownerUserId,
-        "PUBLISH_VERSION",
-        idempotencyKey,
+        claim,
         versionId,
+        snapshot,
       );
-      return asPublished(mapLifecycle(published, ownerUserId));
+      return result;
     });
   } catch (error) {
     if (error instanceof KernelError) {
       if (error.code === "KERNEL_ENS_AUTHORITY_DENIED") {
-        await recordPublicationRefusal(
+        throw await completePublicationDenial(
           sql,
+          claim,
           ownerUserId,
           versionId,
           "ENS_PUBLICATION_DECISION_INVALID",
           now,
         );
       }
+      await markLifecycleActionRetryable(sql, claim, error.code);
       throw error;
     }
     if (error && typeof error === "object" && "code" in error && error.code === "23514") {
-      await recordPublicationRefusal(
+      throw await completePublicationDenial(
         sql,
+        claim,
         ownerUserId,
         versionId,
         "ENS_PUBLICATION_COMMIT_STALE",
         now,
       );
-      throw new KernelError(
-        "KERNEL_ENS_AUTHORITY_DENIED",
-        "Durable A4 publication decision expired before commit",
-        409,
-      );
     }
+    await markLifecycleActionRetryable(
+      sql,
+      claim,
+      error instanceof Error && /^[A-Z][A-Z0-9_]{2,64}$/.test(error.message)
+        ? error.message
+        : "KERNEL_PUBLICATION_RETRYABLE",
+    );
     throw error;
   }
 }

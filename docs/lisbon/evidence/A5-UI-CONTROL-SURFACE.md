@@ -119,3 +119,22 @@ late replay is mutable and duplicates authority work, a rejecting stream cancel
 can return 500, and DSN isolation is incomplete. Kernel W5 and re-audit must
 pass before UI wiring. A5, live journey, A6, deployment, sponsor, push, release,
 and claim gates remain closed.
+
+## Kernel action-integrity remediation handoff on 2026-07-25
+
+Kernel task `A4-KERNEL-ACTION-INTEGRITY-20260725:W5:06B62A2` locally repairs
+all four immutable W9 findings. Publication now requires the unique completed
+owner action, its immutable result hash and exact event, the accepted W8
+decision, exact protected state, and commit-time freshness. Exact late replays
+return their original snapshots; 20 concurrent success or denial requests share
+one authority call and one terminal event; retryable and expired claims recover
+the same durable action. Hostile body streams preserve bounded 400/413, and the
+decoded pooled/direct DSN plus runtime role/privilege attestation fails closed
+before authority use.
+
+Five twelve-migration lanes and the complete local floor pass. Detailed evidence
+is in [`A4-ENS-AUTHORITY.md`](A4-ENS-AUTHORITY.md). This is only
+`PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`: immutable Kernel audit must pass before
+UI rewire or A5 acceptance. Live journey, mandatory A6 entry, deployment,
+sponsor, managed migration, signature, transaction, push, release, and claim
+gates remain closed.

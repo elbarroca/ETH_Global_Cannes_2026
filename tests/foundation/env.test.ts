@@ -107,6 +107,46 @@ test("ENS publication database requires a distinct restricted login without secr
   assert.throws(
     () => requireEnsPublicationDatabaseUrl({
       DATABASE_URL: main,
+      ENS_PUBLICATION_DATABASE_URL: "postgresql://%6bernel:encoded@localhost:5432/app",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EnvironmentValidationError);
+      assert.match(error.message, /distinct restricted database login/);
+      assert.doesNotMatch(error.message, /encoded|main-secret/);
+      return true;
+    },
+  );
+  assert.throws(
+    () => requireEnsPublicationDatabaseUrl({
+      DATABASE_URL: main,
+      DIRECT_URL: "postgresql://migration_owner:direct-secret@localhost:5432/app",
+      ENS_PUBLICATION_DATABASE_URL:
+        "postgresql://migration_owner:restricted-secret@localhost:5432/app",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EnvironmentValidationError);
+      assert.match(error.message, /distinct restricted database login/);
+      assert.doesNotMatch(error.message, /direct-secret|restricted-secret|main-secret/);
+      return true;
+    },
+  );
+  assert.throws(
+    () => requireEnsPublicationDatabaseUrl({
+      DATABASE_URL: main,
+      ENS_PUBLICATION_DATABASE_URL: "postgresql://%ZZ:never-print@localhost:5432/app",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof EnvironmentValidationError);
+      assert.deepEqual(error.issues, [
+        "ENS_PUBLICATION_DATABASE_URL: invalid database login encoding",
+      ]);
+      assert.doesNotMatch(error.message, /never-print|main-secret|%ZZ/);
+      return true;
+    },
+  );
+  assert.throws(
+    () => requireEnsPublicationDatabaseUrl({
+      DATABASE_URL: main,
       ENS_PUBLICATION_DATABASE_URL: "postgresql://ens_runtime:never-print@[/app",
     }),
     (error: unknown) => {

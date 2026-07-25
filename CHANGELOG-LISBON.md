@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W5 Kernel action-integrity audit remediation
+
+- Added additive migration `20260725082000_a4_kernel_action_integrity` (SHA-256 `0244cd31f9fc13247182677db964c1245ce24dfb9d7567cd1c1308858b5dcd7f`) with fail-closed upgrade preflight, canonical result hashing, leased action attempts, unique completed action/version bindings, mandatory action-bound lifecycle events, and deferred exact publication action/decision/event/state/freshness enforcement.
+- Persisted bounded immutable success/denial snapshots and hashes. Late exact replays now return the original action result, while 20 identical publication successes or denials share one authority call and one terminal event. Retryable resolver failure and expired-claim recovery advance the same durable action attempt without blind duplicate effects.
+- Protected hire now requires the completed owner-matching `PUBLISH_VERSION` action, its exact event/result hash, and the accepted durable decision. Direct actionless state, actionless event, action-only completion, mismatched binding, and commit-time expiry all roll back.
+- Hardened the 8 KiB request-body reader so rejected cancellation cannot replace 413, stream failures and invalid UTF-8/JSON remain bounded 400, and the reader lock is always released. PostgreSQL usernames are percent-decoded and normalized before pooled/direct comparison; the isolated publication connection attests exact current/session user, direct-only `alphadawg_runtime` membership, safe role attributes, non-ownership, no schema/table authority, and function-only admission before use.
+- Passed all five twelve-migration lanes and the complete local floor: lint zero errors/23 inherited warnings, typecheck, foundation 10/10, auth 9/9, Kernel 25/25, checksum-pinned Go 1.23.10, A3 12/12, A4 22/22, A5 3/3, integration 39/39, e2e 4/4, resilience 1/1, redaction 3/3, protected boot, secret/shell/diff checks, build 31 pages, and loopback HTTP 200. Temporary Go, verifier, PostgreSQL, and HTTP artifacts were removed.
+- Returned only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. `A4_ACCEPTED`, A5 acceptance/UI rewire, mandatory A6 entry, live ENS/0G/Uniswap, sponsor, managed migration, signature, transaction, push, deployment, release, and claims remain closed.
+
 ## 2026-07-25 - W9 Kernel immutable audit
 
 - Reconciled verdict `FIX` for exact SHA `551876f4e0554654dd1899e1be4181362c9c9c0a`, tree `e47310d84609d21e92ca84d51f3b2bed883168b3`, and parent `9c6e37d169ac6ddee2439602551deaca5347c41a`.
