@@ -200,6 +200,7 @@ interface MockOptions {
   sessionMissing?: boolean;
   actionRequiredOnce?: boolean;
   noAgents?: boolean;
+  lifecycleStatus?: 500 | 503;
   catalog?: unknown;
   onGoalCreate?: (body: Record<string, unknown>) => void;
   onGoalAction?: (body: Record<string, unknown>) => void;
@@ -297,6 +298,7 @@ async function installApiMocks(page: Page, options: MockOptions = {}): Promise<v
         drafts = [];
         return json(route, { action: "PUBLISH_VERSION", version: published });
       }
+      if (options.lifecycleStatus) return json(route, { error: `Protected catalog returned ${options.lifecycleStatus}`, code: "KERNEL_UNAVAILABLE" }, options.lifecycleStatus);
       return json(route, { agents: options.noAgents ? [] : [OWNER_AGENT, AVAILABLE_AGENT], drafts });
     }
     if (path === "/api/kernel/agent-recommendations") return json(route, options.catalog ?? CATALOG);
@@ -358,7 +360,8 @@ test("landing communicates the protected recurring loop at 375, 768, and 1440", 
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "One goal. A verified agent loop." })).toBeVisible();
     await expect(page.getByRole("link", { name: "AlphaDawg home" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Enter workspace/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Define a protected goal/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Explore agents/ })).toBeVisible();
     await expect(page.getByText("Publish, hire, prove")).toBeVisible();
     await expectNoOverflow(page);
     await page.screenshot({ path: `test-results/visual/a5-landing-${width}.png`, fullPage: true });
@@ -503,22 +506,33 @@ test("marketplace preserves URL tabs, dense authority rows, and external hire", 
 });
 
 test("catalog V3 creation sends only template identity fields and publishes the returned version", async ({ page }) => {
+  const errors = monitorErrors(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   let createBody: Record<string, unknown> | null = null;
   await page.unroute("**/api/**");
   await installApiMocks(page, { onAgentCreate: (body) => { createBody = body; } });
-  await connectReady(page, "/marketplace?view=mine");
-  const open = page.getByRole("link", { name: "Create agent" });
-  await open.click();
+  await connectReady(page, "/marketplace?view=mine&create=1");
   await expect(page.getByRole("dialog", { name: "Create a protected agent" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Publication progress" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Identity" })).toBeVisible();
   await page.getByLabel("Agent name").fill("Bounded Market Researcher");
   await page.getByLabel("Description").fill("Researches bounded market evidence with explicit source and execution limits.");
   await page.getByRole("button", { name: /Continue/ }).click();
   await expect(page.getByRole("button", { name: /Alpha Researcher/ })).toBeVisible();
   await page.getByRole("button", { name: /Alpha Researcher/ }).click();
-  await expect(page.getByRole("heading", { name: "MCP availability" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "MCP availability" }).locator("..").getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
+  await expect(page.locator("[data-category-heading-icon]")).toHaveCount(4);
+  await expect(page.getByText("The role and reasoning stance the agent follows.")).toBeVisible();
+  await expect(page.getByText("Read-only sources the protected runtime may query.")).toBeVisible();
+  await expect(page.getByText("Included by template").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Catalog provider readiness" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Catalog provider readiness" }).locator("..").getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
+  await page.locator('[data-category-icon="PERSONA"]').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/visual/a5-create-capabilities-1440.png" });
   await page.getByRole("button", { name: /Continue/ }).click();
-  await page.getByLabel("Creator ENS parent").fill("maker.eth");
+  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("maker.eth");
+  await expect(page.getByTestId("agent-subname-preview")).toHaveText("bounded-market-researcher.maker.eth");
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: "test-results/visual/a5-create-ens-1440.png" });
   await page.getByRole("button", { name: "Prepare immutable draft" }).click();
   await expect(page.getByLabel("Immutable server preview")).toBeVisible();
   expect(Object.keys(createBody ?? {}).sort()).toEqual(["action", "description", "name", "templateId"]);
@@ -529,6 +543,7 @@ test("catalog V3 creation sends only template identity fields and publishes the 
   await expect(page.getByLabel("Publication receipt").getByText("ELIGIBLE", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /View my agents/ }).click();
   await expect(page).toHaveURL(/view=mine/);
+  expect(errors).toEqual([]);
 });
 
 test("agent catalog empty state and provider availability remain explicit", async ({ page }) => {
@@ -541,10 +556,38 @@ test("agent catalog empty state and provider availability remain explicit", asyn
   await page.getByLabel("Description").fill("Shows exact provider availability from the authenticated catalog response.");
   await page.getByRole("button", { name: /Continue/ }).click();
   await page.getByRole("button", { name: /Alpha Researcher/ }).click();
-  const availability = page.getByRole("heading", { name: "MCP availability" }).locator("..");
+  const availability = page.getByRole("heading", { name: "Catalog provider readiness" }).locator("..");
   await expect(availability.getByText("AVAILABLE", { exact: true }).first()).toBeVisible();
   await expect(availability.getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
 });
+
+test("first agent keeps ENS parent blank and never invents a wallet-derived name", async ({ page }) => {
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { noAgents: true });
+  await connectReady(page, "/marketplace?view=mine&create=1");
+  await page.getByLabel("Agent name").fill("First Evidence Agent");
+  await page.getByLabel("Description").fill("Exercises the first-agent canonical creator parent refusal state.");
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await page.getByRole("button", { name: /Alpha Researcher/ }).click();
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("");
+  await expect(page.getByTestId("agent-subname-preview")).toHaveText("Unavailable until a canonical creator parent is entered.");
+  await expect(page.getByText("CREATOR_PARENT_REQUIRED: No wallet-derived ENS parent was substituted.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Prepare immutable draft" })).toBeDisabled();
+});
+
+for (const status of [500, 503] as const) {
+  test(`kernel catalog ${status} remains an error, not empty data`, async ({ page }) => {
+    await installWallet(page);
+    await page.unroute("**/api/**");
+    await installApiMocks(page, { lifecycleStatus: status });
+    await page.goto("/marketplace?view=available");
+    const connect = page.getByRole("button", { name: "Connect Wallet" });
+    if (await connect.isVisible()) await connect.click();
+    await expect(page.getByText(`Protected catalog returned ${status}`)).toBeVisible();
+    await expect(page.getByText("No external canonical versions are available.")).toHaveCount(0);
+  });
+}
 
 test("creation dialog traps focus, returns focus, and contains no legacy manual flow", async ({ page }) => {
   await connectReady(page, "/marketplace?view=available");
@@ -575,18 +618,35 @@ test("verify deep link shows authoritative MCP and proof failure precedence", as
 });
 
 test("all primary routes remain usable and overflow-free at mobile, tablet, and desktop", async ({ page }) => {
+  const errors = monitorErrors(page);
   await installWallet(page);
+  const routes = [
+    ["/", "landing"],
+    ["/dashboard", "dashboard"],
+    ["/marketplace?view=mine&create=1", "marketplace-create"],
+    ["/marketplace?view=available", "marketplace-available"],
+    ["/verify", "verify"],
+  ] as const;
+  let connected = false;
   for (const width of [375, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const path of ["/dashboard", "/marketplace?view=available", "/verify"]) {
+    for (const [path, label] of routes) {
       await page.goto(path);
-      const connect = page.getByRole("button", { name: "Connect Wallet" });
-      if (await connect.isVisible()) await connect.click();
+      if (!connected && path !== "/") {
+        await page.getByRole("button", { name: "Connect Wallet" }).click();
+        await expect(page.getByRole("button", { name: "Disconnect wallet" })).toBeVisible();
+        connected = true;
+      }
       await expect(page.locator("main").first()).toBeVisible();
+      if (path.includes("create=1")) {
+        await expect(page.getByRole("list", { name: "Publication progress" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Identity" })).toBeVisible();
+      }
       await expectNoOverflow(page);
-      await page.screenshot({ path: `test-results/visual/a5-route-${path.split("?")[0].slice(1)}-${width}.png`, fullPage: true });
+      await page.screenshot({ path: `test-results/visual/a5-route-${label}-${width}.png`, fullPage: !path.includes("create=1") });
     }
   }
+  expect(errors).toEqual([]);
 });
 
 test("mobile navigation, focus return, and reduced motion remain operable", async ({ page }) => {
@@ -606,4 +666,17 @@ test("malformed proof deep links refuse without substituting evidence", async ({
   await connectReady(page, "/verify?jobId=not-a-uuid");
   await expect(page.getByRole("heading", { name: "Invalid protected job ID" })).toBeVisible();
   await expect(page.getByText("No alternate evidence was substituted.")).toBeVisible();
+});
+
+test("legacy primary routes redirect while UUID job detail remains protected", async ({ page }) => {
+  await connectReady(page, "/dashboard");
+  for (const path of ["/deposit", "/history", "/portfolio", "/dashboard/compute/42"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/dashboard$/);
+  }
+  await page.goto("/infrastructure");
+  await expect(page).toHaveURL(/\/verify$/);
+  await page.goto(`/dashboard/compute/${JOB_ID}`);
+  await expect(page.getByRole("heading", { name: new RegExp(AVAILABLE_AGENT.name) })).toBeVisible();
+  await expect(page.getByText("STORAGE_READBACK_MISMATCH").first()).toBeVisible();
 });

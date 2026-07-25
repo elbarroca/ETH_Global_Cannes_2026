@@ -1,5 +1,70 @@
 # A5 Whole-Product UI and Protected Control Surface Evidence
 
+## Premium protected product story on 2026-07-25
+
+Frontend task `A5-PREMIUM-PROTECTED-STORY-W3:W3:4B79F1A` starts from
+control SHA `4b79f1a50a3ccde0e76a3f49ecd57986b42aaf1e` and changes no protected
+API, Kernel, ENS, payment, database, 0G, worker, or provider implementation.
+
+The landing now uses one dominant `Define a protected goal` action and one
+secondary `Explore agents` action beneath the global wallet control. Its
+compact first viewport shows a real goal input branching into research, risk,
+and market lanes and converging into an evidence-linked report. The desktop
+viewport no longer reserves a full-screen dead zone. The visual uses the
+existing off-black, ivory, and signal-yellow system with Geist, JetBrains Mono,
+Phosphor, and the existing reduced-motion-safe orchestration transitions.
+
+The V3 creation flow keeps the existing Identity, Capability bundle, ENS
+authority, and Publish and receipt stages. Capability cards and the selected
+bundle use Phosphor icons and plain-language Persona, Data, Action, and
+Connection definitions. Template inclusion is visually separate from current
+MCP provider availability. Custom skill and MCP multi-select remains blocked
+by the protected Kernel contract because draft creation persists only the
+server-owned template ID, name, description, and optional agent ID; the UI does
+not simulate a client-only selection or add fields to the request body.
+
+Creator-parent prefill uses only canonical parents returned on authenticated
+owned lifecycle versions. Stable lifecycle order is preserved, duplicate
+parents are removed, the first parent is initialized without overwriting later
+user edits, and all authoritative alternatives remain available through the
+native input list. The preview is exactly the slugified agent label plus the
+selected canonical parent. A first agent with no owned parent remains blank and
+shows `CREATOR_PARENT_REQUIRED`; no ENS name is derived from the wallet.
+
+Legacy `/deposit`, `/history`, `/portfolio`, and non-UUID compute views replace
+to Workspace after the authentication gate; `/infrastructure` replaces to
+Proof. Before authentication, those routes expose only the shared wallet gate,
+never legacy product data. `/dashboard/compute/[uuid]` continues to render the
+protected job detail. The underlying legacy APIs and stored data are unchanged.
+Kernel catalog HTTP 500 and 503 responses remain visible errors and are never
+converted into empty catalog data.
+
+### Local verification
+
+| Check | Result |
+|---|---|
+| `npm run lint` | PASS: zero errors; 23 inherited warnings outside this frontend change |
+| `npm run typecheck` | PASS |
+| `npm test` | PASS: 10/10 |
+| `npm run test:a5` | PASS: 6/6 |
+| `CI=1 npm run test:playwright` | PASS: fresh production server, 21/21 Chromium tests |
+| `npm run scan:secrets` | PASS |
+| `npm run build` | PASS: Next.js 16.2.11, 35 pages |
+| `git diff --check` | PASS |
+
+Fresh UI evidence covers `/`, `/dashboard`,
+`/marketplace?view=available`, `/marketplace?view=mine&create=1`, and `/verify`
+at 375, 768, and 1440 CSS pixels with zero page errors and zero horizontal
+overflow. Additional frames inspect the selected capability hierarchy and the
+canonical ENS prefill/preview. Screenshots under `test-results/visual/` are
+local UI evidence only until the same-SHA live journey passes.
+
+Verdict: `PASS_TO_AUDIT; LOCAL_ONLY`. The final build loaded `.env.local`
+through normal Next.js configuration without printing values. No managed Neon
+migration, database/provider call, push, deploy, upload, wallet signature,
+transaction, funding, spend, or public claim was attempted by this frontend
+writer.
+
 ## Protected V3 catalog workspace repair on 2026-07-25
 
 Frontend task `A5-PROTECTED-V3-UI-W2:W2:1D7F82B` repairs the protected

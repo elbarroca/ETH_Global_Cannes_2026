@@ -47,6 +47,11 @@ function MarketplaceContent() {
   const drafts = lifecycle.data?.drafts ?? [];
   const available = useMemo(() => agents.filter((agent) => !agent.ownedByViewer), [agents]);
   const mine = useMemo(() => agents.filter((agent) => agent.ownedByViewer), [agents]);
+  const ownedCreatorParents = useMemo(
+    () => [...new Set(mine.filter((agent) => agent.canonicalState === "CANONICAL").map((agent) => agent.creatorParent.trim()).filter(Boolean))],
+    [mine],
+  );
+  const defaultCreatorParent = ownedCreatorParents[0] ?? null;
   const selected = agents.find((agent) => agent.versionId === selectedAgentId) ?? null;
 
   function replaceQuery(changes: Record<string, string | null>): void {
@@ -112,7 +117,7 @@ function MarketplaceContent() {
         </section>
       )}
 
-      {createOpen && <CreateAgentModal onClose={closeCreate} onCreated={() => { replaceQuery({ create: null, view: "mine" }); void lifecycle.refetch(); }} />}
+      {createOpen && <CreateAgentModal defaultCreatorParent={defaultCreatorParent} creatorParentOptions={ownedCreatorParents} onClose={closeCreate} onCreated={() => { replaceQuery({ create: null, view: "mine" }); void lifecycle.refetch(); }} />}
       {selected && <KernelJobDialog agent={selected} onClose={() => replaceQuery({ agentId: null })} />}
     </main>
   );

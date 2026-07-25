@@ -3,6 +3,69 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/premium_protected_story
+task_id: A5-PREMIUM-PROTECTED-STORY-W3
+task_instance_id: A5-PREMIUM-PROTECTED-STORY-W3:W3:4B79F1A
+generation: 3
+sprint: Refine the premium protected product story
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 4b79f1a50a3ccde0e76a3f49ecd57986b42aaf1e
+control_sha: 4b79f1a50a3ccde0e76a3f49ecd57986b42aaf1e
+token: A5-PREMIUM-PROTECTED-STORY-W3-4B79F1A-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T19:23:03Z
+expires_at: 2026-07-25T21:01:53Z
+allowed_paths:
+  - app/page.tsx
+  - app/globals.css
+  - components/landing/**
+  - components/create-agent-modal.tsx
+  - components/nav.tsx
+  - app/dashboard/page.tsx
+  - components/goal-workspace.tsx
+  - app/marketplace/page.tsx
+  - app/verify/page.tsx
+  - components/kernel-job-detail.tsx
+  - components/proof-rail.tsx
+  - app/deposit/page.tsx
+  - app/history/page.tsx
+  - app/portfolio/page.tsx
+  - app/infrastructure/page.tsx
+  - app/dashboard/compute/[id]/page.tsx
+  - tests/a5/**
+  - tests/playwright/a5-ui.spec.ts
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T19:01:53Z
+deadline: 2026-07-25T21:01:53Z
+expected_exit: premium protected goal-to-agent-to-proof story, catalog-grounded creation wizard, legacy primary-story quarantine, and fresh production browser evidence
+external_effect_authority: local files existing dependencies local deterministic tests loopback browser evidence screenshots and one local commit only; no push deploy managed migration provider call upload ENS signature transaction funding spend or public claim
+completed_at: 2026-07-25T19:27:29Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - landing has one dominant protected-goal intent one secondary catalog intent and a compact goal-to-parallel-lanes-to-converged-report visual at 375 768 and 1440 CSS pixels
+  - creation keeps the existing StageRail and four-stage V3 flow with Phosphor category icons plain-language capabilities explicit fixed-by-template skills and separate provider availability
+  - canonical authenticated owned creator parents are deduplicated in stable lifecycle order the first is prefilled once all alternatives remain selectable and no-parent state stays blank with CREATOR_PARENT_REQUIRED
+  - draft POST remains action templateId name description and optional agentId only; custom skill and MCP multi-select remains blocked on the Kernel contract and is not simulated client-side
+  - legacy Arc hunt portfolio history and non-UUID compute surfaces redirect to Workspace or Proof after the shared auth gate while UUID protected job detail remains intact and underlying data is unchanged
+  - HTTP 500 and 503 catalog responses remain explicit errors rather than empty data
+  - npm run lint PASS with zero errors and 23 inherited warnings; npm run typecheck PASS; npm test PASS 10 of 10; npm run test:a5 PASS 6 of 6
+  - CI=1 npm run test:playwright PASS against a fresh production server with 21 of 21 Chromium tests including direct create query keyboard focus reduced motion and zero overflow at 375 768 and 1440 CSS pixels
+  - npm run scan:secrets PASS; npm run build PASS with 35 pages; git diff --check PASS
+remaining_blocks:
+  - screenshots are local UI evidence only until the same-SHA live journey passes
+  - custom skill and MCP multi-select requires a reviewed persisted Kernel contract before UI affordances can exist
+  - immutable exact-SHA independent audit remains required
+  - managed migration provider calls push deploy upload wallet signature transaction funding spend and public claims were not attempted by this frontend writer
+external_effects_attempted: local build loaded .env.local without printing values; no managed database migration provider network push deploy upload wallet signature transaction funding spend or public claim attempted
+claim_changes: none
+verdict: PASS_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token A5-PREMIUM-PROTECTED-STORY-W3-4B79F1A-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/kernel_schema_readiness
 task_id: KERNEL-SCHEMA-READINESS-W1
 task_instance_id: KERNEL-SCHEMA-READINESS-W1:W1:8E2DEE8

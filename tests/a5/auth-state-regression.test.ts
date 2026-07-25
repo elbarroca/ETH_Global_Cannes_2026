@@ -62,3 +62,30 @@ test("primary protected surfaces do not restore legacy authority", async () => {
   assert.doesNotMatch(combined, /api\/(?:swarm|cycle|marketplace\/(?:earnings|create|leaderboard))|setInterval/);
   assert.doesNotMatch(combined, /\bhunt pack\b|\bELO\b|\bfake iNFT\b|\bArc funding\b/i);
 });
+
+test("creation wizard explains locked catalog capabilities and canonical ENS preview", async () => {
+  const [creator, marketplace] = await Promise.all([
+    readFile(`${root}/components/create-agent-modal.tsx`, "utf8"),
+    readFile(`${root}/app/marketplace/page.tsx`, "utf8"),
+  ]);
+
+  for (const icon of ["BrainIcon", "DatabaseIcon", "LightningIcon", "PlugsConnectedIcon"]) {
+    assert.match(creator, new RegExp(icon));
+  }
+  for (const explanation of [
+    "The role and reasoning stance the agent follows.",
+    "Read-only sources the protected runtime may query.",
+    "Bounded proposals the agent may prepare without signing.",
+    "Required protected compute and storage rails.",
+  ]) {
+    assert.match(creator, new RegExp(explanation.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.match(creator, /defaultCreatorParent/);
+  assert.match(marketplace, /filter\(\(agent\) => agent\.canonicalState === "CANONICAL"\)/);
+  assert.match(marketplace, /defaultCreatorParent=\{defaultCreatorParent\}/);
+  assert.match(marketplace, /creatorParentOptions=\{ownedCreatorParents\}/);
+  assert.match(creator, /`\$\{agentLabel\}\.\$\{normalizedCreatorParent\}`/);
+  assert.match(creator, /CREATOR_PARENT_REQUIRED: No wallet-derived ENS parent was substituted\./);
+  assert.doesNotMatch(creator, /\.creator\.eth/);
+  assert.doesNotMatch(creator, /skillIds:\s*|mcpBindings:\s*/);
+});
