@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import test from "node:test";
 import postgres from "postgres";
 import {
@@ -108,14 +108,22 @@ async function startPublicationRuntime(
   suffix = "runtime",
 ): Promise<PublicationRuntimeConnection> {
   const role = `a4_pub_${suffix}_${process.pid}_${Date.now().toString(36)}`;
+  const password = randomBytes(32).toString("base64url");
   assert.match(role, /^[a-z][a-z0-9_]{1,62}$/);
-  await database.sql.unsafe(
-    `CREATE ROLE "${role}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT; ` +
-    `GRANT alphadawg_runtime TO "${role}"`,
-  );
+  const commands = await database.sql<{ create_role: string; grant_role: string }[]>`
+    SELECT
+      format(
+        'CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT',
+        ${role}::text, ${password}::text
+      ) AS create_role,
+      format('GRANT alphadawg_runtime TO %I', ${role}::text) AS grant_role
+  `;
+  if (!commands[0]) throw new Error("A4_PUBLICATION_TEST_ROLE_COMMAND_INVALID");
+  await database.sql.unsafe(commands[0].create_role);
+  await database.sql.unsafe(commands[0].grant_role);
   const runtimeUrl = new URL(database.url);
   runtimeUrl.username = role;
-  runtimeUrl.password = "";
+  runtimeUrl.password = password;
   const sql = postgres(runtimeUrl.toString(), { max: 1, prepare: false });
   return {
     role,

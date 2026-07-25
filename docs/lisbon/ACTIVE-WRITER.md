@@ -3,6 +3,46 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: ENS Integrator /root/ens_scram_ci_fix
+task_id: A4-ENS-SCRAM-CI-FIX-20260725
+task_instance_id: A4-ENS-SCRAM-CI-FIX-20260725:W1:5D6C604
+generation: 1
+sprint: minimal GitHub Actions SCRAM test-role repair
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 5d6c604efe137bf375254537c5c99e39251e2198
+control_sha: 5d6c604efe137bf375254537c5c99e39251e2198
+token: A4-ENS-SCRAM-CI-W1-5D6C604-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T15:02:28Z
+expires_at: 2026-07-25T20:30:00Z
+allowed_paths:
+  - tests/a4/ens-publication.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md only if exact local evidence needs one line
+  - docs/lisbon/EVIDENCE.md only if exact local evidence needs one line
+  - CHANGELOG-LISBON.md only if exact local change record is required
+started_at: 2026-07-25T15:00:56Z
+deadline: 2026-07-25T20:30:00Z
+expected_exit: SCRAM-authenticated disposable A4 publication roles with random test-only passwords and unchanged restricted-role cleanup
+external_effect_authority: local files existing dependencies disposable local PostgreSQL tests and one local commit only; no Neon managed migration push deploy live ENS or API signature transaction funding form spend or claim
+completed_at: 2026-07-25T15:02:28Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - npm run test:a4 PASS 22 of 22
+  - npm run typecheck PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+remaining_blocks:
+  - immutable exact-SHA audit and the owner-scheduled full repository CI floor remain required
+  - managed Neon migration push deploy live ENS APIs signatures transactions funding forms spend and claims remain unauthorized
+external_effects_attempted: none
+verdict: PASS_TO_AUDIT
+lock_release: release only exact token A4-ENS-SCRAM-CI-W1-5D6C604-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/goal_loop_kernel
 task_id: A5-GOAL-LOOP-KERNEL-REMEDIATION-20260725
 task_instance_id: A5-GOAL-LOOP-KERNEL-REMEDIATION-20260725:W2:D8C9E6D
