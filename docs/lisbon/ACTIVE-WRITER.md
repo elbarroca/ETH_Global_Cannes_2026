@@ -3,6 +3,68 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/frontend_localhost_journey
+task_id: A5-LOCALHOST-CREATOR-HIRE-UX-20260725
+task_instance_id: A5-LOCALHOST-CREATOR-HIRE-UX-20260725:W1:62C2F04
+generation: 1
+sprint: A5_protected_localhost_creator_to_receipt_UX
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 62c2f04ae0ecec593abc6804b203f68119504e4e
+control_sha: 62c2f04ae0ecec593abc6804b203f68119504e4e
+token: A5-LOCALHOST-CREATOR-HIRE-UX-W1-62C2F04-86ACEE58-79B2-4739-8E5A-55983E3B49B1
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T13:26:08Z
+expires_at: 2026-07-25T20:00:00Z
+allowed_paths:
+  - app/** except app/api/**
+  - components/**
+  - contexts/**
+  - hooks/**
+  - client-only helpers under lib/**
+  - tests/a5/**
+  - tests/playwright/**
+  - playwright.config.ts
+  - design-qa.md
+  - DESIGN.md
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+preserved_dirty_path: components/kernel-jobs-panel.tsx
+preserved_dirty_sha256: 5786a69db60f5fac3f01d603664b655d3313a1f7f24151888bedbe2c408566c9
+started_at: 2026-07-25T14:04:00Z
+deadline: 2026-07-25T20:00:00Z
+external_effect_authority: local files existing dependencies local tests processes disposable loopback PostgreSQL and one local commit only; no network download push deploy managed migration sponsor live API wallet signature transaction funding upload form spend or claim promotion
+scope_amendment: approved Option 1 landing dashboard creator marketplace proof and Evidence Index restructure against exec-63df1dd6-6f69-480c-8413-7eb49581ff92.png; reuse exact DawgLogo and installed icons; no new assets dependencies or backend mutation
+completed_at: 2026-07-25T13:26:08Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm run test:a5 PASS 3 of 3
+  - npm test PASS 10 of 10
+  - npm run test:auth PASS 9 of 9
+  - npm run test:kernel PASS 26 of 26
+  - CI=1 npx playwright test PASS 15 of 15 on isolated port 3100
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+  - npm run build PASS 34 routes
+  - impeccable unavailable locally and not downloaded
+  - Option 1 reference and implementation compared at 1440 by 1024; design-qa.md final result passed
+remaining_blocks:
+  - ENS-owned test:a4 PASS 16 of 22; six stale expectations require DELIVERY_READY with zero settlement and commission instead of SUCCEEDED
+  - A3 remains BLOCKED_MISSING_LOCAL_GO
+  - protected low mid high policy is absent from current Kernel recommendation and job contracts
+external_effects_attempted: none
+verdict: HANDOFF_TO_ENS
+lock_release: release only matching token after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: 0G Integrator /root/a3_manifest_v2_compat_audit
 task_id: A3-MANIFEST-V2-COMPAT-REMEDIATION-20260725
 task_instance_id: A3-MANIFEST-V2-COMPAT-REMEDIATION-20260725:W1:6AFAA40

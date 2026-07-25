@@ -3,18 +3,18 @@
 /* AlphaDawg cryptographic-instrument theme. */
 
 @theme {
-  --color-black: #050504;
+  --color-black: #070706;
   --color-white: #F5F1E6;
-  --color-void-950: #050504;
-  --color-void-900: #0A0A08;
-  --color-void-850: #10100D;
-  --color-void-800: #1A1916;
-  --color-void-700: #312F29;
-  --color-void-600: #5E5B53;
-  --color-void-500: #737067;
-  --color-void-400: #AAA69A;
-  --color-void-300: #C7C2B5;
-  --color-void-200: #DED9CD;
+  --color-void-950: #070706;
+  --color-void-900: #0D0D0B;
+  --color-void-850: #19191C;
+  --color-void-800: #242429;
+  --color-void-700: #383840;
+  --color-void-600: #62626E;
+  --color-void-500: #787885;
+  --color-void-400: #A8A49A;
+  --color-void-300: #C4C4CC;
+  --color-void-200: #E2E2E6;
   --color-void-100: #F5F1E6;
 
   --color-blood-50:  #FEF2F2;
@@ -32,36 +32,36 @@
   --color-gold-100: #FEF3C7;
   --color-gold-200: #FDE68A;
   --color-gold-300: #FCD34D;
-  --color-gold-400: #FBBF24;
-  --color-gold-500: #F59E0B;
-  --color-gold-600: #D97706;
-  --color-gold-700: #B45309;
+  --color-gold-400: #E5C158;
+  --color-gold-500: #D4AF37;
+  --color-gold-600: #B59325;
+  --color-gold-700: #8C7018;
 
   --color-dawg-50:  #FFFBEB;
   --color-dawg-100: #FEF3C7;
-  --color-dawg-200: #FFE9A4;
-  --color-dawg-300: #FFD766;
-  --color-dawg-400: #F8CD55;
+  --color-dawg-200: #FDE68A;
+  --color-dawg-300: #F5D979;
+  --color-dawg-400: #F4C542;
   --color-dawg-500: #F4C542;
-  --color-dawg-600: #D5A72B;
-  --color-dawg-700: #A97F19;
-  --color-dawg-800: #72540F;
-  --color-dawg-900: #493507;
+  --color-dawg-600: #B59325;
+  --color-dawg-700: #8C7018;
+  --color-dawg-800: #634F10;
+  --color-dawg-900: #3B2E08;
 }
 
 @theme inline {
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-geist);
   --font-mono: var(--font-jetbrains-mono);
-  --font-pixel: var(--font-inter);
+  --font-pixel: var(--font-geist);
 }
 
 :root {
   --brand: #F4C542;
-  --brand-hover: #FFD766;
-  --surface: #0A0A08;
-  --surface-raised: #10100D;
-  --line: rgba(245, 241, 230, 0.10);
-  --line-brand: rgba(244, 197, 66, 0.28);
+  --brand-hover: #F8D766;
+  --surface: #0D0D0B;
+  --surface-raised: #19191C;
+  --line: rgba(245, 245, 240, 0.08);
+  --line-brand: rgba(212, 175, 55, 0.25);
 }
 
 .text-gradient-brand {
@@ -75,7 +75,7 @@
 body {
   background: var(--color-void-950);
   color: var(--color-void-100);
-  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-geist), 'Geist', system-ui, -apple-system, sans-serif;
 }
 
 ::selection {
@@ -90,7 +90,7 @@ body {
 
 .instrument-panel {
   border: 1px solid var(--line);
-  border-radius: 0.75rem;
+  border-radius: 12px;
   background: var(--surface);
   box-shadow: inset 0 1px 0 rgba(245, 241, 230, 0.035);
 }
@@ -115,7 +115,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 0.5rem;
+  border-radius: 10px;
   padding-inline: 1rem;
   font-size: 0.875rem;
   font-weight: 700;
@@ -584,7 +584,7 @@ body {
  */
 
 .font-pixel {
-  font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+  font-family: var(--font-geist), 'Geist', system-ui, sans-serif;
   font-weight: 650;
   letter-spacing: -0.01em;
 }

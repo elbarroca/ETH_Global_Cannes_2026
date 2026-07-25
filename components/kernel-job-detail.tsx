@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { DawgSpinner } from "@/components/dawg-spinner";
 import { ProofRail } from "@/components/proof-rail";
+import { EvidenceIndexItem } from "@/components/evidence-index-item";
 import { Card, CardBody, CodeBlock } from "@/components/ui/card";
 import { CopyableIdentifier, EvidenceStatus } from "@/components/ui/evidence";
 import {
@@ -64,13 +65,13 @@ export function classifyKernelError(error: unknown): {
 }
 
 export function isTerminalKernelJob(job: Pick<KernelJobDetailRecord, "state">): boolean {
-  return job.state !== "QUEUED" && job.state !== "RUNNING";
+  return job.state === "SUCCEEDED" || job.state === "FAILED" || job.state === "CANCELED" || job.state === "A3_NOT_CONFIGURED";
 }
 
 function stateEvidence(
   job: Pick<KernelJobDetailRecord, "state" | "evidence">,
 ): EvidenceState {
-  if (job.state === "QUEUED" || job.state === "RUNNING") return "pending";
+  if (job.state === "QUEUED" || job.state === "RUNNING" || job.state === "DELIVERY_READY") return "pending";
   if (job.state === "SUCCEEDED") {
     return job.evidence.receipt === "verified" ? "verified" : "failed";
   }
@@ -124,7 +125,7 @@ export function KernelJobDetailView({
   const receipt = job.evidenceDetail.receipt;
   const delivery = job.evidenceDetail.delivery;
   const { settlement, refund } = job.evidenceDetail.financial;
-  const cancelable = !isTerminalKernelJob(job) && !job.cancelRequestedAt;
+  const cancelable = (job.state === "QUEUED" || job.state === "RUNNING") && !job.cancelRequestedAt;
 
   return (
     <div className="min-w-0 space-y-4" data-proof-workbench={mode === "verify" ? "true" : undefined}>
@@ -154,6 +155,11 @@ export function KernelJobDetailView({
         {job.state === "A3_NOT_CONFIGURED" && (
           <div className="rounded-xl border border-void-700 bg-void-950 p-3 text-sm text-void-400">
             Protected A3 execution was not configured for this job. Later runtime evidence remains unavailable.
+          </div>
+        )}
+        {job.state === "DELIVERY_READY" && (
+          <div className="rounded-xl border border-dawg-500/25 bg-dawg-500/5 p-3 text-sm text-dawg-200">
+            Verified delivery evidence is ready. Settlement and terminal success remain pending until payment finalization succeeds.
           </div>
         )}
         {job.evidenceDetail.errorCode && (
@@ -233,7 +239,7 @@ export function KernelJobDetailView({
               Verify view
             </Link>
           </div>
-          {onCancel && !isTerminalKernelJob(job) && (
+          {onCancel && (job.state === "QUEUED" || job.state === "RUNNING") && (
             <button
               type="button"
               onClick={onCancel}
@@ -268,6 +274,12 @@ export function KernelJobDetailView({
           </div>
         </aside>
       </div>
+      <section className="space-y-3" aria-labelledby={`evidence-index-${job.jobId}`}>
+        <div><p className="instrument-label">Authenticated job detail</p><h2 id={`evidence-index-${job.jobId}`} className="mt-2 text-lg font-semibold text-void-100">Evidence index</h2></div>
+        <div className="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {(["ens", "compute", "storage", "receipt", "uniswap"] as const).map((kind) => <EvidenceIndexItem key={kind} job={job} kind={kind} />)}
+        </div>
+      </section>
     </div>
   );
 }
@@ -331,7 +343,7 @@ export function KernelJobDetail({
   }, [load, shouldPoll]);
 
   async function cancel(): Promise<void> {
-    if (!job || isTerminalKernelJob(job) || job.cancelRequestedAt) return;
+    if (!job || (job.state !== "QUEUED" && job.state !== "RUNNING") || job.cancelRequestedAt) return;
     setCanceling(true);
     try {
       await cancelKernelJob(job.jobId);

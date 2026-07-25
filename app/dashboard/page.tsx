@@ -25,8 +25,6 @@ import { ExpandableHuntCard } from "@/components/expandable-hunt-card";
 import { CycleNarrativePanel } from "@/components/cycle-narrative-panel";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreconditionModal } from "@/components/precondition-modal";
-import { TelegramModal } from "@/components/telegram-modal";
-import { FundingModal } from "@/components/funding-modal";
 import { NaryoFeed } from "@/components/naryo-feed";
 import { RagStatusLine } from "@/components/rag-status-line";
 import { CreateAgentModal } from "@/components/create-agent-modal";
@@ -38,6 +36,7 @@ import { SwarmStatusBar } from "@/components/swarm-status-bar";
 import { SwarmActivityTicker } from "@/components/swarm-activity-ticker";
 import { InProgressHuntBanner } from "@/components/in-progress-hunt-banner";
 import { KernelJobsPanel } from "@/components/kernel-jobs-panel";
+import { ProtectedWorkspaceOverview } from "@/components/protected-workspace-overview";
 // DebateTheater removed — debate data is shown inside ExpandableHuntCard
 
 function formatFeedSyncedAge(ms: number): string {
@@ -64,9 +63,7 @@ export default function DashboardPage() {
   const {
     user,
     userId,
-    linkCode,
     telegramVerified,
-    refreshLinkCode,
     agentBalance,
     agentBalanceFetchedAt,
     refetch: refetchUser,
@@ -400,21 +397,6 @@ export default function DashboardPage() {
     <>
       <DashboardOnboardingModal open={showOnboarding} onDismiss={() => setShowOnboarding(false)} />
       <main className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
-      {/* Unskippable Telegram verification modal */}
-      {user && !telegramVerified && (
-        <TelegramModal linkCode={linkCode} onRefresh={refreshLinkCode} />
-      )}
-
-      {/* Unskippable funding modal — shown after Telegram is verified but the
-          live proxy wallet is empty. Uses agentBalance (Arc RPC direct) so a
-          fresh top-up auto-dismisses the modal on the next 5s poll. */}
-      {user && telegramVerified && (agentBalance ?? user.fund.depositedUsdc) === 0 && user.proxyWallet?.address && (
-        <FundingModal
-          proxyAddress={user.proxyWallet.address}
-          onNavigate={(href) => router.push(href)}
-        />
-      )}
-
       <div className="min-w-0 space-y-4">
 
       {/* Degraded-cycle banner: only rendered when the last committed cycle
@@ -456,10 +438,17 @@ export default function DashboardPage() {
         </p>
       </motion.section>
 
+      <motion.div {...sectionReveal} transition={{ delay: reduceMotion ? 0 : 0.03 }} data-dashboard-order="next-action">
+        <ProtectedWorkspaceOverview onPublish={() => setShowCreateAgent(true)} />
+      </motion.div>
+
       <motion.div {...sectionReveal} transition={{ delay: reduceMotion ? 0 : 0.04 }} data-dashboard-order="protected-jobs">
         <KernelJobsPanel />
       </motion.div>
 
+      <details className="rounded-xl border border-void-800 bg-void-900/35 p-3">
+        <summary className="cursor-pointer rounded-lg px-2 py-3 text-sm font-semibold text-void-300 focus-visible:outline-none">Legacy hunt, funding, telemetry, and pack</summary>
+        <div className="mt-4 space-y-4 border-t border-void-800 pt-4">
       <motion.div {...sectionReveal} transition={{ delay: reduceMotion ? 0 : 0.08 }} data-dashboard-order="observed-balance">
         <NasdaqHeader
           fund={fund}
@@ -934,6 +923,8 @@ export default function DashboardPage() {
             Network activity is platform-wide telemetry, not personal job evidence.
           </p>
         </motion.section>
+        </div>
+      </details>
       </div>
     </main>
     {showCreateAgent && (

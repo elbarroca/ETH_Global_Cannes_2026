@@ -23,9 +23,9 @@ import { useUser } from "@/contexts/user-context";
 import { arcAddressUrl, inftTokenUrl } from "@/lib/links";
 
 const PRIMARY = [
-  { href: "/dashboard", label: "Workspace", icon: SquaresFourIcon },
   { href: "/marketplace", label: "Agents", icon: RobotIcon },
   { href: "/verify", label: "Proof", icon: ShieldCheckIcon },
+  { href: "/dashboard", label: "Workspace", icon: SquaresFourIcon },
 ] as const;
 
 const ACCOUNT = [
@@ -78,13 +78,13 @@ export function Nav() {
   return (
     <MotionConfig reducedMotion="user" transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}>
       <header className="sticky top-0 z-50 border-b border-void-800 bg-void-950/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-screen-2xl items-center gap-3 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label="AlphaDawg home">
-            <DawgLogo animated className="h-9 w-9" />
+            <DawgLogo animated className="h-8 w-8" />
             <span className="hidden text-base font-bold tracking-[-0.02em] text-void-100 sm:inline">AlphaDawg</span>
           </Link>
 
-          <nav aria-label="Primary" className="mx-auto hidden h-full items-center gap-1 md:flex">
+          <nav aria-label="Primary" className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 md:flex">
             {PRIMARY.map(({ href, label, icon: Icon }) => {
               const active = isActive(pathname, href);
               return (
@@ -108,7 +108,7 @@ export function Nav() {
             })}
           </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {mounted && (
               <details className="group relative hidden md:block" onKeyDown={(event) => {
                 if (event.key === "Escape") event.currentTarget.removeAttribute("open");

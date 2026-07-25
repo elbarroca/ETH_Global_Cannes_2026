@@ -22,6 +22,7 @@ const POLL_MS = 2_000;
 const STATE_LABEL: Record<JobState, string> = {
   QUEUED: "Queued",
   RUNNING: "Running",
+  DELIVERY_READY: "Delivering",
   SUCCEEDED: "Succeeded",
   FAILED: "Failed",
   CANCELED: "Canceled",
@@ -29,7 +30,7 @@ const STATE_LABEL: Record<JobState, string> = {
 };
 
 function jobStateEvidence(job: Pick<KernelJobListItem, "state" | "evidence">): EvidenceState {
-  if (job.state === "QUEUED" || job.state === "RUNNING") return "pending";
+  if (job.state === "QUEUED" || job.state === "RUNNING" || job.state === "DELIVERY_READY") return "pending";
   if (job.state === "SUCCEEDED") {
     return job.evidence.receipt === "verified" ? "verified" : "failed";
   }
@@ -61,7 +62,7 @@ export function KernelJobsPanel() {
     void load();
   }, [load]);
 
-  const hasActiveJob = jobs?.some((job) => job.state === "QUEUED" || job.state === "RUNNING") ?? false;
+  const hasActiveJob = jobs?.some((job) => job.state === "QUEUED" || job.state === "RUNNING" || job.state === "DELIVERY_READY") ?? false;
   useEffect(() => {
     if (!hasActiveJob) return;
     let canceled = false;
@@ -95,6 +96,7 @@ export function KernelJobsPanel() {
     const next: Record<JobState, number> = {
       QUEUED: 0,
       RUNNING: 0,
+      DELIVERY_READY: 0,
       SUCCEEDED: 0,
       FAILED: 0,
       CANCELED: 0,
@@ -205,6 +207,7 @@ export function KernelJobsPanel() {
                             <p className="mt-1 text-xs text-void-500">
                               Created {job.createdAt} · {job.agent.priceAtomic} {job.agent.asset}
                             </p>
+                            {job.state === "DELIVERY_READY" && <p className="mt-1 text-xs text-dawg-300">Verified delivery evidence is ready; payment finalization and terminal success remain pending.</p>}
                             {job.cancelRequestedAt && !cancelable && (job.state === "QUEUED" || job.state === "RUNNING") && (
                               <p className="mt-1 text-xs text-dawg-300">Cancellation requested {job.cancelRequestedAt}</p>
                             )}

@@ -5,7 +5,9 @@ import type {
   KernelJobDetail,
   KernelJobListItem,
   JobSnapshot,
-  PublishedAgent,
+  ProtectedPublishedAgent,
+  PinnedAgentSkill,
+  AgentNativeConnection,
   SubmittedJob,
 } from "@/src/kernel/types";
 import type { TokenPick } from "@/src/types/index";
@@ -16,7 +18,7 @@ export type {
   KernelJobDetail,
   KernelJobListItem,
   JobSnapshot,
-  PublishedAgent,
+  ProtectedPublishedAgent,
   SubmittedJob,
 } from "@/src/kernel/types";
 
@@ -340,16 +342,34 @@ export interface CreateAgentDraftInput {
   agentId?: string;
 }
 
-export async function getPublishedAgents(signal?: AbortSignal): Promise<PublishedAgent[]> {
-  const response = await apiFetch<{ agents: PublishedAgent[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
+export interface AgentRecommendation {
+  reviewedPromptDraft: string;
+  pinnedSkills: readonly PinnedAgentSkill[];
+  nativeConnections: readonly AgentNativeConnection[];
+  mcp: readonly [];
+  readiness: "READY" | "REFUSED";
+  reasons: readonly string[];
+}
+
+export async function getAgentRecommendations(
+  requestedSkills: readonly string[],
+): Promise<AgentRecommendation> {
+  return apiFetch<AgentRecommendation>("/api/kernel/agent-recommendations", {
+    method: "POST",
+    body: JSON.stringify({ requestedSkills }),
+  });
+}
+
+export async function getPublishedAgents(signal?: AbortSignal): Promise<ProtectedPublishedAgent[]> {
+  const response = await apiFetch<{ agents: ProtectedPublishedAgent[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
     cache: "no-store",
     signal,
   });
   return response.agents;
 }
 
-export async function getAgentLifecycle(signal?: AbortSignal): Promise<{ agents: PublishedAgent[]; drafts: AgentLifecycleVersion[] }> {
-  return apiFetch<{ agents: PublishedAgent[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
+export async function getAgentLifecycle(signal?: AbortSignal): Promise<{ agents: ProtectedPublishedAgent[]; drafts: AgentLifecycleVersion[] }> {
+  return apiFetch<{ agents: ProtectedPublishedAgent[]; drafts: AgentLifecycleVersion[] }>("/api/kernel/agents", {
     cache: "no-store",
     signal,
   });

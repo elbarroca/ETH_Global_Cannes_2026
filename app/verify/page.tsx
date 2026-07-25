@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { ArrowSquareOutIcon, CheckIcon, SpinnerGapIcon } from "@phosphor-icons/react";
+import { ArrowSquareOutIcon, CheckIcon, ShieldCheckIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Card, CardBody, CodeBlock } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DawgSpinner } from "@/components/dawg-spinner";
@@ -137,6 +138,7 @@ export default function VerifyPage() {
 function VerifyContent() {
   const searchParams = useSearchParams();
   const jobId = searchParams.get("jobId");
+  const cycle = searchParams.get("cycle");
   if (jobId && UUID_PATTERN.test(jobId)) {
     return (
       <main className="mx-auto max-w-[90rem] space-y-5 px-4 py-6 sm:px-6 lg:px-8">
@@ -152,7 +154,20 @@ function VerifyContent() {
       </main>
     );
   }
-  return <LegacyCycleVerifyContent />;
+  if (jobId) {
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+        <Card><CardBody className="space-y-4 py-10 text-center"><p className="instrument-label">Protected proof refusal</p><h1 className="text-2xl font-semibold text-void-100">Invalid protected job ID</h1><p className="text-sm text-void-500">The job ID must be a canonical UUID. No legacy evidence was substituted.</p><Link href="/dashboard" className="instrument-button instrument-button-primary">Open protected jobs</Link></CardBody></Card>
+      </main>
+    );
+  }
+  if (cycle) return <LegacyCycleVerifyContent />;
+  return (
+    <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+      <header className="border-b border-void-800 pb-5"><p className="instrument-label">AlphaDawg proof system</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-void-100">Protected proof</h1><p className="mt-2 text-sm text-void-500">Choose an authenticated protected job. Missing evidence remains unavailable.</p></header>
+      <Card className="mt-6"><CardBody className="space-y-4 py-12 text-center"><ShieldCheckIcon size={28} className="mx-auto text-dawg-400" aria-hidden /><h2 className="text-xl font-semibold text-void-100">No protected job selected</h2><p className="mx-auto max-w-md text-sm leading-relaxed text-void-500">Open Protected jobs in the workspace, then choose Verify view for the exact buyer-owned job.</p><Link href="/dashboard" className="instrument-button instrument-button-primary">Open protected jobs</Link><details className="mx-auto max-w-lg rounded-xl border border-void-800 p-3 text-left"><summary className="cursor-pointer text-xs font-semibold text-void-400">Legacy cycle evidence</summary><p className="mt-2 text-xs text-void-600">Legacy hunt evidence is secondary and available only with an explicit cycle query.</p></details></CardBody></Card>
+    </main>
+  );
 }
 
 function LegacyCycleVerifyContent() {

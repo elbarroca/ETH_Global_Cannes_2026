@@ -387,3 +387,8 @@ Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 - Preserved the byte-for-byte research archive and split its SHA-256 integrity gate from authored-control whitespace checks after independent post-commit audit.
 - Reconciled the independent premortem and submission audits; sprint and split-prompt IDs now use `C0/A1/P0/E0/U0/A2/A2R/A3/A4/A5/A6-A7/VA` consistently.
 - No dependency install, feature code, push, deployment, signature, transaction, form submission, spend, or track promotion occurred.
+# 2026-07-25 — A5 Option 1 protected localhost UX
+
+- Rebuilt the landing and workspace hierarchy around protected publication, external hire, authenticated proof, and fail-closed evidence.
+- Added schema-v2 reviewed draft preparation, protected deterministic recommendations, persisted draft visibility, self-hire refusal, DELIVERY_READY pending treatment, and explicit reauthentication for legacy hire 401/403 responses.
+- Kept hunt, iNFT, Hedera, Naryo, funding, and telemetry available only as collapsed or configured supporting surfaces; no live or release claim was promoted.

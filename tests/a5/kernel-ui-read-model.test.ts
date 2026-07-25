@@ -134,19 +134,18 @@ test("A5 read models remain owner-scoped, redacted, and evidence-driven", async 
     });
     assert.equal(worker.claimed, 1);
 
-    const succeeded = await getBuyerJobDetail(BUYER_ID, queued.jobId, {
+    const deliveryReady = await getBuyerJobDetail(BUYER_ID, queued.jobId, {
       sql: database.sql,
     });
-    assert.equal(succeeded?.state, "SUCCEEDED");
-    assert.equal(succeeded?.evidence.ens, "verified");
-    assert.equal(succeeded?.evidence.receipt, "verified");
-    assert.equal(succeeded?.evidence.compute, "unavailable");
-    assert.equal(succeeded?.evidence.storage, "unavailable");
-    assert.equal(succeeded?.evidenceDetail.receipt?.verified, true);
-    assert.equal(succeeded?.evidenceDetail.financial.settlement?.amountAtomic, "1000");
-    assert.equal(succeeded?.evidenceDetail.financial.refund, null);
-    assert.equal(succeeded?.evidenceDetail.delivery?.resultHash.length, 64);
-    const serialized = JSON.stringify(succeeded);
+    assert.equal(deliveryReady?.state, "DELIVERY_READY");
+    assert.equal(deliveryReady?.evidence.ens, "verified");
+    assert.equal(deliveryReady?.evidence.compute, "unavailable");
+    assert.equal(deliveryReady?.evidence.storage, "unavailable");
+    assert.equal(deliveryReady?.evidenceDetail.receipt?.verified, true);
+    assert.equal(deliveryReady?.evidenceDetail.financial.settlement, null);
+    assert.equal(deliveryReady?.evidenceDetail.financial.refund, null);
+    assert.equal(deliveryReady?.evidenceDetail.delivery, null);
+    const serialized = JSON.stringify(deliveryReady);
     assert.doesNotMatch(serialized, /request_bytes|requestBytes|receipt_bytes|record_bytes/i);
 
     await database.sql`ALTER TABLE receipts DISABLE TRIGGER USER`;

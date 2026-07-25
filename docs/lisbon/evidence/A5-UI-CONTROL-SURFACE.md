@@ -1,5 +1,13 @@
 # A5 Whole-Product UI and Protected Control Surface Evidence
 
+## Option 1 protected localhost handoff on 2026-07-25
+
+Frontend task `A5-LOCALHOST-CREATOR-HIRE-UX-20260725:W1:62C2F04` aligns the current product with the selected Option 1 reference while preserving the existing shell. The landing now leads with `Publish an agent buyers can verify.`, a truthful schema-v2 Example draft, stable anchors, linear Publish / Hire / Prove, configured-reference evidence index, and no fake metrics or live claims. The workspace leads with next action, owned drafts/published versions, protected jobs, and proof; legacy hunt/funding/telemetry remains collapsed.
+
+The creator calls authenticated deterministic `POST /api/kernel/agent-recommendations`, saves a private draft, binds ENS, prepares the inert write plan, shows exact server-owned price/owner/hashes/subname, then requires explicit final publication. The registry separates owned, external, and capability-matched versions; self-hire is refused. `/verify` defaults to protected proof discovery, and `DELIVERY_READY` remains pending with zero settlement and continued polling. `EvidenceIndexItem` derives ENS, 0G Compute, Storage, receipt, and Uniswap-unavailable state only from authenticated job detail. Supporting iNFT/Hedera/Naryo is absent unless evidence exists.
+
+No protected low/mid/high policy field exists in the current Kernel recommendation or job contract. The UI reports that connection gap and does not substitute the legacy hunt risk profile. A4 remains blocked by six stale `SUCCEEDED`/settlement/commission expectations against intentional `DELIVERY_READY`; A3 remains `BLOCKED_MISSING_LOCAL_GO`. No live, sponsor, wallet-signature, transaction, managed migration, deployment, push, or claim effect occurred.
+
 - Task: `A5-UI-CONTROL-SURFACE-20260724`
 - Sprint: `A5`
 - Start/control SHA: `1ccadb6fec02b3bcae7cf1c16f5b707fe1c240a9`

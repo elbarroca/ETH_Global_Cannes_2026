@@ -7,13 +7,13 @@ import { CopyableIdentifier, EvidenceStatus } from "@/components/ui/evidence";
 import {
   ApiError,
   submitKernelJob,
-  type PublishedAgent,
+  type ProtectedPublishedAgent,
   type SubmittedJob,
 } from "@/lib/api";
 import type { EvidenceState } from "@/src/kernel/types";
 
 interface KernelJobDialogProps {
-  agent: PublishedAgent;
+  agent: ProtectedPublishedAgent;
   onClose: () => void;
   onSubmitted?: (job: SubmittedJob) => void;
 }
@@ -38,7 +38,7 @@ function submissionError(error: unknown): string {
 }
 
 function jobEvidenceState(job: SubmittedJob): EvidenceState {
-  if (job.state === "QUEUED" || job.state === "RUNNING") return "pending";
+  if (job.state === "QUEUED" || job.state === "RUNNING" || job.state === "DELIVERY_READY") return "pending";
   if (job.state === "SUCCEEDED") return "unavailable";
   if (job.state === "FAILED") return "failed";
   return "unavailable";
@@ -56,6 +56,12 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
   }, []);
 
   async function submit(): Promise<void> {
+    if (agent.ownedByViewer || !agent.hireable || agent.canonicalState !== "CANONICAL") {
+      setErrorMessage(agent.ownedByViewer
+        ? "Self-hire refused: buyer wallet must differ from the publishing owner."
+        : agent.refusalReason ?? "This version is not eligible for protected hire.");
+      return;
+    }
     const normalizedPrompt = prompt.trim();
     if (!idempotencyKey || normalizedPrompt.length < 1 || normalizedPrompt.length > 2_000) return;
 
@@ -141,11 +147,11 @@ export function KernelJobDialog({ agent, onClose, onSubmitted }: KernelJobDialog
             <button
               type="button"
               onClick={submit}
-              disabled={submitting || !idempotencyKey || prompt.trim().length < 1}
+              disabled={submitting || !idempotencyKey || prompt.trim().length < 1 || agent.ownedByViewer || !agent.hireable || agent.canonicalState !== "CANONICAL"}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-dawg-500 px-5 text-sm font-bold text-black hover:bg-dawg-400 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" aria-hidden="true" />}
-              {submitting ? "Submitting safely…" : errorMessage ? "Retry same request" : "Submit protected job"}
+              {agent.ownedByViewer ? "Self-hire refused" : submitting ? "Submitting safely…" : errorMessage ? "Retry same request" : "Submit protected job"}
             </button>
           </div>
         </div>

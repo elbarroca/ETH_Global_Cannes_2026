@@ -14,7 +14,7 @@ import type { EvidenceState, KernelJobDetail } from "@/src/kernel/types";
 function financialState(job: KernelJobDetail): EvidenceState {
   const { settlement, refund } = job.evidenceDetail.financial;
   if (settlement || refund) return "verified";
-  if (job.state === "QUEUED" || job.state === "RUNNING") return "pending";
+  if (job.state === "QUEUED" || job.state === "RUNNING" || job.state === "DELIVERY_READY") return "pending";
   return job.state === "SUCCEEDED" || job.state === "FAILED" ? "failed" : "unavailable";
 }
 

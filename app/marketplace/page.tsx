@@ -9,13 +9,16 @@ import { DawgSpinner } from "@/components/dawg-spinner";
 import { CreateAgentModal } from "@/components/create-agent-modal";
 import { KernelJobDialog } from "@/components/kernel-job-dialog";
 import {
+  ApiError,
   fireAgent,
+  getAgentLifecycle,
+  getAgentRecommendations,
   getLeaderboard,
   getMyAgents,
-  getPublishedAgents,
   hireAgent,
+  type AgentLifecycleVersion,
   type HiredAgent,
-  type PublishedAgent,
+  type ProtectedPublishedAgent,
 } from "@/lib/api";
 import type {
   Agent,
@@ -63,19 +66,27 @@ export default function MarketplacePage() {
   const [loadingMarketplace, setLoadingMarketplace] = useState(true);
   const [hiringName, setHiringName] = useState<string | null>(null);
   const [firingName, setFiringName] = useState<string | null>(null);
+  const [legacyHireError, setLegacyHireError] = useState<string | null>(null);
   const [health, setHealth] = useState<SwarmHealthResponse | null>(null);
   const [earnings, setEarnings] = useState<MarketplaceEarningsResponse | null>(null);
   const [showCreateAgent, setShowCreateAgent] = useState(false);
-  const [publishedAgents, setPublishedAgents] = useState<PublishedAgent[]>([]);
+  const [publishedAgents, setPublishedAgents] = useState<ProtectedPublishedAgent[]>([]);
+  const [draftAgents, setDraftAgents] = useState<AgentLifecycleVersion[]>([]);
   const [loadingPublished, setLoadingPublished] = useState(true);
   const [publishedError, setPublishedError] = useState<string | null>(null);
-  const [selectedPublishedAgent, setSelectedPublishedAgent] = useState<PublishedAgent | null>(null);
+  const [selectedPublishedAgent, setSelectedPublishedAgent] = useState<ProtectedPublishedAgent | null>(null);
+  const [goal, setGoal] = useState("");
+  const [recommendedSkillIds, setRecommendedSkillIds] = useState<readonly string[]>([]);
+  const [recommendationStatus, setRecommendationStatus] = useState<string | null>(null);
+  const [recommendationBusy, setRecommendationBusy] = useState(false);
 
   const fetchProtectedAgents = useCallback(async () => {
     setLoadingPublished(true);
     setPublishedError(null);
     try {
-      setPublishedAgents(await getPublishedAgents());
+      const lifecycle = await getAgentLifecycle();
+      setPublishedAgents(lifecycle.agents);
+      setDraftAgents(lifecycle.drafts);
     } catch (error) {
       setPublishedAgents([]);
       setPublishedError(error instanceof Error ? error.message : "Published agents could not be loaded.");
@@ -87,6 +98,37 @@ export default function MarketplacePage() {
   useEffect(() => {
     void fetchProtectedAgents();
   }, [fetchProtectedAgents]);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("create") === "1") setShowCreateAgent(true);
+  }, []);
+
+  async function recommendForGoal(): Promise<void> {
+    const normalized = goal.toLowerCase();
+    const requested = [
+      ...(normalized.includes("risk") || normalized.includes("downside") ? ["risk-analysis"] : []),
+      ...(normalized.includes("market") || normalized.includes("price") ? ["market-analysis"] : []),
+      ...(normalized.includes("research") || normalized.includes("evidence") ? ["research"] : []),
+    ];
+    const bounded = requested.length > 0 ? [...new Set(requested)] : ["research"];
+    setRecommendationBusy(true);
+    setRecommendationStatus(null);
+    try {
+      const result = await getAgentRecommendations(bounded);
+      if (result.readiness === "REFUSED") {
+        setRecommendedSkillIds([]);
+        setRecommendationStatus(`Recommendation refused: ${result.reasons.join(", ") || "No reason returned"}.`);
+      } else {
+        setRecommendedSkillIds(result.pinnedSkills.map((skill) => skill.id));
+        setRecommendationStatus("Deterministic capability match from server-reviewed skill identifiers.");
+      }
+    } catch (error) {
+      setRecommendedSkillIds([]);
+      setRecommendationStatus(error instanceof Error ? error.message : "Protected recommendations are unavailable.");
+    } finally {
+      setRecommendationBusy(false);
+    }
+  }
 
   // Poll swarm health + marketplace earnings every 15s so the cards show live
   // online dots and cumulative USDC earned per specialist.
@@ -226,11 +268,14 @@ export default function MarketplacePage() {
   async function handleHire(registryName: string, displayName: string) {
     if (!userId) return;
     setHiringName(displayName);
+    setLegacyHireError(null);
     try {
       await hireAgent(userId, registryName);
       await fetchMyAgents();
     } catch (err) {
-      console.error("[marketplace] Hire failed:", err);
+      setLegacyHireError(err instanceof ApiError && (err.status === 401 || err.status === 403)
+        ? "Fresh wallet authorization required. Reauthenticate and provide a fresh signature, then retry this legacy hire."
+        : err instanceof Error ? err.message : "The legacy hire could not be completed.");
     } finally {
       setHiringName(null);
     }
@@ -260,6 +305,9 @@ export default function MarketplacePage() {
   const availableCount = marketplaceAgents.length;
   const viewerPublishedAgents = publishedAgents.filter((agent) => agent.ownedByViewer);
   const availablePublishedAgents = publishedAgents.filter((agent) => !agent.ownedByViewer);
+  const recommendedAgents = recommendedSkillIds.length === 0 ? [] : availablePublishedAgents.filter((agent) =>
+    agent.capabilities.some((capability) => recommendedSkillIds.includes(capability)),
+  );
 
   // Top-5 ELO standings — drawn from the same leaderboard fetch so the strip
   // at the top of the marketplace is always coherent with the cards below.
@@ -268,7 +316,7 @@ export default function MarketplacePage() {
     .slice(0, 5);
 
   return (
-    <main className="mx-auto max-w-[90rem] space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <main className="mx-auto min-w-0 max-w-[90rem] space-y-8 overflow-x-clip px-4 py-6 sm:px-6 lg:px-8">
       <section className="space-y-4" aria-labelledby="protected-agent-registry-title">
         <div className="relative overflow-hidden rounded-xl border border-dawg-500/30 bg-black p-5 sm:p-8">
           <div className="brand-hairline absolute inset-x-0 top-0 h-0.5" aria-hidden="true" />
@@ -295,6 +343,13 @@ export default function MarketplacePage() {
           </div>
         </div>
 
+        <div className="grid min-w-0 gap-3 rounded-xl border border-void-800 bg-void-900 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+          <div className="min-w-0"><label htmlFor="agent-goal" className="text-xs font-semibold text-void-300">What do you need done?</label><input id="agent-goal" value={goal} onChange={(event) => setGoal(event.target.value)} maxLength={240} placeholder="Research evidence and flag downside risk" className="mt-2 min-h-11 w-full rounded-[10px] border border-void-700 bg-black px-3 text-sm text-void-100" /><p className="mt-2 text-xs text-void-500">Matches bounded words to server-reviewed capabilities. It does not claim an LLM searched the marketplace.</p></div>
+          <button type="button" onClick={() => void recommendForGoal()} disabled={recommendationBusy || goal.trim().length < 2} className="instrument-button instrument-button-primary">{recommendationBusy ? "Matching" : "Recommend agents"}</button>
+        </div>
+        {recommendationStatus && <p role="status" className="text-xs text-void-400">{recommendationStatus}</p>}
+        {recommendedSkillIds.length > 0 && <ProtectedAgentGroup title="Recommended for this goal" subtitle={`Capability match: ${recommendedSkillIds.join(", ")}`} agents={recommendedAgents} empty="No external published version matches these reviewed capabilities." onRun={setSelectedPublishedAgent} />}
+
         {loadingPublished ? (
           <EmptyState>
             <DawgSpinner size={56} label="Loading published agents…" />
@@ -312,6 +367,7 @@ export default function MarketplacePage() {
           </div>
         ) : (
           <div className="space-y-6">
+            <DraftAgentGroup agents={draftAgents} />
             <ProtectedAgentGroup
               title="Published by you"
               subtitle="Immutable protected versions owned by the authenticated wallet."
@@ -320,7 +376,7 @@ export default function MarketplacePage() {
               onRun={setSelectedPublishedAgent}
             />
             <ProtectedAgentGroup
-              title="Available agents"
+              title="Hireable external versions"
               subtitle="Versions published by other owners. Runtime availability is not inferred from publication."
               agents={availablePublishedAgents}
               empty="No agent versions from other owners are published yet."
@@ -524,6 +580,7 @@ export default function MarketplacePage() {
             <Badge variant="gray">Legacy flow</Badge>
           }
         />
+        {legacyHireError && <div role="alert" className="rounded-xl border border-blood-500/30 bg-blood-900/20 p-3"><p className="text-sm font-semibold text-blood-200">Legacy hire needs reauthentication</p><p className="mt-1 text-sm text-blood-300">{legacyHireError}</p></div>}
 
         {loadingMarketplace ? (
           <EmptyState>
@@ -595,9 +652,9 @@ function ProtectedAgentGroup({
 }: {
   title: string;
   subtitle: string;
-  agents: PublishedAgent[];
+  agents: ProtectedPublishedAgent[];
   empty: string;
-  onRun: (agent: PublishedAgent) => void;
+  onRun: (agent: ProtectedPublishedAgent) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -621,7 +678,7 @@ function ProtectedAgentCard({
   agent,
   onRun,
 }: {
-  agent: PublishedAgent;
+  agent: ProtectedPublishedAgent;
   onRun: () => void;
 }) {
   return (
@@ -631,7 +688,7 @@ function ProtectedAgentCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-bold text-void-100">{agent.name}</h3>
-              <EvidenceStatus state={agent.canonicalState === "CANONICAL" ? "verified" : "pending"} label={agent.canonicalState === "CANONICAL" ? "Canonical" : "Published"} />
+              <EvidenceStatus state={agent.canonicalState === "CANONICAL" ? "verified" : "unavailable"} label={agent.canonicalState === "CANONICAL" ? "Canonical" : agent.canonicalState} />
               {agent.ownedByViewer && <Badge variant="gray">Yours</Badge>}
             </div>
             {agent.fullSubname && (
@@ -658,22 +715,38 @@ function ProtectedAgentCard({
         <div className="grid min-w-0 gap-2 sm:grid-cols-2">
           <CopyableIdentifier label="Owner wallet" value={agent.ownerWallet} />
           <CopyableIdentifier label="Manifest hash" value={agent.manifestHash} />
+          <CopyableIdentifier label="Creator parent" value={agent.creatorParent} />
+          <CopyableIdentifier label="Agent subname" value={agent.fullSubname} />
+          <CopyableIdentifier label="Authority owner" value={agent.authorityOwner} />
+          <CopyableIdentifier label="Authority delegate" value={agent.authorityDelegate ?? "Unavailable"} />
+          <CopyableIdentifier label="Release SHA" value={agent.authorityReleaseSha} />
+          <CopyableIdentifier label="Publication decision" value={agent.publicationDecisionId} />
         </div>
 
         <div className="flex flex-col gap-3 border-t border-void-800 pt-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-md text-xs leading-relaxed text-void-500">
-            Runtime status is unknown until a job records its own evidence.
+            {agent.ownedByViewer ? "Self-hire refused: buyer wallet must differ from the publishing owner." : "Runtime status is unknown until a job records its own evidence."}
           </p>
           <button
             type="button"
             onClick={onRun}
+            disabled={agent.ownedByViewer || !agent.hireable || agent.canonicalState !== "CANONICAL"}
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-dawg-500/40 bg-dawg-500/10 px-4 text-sm font-semibold text-dawg-300 transition-colors hover:border-dawg-500/70 hover:bg-dawg-500/15"
           >
-            Submit protected job
+            {agent.ownedByViewer ? "Published by you" : "Submit protected job"}
           </button>
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+function DraftAgentGroup({ agents }: { agents: AgentLifecycleVersion[] }) {
+  return (
+    <div className="space-y-3">
+      <SectionHeader title="Your persisted drafts" subtitle="Private lifecycle records; never shown as published or hireable." count={agents.length} />
+      {agents.length === 0 ? <EmptyState>No saved protected drafts.</EmptyState> : <div className="grid gap-3 lg:grid-cols-2">{agents.map((agent) => <Card key={agent.versionId} className="min-w-0 overflow-hidden"><CardBody className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-void-100">{agent.name}</h3><EvidenceStatus state="unavailable" label={agent.lifecycleState} /></div><p className="text-sm text-void-500">Draft version {agent.version}; not published or hireable.</p><div className="grid min-w-0 gap-2 sm:grid-cols-2"><CopyableIdentifier label="Version ID" value={agent.versionId} /><CopyableIdentifier label="Manifest hash" value={agent.manifestHash} /></div></CardBody></Card>)}</div>}
+    </div>
   );
 }
 

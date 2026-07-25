@@ -45,7 +45,6 @@ const JOB_ID = "55555555-5555-4555-8555-555555555555";
 const EFFECT_ID = "d".repeat(64);
 const TEST_WALLET = "0x1111111111111111111111111111111111111111";
 const TELEGRAM_LINK_CODE = "A5LINK42";
-const TELEGRAM_CODE_TTL_MS = 10 * 60 * 1000;
 
 const TELEGRAM_USER = {
   id: "telegram-user",
@@ -285,6 +284,7 @@ interface ApiMockOptions {
   onJobSubmit?: () => void;
   onCancel?: () => void;
   user?: typeof TELEGRAM_USER | typeof DASHBOARD_USER;
+  onAgentAction?: (action: string) => void;
 }
 
 async function fulfillJson(route: Route, body: unknown, status = 200): Promise<void> {
@@ -329,6 +329,7 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}): Promis
     if (path === "/api/kernel/agents") {
       if (request.method() === "POST") {
         const requestBody = request.postDataJSON() as { action?: string };
+        options.onAgentAction?.(requestBody.action ?? "UNKNOWN");
         await fulfillJson(route, {
           action: requestBody.action ?? "UNKNOWN",
           version: OWNER_AGENT,
@@ -350,7 +351,20 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}): Promis
         }, 201);
         return;
       }
-      await fulfillJson(route, { agents: [OWNER_AGENT, AVAILABLE_AGENT] });
+      await fulfillJson(route, { agents: [OWNER_AGENT, AVAILABLE_AGENT], drafts: [] });
+      return;
+    }
+    if (path === "/api/kernel/agent-recommendations") {
+      const requestBody = request.postDataJSON() as { requestedSkills?: string[] };
+      const skills = requestBody.requestedSkills ?? [];
+      await fulfillJson(route, {
+        reviewedPromptDraft: `## Role\nProtected agent\n\n## Reviewed skills\n${skills.map((skill) => `- ${skill}`).join("\n")}`,
+        pinnedSkills: skills.map((id) => ({ id, source: `kernel://skills/${id}@1`, reviewedHash: "a".repeat(64), policy: "metadata-only-never-execute" })),
+        nativeConnections: [{ id: "zero-g-compute", required: true }, { id: "zero-g-storage", required: true }],
+        mcp: [],
+        readiness: skills.length > 0 ? "READY" : "REFUSED",
+        reasons: skills.length > 0 ? [] : ["AT_LEAST_ONE_SUPPORTED_SKILL_REQUIRED"],
+      });
       return;
     }
     if (path === "/api/kernel/jobs") {
@@ -410,9 +424,9 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}): Promis
   });
 }
 
-async function installInjectedWallet(page: Page): Promise<void> {
-  await page.addInitScript(({ walletAddress, chainId }) => {
-    let connected = false;
+async function installInjectedWallet(page: Page, initiallyConnected = false): Promise<void> {
+  await page.addInitScript(({ walletAddress, chainId, initiallyConnected: connectedAtStart }) => {
+    let connected = connectedAtStart;
     const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
     const provider = {
       request: async ({ method }: { method: string }): Promise<unknown> => {
@@ -447,6 +461,7 @@ async function installInjectedWallet(page: Page): Promise<void> {
   }, {
     walletAddress: TEST_WALLET,
     chainId: "0x4cef52",
+    initiallyConnected,
   });
 }
 
@@ -456,7 +471,7 @@ test.beforeEach(async ({ page }) => {
 
 test("preserves the product shell without horizontal overflow", async ({ page }) => {
   const widths = [390, 768, 1024, 1280, 1440];
-  const routes = ["/", "/marketplace", "/dashboard", "/infrastructure"];
+  const routes = ["/", "/marketplace", "/dashboard", "/verify", "/infrastructure"];
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
     for (const path of routes) {
@@ -469,7 +484,7 @@ test("preserves the product shell without horizontal overflow", async ({ page })
 });
 
 test("keeps navigation compact, active, and keyboard operable", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize({ width: 1440, height: 1024 });
   await page.goto("/dashboard");
   const activeDashboard = page.getByRole("link", { name: "Workspace", exact: true }).first();
   await expect(activeDashboard).toHaveAttribute("aria-current", "page");
@@ -501,13 +516,9 @@ test("prioritizes protected work and keeps network telemetry fail closed", async
   await expect(page.getByRole("heading", { name: "Hire immutable agents. Inspect exact proof." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Protected jobs" })).toBeVisible();
   const orderedRegions = page.locator("[data-dashboard-order]");
-  await expect(orderedRegions).toHaveCount(3);
-  await expect(orderedRegions.nth(0)).toHaveAttribute("data-dashboard-order", "protected-jobs");
-  await expect(orderedRegions.nth(1)).toHaveAttribute("data-dashboard-order", "observed-balance");
-  await expect(orderedRegions.nth(2)).toHaveAttribute("data-dashboard-order", "network-telemetry");
-  await expect(page.getByText("Freshness").locator("..")).toContainText("Unavailable");
-  await expect(page.getByText("Release SHA").locator("..")).toContainText("Unavailable");
-  await expect(page.getByText("Network activity is platform-wide telemetry, not personal job evidence.")).toBeVisible();
+  await expect(orderedRegions.nth(0)).toHaveAttribute("data-dashboard-order", "next-action");
+  await expect(orderedRegions.nth(1)).toHaveAttribute("data-dashboard-order", "protected-jobs");
+  await expect(page.getByText("Network activity is platform-wide telemetry, not personal job evidence.")).toBeHidden();
   await page.getByRole("button", { name: "Expand evidence" }).click();
   await expect(page.getByText(/Error code: STORAGE_READBACK_MISMATCH/).first()).toBeVisible();
   await expect(page.getByTestId("protected-work-hero")).toHaveCSS("opacity", "1");
@@ -531,123 +542,50 @@ test("keeps long identity evidence contained", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/dashboard");
   await page.getByRole("button", { name: "Connect Wallet" }).click();
-  await page.locator("details").filter({ hasText: "Account" }).locator("summary").click();
+  await page.locator("details > summary").filter({ hasText: /^Account/ }).first().click();
   await expect(page.getByRole("link", { name: /Connected wallet 0x1111/ })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test("presents one fail-closed agent-commerce story on the landing page", async ({ page }) => {
+  await installInjectedWallet(page, true);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize({ width: 1440, height: 1024 });
   await page.goto("/");
-
-  await expect(page.getByRole("heading", { name: "Hire agents. Verify every outcome." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open workspace" }).first()).toHaveAttribute("href", "/dashboard");
-  await expect(page.getByRole("link", { name: "Browse agents" })).toHaveAttribute("href", "/marketplace");
-  await expect(page.getByText(/Local product capture with fixture data/)).toBeVisible();
-  await expect(page.getByText(/Drafts, fixtures, caches, and HTTP 200 responses/)).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(/Observed HCS sequence|Configured explorer identifiers|How a hunt flows/);
-  await expect(page.locator(".fade-in-up").first()).toHaveCSS("opacity", "1");
+  await expect(page.getByRole("heading", { name: "Publish an agent buyers can verify." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Publish an agent" }).first()).toHaveAttribute("href", "/marketplace?create=1");
+  await expect(page.getByRole("link", { name: "Hire an agent" })).toHaveAttribute("href", "/marketplace");
+  await expect(page.getByText("Example only. This draft is not published, hireable, deployed, or verified.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Evidence, never inference." })).toBeVisible();
   await page.screenshot({
-    path: "test-results/visual/a5-landing-desktop-1440x900.png",
-    fullPage: true,
+    path: "test-results/visual/a5-option1-landing-1440x1024.png",
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Hire agents. Verify every outcome." })).toBeVisible();
-  await expect(page.locator(".fade-in-up").first()).toHaveCSS("opacity", "1");
+  await expect(page.getByRole("heading", { name: "Publish an agent buyers can verify." })).toBeVisible();
   await page.screenshot({
     path: "test-results/visual/a5-landing-mobile-390x844.png",
     fullPage: true,
   });
 });
 
-test("keeps Telegram linking explicit, contained, and fail-closed", async ({ page }) => {
-  await page.clock.install();
+test("does not gate protected workspace on Telegram or funding", async ({ page }) => {
   await installInjectedWallet(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/dashboard");
   await page.getByRole("button", { name: "Connect Wallet" }).click();
-
-  const dialog = page.getByRole("dialog", { name: "Link Telegram to this wallet session" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toBeFocused();
-  await expect(dialog).toContainText("It never replaces wallet authority.");
-  await expect(dialog.getByLabel(`One-time Telegram code ${TELEGRAM_LINK_CODE}`)).toHaveText(
-    TELEGRAM_LINK_CODE,
-  );
-  await page.keyboard.press("Shift+Tab");
-  await expect(dialog.getByRole("button", { name: "Copy code" })).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(dialog.getByRole("link", { name: "Open Telegram" })).toBeFocused();
-
-  await page.waitForTimeout(100);
-  await page.screenshot({ path: "test-results/visual/a5-telegram-mobile-390x844.png" });
-  const mobileOverflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - window.innerWidth,
-  );
-  expect(mobileOverflow).toBeLessThanOrEqual(1);
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(dialog).toBeVisible();
-  await page.waitForTimeout(100);
-  await page.screenshot({ path: "test-results/visual/a5-telegram-desktop-1440x900.png" });
-
-  await dialog.focus();
-  await page.keyboard.press("Shift+Tab");
-  await expect(dialog.getByRole("button", { name: "Copy code" })).toBeFocused();
-
-  await page.evaluate(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: async (): Promise<void> => {
-          throw new Error("Clipboard permission denied");
-        },
-      },
-    });
-  });
-  await page.keyboard.press("Enter");
-  await expect(dialog.getByText(/Clipboard access was refused/)).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Copy failed" })).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(dialog.getByRole("link", { name: "Open Telegram" })).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
-  await expect(dialog.getByRole("button", { name: "Copy failed" })).toBeFocused();
-
-  await page.evaluate(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async (): Promise<void> => undefined },
-    });
-  });
-  await page.keyboard.press("Space");
-  await expect(dialog.getByText("Code copied to the clipboard.")).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Copied" })).toBeFocused();
-
-  await page.clock.fastForward(TELEGRAM_CODE_TTL_MS + 1_000);
-  await expect(dialog.getByText("This code expired without linking an account.")).toBeVisible();
-  const refreshButton = dialog.getByRole("button", { name: "Create new code" });
-  await expect(refreshButton).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
-  await expect(refreshButton).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(refreshButton).toBeFocused();
-
-  await page.route("**/api/onboard", async (route) => {
-    await fulfillJson(route, { error: "Fresh authorization required" }, 401);
-  });
-  await page.keyboard.press("Enter");
-  await expect(dialog.getByText("A new code could not be created. Try again.")).toBeVisible();
-  await expect(refreshButton).toBeFocused();
-
+  await expect(page.getByRole("dialog", { name: "Link Telegram to this wallet session" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Protected jobs" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test("supports keyboard dialog flow and immutable publication copy", async ({ page }) => {
+  const actions: string[] = [];
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { onAgentAction: (action) => actions.push(action) });
   await page.goto("/marketplace");
   const publishButton = page.getByRole("button", { name: /Publish agent/ });
   await publishButton.click();
@@ -655,19 +593,21 @@ test("supports keyboard dialog flow and immutable publication copy", async ({ pa
   await expect(dialog).toBeVisible();
   await page.getByLabel("Agent name").fill("Manual Evidence Agent");
   await page.getByLabel("What should this agent do?").fill("Analyze bounded evidence without inventing execution claims.");
-  await page.getByRole("button", { name: "Choose capabilities" }).click();
+  await page.getByRole("button", { name: "Review selected capabilities" }).click();
   await page.screenshot({ path: "test-results/visual/a5-create-capabilities-desktop-1440x900.png" });
-  await page.getByRole("button", { name: "Write instructions", exact: true }).click();
-  await page.getByRole("button", { name: "Write instructions manually" }).click();
-  await expect(dialog).toContainText("Manual draft");
-  await page.getByRole("textbox", { name: "Instructions" }).fill("Inspect the supplied evidence, state uncertainty, and return a concise result.");
-  await page.getByRole("button", { name: "Review manifest" }).click();
+  await page.getByRole("button", { name: "Write manually" }).click();
+  await page.getByRole("textbox", { name: "Markdown instructions" }).fill("Inspect the supplied evidence, state uncertainty, and return a concise result.");
+  await page.getByRole("button", { name: "Review identity" }).click();
   await page.getByLabel("Your ENS name (creator parent)").fill("maker.eth");
+  await page.getByRole("button", { name: "Prepare immutable draft" }).click();
+  await expect(dialog).toContainText("Server returned");
+  await expect(dialog).toContainText("schema_version: 2");
   await dialog.evaluate((element) => element.scrollTo({ top: 0 }));
   await page.screenshot({ path: "test-results/visual/a5-create-review-desktop-1440x900.png" });
   await page.getByRole("button", { name: "Continue to publish" }).click();
   await page.getByRole("button", { name: "Publish immutable version" }).click();
   await expect(dialog).toContainText("Publication receipt");
+  expect(actions).toEqual(["CREATE_DRAFT", "BIND_NAME", "PREPARE_ENS_WRITE", "PUBLISH_VERSION"]);
   await expect(dialog).not.toContainText(/deployed agent|minted agent|sealed execution/i);
   await page.getByRole("button", { name: "Close dialog" }).click();
 
@@ -680,7 +620,7 @@ test("supports keyboard dialog flow and immutable publication copy", async ({ pa
 
 test("submits one job and fails closed when receipt and storage verification are absent", async ({ page }) => {
   await page.goto("/marketplace");
-  await page.getByRole("button", { name: "Submit protected job" }).nth(1).click();
+  await page.getByRole("button", { name: "Submit protected job" }).first().click();
   const dialog = page.getByRole("dialog", { name: `Run ${AVAILABLE_AGENT.name}` });
   await page.getByLabel("Task prompt").fill("Assess this evidence boundary.");
   await dialog.getByRole("button", { name: "Submit protected job" }).click();
@@ -729,7 +669,7 @@ test("renders an idempotent replay as the original job without a second submissi
     },
   });
   await page.goto("/marketplace");
-  await page.getByRole("button", { name: "Submit protected job" }).nth(1).click();
+  await page.getByRole("button", { name: "Submit protected job" }).first().click();
   const dialog = page.getByRole("dialog", { name: `Run ${AVAILABLE_AGENT.name}` });
   await page.getByLabel("Task prompt").fill("Replay this bounded request safely.");
   await dialog.getByRole("button", { name: "Submit protected job" }).click();
@@ -782,8 +722,30 @@ test("remains operable at 200 percent zoom", async ({ page }) => {
 test("honors reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const duration = await page.getByRole("link", { name: "Open workspace" }).first().evaluate((element) =>
+  const duration = await page.getByRole("link", { name: "Publish an agent" }).first().evaluate((element) =>
     getComputedStyle(element).transitionDuration,
   );
   expect(Number.parseFloat(duration)).toBeLessThanOrEqual(0.00001);
+});
+
+test("defaults proof to protected discovery and refuses malformed job ids", async ({ page }) => {
+  await page.goto("/verify");
+  await expect(page.getByRole("heading", { name: "Protected proof" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "No protected job selected" })).toBeVisible();
+  await page.goto("/verify?jobId=not-a-uuid");
+  await expect(page.getByRole("heading", { name: "Invalid protected job ID" })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("Legacy cycle evidence | hunt");
+});
+
+test("keeps DELIVERY_READY pending with zero settlement and continues polling", async ({ page }) => {
+  let reads = 0;
+  const readyList = { ...VERIFIED_JOB_LIST_ITEM, state: "DELIVERY_READY", financialOutcome: null } as const;
+  const readyDetail = { ...VERIFIED_JOB_DETAIL, state: "DELIVERY_READY", financialOutcome: null, evidenceDetail: { ...VERIFIED_JOB_DETAIL.evidenceDetail, delivery: null, financial: { settlement: null, refund: null } } } as const;
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { jobList: [readyList], jobDetail: readyDetail });
+  await page.route("**/api/kernel/jobs?jobId=*", async (route) => { reads += 1; await fulfillJson(route, { job: readyDetail }); });
+  await page.goto(`/verify?jobId=${JOB_ID}`);
+  await expect(page.getByText("Verified delivery evidence is ready. Settlement and terminal success remain pending until payment finalization succeeds.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Financial evidence" })).toContainText("No settlement or refund record is available yet.");
+  await expect.poll(() => reads, { timeout: 5_000 }).toBeGreaterThan(1);
 });
