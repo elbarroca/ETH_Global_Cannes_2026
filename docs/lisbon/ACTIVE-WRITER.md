@@ -14,7 +14,7 @@ start_sha: de6abf901f510b937f94c1eea99d68343330a5ab
 control_sha: de6abf901f510b937f94c1eea99d68343330a5ab
 token: GITHUB-BRANCH-CLEANUP-W1-DE6ABF-20260725T202640Z
 lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
-heartbeat_at: 2026-07-25T20:26:58Z
+heartbeat_at: 2026-07-25T20:29:49Z
 expires_at: 2026-07-25T21:26:58Z
 allowed_paths:
   - docs/lisbon/EXTERNAL-EFFECTS.md
@@ -23,16 +23,22 @@ started_at: 2026-07-25T20:26:58Z
 deadline: 2026-07-25T21:26:58Z
 expected_exit: archive the unique Fly commit, switch the GitHub default, delete only six authorized remote branches, and verify one remaining branch
 external_effect_authority: exact owner-authorized GITHUB-BRANCH-CLEANUP-20260725-01 tuple only; no application push force rewrite merge release deploy transaction spend or local main worktree mutation
-completed_at: null
-exit_sha: null
-verification_evidence: []
+completed_at: 2026-07-25T20:29:49Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - preflight matched all seven expected remote heads the main default branch no branch protections no repository rulesets and an absent archive tag
+  - lightweight remote tag archive/flyio-new-files-20260725 resolves exactly f87867a10ae18317c65910b3333f45d3b11f09a8
+  - GitHub default branch is Eth_global_lisbon_
+  - atomic deletion removed exactly main feat/agent-voice-debate-rewrite feat/new-theme feat/openclaw-gateway-migration feat/sprint-b and flyio-new-files
+  - post-readback exposes only Eth_global_lisbon_ at 00147dd019ccd1c50b5de6b4cc8288a365c51c5f and the Lisbon branch is unprotected
+  - local main remains bfa7bd37c573e2e49525d965f7f937210e170d72 in its existing separate worktree
 remaining_blocks:
-  - pre-effect remote default branch protection and ref readback must match the authorization row
-external_effects_attempted: none
+  - Railway CLI is absent in this shell so project-level branch binding remains a separate deployment-readiness check; repository-side selection is clear because Lisbon is the sole default branch
+external_effects_attempted: exact authorized GitHub tag creation default-branch change and six-branch atomic deletion only; no application push force rewrite merge deploy release transaction spend or local main mutation
 claim_changes: none
-verdict: IN_PROGRESS_AUTHORIZATION_RECORDING
+verdict: PASS_REMOTE_BRANCH_CLEANUP; LOCAL_APPLICATION_RELEASE_UNCHANGED
 lock_release: release only exact token GITHUB-BRANCH-CLEANUP-W1-DE6ABF-20260725T202640Z after post-effect reconciliation commit
-status: active
+status: completed
 ```
 
 ```yaml
