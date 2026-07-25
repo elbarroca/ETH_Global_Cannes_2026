@@ -3,6 +3,52 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Cycle Wirer /root/founding_skill_catalog
+task_id: A5-FOUNDING-SKILL-CATALOG-CYCLE-W1
+task_instance_id: A5-FOUNDING-SKILL-CATALOG-CYCLE-W1:W1:A07E325
+generation: 1
+sprint: Add the minimum immutable server-owned founding creation catalog
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: a07e32503b5d4b2fb72843bd489da0c814517d8a
+control_sha: a07e32503b5d4b2fb72843bd489da0c814517d8a
+token: A5-FOUNDING-SKILL-CATALOG-CYCLE-W1-A07E325-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T17:14:11Z
+expires_at: 2026-07-25T18:44:11Z
+allowed_paths:
+  - src/agents/founding-pack.ts
+  - tests/agents/founding-pack.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T17:14:11Z
+deadline: 2026-07-25T18:44:11Z
+expected_exit: immutable server-owned four-category catalog with eight deterministic protected templates and frozen reviewed source provenance
+external_effect_authority: local files existing dependencies local tests and one local commit only; no push deploy managed migration MCP provider ENS signature transaction funding form spend release or claim
+completed_at: 2026-07-25T17:19:19Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - founding pack is deeply frozen and exposes only four fixed categories nine fixed skill IDs and eight deterministic template IDs
+  - every template has exact capability and data selections price 1000 and protected A3 Compute and Storage connections
+  - DATA skills are read-only and no catalog field contains credentials client URLs executable code arbitrary tools or raw GraphQL
+  - Uniswap action is proposal-only allowlisted to Unichain Sepolia requires wallet approval and forbids signing and broadcasting
+  - reviewed Graph CoinGecko Circle and Uniswap revisions licenses paths and SHA-256 hashes are pinned; Circle is guidance-only
+  - every bounded Markdown prompt treats MCP input as untrusted cites missing data and forbids fabricated availability execution and results
+  - npx tsx --test tests/agents/founding-pack.test.ts PASS 3 of 3 exit 0
+  - npm run lint PASS 0 errors 23 inherited warnings exit 0
+  - npm run typecheck PASS exit 0
+  - git diff --check PASS exit 0
+remaining_blocks:
+  - immutable exact-SHA independent audit remains required
+  - browser and protected creation-flow integration require sequential C0 handoffs to their domain owners
+  - push deploy managed migration MCP provider ENS signature transaction funding form spend release and claims remain unauthorized
+external_effects_attempted: none
+claim_changes: none
+verdict: PASS_TO_AUDIT
+lock_release: release only exact token A5-FOUNDING-SKILL-CATALOG-CYCLE-W1-A07E325-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /claude-code/swap_failclosed_w1
 task_id: A6-SWAP-EXECUTE-FAIL-CLOSED-20260725
 task_instance_id: A6-SWAP-EXECUTE-FAIL-CLOSED-20260725:W1:A0DEB54
