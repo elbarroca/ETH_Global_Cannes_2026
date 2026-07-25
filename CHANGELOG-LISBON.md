@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W5 publication-authority immutable audit
+
+- Reconciled independent verdict `FIX` for exact SHA `5a5678cf59d8f106870a9fd26fcd42e932a6da7b`, tree `413afd57206299e3eca7ff18cdc844930b95cd9d`, and range `4a9a82b927a7f944c3b4aeffd85073726c3424f3..5a5678cf59d8f106870a9fd26fcd42e932a6da7b`.
+- Recorded two HIGH findings: authoritative runtime policy remains caller-controlled, and inherited role membership can retain direct authority-table access. Recorded three MEDIUM findings: non-finite release expiry, session-timezone-dependent convergence, and JSON processing before size bounds.
+- The full local floor otherwise passed, including both seven-migration lanes, all test lanes, checksum-pinned Go, 31-page build, and loopback HTTP 200. Cleanup completed; no external effect occurred.
+- Kept Kernel consumption, `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS, sponsor, push, release, and claims closed pending one narrowed ENS W6 repair and immutable re-audit.
+
 ## 2026-07-25 - W5 database-owned publication-decision authority remediation
 
 - Added immutable, finite-window release admission controlled by the migration/database owner; no release is seeded or inferred from fixture state, and missing or overlapping active admissions deny publication.

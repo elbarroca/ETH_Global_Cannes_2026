@@ -413,9 +413,19 @@ must separately insert one finite release window as the database owner. Without
 those prerequisites, migration or admission fails rather than weakening the
 boundary.
 
-W5 returns only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. An independent audit
-must bind the containing immutable SHA before the sequential Kernel owner may
-consume the decision by foreign key and repair its transaction-time freshness,
-event, idempotency, and body-bound findings. `A4_ACCEPTED`, A5 acceptance,
-mandatory A6 entry, live ENS, sponsor qualification, push, release, and public
-claims remain closed.
+## W5 immutable publication-authority audit
+
+- Audit SHA: `5a5678cf59d8f106870a9fd26fcd42e932a6da7b`
+- Tree: `413afd57206299e3eca7ff18cdc844930b95cd9d`
+- Audited range: `4a9a82b927a7f944c3b4aeffd85073726c3424f3..5a5678cf59d8f106870a9fd26fcd42e932a6da7b`
+- Result: `FIX; LOCAL_ONLY`
+
+The independent audit found two HIGH defects. The admission function reloads immutable version/name lineage but still accepts runtime policy fields from caller JSON, so consistently changed policy/record evidence can become `ALLOW`. It also validates direct role attributes without rejecting inherited parent memberships, allowing a pre-existing inherited privilege to survive direct revocation.
+
+Three MEDIUM defects remain. Release-window checks admit PostgreSQL non-finite timestamps; convergence hashing depends on the caller session timezone; and JSON evidence is serialized/hashed before an early size bound. Existing focused tests do not cover these cases.
+
+The prescribed floor otherwise passed: both seven-migration lanes twice with sentinel preservation; lint with zero errors and 23 inherited warnings; typecheck; foundation 9/9; auth 9/9; Kernel 17/17; checksum-pinned Go; A3 12/12; A4 22/22; A5 3/3; integration 39/39; e2e 4/4; resilience 1/1; redaction 3/3; boot; secret/shell/diff checks; 31-page build; and loopback HTTP 200. Cleanup completed and no external effect occurred.
+
+Minimum repair is one ENS-owned W6: database-owner-admitted immutable policy identity; parent-membership and effective-privilege rejection; finite bounded release windows; canonical UTC convergence; early input bounds; restricted-role/removal regressions; then another immutable audit.
+
+W5 is `AUDIT_FIX`. The sequential Kernel owner may not consume the decision. `A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor qualification, push, release, and public claims remain closed.

@@ -3,6 +3,55 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-A4-W5-AUDIT-RECONCILIATION-20260725
+task_instance_id: C0-A4-W5-AUDIT-RECONCILIATION-20260725:5A5678C
+generation: 1
+sprint: A4_publication_decision_authority_audit_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: 5a5678cf59d8f106870a9fd26fcd42e932a6da7b
+control_sha: 5a5678cf59d8f106870a9fd26fcd42e932a6da7b
+audit_sha: 5a5678cf59d8f106870a9fd26fcd42e932a6da7b
+token: C0-A4-W5-AUDIT-RECONCILE-5A5678C-431E25F4-71D9-46CD-A12A-C11779622C49
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T04:37:34Z
+expires_at: 2026-07-25T05:37:34Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T04:37:34Z
+deadline: 2026-07-25T05:37:34Z
+expected_exit: record exact W5 immutable audit FIX and open only narrowed ENS W6 remediation
+acceptance_items:
+  - bind audit to exact target 5a5678c tree 413afd5 and parent 4a9a82b
+  - record two HIGH and three MEDIUM findings plus otherwise green full floor
+  - keep Kernel A4_ACCEPTED A5 A6 live sponsor push release and claims closed
+  - commit local controls and release only the matching lease
+external_effect_authority: safe local control files deterministic checks and one atomic local commit only; no product change push deploy managed migration live call signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T04:40:06Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - audit bound exact target 5a5678c tree 413afd5 parent 4a9a82b and returned FIX
+  - two HIGH and three MEDIUM findings are canonical with otherwise green full audit floor
+  - reconciliation diff check lint zero errors with 23 inherited warnings typecheck foundation 9 of 9 secret scan and 31-page build passed
+  - Kernel A4_ACCEPTED A5 A6 live sponsor push release and claims remain closed
+remaining_blocks:
+  - narrowed ENS W6 policy membership finite-window UTC and input-bound repair
+  - immutable W6 audit then sequential Kernel remediation and audit
+  - every live ENS sponsor push release and public claim gate
+external_effects_attempted: none
+result: A4_W5_AUDIT_FIX_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-A4-W5-AUDIT-RECONCILE-5A5678C-431E25F4-71D9-46CD-A12A-C11779622C49 after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: ENS Integrator /root/a4_ensv2_gap_inventory
 task_id: A4-ENS-PUBLICATION-DECISION-AUTHORITY-20260725
 task_instance_id: A4-ENS-PUBLICATION-DECISION-AUTHORITY-20260725:W5:4A9A82B
