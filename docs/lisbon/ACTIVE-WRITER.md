@@ -3,6 +3,53 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-OG-TRANSFER-RECONCILIATION-20260725
+task_instance_id: C0-OG-TRANSFER-RECONCILIATION-20260725:E9B0E78B
+generation: 1
+sprint: external_effect_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: c0bef991bb1bfce4b804eeb9513bcc6a4fc65732
+control_sha: c0bef991bb1bfce4b804eeb9513bcc6a4fc65732
+token: C0-OG-TRANSFER-RECONCILE-E9B0E78B-6852-4AE0-B98A-04BA894C98B2
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T00:10:01Z
+expires_at: 2026-07-25T01:10:01Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+started_at: 2026-07-25T00:10:01Z
+deadline: 2026-07-25T01:10:01Z
+expected_exit: preserve and separately commit the authenticated user-owned consumed 0G transfer ledger after the ENS writer released its lease
+source_task:
+  - thread 019f9690-e529-7d70-a5f4-527e088f6a5d title Send 0G testnet tokens
+  - authenticated owner requested exactly 1 A0GI to 0xaA732B3Fa548F5885EdDdceD8272BcDF8DC4B736 and then instructed just send
+  - source task recorded AUTHORIZED_ONCE before broadcast and CONSUMED after exact receipt readback
+acceptance_items:
+  - preserve the source task ledger diff byte-for-byte
+  - record no new authority and attempt no repeat or replacement
+  - do not promote the transfer into A3 live product proof or any sponsor claim
+  - commit only this control record and the preserved external-effect ledger
+external_effect_authority: local control commit only; the transfer is already consumed and no live read call signature transaction replacement spend push deploy or claim is authorized
+completed_at: 2026-07-25T00:12:19Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - preserved the authenticated source task ledger diff byte-for-byte
+  - the consumed row records exact recipient value nonce fee block and transaction receipt without secrets
+  - no new authority replacement transfer live read or A3 sponsor-proof promotion was recorded
+  - git diff check secret scan lint typecheck tests and production build passed; lint retained 23 inherited warnings and zero errors
+remaining_blocks:
+  - all live ENS and product 0G sponsor proof
+  - every push deployment submission public claim and release gate
+external_effects_attempted: none by this reconciliation task; the source transfer was already confirmed and consumed before this task acquired the writer lease
+result: PASS_TRANSFER_LEDGER_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-OG-TRANSFER-RECONCILE-E9B0E78B-6852-4AE0-B98A-04BA894C98B2 after the containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: ENS Integrator /root/a4_ensv2_gap_inventory
 task_id: A4-ENSV2-HIERARCHY-REMEDIATION-20260725
 task_instance_id: A4-ENSV2-HIERARCHY-REMEDIATION-20260725:W2:091A657
