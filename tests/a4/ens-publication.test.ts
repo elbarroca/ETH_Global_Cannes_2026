@@ -734,14 +734,54 @@ test("restricted runtime admits only owner policy with bounded UTC observations 
     assert.equal(evidence.release_sha, RELEASE_SHA);
     assert.match(evidence.decision_key, /^[0-9a-f]{64}$/);
 
-    const exact = await runtime.sql<{ decision_id: string }[]>`
-      SELECT decision_id::text FROM public.admit_ens_publication_decision(
-        ${versionId}::uuid, ${runtime.sql.json(JSON.parse(evidence.record_bytes))},
-        ${evidence.block_number}::numeric, ${evidence.block_timestamp}::timestamptz,
-        ${evidence.transaction_hash}, NULL
-      )
+    const runtimeSql = runtime.sql;
+    const replayBlockNumber = async (blockNumber: string): Promise<string | undefined> => {
+      const rows = await runtimeSql<{ decision_id: string }[]>`
+        SELECT decision_id::text FROM public.admit_ens_publication_decision(
+          ${versionId}::uuid, ${runtimeSql.json(JSON.parse(evidence.record_bytes))},
+          ${blockNumber}::numeric, ${evidence.block_timestamp}::timestamptz,
+          ${evidence.transaction_hash}, NULL
+        )
+      `;
+      return rows[0]?.decision_id;
+    };
+    assert.equal(await replayBlockNumber("12345"), allowed.decisionId);
+    assert.equal(await replayBlockNumber("12345.0"), allowed.decisionId);
+    assert.equal(await replayBlockNumber("1.2345e4"), allowed.decisionId);
+    assert.equal(await replayBlockNumber("00012345"), allowed.decisionId);
+    const converged = await database.sql<{ decisions: number }[]>`
+      SELECT count(*)::int AS decisions FROM ens_publication_decisions
     `;
-    assert.equal(exact[0]?.decision_id, allowed.decisionId);
+    assert.equal(converged[0]?.decisions, 1);
+
+    for (const invalidBlock of [
+      "12345.5",
+      "-1",
+      "100000000000000000000",
+      "NaN",
+      "Infinity",
+      "-Infinity",
+    ]) {
+      await assert.rejects(replayBlockNumber(invalidBlock), /observation exceeds early bounds/);
+    }
+    const rejectedBlockState = await database.sql<{
+      decisions: number;
+      jobs: number;
+      effects: number;
+      receipts: number;
+    }[]>`
+      SELECT
+        (SELECT count(*)::int FROM ens_publication_decisions) AS decisions,
+        (SELECT count(*)::int FROM jobs) AS jobs,
+        (SELECT count(*)::int FROM effects) AS effects,
+        (SELECT count(*)::int FROM receipts) AS receipts
+    `;
+    assert.deepEqual(rejectedBlockState[0], {
+      decisions: 1,
+      jobs: 0,
+      effects: 0,
+      receipts: 0,
+    });
 
     const alteredRecord = JSON.parse(evidence.record_bytes) as Record<string, unknown>;
     alteredRecord.chainId = 1;

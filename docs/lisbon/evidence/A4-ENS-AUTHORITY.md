@@ -536,3 +536,69 @@ One MEDIUM remains. The admission function accepts unrestricted-scale `NUMERIC`,
 All available independent lanes passed, including both eight-migration lanes, lint/typecheck, foundation/auth/Kernel/A4/A5, standalone integration, e2e/resilience/redaction, boot, secret/shell/diff checks, build 31 pages, and HTTP 200. The audit host lacked Go, so Go-dependent A3 and aggregate integration were not independently rerun; W6 writer evidence records their checksum-pinned pass. Cleanup completed and no external effect occurred.
 
 W6 is `AUDIT_FIX`. Until W7 and immutable re-audit pass, the sequential Kernel owner may not consume a publication decision, `A4_ACCEPTED` remains closed, and A5 acceptance, mandatory A6 entry, live ENS, sponsor qualification, push, release, and public claims remain blocked.
+
+## W7 publication block-number normalization remediation
+
+- Task: `A4-ENS-PUBLICATION-BLOCK-NORMALIZATION-20260725:W7:045945E`
+- Start/control SHA: `045945e3b1c7ce0081c061a8b769d7b085687d9f`
+- Migration: `20260725062500_a4_publication_block_normalization`
+- Migration SHA-256: `30b805534066edaae552cc1b512ddfd179ad8cdd27e0a62b95ca1371d365633e`
+- Result: `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`
+
+W7 replaces only the existing six-argument publication admission function in
+one additive migration. W4, W5, and W6 migrations remain byte-unchanged. At the
+first observation boundary, a non-null block number must be finite, nonnegative,
+within the exact `NUMERIC(20,0)` maximum, and equal to its integral truncation.
+The function then normalizes it exactly once into a `NUMERIC(20,0)` variable and
+derives one locale- and scale-independent base-10 integer string from that
+value. The canonical string enters convergence material; the same normalized
+numeric value enters the immutable decision row and the post-conflict equality
+check. No unnormalized block value reaches hashing, insertion, or comparison.
+
+The required red/green was reproduced through the real restricted login. With
+the exact W6 boundary and no W7 migration, `12345` admitted one `ALLOW`, but the
+otherwise identical `12345.0` replay failed with PostgreSQL `23505` on
+`uniq_ens_publication_decision_evidence`, proving scale-sensitive convergence.
+After W7, `12345`, `12345.0`, exact scientific `1.2345e4`, and leading-zero
+`00012345` all return the original decision ID and leave exactly one decision.
+Fractional `12345.5`, negative `-1`, out-of-range
+`100000000000000000000`, `NaN`, `Infinity`, and `-Infinity` fail at early
+bounds. The failure set leaves decision/job/effect/receipt counts at `1/0/0/0`.
+
+The migration verifier requires nine completed migrations and inspects the
+installed function body for the normalized variable, integral check, canonical
+key material, normalized insert path, and removal of both W6 scale-sensitive
+hash and raw insert expressions. Both empty and synthetic Cannes-shaped lanes
+pass with the sentinel SHA-256 unchanged. The independent pre-W6 direct/nested
+runtime-parent probe still aborts W6 before W7, preserving the proven role
+boundary. A direct function diff confirms all W6 policy, release, role,
+effective-privilege, UTC, early-bound, append-only, and decision-trigger logic
+is otherwise unchanged. No ENS resolver, viem call, runtime API, Kernel, worker,
+0G, UI, Telegram, dependency, or schema model changed.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| W6-only restricted regression | 1 expected | `12345.0` reproduced `23505 uniq_ens_publication_decision_evidence` after the existing `12345` row. |
+| W7 focused restricted regression | 0 | Integer/scale/scientific/leading-zero forms converged; fractional, negative, out-of-range, NaN, and infinities refused with zero new decision or commerce rows. |
+| `npm run validate:env` / loopback-placeholder Prisma validate/generate | 0 | Offline environment passed; schema valid; Prisma Client `6.19.3` generated. |
+| `npx tsx scripts/test-migrations.ts` | 0 | Empty and synthetic Cannes-shaped nine-migration lanes passed; sentinel SHA-256 remained `fb8aece1677586a330f0cfeb0850b71488849302324eb1d6a079673e35e3829e`; W6 direct/nested runtime parents remained rejected. |
+| `npm run lint` / `npm run typecheck` | 0 | Lint has zero errors and 23 inherited warnings; strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | Foundation 9/9, authentication 9/9, and Kernel 17/17 passed. |
+| checksum-pinned `npm run test:go` / `npm run test:a3` | 0 | Official Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`; A3 passed 12/12. This removes the W6 audit host's independent Go/A3 rerun limitation for the W7 writer floor. |
+| `npm run test:a4` / checksum-pinned `npm run test:integration` | 0 | A4 passed 22/22; integration passed 39/39 plus both nine-migration lanes and the unsafe-role migration probe. |
+| `npm run test:a5` / `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 3/3, 4/4, 1/1, and 3/3 passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` / `git diff --check` | 0 | Protected boot, tracked secret scan, shell syntax, and diff hygiene passed. |
+| `npm run build` / loopback `next start` | 0 | Next `16.2.11` generated 31/31 pages, became ready in 125 ms, and served `/` with HTTP `200` and 32,236 bytes. |
+
+The official Go archive matched SHA-256
+`25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`
+and reported exact `go1.23.10 darwin/arm64`. Its W7 task-specific archive,
+toolchain, verifier binary, and HTTP artifact were deleted. No live
+ENS/0G/Uniswap/sponsor call, shared or managed database effect, migration deploy,
+wallet signature, transaction, push, deployment, form, funding, upload, spend,
+public identifier, live proof, or claim promotion was attempted.
+
+W7 requires a new immutable-SHA audit. Until it passes, the sequential Kernel
+owner may not consume publication decisions. `A4_ACCEPTED`, A5 acceptance,
+mandatory A6 entry, live ENS, sponsor qualification, push, release, and public
+claims remain closed.

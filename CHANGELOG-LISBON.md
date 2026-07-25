@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W7 publication block-number normalization
+
+- Reproduced the exact W6 audit defect through the real restricted login: after `12345` admitted, `12345.0` derived a different key and failed on `uniq_ens_publication_decision_evidence`.
+- Added only additive migration `20260725062500_a4_publication_block_normalization`, replacing the existing function so finite nonnegative integral values normalize exactly once to `NUMERIC(20,0)` before evidence work. One canonical base-10 integer string drives convergence and the same normalized value drives insert/conflict comparison.
+- Proved `12345`, `12345.0`, `1.2345e4`, and `00012345` converge to one decision. Fractional, negative, out-of-range, NaN, and infinite values reject at early bounds with zero new decision/job/effect/receipt.
+- Preserved the complete W6 role/policy/release/UTC/bounds boundary and unsafe-role migration refusal. Both empty and synthetic Cannes-shaped lanes now apply nine migrations with the sentinel hash unchanged; migration SHA-256 is `30b805534066edaae552cc1b512ddfd179ad8cdd27e0a62b95ca1371d365633e`.
+- Passed the complete local floor: lint with zero errors and 23 inherited warnings, typecheck, foundation 9/9, auth 9/9, Kernel 17/17, checksum-pinned Go, A3 12/12, A4 22/22, A5 3/3, integration 39/39, both migration lanes, e2e 4/4, resilience 1/1, redaction 3/3, boot, secret/shell/diff checks, 31-page build, and loopback HTTP 200.
+- Returned only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. Immutable W7 audit, sequential Kernel consumption, `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS, sponsor, push, release, and public claims remain closed.
+
 ## 2026-07-25 - W6 hardening immutable audit
 
 - Reconciled independent verdict `FIX` for exact SHA `b8da4fa76f6bbcce364dd8cc35db459cd2dd0e1d`, tree `1458a6d99e6730ea4b84eb815fe55739af2073bf`, and range `e53cd6d5d8af34298b886812df0fec025eeaa852..b8da4fa76f6bbcce364dd8cc35db459cd2dd0e1d`.

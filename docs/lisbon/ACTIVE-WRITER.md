@@ -3,6 +3,64 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: ENS Integrator /root/a4_ensv2_gap_inventory
+task_id: A4-ENS-PUBLICATION-BLOCK-NORMALIZATION-20260725
+task_instance_id: A4-ENS-PUBLICATION-BLOCK-NORMALIZATION-20260725:W7:045945E
+generation: 7
+sprint: A4_publication_block_normalization
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 045945e3b1c7ce0081c061a8b769d7b085687d9f
+control_sha: 045945e3b1c7ce0081c061a8b769d7b085687d9f
+token: A4-ENS-PUB-BLOCK-W7-045945E-B65B435E-DB21-4666-90A4-7C8D98231527
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T05:44:31Z
+expires_at: 2026-07-25T07:31:13Z
+allowed_paths:
+  - src/ens/**
+  - tests/a4/**
+  - tests/helpers/ens.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260725062500_a4_publication_block_normalization/**
+  - scripts/test-migrations.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T05:31:13Z
+deadline: 2026-07-25T07:31:13Z
+expected_exit: normalize publication block numbers once at the first database boundary and close the W6 audit MEDIUM
+acceptance_items:
+  - exact finite integral NUMERIC 20 0 nonnegative block number is required before hashing or insertion
+  - canonical base-10 integer text and normalized NUMERIC value are reused for convergence storage and comparison
+  - restricted login proves 12345 ALLOW 12345.0 exact convergence and 12345.5 zero-row refusal
+  - W6 authority properties remain green and both replay lanes advance additively to nine migrations
+  - complete local floor one atomic commit clean matching-token release and immutable audit handoff
+external_effect_authority: safe local allowed files disposable loopback PostgreSQL and processes build output checksum-pinned temporary Go and one local commit only; no live ENS 0G Uniswap sponsor shared or managed database migration deploy push signature transaction faucet form funding upload spend public ID claim or mainnet effect
+completed_at: 2026-07-25T05:44:31Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - exact W6 restricted-login red reproduced 12345 point 0 unique-evidence failure after integer admission
+  - W7 normalizes finite nonnegative integral block numbers exactly once to NUMERIC 20 0 before evidence work
+  - integer scale scientific and leading-zero aliases converge while fractional negative out-of-range NaN and infinities refuse with zero new rows
+  - installed function removes the W6 scale-sensitive hash and raw insert expressions while preserving the W6 authority body
+  - A4 22 of 22 integration 39 of 39 both nine-migration lanes unsafe-role probe and complete local floor passed
+  - migration SHA-256 30b805534066edaae552cc1b512ddfd179ad8cdd27e0a62b95ca1371d365633e
+  - checksum-pinned Go closes the W6 audit-host rerun limitation and all W7 task artifacts were deleted
+remaining_blocks:
+  - immutable W7 audit against the containing commit
+  - sequential Kernel decision consumption and immutable audit
+  - A4_ACCEPTED A5 mandatory A6 live ENS sponsor push release and public claim gates
+external_effects_attempted: authorized checksum-pinned official Go archive download and task-local loopback processes only; no live product sponsor shared database release or public effect
+result: PASS_TO_AUDIT_REMEDIATION_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token A4-ENS-PUB-BLOCK-W7-045945E-B65B435E-DB21-4666-90A4-7C8D98231527 after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-A4-W6-AUDIT-RECONCILIATION-20260725
 task_instance_id: C0-A4-W6-AUDIT-RECONCILIATION-20260725:B8DA4FA

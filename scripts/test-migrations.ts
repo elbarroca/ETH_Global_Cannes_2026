@@ -20,6 +20,7 @@ const A5_MIGRATION = "20260725020000_a5_protected_lifecycle";
 const A4_PUBLICATION_MIGRATION = "20260725042000_a4_publication_decision";
 const A4_PUBLICATION_AUTHORITY_MIGRATION = "20260725045500_a4_publication_decision_authority";
 const A4_PUBLICATION_HARDENING_MIGRATION = "20260725053000_a4_publication_authority_hardening";
+const A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION = "20260725062500_a4_publication_block_normalization";
 const PRE_HARDENING_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -319,6 +320,7 @@ async function verifyDatabase(
       a4_publication_count: string;
       a4_publication_authority_count: string;
       a4_publication_hardening_count: string;
+      a4_publication_block_normalization_count: string;
       invariant_trigger_count: string;
       a4_constraint_count: string;
       a4_publication_constraint_count: string;
@@ -328,6 +330,7 @@ async function verifyDatabase(
       a4_publication_runtime_role_count: string;
       a4_publication_runtime_direct_privilege_count: string;
       a4_publication_hardening_constraint_count: string;
+      a4_publication_block_function_count: string;
       a4_publication_old_function_count: string;
       a5_constraint_count: string;
       receipt_authority_nullable: string;
@@ -392,6 +395,11 @@ async function verifyDatabase(
           SELECT count(*)::text FROM "_prisma_migrations"
           WHERE migration_name = ${A4_PUBLICATION_HARDENING_MIGRATION} AND finished_at IS NOT NULL
         ) AS a4_publication_hardening_count,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION}
+            AND finished_at IS NOT NULL
+        ) AS a4_publication_block_normalization_count,
         (
           SELECT count(*)::text FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN (
@@ -508,6 +516,24 @@ async function verifyDatabase(
           SELECT count(*)::text
           FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname = 'admit_ens_publication_decision'
+            AND position('normalized_block_number NUMERIC(20,0)' in p.prosrc) > 0
+            AND position('p_block_number <> pg_catalog.trunc(p_block_number)' in p.prosrc) > 0
+            AND position('''blockNumber'', normalized_block_number_text' in p.prosrc) > 0
+            AND position(
+              'record_bytes, record_hash, normalized_block_number, p_block_timestamp' in p.prosrc
+            ) > 0
+            AND position(
+              '''blockNumber'', CASE WHEN p_block_number IS NULL THEN NULL ELSE p_block_number::text END'
+              in p.prosrc
+            ) = 0
+            AND position(
+              'record_bytes, record_hash, p_block_number, p_block_timestamp' in p.prosrc
+            ) = 0
+        ) AS a4_publication_block_function_count,
+        (
+          SELECT count(*)::text
+          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'admit_ens_publication_decision'
             AND p.pronargs = 8
         ) AS a4_publication_old_function_count,
         (
@@ -558,7 +584,7 @@ async function verifyDatabase(
       result.ens_publication_authority_policies !== "ens_publication_authority_policies" ||
       result.agent_version_events !== "agent_version_events" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 8 ||
+      Number(result.migration_count) !== 9 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -567,6 +593,7 @@ async function verifyDatabase(
       Number(result.a4_publication_count) !== 1 ||
       Number(result.a4_publication_authority_count) !== 1 ||
       Number(result.a4_publication_hardening_count) !== 1 ||
+      Number(result.a4_publication_block_normalization_count) !== 1 ||
       Number(result.invariant_trigger_count) !== 18 ||
       Number(result.a4_constraint_count) !== 14 ||
       Number(result.a4_publication_constraint_count) !== 7 ||
@@ -576,6 +603,7 @@ async function verifyDatabase(
       Number(result.a4_publication_runtime_role_count) !== 1 ||
       Number(result.a4_publication_runtime_direct_privilege_count) !== 0 ||
       Number(result.a4_publication_hardening_constraint_count) !== 10 ||
+      Number(result.a4_publication_block_function_count) !== 1 ||
       Number(result.a4_publication_old_function_count) !== 0 ||
       Number(result.a5_constraint_count) !== 11 ||
       result.receipt_authority_nullable !== "NO" ||
