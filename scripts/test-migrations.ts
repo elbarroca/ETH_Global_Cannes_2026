@@ -14,6 +14,8 @@ import {
 } from "../src/ens/authority";
 import { bindManifestEns } from "../src/kernel/agent-catalog";
 import { domainHash } from "../src/kernel/canonical";
+import { KernelError } from "../src/kernel/errors";
+import { parseGoalPatch, patchGoal } from "../src/kernel/goals";
 import { parseAgentInput, parseEnsBinding } from "../src/kernel/policy";
 import { createEnsPublicationAuthorityFixture } from "../tests/helpers/ens";
 
@@ -36,6 +38,23 @@ const A6_UNISWAP_TOOL_RECEIPT_MIGRATION = "20260725100000_a6_uniswap_tool_receip
 const A5_A6_KERNEL_FOUNDATION_MIGRATION = "20260725113000_a5_a6_kernel_foundation";
 const PROTECTED_GOAL_LOOP_MIGRATION = "20260725163000_protected_goal_loop";
 const GOAL_LOOP_HARDENING_MIGRATION = "20260725173000_goal_loop_hardening";
+const GOAL_LOOP_PREDECESSOR_MIGRATIONS = [
+  BASELINE_MIGRATION,
+  A2_MIGRATION,
+  A3_MIGRATION,
+  A4_MIGRATION,
+  A5_MIGRATION,
+  A4_PUBLICATION_MIGRATION,
+  A4_PUBLICATION_AUTHORITY_MIGRATION,
+  A4_PUBLICATION_HARDENING_MIGRATION,
+  A4_PUBLICATION_BLOCK_NORMALIZATION_MIGRATION,
+  A4_PUBLICATION_UPGRADE_PREFLIGHT_MIGRATION,
+  A4_KERNEL_PUBLICATION_INTEGRITY_MIGRATION,
+  A4_KERNEL_ACTION_INTEGRITY_MIGRATION,
+  A6_UNISWAP_TOOL_RECEIPT_MIGRATION,
+  A5_A6_KERNEL_FOUNDATION_MIGRATION,
+  PROTECTED_GOAL_LOOP_MIGRATION,
+] as const;
 const PRE_HARDENING_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -371,6 +390,135 @@ async function applyMigrationSql(sql: DatabaseClient, migration: string): Promis
     "utf8",
   );
   await sql.unsafe(migrationSql);
+}
+
+async function verifyPopulatedGoalLoopUpgradeLane(
+  adminUrl: string,
+  database: string,
+): Promise<void> {
+  await createDatabase(adminUrl, database);
+  const url = databaseUrl(adminUrl, database);
+  const sql = postgres(url, { max: 1, prepare: false });
+  try {
+    for (const migration of GOAL_LOOP_PREDECESSOR_MIGRATIONS) {
+      await applyMigrationSql(sql, migration);
+      run(
+        PRISMA,
+        ["migrate", "resolve", "--applied", migration, "--schema", SCHEMA],
+        prismaEnv(url),
+      );
+    }
+    const ownerUserId = "goal-loop-upgrade-owner";
+    const policy = {
+      cadenceMinutes: 5,
+      runMode: "CONTINUOUS",
+      executionMode: "RESEARCH_ONLY",
+      runLimit: null,
+      maxAgents: 1,
+      perRunCapAtomic: "1000",
+      dailyCapAtomic: "1000",
+    } as const;
+    await sql`
+      INSERT INTO users (id, wallet_address)
+      VALUES (${ownerUserId}, '0x7777777777777777777777777777777777777777')
+    `;
+    const goalRows = await sql<{ id: string }[]>`
+      INSERT INTO goals (
+        owner_user_id, idempotency_key, definition_hash, objective,
+        required_capabilities, cadence_minutes, run_mode, execution_mode,
+        run_limit, max_agents, per_run_cap_atomic, daily_cap_atomic, state,
+        next_run_at, completed_runs, created_at, updated_at
+      ) VALUES (
+        ${ownerUserId}, 'goal-upgrade-create-01', ${domainHash("goal-definition", {
+          objective: "Preserve a populated migration 15 goal and its latest mutation.",
+          policy,
+          requiredCapabilities: ["research"],
+          state: "PAUSED",
+        })},
+        'Preserve a populated migration 15 goal and its latest mutation.',
+        ${["research"]}, 5, 'CONTINUOUS', 'RESEARCH_ONLY', NULL, 1,
+        1000, 1000, 'PAUSED', NULL, 0,
+        '2026-07-20T10:00:00.000Z', '2026-07-20T10:05:00.000Z'
+      ) RETURNING id
+    `;
+    const goalId = goalRows[0]?.id;
+    if (!goalId) throw new Error("populated goal-loop predecessor goal was not created");
+    const legacyPatch = parseGoalPatch({ action: "PAUSE" });
+    const legacyPayloadHash = domainHash("goal-mutation", { goalId, input: legacyPatch });
+    await sql`
+      UPDATE goals SET last_mutation_key = 'goal-upgrade-pause-01',
+        last_mutation_hash = ${legacyPayloadHash}
+      WHERE id = ${goalId}::uuid
+    `;
+    await sql`
+      INSERT INTO goal_runs (
+        goal_id, owner_user_id, idempotency_key, scheduled_for, state,
+        objective_snapshot, capabilities_snapshot, policy_snapshot, policy_hash,
+        effect_identity, total_price_atomic, started_at, created_at, updated_at
+      ) VALUES (
+        ${goalId}::uuid, ${ownerUserId}, 'goal-upgrade-run-01',
+        '2026-07-19T10:00:00.000Z', 'RUNNING',
+        'Preserve a populated migration 15 goal and its latest mutation.',
+        ${["research"]}, ${sql.json(policy)}, ${domainHash("goal-policy", policy)},
+        ${domainHash("goal-upgrade-run", { goalId })}, 1000,
+        '2026-07-19T10:00:00.000Z', '2026-07-19T10:00:00.000Z',
+        '2026-07-19T10:00:00.000Z'
+      )
+    `;
+    const migrationStartedAt = new Date();
+    run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(url));
+    const migrationFinishedAt = new Date();
+    const upgraded = await sql<{
+      cost_reserved_at: Date;
+      scheduled_for: Date;
+      payload_hash: string;
+      result_hash: string;
+      result_snapshot: unknown;
+    }[]>`
+      SELECT run.cost_reserved_at, run.scheduled_for, mutation.payload_hash,
+        mutation.result_hash, mutation.result_snapshot
+      FROM goal_runs run
+      JOIN goal_mutations mutation ON mutation.goal_id = run.goal_id
+      WHERE run.goal_id = ${goalId}::uuid
+    `;
+    const state = upgraded[0];
+    const snapshot = jsonObject(state?.result_snapshot, "legacy goal mutation result");
+    if (
+      !state || state.payload_hash !== legacyPayloadHash || state.result_hash !== legacyPayloadHash ||
+      snapshot.goalId !== goalId || snapshot.state !== "PAUSED" ||
+      state.cost_reserved_at < migrationStartedAt || state.cost_reserved_at > migrationFinishedAt ||
+      state.cost_reserved_at.getTime() === state.scheduled_for.getTime()
+    ) {
+      throw new Error("populated migration 15 goal state did not upgrade exactly");
+    }
+    const resumed = await patchGoal(
+      ownerUserId,
+      goalId,
+      parseGoalPatch({ action: "RESUME" }),
+      "goal-upgrade-resume-01",
+      { now: new Date(), sql },
+    );
+    if (resumed.state !== "ACTIVE") throw new Error("post-upgrade goal did not resume");
+    let legacyReplayRejected = false;
+    try {
+      await patchGoal(ownerUserId, goalId, legacyPatch, "goal-upgrade-pause-01", {
+        now: new Date(), sql,
+      });
+    } catch (error) {
+      legacyReplayRejected = error instanceof KernelError && error.code === "KERNEL_CONFLICT";
+    }
+    const finalState = await sql<{ state: string; mutations: number }[]>`
+      SELECT goal.state,
+        (SELECT count(*)::int FROM goal_mutations WHERE goal_id = goal.id) AS mutations
+      FROM goals goal WHERE goal.id = ${goalId}::uuid
+    `;
+    if (!legacyReplayRejected || finalState[0]?.state !== "ACTIVE" || finalState[0]?.mutations !== 2) {
+      throw new Error("legacy goal mutation replay changed post-migration state");
+    }
+    console.log("Populated migration 15 goal reservations and legacy PATCH key upgraded fail-closed");
+  } finally {
+    await sql.end({ timeout: 1 });
+  }
 }
 
 function markPreW7MigrationsApplied(url: string): void {
@@ -1176,7 +1324,8 @@ async function verifyDatabase(
             'goal_runs_reservation_immutable',
             'goal_runs_terminal_immutable',
             'goal_mutations_append_only',
-            'goal_run_jobs_terminal_insert_guard'
+            'goal_mutations_no_truncate',
+            'goal_run_jobs_terminal_mutation_guard'
           )
         ) AS goal_loop_hardening_trigger_count,
         seq.data_type AS sequence_type,
@@ -1252,7 +1401,7 @@ async function verifyDatabase(
       Number(result.protected_goal_loop_trigger_count) !== 5 ||
       Number(result.goal_loop_hardening_count) !== 1 ||
       Number(result.goal_loop_hardening_constraint_count) !== 5 ||
-      Number(result.goal_loop_hardening_trigger_count) !== 4 ||
+      Number(result.goal_loop_hardening_trigger_count) !== 5 ||
       result.receipt_authority_nullable !== "NO" ||
       result.lifecycle_action_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||
@@ -1347,6 +1496,7 @@ async function main(): Promise<void> {
   const unsafeRoleDatabase = `alphadawg_a4_unsafe_role_${suffix}`;
   const canonicalUpgradeDatabase = `alphadawg_a4_w6_canonical_${suffix}`;
   const noncanonicalUpgradeDatabase = `alphadawg_a4_w6_noncanonical_${suffix}`;
+  const populatedGoalLoopDatabase = `alphadawg_goal_loop_populated_${suffix}`;
   const emptyUrl = databaseUrl(adminUrl, emptyDatabase);
   const cannesUrl = databaseUrl(adminUrl, cannesDatabase);
 
@@ -1366,11 +1516,12 @@ async function main(): Promise<void> {
     run(PRISMA, ["migrate", "deploy", "--schema", SCHEMA], prismaEnv(cannesUrl));
     await verifyDatabase(cannesUrl, 1, 43, sentinelBeforeResolution);
     await verifyInheritedRuntimeRoleBlocksHardening(adminUrl, unsafeRoleDatabase);
+    await verifyPopulatedGoalLoopUpgradeLane(adminUrl, populatedGoalLoopDatabase);
     await verifyPreW7UpgradeLane(adminUrl, canonicalUpgradeDatabase, "canonical");
     await verifyPreW7UpgradeLane(adminUrl, noncanonicalUpgradeDatabase, "scale_alias");
 
     console.log(
-      "Migration replay passed: fresh/Cannes deploy plus canonical/noncanonical W6 upgrade lanes",
+      "Migration replay passed: fresh/Cannes, populated goal-loop, and canonical/noncanonical W6 upgrade lanes",
     );
   } finally {
     await dropDatabase(adminUrl, emptyDatabase).catch(() => undefined);
@@ -1378,6 +1529,7 @@ async function main(): Promise<void> {
     await dropDatabase(adminUrl, unsafeRoleDatabase).catch(() => undefined);
     await dropDatabase(adminUrl, canonicalUpgradeDatabase).catch(() => undefined);
     await dropDatabase(adminUrl, noncanonicalUpgradeDatabase).catch(() => undefined);
+    await dropDatabase(adminUrl, populatedGoalLoopDatabase).catch(() => undefined);
     await local?.close();
   }
 }

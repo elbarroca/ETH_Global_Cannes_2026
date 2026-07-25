@@ -628,6 +628,13 @@ export async function patchGoal(
           409,
         );
       }
+      if (replay[0].result_hash === replay[0].payload_hash) {
+        throw new KernelError(
+          "KERNEL_CONFLICT",
+          "Legacy goal mutation result cannot be replayed safely",
+          409,
+        );
+      }
       return parseStoredGoalSnapshot(replay[0].result_snapshot, goalId, replay[0].result_hash);
     }
     const rows = await tx<GoalRow[]>`

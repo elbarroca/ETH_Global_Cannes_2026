@@ -4,6 +4,66 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Kernel Integrator /root/goal_loop_kernel
+task_id: A5-GOAL-LOOP-KERNEL-REMEDIATION-20260725
+task_instance_id: A5-GOAL-LOOP-KERNEL-REMEDIATION-20260725:W3:074CAAC
+generation: 3
+sprint: repair four bounded findings from immutable re-audit of 5d6c604
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 074caac6262d0d6d24da35f46d0490531a4d5a66
+control_sha: 074caac6262d0d6d24da35f46d0490531a4d5a66
+token: A5-GOAL-LOOP-KERNEL-W3-074CAAC-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T15:11:05Z
+expires_at: 2026-07-25T21:45:00Z
+allowed_paths:
+  - prisma/migrations/20260725173000_goal_loop_hardening/**
+  - src/kernel/**
+  - scripts/test-migrations.ts
+  - tests/kernel/**
+  - tests/integration/protected-goal-loop.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T15:11:05Z
+deadline: 2026-07-25T21:45:00Z
+expected_exit: migration15 populated upgrade compatibility legacy PATCH replay preservation terminal GoalRunJob immutability and no-truncate goal mutation ledger
+external_effect_authority: local files existing dependencies disposable local PostgreSQL tests and one local commit only; no Neon push deploy live API signature transaction funding form spend or claim
+baseline_evidence: PG14.23 host SCRAM passes Kernel 35 of 35 A4 22 of 22 lint zero errors with 23 inherited warnings typecheck and foundation 10 of 10; remote remains stale and push unauthorized
+completed_at: 2026-07-25T15:19:19Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - migration 20260725173000_goal_loop_hardening SHA-256 18e375b2e9e181fcdbffa4846e4c920044befbb58eb66b674b09e89f8a9f647f
+  - prisma validate and generate PASS
+  - migration replay PASS fresh Cannes populated migration15 predecessor canonical W6 and noncanonical W6 lanes
+  - populated predecessor proves database-clock reservation backfill and legacy PAUSE replay fail-closed after RESUME
+  - focused goal-loop PASS 9 of 9 including terminal child INSERT UPDATE DELETE and goal mutation TRUNCATE refusal
+  - focused goal-loop and worker-fencing integration PASS 3 of 3
+  - npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm test PASS 10 of 10
+  - npm run test:auth PASS 9 of 9
+  - npm run test:kernel PASS 35 of 35 serialized
+  - npm run test:a4 PASS 22 of 22
+  - npm run test:a5 PASS 3 of 3
+  - npm run test:a6 PASS 19 of 19
+  - npm run test:e2e PASS 4 of 4
+  - npm run test:resilience PASS 1 of 1
+  - npm run test:redaction PASS 3 of 3
+  - npm run test:boot PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+  - npm run build PASS 35 generated pages and three protected goal API routes
+remaining_blocks:
+  - npm run test:integration PASS 31 of 41; ten inherited A3 tests hook-fail only because the host has no local Go toolchain
+  - immutable exact-SHA W3 re-audit remains required
+  - remote remains stale and push managed Neon deployment live APIs signatures transactions funding forms spend release and claims remain unauthorized
+external_effects_attempted: none
+verdict: PASS_TO_REAUDIT
+lock_release: release only exact token A5-GOAL-LOOP-KERNEL-W3-074CAAC-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
+owner: Kernel Integrator /root/goal_loop_kernel
 task_id: KERNEL-TEST-SCRAM-SERIALIZATION-20260725
 task_instance_id: KERNEL-TEST-SCRAM-SERIALIZATION-20260725:W1:D33F58E
 generation: 1

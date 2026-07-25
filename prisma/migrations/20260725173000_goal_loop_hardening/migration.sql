@@ -3,6 +3,14 @@
 
 ALTER TABLE "goal_runs" ADD COLUMN "cost_reserved_at" TIMESTAMPTZ(6);
 
+WITH migration_clock AS (
+  SELECT clock_timestamp() AS reserved_at
+)
+UPDATE "goal_runs" run
+SET "cost_reserved_at" = migration_clock.reserved_at
+FROM migration_clock
+WHERE run."total_price_atomic" > 0 AND run."cost_reserved_at" IS NULL;
+
 ALTER TABLE "goal_runs" ADD CONSTRAINT "goal_runs_reservation_check" CHECK (
   ("total_price_atomic" = 0 AND "cost_reserved_at" IS NULL) OR
   ("total_price_atomic" > 0 AND "cost_reserved_at" IS NOT NULL)
@@ -61,6 +69,47 @@ CREATE UNIQUE INDEX "uniq_goal_mutations_owner_idempotency"
 CREATE INDEX "idx_goal_mutations_goal_created"
   ON "goal_mutations"("goal_id", "created_at");
 
+-- Migration 15 retained only the most recent PATCH key and payload hash. Keep
+-- that key reserved in the append-only ledger with its then-current goal
+-- snapshot. The copied payload hash in result_hash is an explicit legacy
+-- sentinel: the Kernel refuses replay because migration 15 did not persist a
+-- separately verifiable result hash.
+INSERT INTO "goal_mutations" (
+  "goal_id", "owner_user_id", "idempotency_key", "payload_hash",
+  "result_snapshot", "result_hash", "created_at"
+)
+SELECT
+  goal."id", goal."owner_user_id", goal."last_mutation_key", goal."last_mutation_hash",
+  jsonb_build_object(
+    'goalId', goal."id"::text,
+    'objective', goal."objective",
+    'requiredCapabilities', to_jsonb(goal."required_capabilities"),
+    'policy', jsonb_build_object(
+      'cadenceMinutes', goal."cadence_minutes",
+      'runMode', goal."run_mode",
+      'executionMode', goal."execution_mode",
+      'runLimit', goal."run_limit",
+      'maxAgents', goal."max_agents",
+      'perRunCapAtomic', goal."per_run_cap_atomic"::text,
+      'dailyCapAtomic', CASE
+        WHEN goal."daily_cap_atomic" IS NULL THEN NULL
+        ELSE goal."daily_cap_atomic"::text
+      END
+    ),
+    'state', goal."state",
+    'nextRunAt', CASE
+      WHEN goal."next_run_at" IS NULL THEN NULL
+      ELSE to_char(goal."next_run_at" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+    END,
+    'completedRuns', goal."completed_runs",
+    'createdAt', to_char(goal."created_at" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+    'updatedAt', to_char(goal."updated_at" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+  ),
+  goal."last_mutation_hash",
+  clock_timestamp()
+FROM "goals" goal
+WHERE goal."last_mutation_key" IS NOT NULL AND goal."last_mutation_hash" IS NOT NULL;
+
 CREATE OR REPLACE FUNCTION enforce_goal_run_reservation()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -105,19 +154,26 @@ CREATE TRIGGER "goal_mutations_append_only"
 BEFORE UPDATE OR DELETE ON "goal_mutations"
 FOR EACH ROW EXECUTE FUNCTION reject_goal_mutation_change();
 
-CREATE OR REPLACE FUNCTION reject_terminal_goal_run_job_insert()
+CREATE TRIGGER "goal_mutations_no_truncate"
+BEFORE TRUNCATE ON "goal_mutations"
+FOR EACH STATEMENT EXECUTE FUNCTION reject_goal_mutation_change();
+
+CREATE OR REPLACE FUNCTION reject_terminal_goal_run_job_mutation()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
   run_state TEXT;
+  target_run_id UUID;
 BEGIN
-  SELECT "state" INTO run_state FROM "goal_runs" WHERE "id" = NEW."goal_run_id" FOR UPDATE;
+  target_run_id := CASE WHEN TG_OP = 'INSERT' THEN NEW."goal_run_id" ELSE OLD."goal_run_id" END;
+  SELECT "state" INTO run_state FROM "goal_runs" WHERE "id" = target_run_id FOR UPDATE;
   IF run_state IN ('READY', 'PARTIAL', 'BLOCKED', 'FAILED', 'CANCELED') THEN
     RAISE EXCEPTION 'terminal goal run jobs are immutable' USING ERRCODE = '23514';
   END IF;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER "goal_run_jobs_terminal_insert_guard"
-BEFORE INSERT ON "goal_run_jobs"
-FOR EACH ROW EXECUTE FUNCTION reject_terminal_goal_run_job_insert();
+CREATE TRIGGER "goal_run_jobs_terminal_mutation_guard"
+BEFORE INSERT OR UPDATE OR DELETE ON "goal_run_jobs"
+FOR EACH ROW EXECUTE FUNCTION reject_terminal_goal_run_job_mutation();

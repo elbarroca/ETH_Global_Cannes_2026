@@ -695,6 +695,70 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       }
       assert.ok(canonicalReady);
       const canonical = canonicalReady;
+      const childRuns = await database.sql<{ id: string }[]>`
+        INSERT INTO goal_runs (
+          goal_id, owner_user_id, idempotency_key, scheduled_for, state,
+          objective_snapshot, capabilities_snapshot, policy_snapshot, policy_hash,
+          effect_identity, total_price_atomic, cost_reserved_at, started_at,
+          created_at, updated_at
+        )
+        SELECT goal_id, owner_user_id, 'goal-terminal-child-01',
+          '2026-07-25T16:00:00.000Z', 'RUNNING', objective_snapshot,
+          capabilities_snapshot, policy_snapshot, policy_hash,
+          ${domainHash("goal-terminal-child", { runId: canonical.runId })},
+          1000, clock_timestamp(), clock_timestamp(), clock_timestamp(), clock_timestamp()
+        FROM goal_runs WHERE id = ${canonical.runId}::uuid
+        RETURNING id
+      `;
+      const childRunId = childRuns[0]?.id;
+      assert.ok(childRunId);
+      const childLinks = await database.sql<{ id: string }[]>`
+        INSERT INTO goal_run_jobs (
+          goal_run_id, agent_version_id, role, selection_rank, covered_capabilities,
+          price_atomic_snapshot, manifest_hash_snapshot, full_subname_snapshot, created_at
+        )
+        SELECT ${childRunId}::uuid, agent_version_id, 'ANALYSIS', 1,
+          covered_capabilities, price_atomic_snapshot, manifest_hash_snapshot,
+          full_subname_snapshot, clock_timestamp()
+        FROM goal_run_jobs WHERE goal_run_id = ${canonical.runId}::uuid
+        ORDER BY selection_rank, id LIMIT 1
+        RETURNING id
+      `;
+      const childLinkId = childLinks[0]?.id;
+      assert.ok(childLinkId);
+      await database.sql`
+        UPDATE goal_runs SET state = 'CANCELED', error_code = 'GOAL_CHILD_TEST_CANCELED',
+          completed_at = clock_timestamp(), updated_at = clock_timestamp()
+        WHERE id = ${childRunId}::uuid
+      `;
+      const existingJobs = await database.sql<{ job_id: string }[]>`
+        SELECT job_id FROM goal_run_jobs
+        WHERE goal_run_id = ${canonical.runId}::uuid AND job_id IS NOT NULL
+        ORDER BY selection_rank, id LIMIT 1
+      `;
+      assert.ok(existingJobs[0]?.job_id);
+      await assert.rejects(database.sql`
+        UPDATE goal_run_jobs SET job_id = ${existingJobs[0].job_id}::uuid
+        WHERE id = ${childLinkId}::uuid
+      `, /terminal goal run jobs are immutable/);
+      await assert.rejects(database.sql`
+        DELETE FROM goal_run_jobs WHERE id = ${childLinkId}::uuid
+      `, /terminal goal run jobs are immutable/);
+      await assert.rejects(database.sql`
+        INSERT INTO goal_run_jobs (
+          goal_run_id, agent_version_id, role, selection_rank, covered_capabilities,
+          price_atomic_snapshot, manifest_hash_snapshot, full_subname_snapshot, created_at
+        )
+        SELECT ${childRunId}::uuid, agent_version_id, 'SYNTHESIS', 2,
+          covered_capabilities, price_atomic_snapshot, manifest_hash_snapshot,
+          full_subname_snapshot, clock_timestamp()
+        FROM goal_run_jobs WHERE goal_run_id = ${canonical.runId}::uuid
+        ORDER BY selection_rank, id LIMIT 1
+      `, /terminal goal run jobs are immutable/);
+      await assert.rejects(
+        database.sql`TRUNCATE goal_mutations`,
+        /goal mutation record is append-only/,
+      );
       await database.sql`ALTER TABLE goal_runs DISABLE TRIGGER USER`;
       await database.sql`ALTER TABLE goal_runs DROP CONSTRAINT goal_runs_report_binding_check`;
 
