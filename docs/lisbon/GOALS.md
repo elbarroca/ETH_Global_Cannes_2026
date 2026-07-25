@@ -8,7 +8,7 @@ Release one exact AlphaDawg SHA that proves this protected path:
 
 `authenticated creator wallet -> canonical creator ENS authority -> immutable agent version + agent subname -> marketplace publication -> authenticated external buyer hire -> fresh pre/post ENS authority -> verified 0G inference and Storage readback -> canonical delivery receipt -> judge-visible UI`
 
-A6 Uniswap swap tooling is mandatory after `A4_ACCEPTED` and frozen `A5_ACCEPTED`, and before A7. Missing live authority yields `A6_BLOCKED_LIVE`; it never removes A6 or opens A7.
+`G1_GRAPH_LIVE_ACCEPTED` replaces mandatory A6 for the Lisbon Continuity release. The Graph is load-bearing: unavailable, malformed, stale, or failed Graph evidence blocks the job before 0G work. Existing Uniswap code remains optional and unclaimed.
 
 ## Current frontier and remaining order
 
@@ -17,7 +17,7 @@ The evidence and claim ledgers, not agent prose, determine the current gate. Rec
 1. `R0_AGENT_READY`: audit and repair the registered specialists and A4-A7 prompt pack.
 2. `A4_ACCEPTED`: reconcile the existing local A4 remediation audit, then add the ENSv2 creator/subname contract and pass its offline/static gate. Live ENSv2 stays blocked until its separate deployment and effect gates pass.
 3. `A5_ACCEPTED`: reconcile the existing local A5 remediation audit, then prove one protected creator -> publish -> external hire -> receipt journey, Telegram-to-app identity link, required service fleet, and browser-ready UI with no legacy marketplace authority.
-4. `A6_SWAP_TOOLING_ACCEPTED`: implement and independently audit the server-proxied quote, explicit buyer confirmation/signing, Unichain Sepolia validation, and separate `UniswapToolReceipt`; missing live authority is `A6_BLOCKED_LIVE`.
+4. `G1_GRAPH_LIVE_ACCEPTED`: one published `liquidity-scout` is selected by least privilege for a bounded `research + market-analysis` goal; fixed live Graph evidence is collected before job admission; 0G reasons over that evidence; causal removal blocks before 0G.
 5. `A7_RELEASE_VALIDATED`: freeze one SHA, pass live/release gates, deploy, replay twice, complete evidence, and pass the final bounty audit.
 
 Local A4/A5 implementation or a micro-commit is not acceptance. A4/A5 remain `PASS_TO_AUDIT` whenever the canonical ledgers have not accepted the exact unchanged SHA.
@@ -68,13 +68,13 @@ The archive is provenance only. It cannot direct current work.
 - Inventory `AGENTS.md`, every `.codex/agents/*.toml`, both converted
   `.agents/skills/source-command-*/SKILL.md` workflows, this contract,
   `SPRINTS.md`, and the active coordinator/executor/auditor prompts.
-- Require exactly one owner for each protected domain: authentication/kernel, ENS, 0G, product UI/E2E, mandatory A6 swap tooling, cycle wiring, and final bounty audit. Add or narrow one specialist instead of leaving ENS unowned or duplicating writers.
+- Require exactly one owner for each protected domain: authentication/kernel, ENS, 0G, product UI/E2E, Graph provider/evidence, cycle wiring, and final bounty audit. Add or narrow one specialist instead of leaving ENS unowned or duplicating writers.
 - Verify every declared path exists, every package/API version matches `package.json` and installed types, and every command exists. Remove stale Cannes-only bounty criteria, `VaultMind` identity, obsolete `src/dashboard/**` paths, and stale SDK signatures before trusting an agent.
 - The ENS owner must cover `src/ens/**`, ENS migrations/tests, Universal Resolver readiness, ENSv2 hierarchy/permission checks, and the creator-subname lifecycle. The Cycle Wirer owns only the cross-domain protected flow. The Frontend Builder owns root `app/**` and `components/**`. The Bounty Auditor must use current Lisbon controls and official requirements.
 - Run a deterministic structure/link/path/version scan and a read-only dry dispatch for each specialist. No agent may claim authority, live proof, bounty qualification, or completion from its prompt.
 - Record a readiness matrix with agent, exact domain, allowed paths, current dependencies, verification commands, conflicts, and verdict. Any missing owner, overlapping mutation scope, nonexistent path, stale API, or stale bounty contract is `R0_AGENT_BLOCKED`.
 
-The lean prompt architecture remains one persistent C0 coordinator plus reusable writer and auditor prompts. Separate A4/A5/A6/A7 prompt files are not required; missing acceptance coverage is.
+The lean prompt architecture remains one persistent C0 coordinator plus reusable writer and auditor prompts. Separate A4/A5/G1/A7 prompt files are not required; missing acceptance coverage is.
 
 ## ENSv2 creator and agent-name contract
 
@@ -123,7 +123,7 @@ Deployment and agent health are evidence-backed:
 
 - Derive the required fleet from one canonical registry. Every required web, API, worker, Telegram receiver, and specialist service exposes non-secret health plus release SHA/version; UI counts come only from fresh probes.
 - `online` requires the expected process and configuration, not merely HTTP `200`. Run a non-effectful health/config check for every agent and an authorized functional request for every required role. One missing agent, SHA mismatch, wrong endpoint, stale probe, or degraded dependency blocks the corresponding gate.
-- The screenshot-observed `12/13 ONLINE`, `Fresh authorization required`, indefinite `Waiting for Arc RPC`, and empty activity are regression inputs. Identify the exact offline agent; make wallet reauthorization recover without reload loops; remove Arc from the protected Lisbon path; and show mandatory A6 Unichain Sepolia readiness as explicitly pre-gated or `A6_BLOCKED_LIVE`, never perpetual loading.
+- The screenshot-observed `12/13 ONLINE`, `Fresh authorization required`, indefinite loading, and empty activity are regression inputs. Identify the exact offline agent; make wallet reauthorization recover without reload loops; remove Arc from the protected Lisbon path; and show The Graph as `CONFIGURED` or `UNAVAILABLE`, never falsely live.
 
 UI readiness requires automated Chromium coverage plus manual visual evidence on the same SHA:
 
@@ -131,17 +131,17 @@ UI readiness requires automated Chromium coverage plus manual visual evidence on
 - Test disconnected, connected-not-onboarded, stale session, Telegram-unlinked/linked, service waking/offline, empty, loading, success, refusal, and long-content states. Every retry must perform a real bounded recovery.
 - A7 screenshots/video may be captured only after auth, Telegram link, required service health, creator publication, external hire, receipt, and two reset/replays pass on the release SHA.
 
-## Mandatory A6 Uniswap swap-tooling contract
+## G1 The Graph live-data contract
 
-A6 starts only after current `A4_ACCEPTED` and frozen `A5_ACCEPTED`. It is required before A7 and has one narrow target:
+G1 starts from frozen local Kernel and UI evidence and has one narrow target:
 
-1. The server proxies the quote request and returns a bounded, runtime-validated quote/route; browser code never receives or logs an API credential.
-2. The buyer sees the exact chain, allowlisted tokens, integer amounts, route, slippage, deadline, spender, target, and calldata hash before explicit confirmation and wallet signing.
-3. Validation and any authorized transaction run only on Unichain Sepolia. Mainnet, automatic signing, arbitrary tokens, cross-chain routing, UniswapX, and server-held buyer keys are prohibited.
-4. A separate immutable `UniswapToolReceipt` binds the buyer, job, agent version, quote/request ID, policy fields, confirmation, transaction, finality, balance delta, failure state, and release SHA. It never replaces the canonical agent-delivery receipt.
-5. Local implementation, negative tests, and an immutable-SHA audit must pass before any live evidence. Acceptance additionally requires separately authorized Unichain Sepolia API/faucet/signature/transaction/form actions and exact causal evidence.
+1. A server-only `THE_GRAPH_API_KEY` authenticates fixed POST requests; browser code never receives or logs it.
+2. Only `pinned-deployment-lookup` and `liquidity-volume-snapshot` are allowed. The primary Subgraph is `8e4dRt4P4WHXnKbEq7STaQfU2g99WZ5S4w39f2PcUTjD`; fallback `AXJd5my1nV3MMeoX2FPoxnE7hqqDHiSYEazARyd4xLMj` may run once.
+3. Redirects, non-2xx responses, GraphQL/indexing errors, missing block identity, malformed or oversized data, timeout, and abort fail closed. No job or 0G effect may follow failed Graph context.
+4. Safe evidence binds Subgraph, deployment, mainnet block number/hash, completion time, request/response/context hashes, and the exact job/version. Raw credentials and arbitrary normalized responses are never public.
+5. Acceptance requires two authorized live replays plus one causal-removal replay that blocks before 0G. Configuration alone is only `CONFIGURED`; it is not live proof.
 
-Missing API, faucet, signature, transaction, push, or form authority is `A6_BLOCKED_LIVE`. It blocks A7 but does not authorize removal, substitution, simulated promotion, or a cut. Any API value pasted into chat is compromised: never use, echo, log, or commit it; require rotation before the first request.
+Uniswap remains optional, pre-gated, and unclaimed. No Uniswap work, transaction, eligibility, or sponsor claim is required for G1 or A7.
 
 ## Autonomous loop
 
@@ -189,7 +189,7 @@ If a required command does not exist, the sprint is not green. A1 must create re
 - functional API and automated critical-path UI tests;
 - production build and start smoke;
 - secret, PII, plaintext, and tracked-history scan;
-- authorized live 0G and ENS paths, including canonical creator-parent and agent-subname readback; direct ENSv2 only when its deployment gate passes; plus accepted A6 swap tooling with authorized Unichain Sepolia evidence and a separate `UniswapToolReceipt`;
+- authorized live Graph, 0G, and ENS paths, including canonical creator-parent, agent-subname readback, Graph block-bound evidence, and causal removal before 0G;
 - one creator-wallet -> agent subname -> immutable publication -> different-buyer hire -> verified receipt browser journey;
 - one secure web-user -> Telegram private-chat link plus command/result round-trip against the same backend identity and release SHA;
 - every required service healthy and functionally proven; no unexplained partial fleet, stale health badge, permanent authorization error, or permanent loading state;
@@ -202,6 +202,6 @@ If a required command does not exist, the sprint is not green. A1 must create re
 
 ## Launch
 
-Paste only [`prompts/C0-A4-CONTINUATION.md`](prompts/C0-A4-CONTINUATION.md) into one persistent Codex task. It must reconstruct the current branch and evidence frontier, pass `R0_AGENT_READY`, reconcile the existing A4/A5 audit state, and continue through A6/A7. It instantiates the reusable executor and auditor prompts itself.
+Paste only [`prompts/C0-A4-CONTINUATION.md`](prompts/C0-A4-CONTINUATION.md) into one persistent Codex task. It must reconstruct the current branch and evidence frontier, pass `R0_AGENT_READY`, reconcile the existing A4/A5 audit state, and continue through G1/A7. It instantiates the reusable executor and auditor prompts itself.
 
 [`prompts/C0-COORDINATOR.md`](prompts/C0-COORDINATOR.md) remains the original A0-A7 launch prompt for provenance, not the current continuation entrypoint.

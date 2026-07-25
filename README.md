@@ -42,21 +42,21 @@ flow, but neither a buyer wallet nor Telegram can replace creator authority.
 
 ---
 
-## Architecture — Six Protected Stages
+## Architecture — Seven Protected Stages
 
 ```mermaid
 flowchart LR
     Wallet["Wallet"] --> Identity["ENSv2 Identity<br/>creator.eth / agent.creator.eth"]
     Identity --> Agent["Immutable Agent"]
     Agent --> Hire["Marketplace Hire"]
-    Hire --> Delivery["Verified 0G Delivery"]
+    Hire --> Graph["Live The Graph Evidence<br/>fixed Subgraph + indexed block"]
+    Graph --> Delivery["Verified 0G Delivery"]
     Delivery --> Result["Receipt / UI"]
 
     Buyer["Different buyer wallet"] --> Hire
     Telegram["Linked Telegram account"] -. "same app identity" .-> Hire
 
-    Result -. "after A4_ACCEPTED + frozen A5_ACCEPTED" .-> Swap["A6 Uniswap target<br/>quote → confirm/sign → Unichain Sepolia → UniswapToolReceipt"]
-    Swap -. "missing live authority" .-> Blocked["A6_BLOCKED_LIVE"]
+    Graph -. "missing / malformed / failed" .-> Blocked["BLOCKED before 0G"]
 ```
 
 Solid arrows are the protected product path. Dashed arrows are secondary or
@@ -67,9 +67,9 @@ pre-gated paths; they are not implementation, eligibility, or live proof.
 | Identity | ENSv2 creator parent + deterministic agent subname | Who owns or is authorized to operate the named agent |
 | Version | Immutable `AgentVersion` | The exact instructions, capability, service, price, policy, and owner hired |
 | Commerce | Protected marketplace + different-buyer job | Who published, who hired, and which version was selected |
+| Data | Fixed The Graph Subgraph operations | Which deployment and indexed Ethereum block supplied the liquidity evidence |
 | Execution | 0G Compute + proof-enabled Storage readback | The accepted output matches the stored delivery |
 | Receipt | Canonical terminal receipt | One delivery and one mutually exclusive financial outcome |
-| Swap tooling | Mandatory pre-gated A6 Uniswap target | A buyer-approved testnet swap and separate tooling receipt |
 
 ---
 
@@ -91,9 +91,8 @@ pre-gated paths; they are not implementation, eligibility, or live proof.
    the immutable job and version.
 8. **Deliver:** ENS is checked again before one canonical receipt is accepted
    and shown in the UI.
-9. **Prove swap tooling:** after `A4_ACCEPTED` and frozen `A5_ACCEPTED`, A6 must
-   prove its bounded Unichain Sepolia lifecycle before A7. Missing live
-   authority yields `A6_BLOCKED_LIVE`; it never removes A6.
+9. **Prove the source:** the proof UI shows Graph Subgraph, deployment, indexed
+   block, context hashes, 0G reasoning/Storage evidence, and the receipt.
 
 ## ENSv2 — A Human Name With Machine Authority
 
@@ -122,22 +121,18 @@ those facts to the exact buyer, job, version, hashes, and terminal outcome.
 A fixture, installed SDK, HTTP `200`, request ID, or green UI badge is not live
 sponsor proof.
 
-## Uniswap — Mandatory, Pre-Gated Swap Tooling
+## The Graph — Load-Bearing Liquidity Evidence
 
-Current state: `A6_REQUIRED_TARGET; PRE_GATES_CLOSED; NOT_IMPLEMENTED;
-LIVE_EFFECT_BLOCKED`.
+`liquidity-scout` uses The Graph before job admission. The server supports only:
 
-After `A4_ACCEPTED` and frozen `A5_ACCEPTED`, A6 must implement and independently
-audit one narrow target: a server-proxied quote, explicit buyer confirmation and
-wallet signing, Unichain Sepolia validation, and a separate immutable
-`UniswapToolReceipt`. Mainnet, automatic signing, arbitrary tokens, cross-chain
-routing, UniswapX, and server-held buyer keys are prohibited.
+- `pinned-deployment-lookup`: `_meta`, deployment, indexed block, and indexing-error state.
+- `liquidity-volume-snapshot`: ETH price, factory totals, and the five highest-TVL pools with pair, fee tier, TVL, volume, fees, liquidity, and transaction count.
 
-API, faucet, signature, transaction, push, and form effects each require an
-exact current `AUTHORIZED` row. Without that authority, A6 is
-`A6_BLOCKED_LIVE` and A7 stays closed. Any API value pasted into chat is treated
-as compromised: it must never be used, echoed, logged, or committed, and must
-be rotated before the first request.
+The endpoint pattern is `POST https://gateway.thegraph.com/api/subgraphs/id/<SUBGRAPH_ID>` with a server-only bearer `THE_GRAPH_API_KEY`. Primary Subgraph: `8e4dRt4P4WHXnKbEq7STaQfU2g99WZ5S4w39f2PcUTjD`; one fallback: `AXJd5my1nV3MMeoX2FPoxnE7hqqDHiSYEazARyd4xLMj`. No user can supply an endpoint, ID, credential, tool, or GraphQL document.
+
+Redirects, non-2xx responses, GraphQL/indexing errors, missing block identity, malformed/oversized responses, timeout, and abort produce `BLOCKED` before 0G work. A configured key displays `CONFIGURED`, never live. Only successful job evidence proves live use.
+
+Implementation base: `17458454933500132dbd2fdc3659bec9e6972491`. Lisbon Graph changelog: fixed native-fetch provider and evidence kernel (`3db3d19`), judge-facing catalog/proof UI (`744eb96`), recovery evidence (`fe019a4`), and audited UI remediation (`96d0f23`). Uniswap code is preserved as optional and unclaimed.
 
 ## Bounty Fit — Plain English
 
@@ -145,7 +140,7 @@ be rotated before the first request.
 |---|---|---|
 | ENS | A creator controls a parent name, each agent gets a deterministic subname, and authority is checked again before execution and delivery. | Local evidence exists, but the Kernel publication handoff is `AUDIT_FIX`; no live ENS or eligibility claim. |
 | 0G | Compute produces the result, Storage preserves it, and proof-enabled readback must match before delivery is accepted. | Deterministic local evidence exists; live 0G execution is `NOT_RUN`. |
-| Uniswap | A server supplies a bounded quote, the buyer confirms and signs, Unichain Sepolia validates it, and a separate receipt records the tooling lifecycle. | Mandatory A6 target only; not implemented, audited, live-proven, or eligibility-proven. |
+| The Graph | A fixed Ethereum Uniswap V3 Subgraph supplies block-bound liquidity evidence before 0G reasoning. | Kernel/UI and mocked causal-removal evidence pass locally; live query remains authorization-gated and `NOT_RUN`. |
 
 ---
 
@@ -161,8 +156,8 @@ The [Lisbon Claim Matrix](docs/lisbon/CLAIM-MATRIX.md) is the source of truth.
   closed.
 - A5's Kernel lifecycle audit returned `FIX`; A5 remains local-only and is not
   accepted.
-- A6 is mandatory after accepted A4 and frozen A5, but is not implemented and
-  its pre-gates and live-effect gate remain closed.
+- `G1_GRAPH_LIVE_ACCEPTED` replaces mandatory A6. Local Graph implementation is
+  frozen; live Graph/0G/ENS evidence and causal replays remain blocked.
 - `RELEASE_BLOCKED` and `LIVE_EFFECT_BLOCKED` remain in force. Production
   readiness is rejected currently; expected winnings are unproven with floor
   `$0`.
@@ -188,9 +183,10 @@ non-authoritative unless a current sprint explicitly admits them.
 | Web | Next.js 16, React 19, TypeScript |
 | Data | Neon PostgreSQL, Prisma |
 | Identity | SIWE, viem, ENS Universal Resolver + ENSv2 readiness fixtures |
+| Live blockchain data | The Graph Gateway, fixed Ethereum Uniswap V3 Subgraphs |
 | Execution | 0G Compute, Storage, pinned Go proof verifier |
 | UI verification | Playwright Chromium |
-| Swap tooling | Mandatory pre-gated A6 target on Unichain Sepolia |
+| Optional tooling | Existing Uniswap path, preserved and unclaimed |
 
 ## Quick Start
 

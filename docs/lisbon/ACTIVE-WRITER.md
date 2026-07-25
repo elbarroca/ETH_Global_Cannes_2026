@@ -3,6 +3,42 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 /root
+task_id: GRAPH-DOCS-FREEZE-R1
+task_instance_id: GRAPH-DOCS-FREEZE-R1:R1:E51CADE
+generation: 1
+sprint: Freeze the local Graph Continuity submission contract
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: e51cade9d8100d79b8e04354b40ec930caa9bf87
+control_sha: e51cade9d8100d79b8e04354b40ec930caa9bf87
+token: GRAPH-DOCS-FREEZE-R1-E51CADE-20260725T233753Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T23:37:53Z
+expires_at: 2026-07-26T00:15:00Z
+allowed_paths:
+  - .env.example
+  - README.md
+  - docs/lisbon/GOALS.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T23:37:53Z
+deadline: 2026-07-26T00:15:00Z
+expected_exit: exact local Graph contract documented with all live effects blocked
+external_effect_authority: local documentation environment template checks and one atomic local commit only; no secret configuration network query push deploy submission signature transaction spend or claim
+external_effects_attempted: none
+claim_changes: G1 replaces mandatory A6 in the controlling local contract; no live or eligibility claim
+completed_at: 2026-07-25T23:43:00Z
+verification_evidence:
+  - npm run validate:env PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+verdict: PASS_TO_AUDIT; LOCAL_ONLY; LIVE_EFFECT_BLOCKED
+lock_release: release only exact token GRAPH-DOCS-FREEZE-R1-E51CADE-20260725T233753Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Frontend Builder /root
 task_id: MARKETPLACE-ENS-RECOVERY-R9
 task_instance_id: MARKETPLACE-ENS-RECOVERY-R9:96D0F23
