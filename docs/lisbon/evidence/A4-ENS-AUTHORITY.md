@@ -321,3 +321,101 @@ The prescribed floor otherwise passed: environment and Prisma checks; both six-m
 Minimum repair: prevent general application-role inserts, derive and validate decision/release identity inside a trusted database-owned boundary, add the missing normal-role regression, and re-audit a new immutable SHA.
 
 W4 is `AUDIT_FIX`, not ready for Kernel consumption. Kernel/API ownership remains untouched. After ENS repair and re-audit, the sequential Kernel handoff must consume the decision by foreign key, recheck freshness with database time in the publication transaction, append the matching lifecycle event, repair action idempotency/body bounds, and pass immutable audit. Therefore `A4_ACCEPTED`, frozen `A5_ACCEPTED`, mandatory A6 entry, live ENS, sponsor qualification, release, push, deployment, public identifiers, and claim promotion remain closed.
+
+## W5 database-owned publication-decision authority remediation
+
+- Task: `A4-ENS-PUBLICATION-DECISION-AUTHORITY-20260725`
+- Task instance: `A4-ENS-PUBLICATION-DECISION-AUTHORITY-20260725:W5:4A9A82B`
+- Generation: `5`
+- Start/control SHA: `4a9a82b927a7f944c3b4aeffd85073726c3424f3`
+- Observed through: `2026-07-25T04:16:39Z`
+- Writer result: `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`
+- Live result: `NOT_RUN; ENSV2_LIVE_BLOCKED; LIVE_EFFECT_BLOCKED`
+
+W5 leaves the W4 migration byte-for-byte unchanged and adds only
+`20260725045500_a4_publication_decision_authority`, SHA-256
+`462c68ee846852f082492b2f30cf3340fde6224f506da85298432b65f285587a`.
+The new immutable release ledger has finite, non-overlapping-by-admission
+operational semantics: PostgreSQL admits a publication decision only when
+exactly one owner-inserted release window is active at database time. No release
+is seeded by the migration, fixtures cannot become live admissions, and missing
+or overlapping active releases deny.
+
+The runtime group `alphadawg_runtime` is a no-login, non-superuser,
+non-owner role. It receives only the exact lineage-column reads needed to
+compose the resolver request and `EXECUTE` on
+`admit_ens_publication_decision`; all decision and release table privileges,
+including `SELECT`, `INSERT`, `UPDATE`, `DELETE`, and `TRUNCATE`, remain denied.
+The admission function is `SECURITY DEFINER`, has fixed
+`search_path = pg_catalog, pg_temp`, contains no dynamic SQL, and returns only
+decision ID, verdict, and bounded error. `PUBLIC` execute is revoked in the same
+migration. The inherited W4 trigger receives a deterministic path only after
+`PUBLIC` and the runtime group lose schema-create authority.
+
+The function accepts only the immutable version identifier plus resolved
+binding/record observations and a bounded validation error. PostgreSQL reloads
+the exact `WRITE_PREPARED` lineage, reconstructs and compares version,
+manifest, capabilities, service, price, payout, normalized creator and agent
+names, DNS names, and owner/delegate; normalizes JSON evidence; derives both
+evidence hashes, `ALLOW`/`DENY`, the active release SHA, the convergence key,
+durable timestamps, and freshness; then performs one atomic insert-or-read.
+Release SHA and decision key are absent from the function signature. The
+disposable clock is accepted only when `session_user` is a database superuser;
+a production caller with `CREATE` on `public` is rejected before admission.
+
+The application no longer accepts `releaseSha`, computes a decision key, or
+issues direct decision-table `INSERT`/`SELECT`. It calls only the bounded
+function. Missing runtime remains `ENS_PUBLICATION_NOT_CONFIGURED`; missing
+release admission, missing function privilege, malformed database evidence, or
+database refusal returns `ENS_PUBLICATION_PERSIST_FAILED` with no admitted row.
+All prior hierarchy, role/admin-role, expiry, forward/back-link, alias,
+resolver, Universal Resolver, CCIP, owner/delegate, chain/root, transfer,
+replacement, stale, outage, and timeout refusals remain intact.
+
+The real restricted-role regression creates a separate non-superuser login and
+proves `current_user = session_user`, both table owners differ, public-schema
+creation is unavailable, and every direct decision/release read or DML/truncate
+attempt fails. The same login succeeds through the bounded function only for
+the exact server-derived current evidence and converges to the existing row.
+Missing release, caller-supplied test time, changed version, manifest/name
+binding, changed manifest/name record, and stale block time fail; neither
+release SHA nor decision key can be passed through the signature. Twenty
+concurrent production-path checks still converge, later drift still appends a
+`DENY`, and zero job/effect/receipt row is created by publication admission.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| `npm run validate:env` / loopback-placeholder Prisma validate/generate | 0 | Offline environment passed; schema valid; Prisma Client `6.19.3` generated. |
+| `npx tsx scripts/test-migrations.ts` | 0 | Empty and synthetic Cannes-shaped seven-migration lanes passed; sentinel SHA-256 remained `fb8aece1677586a330f0cfeb0850b71488849302324eb1d6a079673e35e3829e`. |
+| `npm run lint` / `npm run typecheck` | 0 | Lint has zero errors and 23 inherited warnings; strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | Foundation 9/9, authentication 9/9, and Kernel 17/17 passed. |
+| checksum-pinned `npm run test:go` / `npm run test:a3` | 0 | Official Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`; A3 passed 12/12. |
+| `npm run test:a4` / checksum-pinned `npm run test:integration` | 0 | A4 passed 22/22; integration passed 39/39 plus both seven-migration lanes. |
+| `npm run test:a5` / `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 3/3, 4/4, 1/1, and 3/3 passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` / `git diff --check` | 0 | Protected boot, tracked secret scan, shell syntax, and diff hygiene passed. |
+| `npm run build` / loopback `next start` | 0 | Next `16.2.11` generated 31/31 pages, became ready in 112 ms, and served `/` with HTTP `200` and 32,236 bytes. |
+
+The official Go archive matched SHA-256
+`25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`
+and reported exact `go1.23.10 darwin/arm64`. Its task-specific archive,
+toolchain, verifier binary, and HTTP artifact were deleted after verification.
+No direct ENS/0G/Uniswap/sponsor/API call, shared/managed database effect,
+migration deploy, wallet signature, transaction, push, deployment, form,
+funding, upload, spend, public identifier, live proof, or claim promotion was
+attempted.
+
+Deployment remains fail-closed. The migration owner must have authority to
+create or validate the exact no-login runtime group. A production application
+login must be a non-owner/non-superuser member of `alphadawg_runtime` with no
+direct `CREATE` on `public`; using the migration owner as the runtime connection
+is not admitted evidence. An audited and exactly authorized deployment packet
+must separately insert one finite release window as the database owner. Without
+those prerequisites, migration or admission fails rather than weakening the
+boundary.
+
+W5 returns only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. An independent audit
+must bind the containing immutable SHA before the sequential Kernel owner may
+consume the decision by foreign key and repair its transaction-time freshness,
+event, idempotency, and body-bound findings. `A4_ACCEPTED`, A5 acceptance,
+mandatory A6 entry, live ENS, sponsor qualification, push, release, and public
+claims remain closed.

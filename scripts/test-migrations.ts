@@ -18,6 +18,7 @@ const A3_MIGRATION = "20260724041000_strict_0g";
 const A4_MIGRATION = "20260724130000_ens_authority";
 const A5_MIGRATION = "20260725020000_a5_protected_lifecycle";
 const A4_PUBLICATION_MIGRATION = "20260725042000_a4_publication_decision";
+const A4_PUBLICATION_AUTHORITY_MIGRATION = "20260725045500_a4_publication_decision_authority";
 const BASELINE_SQL = resolve(ROOT, "prisma/migrations", BASELINE_MIGRATION, "migration.sql");
 const SENTINEL_ID = "a1-cannes-sentinel";
 const SENTINEL_WALLET = "0xa1cannessentinel";
@@ -295,6 +296,7 @@ async function verifyDatabase(
       ens_authority_bindings: string | null;
       ens_authority_checks: string | null;
       ens_publication_decisions: string | null;
+      ens_publication_authority_releases: string | null;
       agent_version_events: string | null;
       user_count: string;
       migration_count: string;
@@ -304,9 +306,15 @@ async function verifyDatabase(
       a4_count: string;
       a5_count: string;
       a4_publication_count: string;
+      a4_publication_authority_count: string;
       invariant_trigger_count: string;
       a4_constraint_count: string;
       a4_publication_constraint_count: string;
+      a4_publication_authority_constraint_count: string;
+      a4_publication_authority_function_count: string;
+      a4_publication_trigger_hardening_count: string;
+      a4_publication_runtime_role_count: string;
+      a4_publication_runtime_direct_privilege_count: string;
       a5_constraint_count: string;
       receipt_authority_nullable: string;
       sequence_type: string;
@@ -329,6 +337,7 @@ async function verifyDatabase(
         to_regclass('public.ens_authority_bindings')::text AS ens_authority_bindings,
         to_regclass('public.ens_authority_checks')::text AS ens_authority_checks,
         to_regclass('public.ens_publication_decisions')::text AS ens_publication_decisions,
+        to_regclass('public.ens_publication_authority_releases')::text AS ens_publication_authority_releases,
         to_regclass('public.agent_version_events')::text AS agent_version_events,
         (SELECT count(*)::text FROM users) AS user_count,
         (
@@ -361,6 +370,10 @@ async function verifyDatabase(
           WHERE migration_name = ${A4_PUBLICATION_MIGRATION} AND finished_at IS NOT NULL
         ) AS a4_publication_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A4_PUBLICATION_AUTHORITY_MIGRATION} AND finished_at IS NOT NULL
+        ) AS a4_publication_authority_count,
+        (
           SELECT count(*)::text FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN (
             'agent_versions_immutable_published',
@@ -376,7 +389,9 @@ async function verifyDatabase(
             'receipts_require_ens_authority',
             'agent_versions_legal_lifecycle',
             'agent_version_events_append_only',
-            'ens_publication_decisions_append_only'
+            'ens_publication_decisions_append_only',
+            'ens_publication_authority_releases_append_only',
+            'ens_publication_authority_releases_no_truncate'
           )
         ) AS invariant_trigger_count,
         (
@@ -402,6 +417,51 @@ async function verifyDatabase(
             'ens_publication_decision_shape_check'
           )
         ) AS a4_publication_constraint_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'ens_publication_authority_releases_pkey',
+            'ens_publication_authority_release_sha_check',
+            'ens_publication_authority_release_window_check'
+          )
+        ) AS a4_publication_authority_constraint_count,
+        (
+          SELECT count(*)::text
+          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'admit_ens_publication_decision'
+            AND p.prosecdef
+            AND p.proconfig = ARRAY['search_path=pg_catalog, pg_temp']
+            AND NOT has_function_privilege('public', p.oid, 'EXECUTE')
+            AND has_function_privilege('alphadawg_runtime', p.oid, 'EXECUTE')
+            AND pg_get_userbyid(p.proowner) <> 'alphadawg_runtime'
+        ) AS a4_publication_authority_function_count,
+        (
+          SELECT count(*)::text
+          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'enforce_ens_publication_decision'
+            AND p.proconfig = ARRAY['search_path=pg_catalog, public, pg_temp']
+            AND NOT has_schema_privilege('alphadawg_runtime', 'public', 'CREATE')
+            AND NOT has_schema_privilege('public', 'public', 'CREATE')
+        ) AS a4_publication_trigger_hardening_count,
+        (
+          SELECT count(*)::text FROM pg_roles
+          WHERE rolname = 'alphadawg_runtime' AND NOT rolcanlogin AND NOT rolsuper
+            AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication
+            AND NOT rolbypassrls AND rolinherit
+        ) AS a4_publication_runtime_role_count,
+        (
+          SELECT (
+            CASE WHEN has_table_privilege('alphadawg_runtime', 'public.ens_publication_decisions', 'INSERT')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_decisions', 'UPDATE')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_decisions', 'DELETE')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_decisions', 'TRUNCATE')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_releases', 'INSERT')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_releases', 'UPDATE')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_releases', 'DELETE')
+              OR has_table_privilege('alphadawg_runtime', 'public.ens_publication_authority_releases', 'TRUNCATE')
+            THEN 1 ELSE 0 END
+          )::text
+        ) AS a4_publication_runtime_direct_privilege_count,
         (
           SELECT count(*)::text FROM pg_constraint
           WHERE conname IN (
@@ -446,18 +506,25 @@ async function verifyDatabase(
       result.ens_authority_bindings !== "ens_authority_bindings" ||
       result.ens_authority_checks !== "ens_authority_checks" ||
       result.ens_publication_decisions !== "ens_publication_decisions" ||
+      result.ens_publication_authority_releases !== "ens_publication_authority_releases" ||
       result.agent_version_events !== "agent_version_events" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 6 ||
+      Number(result.migration_count) !== 7 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
       Number(result.a4_count) !== 1 ||
       Number(result.a5_count) !== 1 ||
       Number(result.a4_publication_count) !== 1 ||
-      Number(result.invariant_trigger_count) !== 14 ||
+      Number(result.a4_publication_authority_count) !== 1 ||
+      Number(result.invariant_trigger_count) !== 16 ||
       Number(result.a4_constraint_count) !== 14 ||
       Number(result.a4_publication_constraint_count) !== 7 ||
+      Number(result.a4_publication_authority_constraint_count) !== 3 ||
+      Number(result.a4_publication_authority_function_count) !== 1 ||
+      Number(result.a4_publication_trigger_hardening_count) !== 1 ||
+      Number(result.a4_publication_runtime_role_count) !== 1 ||
+      Number(result.a4_publication_runtime_direct_privilege_count) !== 0 ||
       Number(result.a5_constraint_count) !== 11 ||
       result.receipt_authority_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||

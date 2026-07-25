@@ -186,7 +186,6 @@ export interface EnsPublicationDecisionResult {
 export interface EnsPublicationAuthorityConfig {
   sql: DatabaseClient;
   runtime: EnsPublicationRuntime | null;
-  releaseSha: string;
   now?: Date | (() => Date);
 }
 
@@ -711,7 +710,6 @@ async function derivePublicationBinding(
       AND v.lifecycle_state = 'WRITE_PREPARED'
       AND v.published = false
       AND v.adapter_key = 'protected-a3'
-    FOR SHARE
   `;
   const lineage = rows[0];
   if (!lineage || !HASH.test(lineage.manifest_hash)) {
@@ -1491,7 +1489,6 @@ function publicationDecisionBinding(binding: EnsPublicationBinding): CanonicalVa
 async function persistPublicationDecision(
   sql: DatabaseClient,
   binding: EnsPublicationBinding,
-  releaseSha: string,
   observedAt: Date,
   resolution: ValidatedResolution | null,
   errorCode: string | null,
@@ -1499,86 +1496,37 @@ async function persistPublicationDecision(
 ): Promise<string> {
   const bindingValue = publicationDecisionBinding(binding);
   const bindingBytes = canonicalJson(bindingValue);
-  const bindingHash = sha256(bindingBytes);
+  const bindingDocument = JSON.parse(bindingBytes);
+  const recordDocument = resolution ? JSON.parse(resolution.recordBytes) : null;
   const decision = errorCode === null ? "ALLOW" : "DENY";
-  const decisionKey = sha256(canonicalJson({
-    schemaVersion: 1,
-    agentVersionId: binding.agentVersionId,
-    bindingHash,
-    releaseSha,
-    decision,
-    errorCode,
-    recordHash: resolution?.recordHash ?? null,
-    blockNumber: resolution?.blockNumber ?? null,
-    blockTimestamp: resolution?.blockTimestamp.toISOString() ?? null,
-    freshUntil: resolution?.freshUntil.toISOString() ?? null,
-    transactionHash: resolution?.transactionHash ?? null,
-  }));
-  const parentLink = {
-    parentName: binding.creatorName,
-    childName: binding.agentName,
-    forward: true,
-    back: true,
-  };
-  const roles = binding.ensv2.roles.map((role) => ({
-    scope: role.scope,
-    name: role.name,
-    role: role.role,
-    adminRole: role.adminRole,
-    account: role.account,
-    expiresAt: role.expiresAt,
-  }));
-  const rows = await sql<{ id: string; decision: string; error_code: string | null }[]>`
-    INSERT INTO ens_publication_decisions (
-      decision_key, agent_version_id, agent_version, binding_bytes, binding_hash,
-      manifest_hash, capabilities, service, price_atomic, payout,
-      creator_name, creator_node, creator_dns_name, agent_label, agent_name,
-      agent_node, agent_dns_name, owner, delegate, chain_id, root_registry,
-      universal_resolver, creator_canonical_registry, agent_parent_registry,
-      agent_canonical_registry, roles, external_grants, parent_expiry, agent_expiry,
-      parent_link, alias, creator_resolver_address, resolver_address, resolver_suffix, resolver_mode,
-      ccip_gateway, policy_version, max_age_seconds, record_bytes, record_hash,
-      block_number, block_timestamp, transaction_hash, observed_at, fresh_until,
-      release_sha, decision, error_code, disposable_test_clock, created_at
-    ) VALUES (
-      ${decisionKey}, ${binding.agentVersionId}::uuid, ${binding.agentVersion},
-      ${bindingBytes}, ${bindingHash}, ${binding.manifestHash}, ${binding.capabilities},
-      ${binding.service}, ${binding.priceAtomic}::bigint, ${binding.payout},
-      ${binding.creatorName}, ${binding.creatorNode}, ${binding.creatorDnsName},
-      ${binding.agentLabel}, ${binding.agentName}, ${binding.agentNode},
-      ${binding.agentDnsName}, ${binding.agentOwner}, ${binding.agentDelegate},
-      ${binding.chainId}, ${binding.rootRegistry}, ${binding.universalResolver},
-      ${binding.ensv2.creatorCanonicalRegistry}, ${binding.ensv2.agentParentRegistry},
-      ${binding.ensv2.agentCanonicalRegistry}, ${sql.json(roles)},
-      ${sql.json([])}, ${binding.ensv2.parentExpiry}, ${binding.ensv2.agentExpiry},
-      ${sql.json(parentLink)}, false, ${binding.creatorResolver}, ${binding.agentResolver},
-      ${binding.ensv2.resolverSuffix}, ${binding.ensv2.resolverMode},
-      ${binding.ensv2.ccipGateway}, ${binding.policyVersion}, ${binding.maxAgeSeconds},
-      ${resolution?.recordBytes ?? null}, ${resolution?.recordHash ?? null},
-      ${resolution?.blockNumber ?? null}::numeric, ${resolution?.blockTimestamp ?? null},
-      ${resolution?.transactionHash ?? null}, ${observedAt}, ${resolution?.freshUntil ?? null},
-      ${releaseSha}, ${decision}, ${errorCode}, ${disposableTestClock}, ${observedAt}
-    ) ON CONFLICT (decision_key) DO NOTHING
-    RETURNING id::text, decision, error_code
-  `;
-  const selected = rows[0] ?? (await sql<{
-    id: string;
+  const rows = await sql<{
+    decision_id: string;
     decision: string;
     error_code: string | null;
   }[]>`
-    SELECT id::text, decision, error_code
-    FROM ens_publication_decisions
-    WHERE decision_key = ${decisionKey}
-  `)[0];
+    SELECT decision_id::text, decision, error_code
+    FROM public.admit_ens_publication_decision(
+      ${binding.agentVersionId}::uuid,
+      ${sql.json(bindingDocument)},
+      ${resolution ? sql.json(recordDocument) : null},
+      ${resolution?.blockNumber ?? null}::numeric,
+      ${resolution?.blockTimestamp ?? null}::timestamptz,
+      ${resolution?.transactionHash ?? null},
+      ${errorCode},
+      ${disposableTestClock ? observedAt : null}::timestamptz
+    )
+  `;
+  const selected = rows[0];
   if (!selected || selected.decision !== decision || selected.error_code !== errorCode) {
     throw new Error("ENS_PUBLICATION_DECISION_PERSIST_FAILED");
   }
-  return selected.id;
+  return selected.decision_id;
 }
 
 /**
  * Creates the server-composed pre-publication boundary. Runtime policy, resolver,
- * database, clock, and release identity are fixed by server composition; the
+ * database and clock are fixed by server composition; release identity and
+ * convergence identity are selected and derived inside the database. The
  * per-call request accepts only the immutable agent-version identifier.
  */
 export function createEnsPublicationAuthority(
@@ -1594,9 +1542,6 @@ export function createEnsPublicationAuthority(
     }
     if (!config.runtime) {
       return { allowed: false, decisionId: null, errorCode: "ENS_PUBLICATION_NOT_CONFIGURED" };
-    }
-    if (!/^[0-9a-f]{40}$/.test(config.releaseSha)) {
-      return { allowed: false, decisionId: null, errorCode: "ENS_PUBLICATION_RELEASE_INVALID" };
     }
     const runtime = config.runtime;
     const currentTime = clock(config.now, runtime.disposableTestClock === true);
@@ -1648,7 +1593,6 @@ export function createEnsPublicationAuthority(
       const decisionId = await persistPublicationDecision(
         config.sql,
         binding,
-        config.releaseSha,
         observedAt,
         resolution,
         errorCode,

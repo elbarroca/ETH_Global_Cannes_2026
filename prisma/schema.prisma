@@ -744,3 +744,12 @@ model EnsPublicationDecision {
   @@index([agentVersionId, createdAt], map: "idx_ens_publication_version_created")
   @@map("ens_publication_decisions")
 }
+
+model EnsPublicationAuthorityRelease {
+  releaseSha String   @id @map("release_sha")
+  notBefore DateTime @map("not_before") @db.Timestamptz(6)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  admittedAt DateTime @default(now()) @map("admitted_at") @db.Timestamptz(6)
+
+  @@map("ens_publication_authority_releases")
+}

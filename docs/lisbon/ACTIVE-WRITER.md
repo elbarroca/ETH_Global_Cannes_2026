@@ -3,6 +3,62 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: ENS Integrator /root/a4_ensv2_gap_inventory
+task_id: A4-ENS-PUBLICATION-DECISION-AUTHORITY-20260725
+task_instance_id: A4-ENS-PUBLICATION-DECISION-AUTHORITY-20260725:W5:4A9A82B
+generation: 5
+sprint: A4_publication_decision_database_authority_remediation
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 4a9a82b927a7f944c3b4aeffd85073726c3424f3
+control_sha: 4a9a82b927a7f944c3b4aeffd85073726c3424f3
+token: A4-ENS-PUB-AUTH-W5-4A9A82B-F2E2536D-BC9F-47FA-AE8C-548BA8BEDC9B
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T04:18:22Z
+expires_at: 2026-07-25T05:57:21Z
+allowed_paths:
+  - src/ens/**
+  - tests/a4/**
+  - tests/helpers/ens.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260725045500_a4_publication_decision_authority/**
+  - scripts/test-migrations.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T03:57:21Z
+deadline: 2026-07-25T05:57:21Z
+expected_exit: replace caller-authenticated publication identity with one database-owned release admission and decision-key boundary under a restricted runtime role
+acceptance_items:
+  - runtime and application roles have no direct decision DML truncate or release-control authority
+  - one least-input database function derives release identity convergence key lineage and freshness before atomic insert and bounded return
+  - runtime source uses only the admission function and fails closed on missing privilege release admission malformed evidence or stale evidence
+  - restricted role probes prove owner separation direct DML denial exact evidence admission and altered identity lineage or freshness denial
+  - seven-migration lanes full local floor one atomic local commit and immutable re-audit handoff
+external_effect_authority: safe local allowed files disposable loopback PostgreSQL and processes generated ignored output checksum-pinned temporary Go tooling and one local atomic commit only; no live ENS 0G Uniswap sponsor shared database managed migration push deploy signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T04:18:22Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - runtime source contains no direct publication decision insert select caller release SHA or caller convergence key and invokes only the bounded admission function
+  - real non-superuser login differs from owners cannot create in public cannot read or mutate authority tables and succeeds only for exact current function admission
+  - missing release caller clock altered version manifest name record freshness direct DML and release control deny without commerce rows
+  - A4 22 of 22 integration 39 of 39 both seven-migration lanes and the complete local floor passed
+  - official Go 1.23.10 archive matched the pinned checksum and temporary tooling HTTP artifact and verifier binary were deleted
+remaining_blocks:
+  - independent immutable SHA audit of this W5 remediation
+  - sequential Kernel consumption transaction freshness event idempotency and body-bound remediation plus immutable audit
+  - every live ENS sponsor A5 A6 push release eligibility and public claim gate
+external_effects_attempted: checksum-pinned official Go download to task-specific temporary storage only; no ENS 0G Uniswap sponsor API shared database managed migration signature transaction push deploy form funding upload spend public identifier live proof or claim effect
+result: PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token A4-ENS-PUB-AUTH-W5-4A9A82B-F2E2536D-BC9F-47FA-AE8C-548BA8BEDC9B after containing commit and clean verification
+status: released
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-A4-W4-AUDIT-RECONCILIATION-20260725
 task_instance_id: C0-A4-W4-AUDIT-RECONCILIATION-20260725:3B73C9D

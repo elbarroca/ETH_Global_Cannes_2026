@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
+import postgres from "postgres";
 import {
   CANONICAL_UNIVERSAL_RESOLVER,
   createEnsPublicationAuthority,
@@ -82,8 +83,25 @@ function addExternalGrant(response: Record<string, unknown>): unknown {
   return copy;
 }
 
-async function preparedVersion(database: DisposableDatabase, label = "research"): Promise<string> {
+async function admitPublicationRelease(database: DisposableDatabase): Promise<void> {
+  await database.sql`
+    INSERT INTO ens_publication_authority_releases (release_sha, not_before, expires_at)
+    VALUES (
+      ${RELEASE_SHA},
+      ${new Date(NOW.getTime() - 60 * 60 * 1_000)},
+      ${new Date(NOW.getTime() + 8 * 60 * 60 * 1_000)}
+    )
+    ON CONFLICT (release_sha) DO NOTHING
+  `;
+}
+
+async function preparedVersion(
+  database: DisposableDatabase,
+  label = "research",
+  options: { admitRelease?: boolean } = {},
+): Promise<string> {
   configureDatabaseEnvironment(database.url);
+  if (options.admitRelease !== false) await admitPublicationRelease(database);
   await database.sql`
     INSERT INTO users (id, wallet_address) VALUES (${CREATOR_ID}, ${CREATOR_WALLET})
   `;
@@ -107,6 +125,7 @@ async function preparedVersion(database: DisposableDatabase, label = "research")
 function fixtureAuthority(
   database: DisposableDatabase,
   options: {
+    sql?: DisposableDatabase["sql"];
     now?: Date | (() => Date);
     mutator?: EnsPublicationFixtureMutator;
     beforeResolve?: Parameters<typeof createEnsPublicationAuthorityFixture>[0]["beforeResolve"];
@@ -123,9 +142,8 @@ function fixtureAuthority(
   });
   return {
     authority: createEnsPublicationAuthority({
-      sql: database.sql,
+      sql: options.sql ?? database.sql,
       runtime: fixture.runtime,
-      releaseSha: RELEASE_SHA,
       now: options.now ?? NOW,
     }),
     resolver: fixture.resolver,
@@ -290,7 +308,6 @@ test("missing runtime, caller-owned evidence, outage, timeout, and malformed res
     const missing = createEnsPublicationAuthority({
       sql: database.sql,
       runtime: null,
-      releaseSha: RELEASE_SHA,
       now: NOW,
     });
     assert.deepEqual(await missing({ agentVersionId: versionId }), {
@@ -349,7 +366,6 @@ test("drift creates a new DENY without overwriting ALLOW and decision rows are a
     const authority = createEnsPublicationAuthority({
       sql: database.sql,
       runtime: fixture.runtime,
-      releaseSha: RELEASE_SHA,
       now: NOW,
     });
     const allowed = await authority({ agentVersionId: versionId });
@@ -435,30 +451,201 @@ test("drift creates a new DENY without overwriting ALLOW and decision rows are a
       /stale, expired, or not current/,
     );
 
-    await database.sql.unsafe('CREATE ROLE a4_pub_normal_role NOLOGIN');
+  } finally {
+    await database.close();
+  }
+});
+
+test("restricted runtime role has only bounded database-owned publication admission", async () => {
+  const database = await startDisposableDatabase("a4-pub-role");
+  let runtimeSql: ReturnType<typeof postgres> | null = null;
+  try {
+    const versionId = await preparedVersion(database, "research", { admitRelease: false });
+    const missingRelease = fixtureAuthority(database);
+    assert.deepEqual(await missingRelease.authority({ agentVersionId: versionId }), {
+      allowed: false,
+      decisionId: null,
+      errorCode: "ENS_PUBLICATION_PERSIST_FAILED",
+    });
+    const beforeAdmission = await database.sql<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM ens_publication_decisions
+    `;
+    assert.equal(beforeAdmission[0]?.count, 0);
+    await admitPublicationRelease(database);
+    const loginRole = `a4_pub_runtime_${process.pid}_${Date.now().toString(36)}`;
+    assert.match(loginRole, /^[a-z][a-z0-9_]+$/);
     await database.sql.unsafe(
-      'GRANT USAGE ON SCHEMA public TO a4_pub_normal_role; ' +
-      'GRANT SELECT, INSERT ON ens_publication_decisions TO a4_pub_normal_role',
+      `CREATE ROLE "${loginRole}" LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; ` +
+      `GRANT alphadawg_runtime TO "${loginRole}"`,
+    );
+    const runtimeUrl = new URL(database.url);
+    runtimeUrl.username = loginRole;
+    runtimeUrl.password = "";
+    runtimeSql = postgres(runtimeUrl.toString(), { max: 4, prepare: false });
+
+    const identities = await runtimeSql<{
+      current_role: string;
+      session_role: string;
+      superuser: boolean;
+      can_create_public: boolean;
+      decision_owner: string;
+      release_owner: string;
+    }[]>`
+      SELECT
+        current_user AS current_role,
+        session_user AS session_role,
+        r.rolsuper AS superuser,
+        has_schema_privilege(current_user, 'public', 'CREATE') AS can_create_public,
+        (SELECT tableowner FROM pg_tables WHERE schemaname = 'public' AND tablename = 'ens_publication_decisions') AS decision_owner,
+        (SELECT tableowner FROM pg_tables WHERE schemaname = 'public' AND tablename = 'ens_publication_authority_releases') AS release_owner
+      FROM pg_roles r WHERE r.rolname = current_user
+    `;
+    assert.equal(identities[0]?.current_role, loginRole);
+    assert.equal(identities[0]?.session_role, loginRole);
+    assert.equal(identities[0]?.superuser, false);
+    assert.equal(identities[0]?.can_create_public, false);
+    assert.notEqual(identities[0]?.decision_owner, loginRole);
+    assert.notEqual(identities[0]?.release_owner, loginRole);
+
+    await assert.rejects(runtimeSql`SELECT id FROM ens_publication_decisions`, /permission denied/);
+    await assert.rejects(runtimeSql`INSERT INTO ens_publication_decisions DEFAULT VALUES`, /permission denied/);
+    await assert.rejects(runtimeSql`UPDATE ens_publication_decisions SET decision = 'DENY'`, /permission denied/);
+    await assert.rejects(runtimeSql`DELETE FROM ens_publication_decisions`, /permission denied/);
+    await assert.rejects(runtimeSql`TRUNCATE ens_publication_decisions`, /permission denied/);
+    await assert.rejects(
+      runtimeSql`
+        INSERT INTO ens_publication_authority_releases (release_sha, not_before, expires_at)
+        VALUES (${'9'.repeat(40)}, clock_timestamp(), clock_timestamp() + interval '1 hour')
+      `,
+      /permission denied/,
     );
     await assert.rejects(
-      database.sql.begin(async (transaction) => {
-        const tx = transaction as unknown as typeof database.sql;
-        await tx.unsafe('SET LOCAL ROLE a4_pub_normal_role');
-        await tx`
-          INSERT INTO ens_publication_decisions
-          SELECT (jsonb_populate_record(
-            NULL::ens_publication_decisions,
-            to_jsonb(d) || jsonb_build_object(
-              'id', gen_random_uuid(),
-              'decision_key', repeat('c', 64),
-              'disposable_test_clock', true
-            )
-          )).* FROM ens_publication_decisions d WHERE d.id = ${allowed.decisionId}::uuid
-        `;
-      }),
+      runtimeSql`UPDATE ens_publication_authority_releases SET expires_at = clock_timestamp()`,
+      /permission denied/,
+    );
+    await assert.rejects(runtimeSql`DELETE FROM ens_publication_authority_releases`, /permission denied/);
+    await assert.rejects(runtimeSql`TRUNCATE ens_publication_authority_releases`, /permission denied/);
+
+    const currentClock = (): Date => new Date();
+    const { authority } = fixtureAuthority(database, {
+      sql: runtimeSql,
+      now: currentClock,
+      disposableTestClock: false,
+    });
+    const allowed = await authority({ agentVersionId: versionId });
+    assert.equal(allowed.allowed, true);
+    assert.ok(allowed.decisionId);
+
+    const evidenceRows = await database.sql<{
+      binding_bytes: string;
+      record_bytes: string;
+      block_number: string;
+      block_timestamp: Date;
+      transaction_hash: string;
+      decision_key: string;
+      release_sha: string;
+    }[]>`
+      SELECT binding_bytes, record_bytes, block_number::text, block_timestamp,
+        transaction_hash, decision_key, release_sha
+      FROM ens_publication_decisions WHERE id = ${allowed.decisionId}::uuid
+    `;
+    const evidence = evidenceRows[0];
+    assert.ok(evidence);
+    assert.equal(evidence.release_sha, RELEASE_SHA);
+    assert.match(evidence.decision_key, /^[0-9a-f]{64}$/);
+
+    const exact = await runtimeSql<{ decision_id: string }[]>`
+      SELECT decision_id::text
+      FROM public.admit_ens_publication_decision(
+        ${versionId}::uuid,
+        ${runtimeSql.json(JSON.parse(evidence.binding_bytes))},
+        ${runtimeSql.json(JSON.parse(evidence.record_bytes))},
+        ${evidence.block_number}::numeric,
+        ${evidence.block_timestamp}::timestamptz,
+        ${evidence.transaction_hash},
+        NULL,
+        NULL
+      )
+    `;
+    assert.equal(exact[0]?.decision_id, allowed.decisionId);
+    await assert.rejects(
+      runtimeSql`
+        SELECT * FROM public.admit_ens_publication_decision(
+          ${versionId}::uuid,
+          ${runtimeSql.json(JSON.parse(evidence.binding_bytes))},
+          ${runtimeSql.json(JSON.parse(evidence.record_bytes))},
+          ${evidence.block_number}::numeric,
+          ${evidence.block_timestamp}::timestamptz,
+          ${evidence.transaction_hash},
+          NULL,
+          ${evidence.block_timestamp}::timestamptz
+        )
+      `,
       /requires database superuser/,
     );
+
+    const alteredBinding = JSON.parse(evidence.binding_bytes) as Record<string, unknown>;
+    alteredBinding.manifestHash = "9".repeat(64);
+    alteredBinding.agentName = "wrong.creator.eth";
+    await assert.rejects(
+      runtimeSql`
+        SELECT * FROM public.admit_ens_publication_decision(
+          ${versionId}::uuid, ${runtimeSql.json(JSON.parse(JSON.stringify(alteredBinding)))},
+          ${runtimeSql.json(JSON.parse(evidence.record_bytes))},
+          ${evidence.block_number}::numeric, ${evidence.block_timestamp}::timestamptz,
+          ${evidence.transaction_hash}, NULL, NULL
+        )
+      `,
+      /admission binding mismatch|binding bytes do not match|immutable version lineage/,
+    );
+
+    const alteredRecord = JSON.parse(evidence.record_bytes) as Record<string, unknown>;
+    alteredRecord.manifestHash = "9".repeat(64);
+    object(alteredRecord.agent).name = "wrong.creator.eth";
+    await assert.rejects(
+      runtimeSql`
+        SELECT * FROM public.admit_ens_publication_decision(
+          ${versionId}::uuid, ${runtimeSql.json(JSON.parse(evidence.binding_bytes))},
+          ${runtimeSql.json(JSON.parse(JSON.stringify(alteredRecord)))},
+          ${evidence.block_number}::numeric, ${evidence.block_timestamp}::timestamptz,
+          ${evidence.transaction_hash}, NULL, NULL
+        )
+      `,
+      /ALLOW record is not exact/,
+    );
+
+    await assert.rejects(
+      runtimeSql`
+        SELECT * FROM public.admit_ens_publication_decision(
+          ${"11111111-1111-4111-8111-111111111111"}::uuid,
+          ${runtimeSql.json(JSON.parse(evidence.binding_bytes))},
+          ${runtimeSql.json(JSON.parse(evidence.record_bytes))},
+          ${evidence.block_number}::numeric, ${evidence.block_timestamp}::timestamptz,
+          ${evidence.transaction_hash}, NULL, NULL
+        )
+      `,
+      /immutable version lineage/,
+    );
+    await assert.rejects(
+      runtimeSql`
+        SELECT * FROM public.admit_ens_publication_decision(
+          ${versionId}::uuid, ${runtimeSql.json(JSON.parse(evidence.binding_bytes))},
+          ${runtimeSql.json(JSON.parse(evidence.record_bytes))},
+          ${evidence.block_number}::numeric, ${new Date("2020-01-01T00:00:00.000Z")}::timestamptz,
+          ${evidence.transaction_hash}, NULL, NULL
+        )
+      `,
+      /stale, expired, or not current/,
+    );
+
+    const signatures = await database.sql<{ arguments: string }[]>`
+      SELECT pg_get_function_arguments(p.oid) AS arguments
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname = 'admit_ens_publication_decision'
+    `;
+    assert.doesNotMatch(signatures[0]?.arguments ?? "", /release|decision_key/i);
   } finally {
+    await runtimeSql?.end({ timeout: 1 });
     await database.close();
   }
 });

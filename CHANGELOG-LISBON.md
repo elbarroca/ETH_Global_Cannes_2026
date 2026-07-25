@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W5 database-owned publication-decision authority remediation
+
+- Added immutable, finite-window release admission controlled by the migration/database owner; no release is seeded or inferred from fixture state, and missing or overlapping active admissions deny publication.
+- Added one least-input `SECURITY DEFINER` admission function with fixed `pg_catalog, pg_temp` search path. PostgreSQL derives normalized evidence bytes/hashes, release identity, decision, convergence key, durable timestamps, lineage, and freshness before atomic insert and bounded return.
+- Removed caller/application release SHA and direct decision-table persistence. The runtime path now calls only the admission function; release/key identity cannot be supplied through its signature.
+- Added a real restricted-login regression proving the runtime role is not a superuser or table owner, cannot create in `public`, cannot read or mutate decision/release tables, and can admit only exact current evidence. Missing release, caller clock, altered version/manifest/name/record, and stale evidence fail closed.
+- Extended both deterministic replay lanes from six to seven migrations without changing the synthetic Cannes sentinel hash. A4 passes 22/22, integration 39/39, and the complete local floor including checksum-pinned Go, 31-page build, and loopback HTTP 200.
+- Returned only `PASS_TO_AUDIT_REMEDIATION; LOCAL_ONLY`. Exact-SHA audit, sequential Kernel consumption, `A4_ACCEPTED`, A5/A6 entry, live ENS, sponsor, push, release, and public claims remain closed.
+
 ## 2026-07-25 - W4 publication-decision immutable audit
 
 - Reconciled independent verdict `FIX` for exact SHA `3b73c9dd5339ef42549ff5a529ba3dcd10dd68c5`, tree `3be0b139a06e1031c7f5a02bb8a06fe74a68a796`, and range `70307d045d1b1af327ef7a2f4c55fec4b2ff5bc9..3b73c9dd5339ef42549ff5a529ba3dcd10dd68c5`.
