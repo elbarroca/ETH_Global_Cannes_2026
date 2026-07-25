@@ -410,3 +410,10 @@ Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 - Rebuilt the landing and workspace hierarchy around protected publication, external hire, authenticated proof, and fail-closed evidence.
 - Added schema-v2 reviewed draft preparation, protected deterministic recommendations, persisted draft visibility, self-hire refusal, DELIVERY_READY pending treatment, and explicit reauthentication for legacy hire 401/403 responses.
 - Kept hunt, iNFT, Hedera, Naryo, funding, and telemetry available only as collapsed or configured supporting surfaces; no live or release claim was promoted.
+
+# 2026-07-25 — Protected recurring-goal primary UI
+
+- Replaced the primary landing, workspace, agent catalog, and proof routes with one protected loop: connect/SIWE, define bounded goal, match immutable external versions, run/synthesize, inspect report/proof, and keep optional execution blocked behind explicit wallet authority.
+- Preserved the canonical AlphaDawg logo/wordmark and made catalog tabs, agent selection, proof deep links, auth recovery, keyboard focus, reduced motion, and 375/768/1440 layouts deterministic.
+- Removed legacy swarm/cycle/earnings/leaderboard polling and legacy generator/hire surfaces from primary routes without deleting their underlying compatibility code.
+- Passed lint, typecheck, foundation 10/10, A5 5/5, non-reused production Chromium 9/9, build, secret scan, and diff check. Screenshots remain local UI evidence only; no live, deploy, signature, transaction, release, or claim effect occurred.

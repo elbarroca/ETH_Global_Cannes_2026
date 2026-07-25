@@ -3,6 +3,63 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/frontend_readonly_audit
+task_id: A5-PROTECTED-GOAL-UI-REDESIGN-20260725
+task_instance_id: A5-PROTECTED-GOAL-UI-REDESIGN-20260725:W1:B097DBD
+generation: 1
+sprint: accepted goal API integration plus complete protected primary-app redesign
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: b097dbdc294c802872882079f89516a7ef3b355a
+control_sha: b097dbdc294c802872882079f89516a7ef3b355a
+token: A5-PROTECTED-UI-W1-B097DBD-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T16:56:22Z
+expires_at: 2026-07-25T18:30:00Z
+allowed_paths:
+  - lib/api.ts
+  - hooks/use-protected-goals.ts
+  - contexts/user-context.tsx
+  - contexts/wagmi-provider.tsx
+  - components/auth-guard.tsx
+  - components/wallet-connect.tsx
+  - app/page.tsx
+  - app/globals.css
+  - app/dashboard/page.tsx
+  - components/goal-workspace.tsx
+  - app/marketplace/page.tsx
+  - components/create-agent-modal.tsx
+  - components/nav.tsx
+  - app/verify/page.tsx
+  - components/kernel-job-detail.tsx
+  - components/kernel-job-dialog.tsx
+  - components/proof-rail.tsx
+  - components/evidence-index-item.tsx
+  - components/swap-confirmation-dialog.tsx
+  - tests/a5/**
+  - tests/playwright/a5-ui.spec.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - docs/lisbon/EVIDENCE.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T16:21:23Z
+deadline: 2026-07-25T18:30:00Z
+external_effect_authority: local files tests loopback browser evidence and local commits only; no push deploy managed migration live API webhook signature transaction funding form spend or claim
+completed_at: 2026-07-25T16:56:22Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm test PASS 10 of 10
+  - npm run test:a5 PASS 5 of 5
+  - CI=1 npm run test:playwright PASS 9 of 9 against a non-reused production server and includes npm run build PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+  - local screenshots at 375 768 and 1440 are UI evidence only and do not promote live or release state
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/worker_shutdown_w1
 task_id: A5-RUNTIME-LIFECYCLE-REGRESSION-20260725
 task_instance_id: A5-RUNTIME-LIFECYCLE-REGRESSION-20260725:W2:E5FA4C3

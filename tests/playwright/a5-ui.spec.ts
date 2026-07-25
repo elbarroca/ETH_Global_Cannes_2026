@@ -1,11 +1,28 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+const TEST_WALLET = "0x1111111111111111111111111111111111111111";
+const GOAL_ID = "12121212-1212-4121-8121-121212121212";
+const RUN_ID = "13131313-1313-4131-8131-131313131313";
+const JOB_ID = "55555555-5555-4555-8555-555555555555";
+const SECOND_JOB_ID = "56565656-5656-4565-8565-565656565656";
+
+const USER = {
+  id: "protected-user",
+  walletAddress: TEST_WALLET,
+  telegram: { chatId: null, username: null, verified: false, notifyPreference: "every_cycle" },
+  agent: { active: false, riskProfile: "balanced", maxTradePercent: 5, lastCycleId: 0, lastCycleAt: null, approvalMode: "always", approvalTimeoutMin: 10 },
+  fund: { depositedUsdc: 0, htsShareBalance: 0, currentNav: 0 },
+  hotWalletIndex: null,
+  hotWalletAddress: null,
+  inftTokenId: null,
+} as const;
+
 const OWNER_AGENT = {
   agentId: "11111111-1111-4111-8111-111111111111",
   versionId: "22222222-2222-4222-8222-222222222222",
   version: 1,
   name: "Evidence Researcher With A Deliberately Long Registry Name",
-  description: "Immutable research specialist used to exercise long copy and responsive cards.",
+  description: "Immutable research specialist used to exercise long content.",
   capabilities: ["research", "market-analysis"],
   manifestHash: "a".repeat(64),
   promptHash: "b".repeat(64),
@@ -23,13 +40,15 @@ const OWNER_AGENT = {
   fullSubname: "evidence-researcher.maker.eth",
   writePlanHash: "e".repeat(64),
   canonicalState: "CANONICAL",
-  authorityOwner: "0x1111111111111111111111111111111111111111",
+  authorityOwner: TEST_WALLET,
   authorityDelegate: null,
   authorityPolicyVersion: "1",
   refusalReason: null,
   authorityReleaseSha: "f".repeat(40),
   publicationDecisionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-  publishedAt: "2026-07-24T14:00:00.000Z",
+  publishedAt: "2026-07-25T10:00:00.000Z",
+  verifiedExternalHires: 3,
+  provenance: null,
 } as const;
 
 const AVAILABLE_AGENT = {
@@ -38,65 +57,72 @@ const AVAILABLE_AGENT = {
   versionId: "44444444-4444-4444-8444-444444444444",
   name: "Risk Boundary Agent",
   ownerWallet: "0x4444444444444444444444444444444444444444",
+  fullSubname: "risk-boundary.maker.eth",
   ownedByViewer: false,
+  verifiedExternalHires: 8,
 } as const;
 
-const JOB_ID = "55555555-5555-4555-8555-555555555555";
-const EFFECT_ID = "d".repeat(64);
-const TEST_WALLET = "0x1111111111111111111111111111111111111111";
-const TELEGRAM_LINK_CODE = "A5LINK42";
-
-const TELEGRAM_USER = {
-  id: "telegram-user",
-  walletAddress: TEST_WALLET,
-  telegram: {
-    chatId: null,
-    username: null,
-    verified: false,
-    notifyPreference: "every_cycle",
-  },
-  agent: {
-    active: false,
-    riskProfile: "balanced",
-    maxTradePercent: 5,
-    lastCycleId: 0,
-    lastCycleAt: null,
-    approvalMode: "always",
-    approvalTimeoutMin: 10,
-  },
-  fund: {
-    depositedUsdc: 0,
-    htsShareBalance: 0,
-    currentNav: 0,
-  },
-  hotWalletIndex: null,
-  hotWalletAddress: null,
-  inftTokenId: null,
+const POLICY = {
+  cadenceMinutes: 5,
+  runMode: "CONTINUOUS",
+  executionMode: "PROPOSE_SWAP",
+  runLimit: null,
+  maxAgents: 2,
+  perRunCapAtomic: "3000",
+  dailyCapAtomic: "10000",
 } as const;
 
-const DASHBOARD_USER = {
-  ...TELEGRAM_USER,
-  telegram: {
-    ...TELEGRAM_USER.telegram,
-    chatId: "123456",
-    username: "evidence_user",
-    verified: true,
+const GOAL = {
+  goalId: GOAL_ID,
+  objective: "Monitor liquidity evidence and report bounded execution risk",
+  requiredCapabilities: ["research", "market-analysis", "uniswap-swap"],
+  policy: POLICY,
+  state: "ACTIVE",
+  nextRunAt: "2026-07-25T18:35:00.000Z",
+  completedRuns: 1,
+  createdAt: "2026-07-25T18:00:00.000Z",
+  updatedAt: "2026-07-25T18:30:00.000Z",
+} as const;
+
+const RUN = {
+  runId: RUN_ID,
+  goalId: GOAL_ID,
+  scheduledFor: "2026-07-25T18:30:00.000Z",
+  state: "READY",
+  objective: GOAL.objective,
+  requiredCapabilities: GOAL.requiredCapabilities,
+  policy: POLICY,
+  policyHash: "1".repeat(64),
+  effectIdentity: "2".repeat(64),
+  totalPriceAtomic: "2000",
+  costReservedAt: "2026-07-25T18:30:01.000Z",
+  report: {
+    schemaVersion: 1,
+    goalId: GOAL_ID,
+    runId: RUN_ID,
+    status: "READY",
+    objective: GOAL.objective,
+    summary: "Two immutable external versions completed bounded analysis and agreed on the evidence boundary.",
+    conclusion: "Liquidity evidence is sufficient for research, not live execution.",
+    evidence: [{ jobId: JOB_ID, agentVersionId: AVAILABLE_AGENT.versionId, resultHash: "3".repeat(64), receiptId: "99999999-9999-4999-8999-999999999999" }],
+    swapProposal: { schemaVersion: 1, chainId: 1301, tokenIn: "USDC", tokenOut: "WETH", amountInAtomic: "1000", slippageBps: 50, rationale: "Bounded proposal from verified research output.", requiresWalletApproval: true },
   },
-  fund: {
-    ...TELEGRAM_USER.fund,
-    depositedUsdc: 10,
-    currentNav: 10,
-  },
-  proxyWallet: {
-    address: "0x9999999999999999999999999999999999999999",
-  },
-  inftTokenId: 42,
+  reportHash: "4".repeat(64),
+  errorCode: null,
+  startedAt: "2026-07-25T18:30:00.000Z",
+  completedAt: "2026-07-25T18:30:08.000Z",
+  createdAt: "2026-07-25T18:30:00.000Z",
+  updatedAt: "2026-07-25T18:30:08.000Z",
+  jobs: [
+    { agentVersionId: AVAILABLE_AGENT.versionId, jobId: JOB_ID, role: "ANALYSIS", selectionRank: 1, coveredCapabilities: ["research", "market-analysis"], priceAtomic: "1000", manifestHash: AVAILABLE_AGENT.manifestHash, fullSubname: AVAILABLE_AGENT.fullSubname },
+    { agentVersionId: OWNER_AGENT.versionId, jobId: SECOND_JOB_ID, role: "SYNTHESIS", selectionRank: 2, coveredCapabilities: ["research"], priceAtomic: "1000", manifestHash: OWNER_AGENT.manifestHash, fullSubname: OWNER_AGENT.fullSubname },
+  ],
 } as const;
 
 const JOB_LIST_ITEM = {
   jobId: JOB_ID,
-  effectId: EFFECT_ID,
-  buyerUserId: "buyer",
+  effectId: "d".repeat(64),
+  buyerUserId: USER.id,
   agentVersionId: AVAILABLE_AGENT.versionId,
   state: "FAILED",
   version: 2,
@@ -105,647 +131,250 @@ const JOB_LIST_ITEM = {
   cancelRequestedAt: null,
   lastErrorCode: "STORAGE_READBACK_MISMATCH",
   financialOutcome: "REFUNDED",
-  createdAt: "2026-07-24T14:10:00.000Z",
-  updatedAt: "2026-07-24T14:10:05.000Z",
+  createdAt: "2026-07-25T18:30:00.000Z",
+  updatedAt: "2026-07-25T18:30:05.000Z",
   agent: {
-    agentId: AVAILABLE_AGENT.agentId,
-    versionId: AVAILABLE_AGENT.versionId,
-    version: AVAILABLE_AGENT.version,
-    name: AVAILABLE_AGENT.name,
-    description: AVAILABLE_AGENT.description,
-    ownerWallet: AVAILABLE_AGENT.ownerWallet,
-    capabilities: AVAILABLE_AGENT.capabilities,
-    priceAtomic: AVAILABLE_AGENT.priceAtomic,
-    asset: AVAILABLE_AGENT.asset,
-    proofPolicy: AVAILABLE_AGENT.proofPolicy,
-    creatorParent: AVAILABLE_AGENT.creatorParent,
-    fullSubname: AVAILABLE_AGENT.fullSubname,
-    canonicalState: AVAILABLE_AGENT.canonicalState,
-    authorityOwner: AVAILABLE_AGENT.authorityOwner,
-    authorityDelegate: AVAILABLE_AGENT.authorityDelegate,
-    authorityPolicyVersion: AVAILABLE_AGENT.authorityPolicyVersion,
-    refusalReason: AVAILABLE_AGENT.refusalReason,
-    authorityReleaseSha: AVAILABLE_AGENT.authorityReleaseSha,
+    agentId: AVAILABLE_AGENT.agentId, versionId: AVAILABLE_AGENT.versionId, version: 1, name: AVAILABLE_AGENT.name,
+    description: AVAILABLE_AGENT.description, ownerWallet: AVAILABLE_AGENT.ownerWallet, capabilities: AVAILABLE_AGENT.capabilities,
+    priceAtomic: "1000", asset: "USDC_ATOMIC", proofPolicy: "verified-receipt-required", creatorParent: "maker.eth",
+    fullSubname: AVAILABLE_AGENT.fullSubname, canonicalState: "CANONICAL", authorityOwner: TEST_WALLET,
+    authorityDelegate: null, authorityPolicyVersion: "1", refusalReason: null, authorityReleaseSha: "f".repeat(40),
   },
-  evidence: {
-    owner: "verified",
-    version: "verified",
-    ens: "verified",
-    compute: "verified",
-    storage: "failed",
-    receipt: "failed",
-  },
+  evidence: { owner: "verified", version: "verified", ens: "verified", compute: "verified", storage: "failed", receipt: "failed" },
 } as const;
 
 const JOB_DETAIL = {
   ...JOB_LIST_ITEM,
   evidenceDetail: {
-    timeline: [
-      {
-        version: 0,
-        eventType: "JOB_CREATED",
-        fromState: null,
-        toState: "QUEUED",
-        createdAt: JOB_LIST_ITEM.createdAt,
-      },
-      {
-        version: 2,
-        eventType: "JOB_FAILED",
-        fromState: "RUNNING",
-        toState: "FAILED",
-        createdAt: JOB_LIST_ITEM.updatedAt,
-      },
-    ],
-    latestEnsDecision: {
-      checkId: "91",
-      phase: "PRE_EXECUTION",
-      operation: "EXECUTE",
-      decision: "ALLOW",
-      errorCode: null,
-      recordHash: "e".repeat(64),
-      chainId: 11155111,
-      blockNumber: "100",
-      blockTimestamp: "2026-07-24T14:10:01.000Z",
-      observedAt: "2026-07-24T14:10:01.000Z",
-      freshUntil: "2026-07-24T14:15:01.000Z",
-      transactionHash: null,
-    },
-    execution: {
-      stage: "FAILED",
-      requestHash: "f".repeat(64),
-      requestId: "request-1",
-      responseHash: "1".repeat(64),
-      computeReceiptDigest: "2".repeat(64),
-      proofHash: null,
-      updatedAt: JOB_LIST_ITEM.updatedAt,
-    },
-    storage: {
-      expectedRoot: `0x${"3".repeat(64)}`,
-      expectedDigest: "4".repeat(64),
-      expectedSize: 128,
-      storageReceiptDigest: "5".repeat(64),
-      readbackRoot: `0x${"6".repeat(64)}`,
-      readbackDigest: "7".repeat(64),
-      readbackSize: 128,
-      verified: false,
-    },
+    timeline: [{ version: 0, eventType: "JOB_CREATED", fromState: null, toState: "QUEUED", createdAt: JOB_LIST_ITEM.createdAt }, { version: 2, eventType: "JOB_FAILED", fromState: "RUNNING", toState: "FAILED", createdAt: JOB_LIST_ITEM.updatedAt }],
+    latestEnsDecision: { checkId: "91", phase: "PRE_EXECUTION", operation: "EXECUTE", decision: "ALLOW", errorCode: null, recordHash: "e".repeat(64), chainId: 11155111, blockNumber: "100", blockTimestamp: JOB_LIST_ITEM.createdAt, observedAt: JOB_LIST_ITEM.createdAt, freshUntil: "2026-07-25T18:35:00.000Z", transactionHash: null },
+    execution: { stage: "FAILED", requestHash: "f".repeat(64), requestId: "request-1", responseHash: "1".repeat(64), computeReceiptDigest: "2".repeat(64), proofHash: null, updatedAt: JOB_LIST_ITEM.updatedAt },
+    storage: { expectedRoot: `0x${"3".repeat(64)}`, expectedDigest: "4".repeat(64), expectedSize: 128, storageReceiptDigest: "5".repeat(64), readbackRoot: `0x${"6".repeat(64)}`, readbackDigest: "7".repeat(64), readbackSize: 128, verified: false },
     receipt: null,
     delivery: null,
-    financial: {
-      settlement: null,
-      refund: {
-        amountAtomic: "1000",
-        asset: "USDC_ATOMIC",
-        reasonCode: "STORAGE_READBACK_MISMATCH",
-        createdAt: JOB_LIST_ITEM.updatedAt,
-      },
-    },
+    financial: { settlement: null, refund: { amountAtomic: "1000", asset: "USDC_ATOMIC", reasonCode: "STORAGE_READBACK_MISMATCH", createdAt: JOB_LIST_ITEM.updatedAt } },
     errorCode: "STORAGE_READBACK_MISMATCH",
   },
 } as const;
 
-const VERIFIED_JOB_LIST_ITEM = {
-  ...JOB_LIST_ITEM,
-  state: "SUCCEEDED",
-  version: 4,
-  lastErrorCode: null,
-  financialOutcome: "SETTLED",
-  evidence: {
-    owner: "verified",
-    version: "verified",
-    ens: "verified",
-    compute: "verified",
-    storage: "verified",
-    receipt: "verified",
-  },
-} as const;
-
-const VERIFIED_JOB_DETAIL = {
-  ...VERIFIED_JOB_LIST_ITEM,
-  evidenceDetail: {
-    timeline: [
-      {
-        version: 0,
-        eventType: "JOB_CREATED",
-        fromState: null,
-        toState: "QUEUED",
-        createdAt: JOB_LIST_ITEM.createdAt,
-      },
-      {
-        version: 4,
-        eventType: "JOB_SUCCEEDED",
-        fromState: "RUNNING",
-        toState: "SUCCEEDED",
-        createdAt: JOB_LIST_ITEM.updatedAt,
-      },
-    ],
-    latestEnsDecision: JOB_DETAIL.evidenceDetail.latestEnsDecision,
-    execution: {
-      ...JOB_DETAIL.evidenceDetail.execution,
-      stage: "READBACK_VERIFIED",
-      proofHash: "8".repeat(64),
-    },
-    storage: {
-      ...JOB_DETAIL.evidenceDetail.storage,
-      readbackRoot: JOB_DETAIL.evidenceDetail.storage.expectedRoot,
-      readbackDigest: JOB_DETAIL.evidenceDetail.storage.expectedDigest,
-      readbackSize: JOB_DETAIL.evidenceDetail.storage.expectedSize,
-      verified: true,
-    },
-    receipt: {
-      receiptId: "99999999-9999-4999-8999-999999999999",
-      adapterKey: "protected-a3",
-      proofHash: "8".repeat(64),
-      resultHash: "9".repeat(64),
-      verified: true,
-      createdAt: JOB_LIST_ITEM.updatedAt,
-    },
-    delivery: {
-      resultHash: "9".repeat(64),
-      result: { summary: "Verified bounded delivery" },
-      terminalAt: JOB_LIST_ITEM.updatedAt,
-    },
-    financial: {
-      settlement: {
-        amountAtomic: "1000",
-        asset: "USDC_ATOMIC",
-        createdAt: JOB_LIST_ITEM.updatedAt,
-      },
-      refund: null,
-    },
-    errorCode: null,
-  },
-} as const;
-
-interface ApiMockOptions {
-  submissionReplayed?: boolean;
-  jobList?: readonly unknown[];
-  jobDetail?: unknown;
-  onJobSubmit?: () => void;
-  onCancel?: () => void;
-  user?: typeof TELEGRAM_USER | typeof DASHBOARD_USER;
-  onAgentAction?: (action: string) => void;
+interface MockOptions {
+  goals?: readonly unknown[];
+  runs?: readonly unknown[];
+  sessionExpired?: boolean;
+  onGoalCreate?: (body: Record<string, unknown>) => void;
+  onProtectedRequest?: (path: string) => void;
 }
 
-async function fulfillJson(route: Route, body: unknown, status = 200): Promise<void> {
-  await route.fulfill({
-    status,
-    contentType: "application/json",
-    body: JSON.stringify(body),
-  });
+async function json(route: Route, body: unknown, status = 200): Promise<void> {
+  await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-async function installApiMocks(page: Page, options: ApiMockOptions = {}): Promise<void> {
+async function installApiMocks(page: Page, options: MockOptions = {}): Promise<void> {
+  let goals = [...(options.goals ?? [GOAL])];
+  const runs = [...(options.runs ?? [RUN])];
   await page.route("**/api/**", async (route) => {
     const request = route.request();
-    const url = new URL(request.url());
-    const path = url.pathname;
-
+    const path = new URL(request.url()).pathname;
     if (path === "/api/auth/session") {
-      await fulfillJson(route, {
-        authenticated: true,
-        walletAddress: TEST_WALLET,
-        userId: TELEGRAM_USER.id,
-        expiresAt: "2026-07-25T02:00:00.000Z",
-      });
-      return;
+      if (options.sessionExpired) return json(route, { error: "Expired", code: "AUTH_SESSION_EXPIRED" }, 401);
+      return json(route, { authenticated: true, walletAddress: TEST_WALLET, userId: USER.id, expiresAt: "2026-07-25T20:00:00.000Z" });
     }
-    if (path === "/api/onboard") {
-      await fulfillJson(route, {
-        userId: TELEGRAM_USER.id,
-        walletAddress: TEST_WALLET,
-        proxyWalletAddress: null,
-        telegramLinkCode: TELEGRAM_LINK_CODE,
-        inftTokenId: null,
-        existing: true,
-      });
-      return;
-    }
-    if (path.startsWith("/api/user/")) {
-      await fulfillJson(route, options.user ?? TELEGRAM_USER);
-      return;
-    }
+    if (path === "/api/auth/siwe/challenge") return json(route, { challengeId: "challenge-1", message: "localhost wants you to sign in", expiresAt: "2026-07-25T20:00:00.000Z" }, 201);
+    if (path === "/api/auth/siwe/verify") return json(route, { authenticated: true, walletAddress: TEST_WALLET, userId: USER.id, expiresAt: "2026-07-25T20:00:00.000Z" });
+    if (path === "/api/onboard") return json(route, { userId: USER.id, walletAddress: TEST_WALLET, proxyWalletAddress: null, telegramLinkCode: "A5LINK42", inftTokenId: null, existing: true });
+    if (path.startsWith("/api/user/")) return json(route, USER);
 
+    if (path.startsWith("/api/kernel/")) options.onProtectedRequest?.(path);
+    if (path === "/api/kernel/goals") {
+      if (request.method() === "POST") {
+        const body = request.postDataJSON() as Record<string, unknown>;
+        options.onGoalCreate?.(body);
+        const created = { ...GOAL, ...body };
+        goals = [created];
+        return json(route, { goal: created, replayed: false }, 201);
+      }
+      return json(route, { goals });
+    }
+    if (path === `/api/kernel/goals/${GOAL_ID}/runs`) {
+      if (request.method() === "POST") return json(route, { run: RUN, replayed: false }, 201);
+      return json(route, { runs });
+    }
+    if (path === `/api/kernel/goals/${GOAL_ID}`) return json(route, { goal: GOAL });
     if (path === "/api/kernel/agents") {
-      if (request.method() === "POST") {
-        const requestBody = request.postDataJSON() as { action?: string };
-        options.onAgentAction?.(requestBody.action ?? "UNKNOWN");
-        await fulfillJson(route, {
-          action: requestBody.action ?? "UNKNOWN",
-          version: OWNER_AGENT,
-          plan: requestBody.action === "PREPARE_ENS_WRITE" ? {
-            schemaVersion: 1,
-            kind: "LOCAL_ONLY_UNAUTHORIZED",
-            agentVersionId: OWNER_AGENT.versionId,
-            manifestHash: OWNER_AGENT.manifestHash,
-            creatorParent: OWNER_AGENT.creatorParent,
-            agentLabel: OWNER_AGENT.agentLabel,
-            fullSubname: OWNER_AGENT.fullSubname,
-            creatorDnsName: "maker.eth",
-            agentDnsName: "evidence-researcher.maker.eth",
-            operations: ["CREATE_OR_UPDATE_SUBNAME", "SET_IMMUTABLE_MANIFEST_BINDING"],
-            requiresAuthorization: true,
-            requiresWalletSignature: true,
-          } : undefined,
-          planHash: OWNER_AGENT.writePlanHash,
-        }, 201);
-        return;
-      }
-      await fulfillJson(route, { agents: [OWNER_AGENT, AVAILABLE_AGENT], drafts: [] });
-      return;
+      if (request.method() === "POST") return json(route, { action: "CREATE_DRAFT", version: OWNER_AGENT, planHash: OWNER_AGENT.writePlanHash }, 201);
+      return json(route, { agents: [OWNER_AGENT, AVAILABLE_AGENT], drafts: [] });
     }
-    if (path === "/api/kernel/agent-recommendations") {
-      const requestBody = request.postDataJSON() as { requestedSkills?: string[] };
-      const skills = requestBody.requestedSkills ?? [];
-      await fulfillJson(route, {
-        reviewedPromptDraft: `## Role\nProtected agent\n\n## Reviewed skills\n${skills.map((skill) => `- ${skill}`).join("\n")}`,
-        pinnedSkills: skills.map((id) => ({ id, source: `kernel://skills/${id}@1`, reviewedHash: "a".repeat(64), policy: "metadata-only-never-execute" })),
-        nativeConnections: [{ id: "zero-g-compute", required: true }, { id: "zero-g-storage", required: true }],
-        mcp: [],
-        readiness: skills.length > 0 ? "READY" : "REFUSED",
-        reasons: skills.length > 0 ? [] : ["AT_LEAST_ONE_SUPPORTED_SKILL_REQUIRED"],
-      });
-      return;
-    }
+    if (path === "/api/kernel/agent-recommendations") return json(route, { reviewedPromptDraft: "## Role\nProtected agent", pinnedSkills: [{ id: "research", source: "kernel://skills/research@1", reviewedHash: "a".repeat(64), policy: "metadata-only-never-execute" }], nativeConnections: [{ id: "zero-g-compute", required: true }, { id: "zero-g-storage", required: true }], mcp: [], readiness: "READY", reasons: [] });
     if (path === "/api/kernel/jobs") {
-      if (request.method() === "POST") {
-        options.onJobSubmit?.();
-        await fulfillJson(route, {
-          job: {
-            quoteId: "66666666-6666-4666-8666-666666666666",
-            intentId: "77777777-7777-4777-8777-777777777777",
-            orderId: "88888888-8888-4888-8888-888888888888",
-            jobId: JOB_ID,
-            effectId: EFFECT_ID,
-            state: "QUEUED",
-            version: 0,
-            amountAtomic: "1000",
-            asset: "USDC_ATOMIC",
-            replayed: options.submissionReplayed ?? false,
-          },
-        }, 201);
-        return;
-      }
-      await fulfillJson(route, url.searchParams.has("jobId")
-        ? { job: options.jobDetail ?? JOB_DETAIL }
-        : { jobs: options.jobList ?? [JOB_LIST_ITEM] });
-      return;
+      if (request.method() === "POST") return json(route, { job: { quoteId: "66666666-6666-4666-8666-666666666666", intentId: "77777777-7777-4777-8777-777777777777", orderId: "88888888-8888-4888-8888-888888888888", jobId: JOB_ID, effectId: "d".repeat(64), state: "QUEUED", version: 0, amountAtomic: "1000", asset: "USDC_ATOMIC", replayed: false } }, 201);
+      return json(route, new URL(request.url()).searchParams.has("jobId") ? { job: JOB_DETAIL } : { jobs: [JOB_LIST_ITEM] });
     }
-    if (path.endsWith("/cancel")) {
-      options.onCancel?.();
-      await fulfillJson(route, { job: JOB_LIST_ITEM });
-      return;
-    }
-    if (path === "/api/swarm/health") {
-      await fulfillJson(route, { agents: [], summary: { online: 0, total: 0 } });
-      return;
-    }
-    if (path === "/api/swarm/metrics") {
-      await fulfillJson(route, { last24h: { cycles: 0, teeAttestations: 0, hires: 0, paymentsUsd: 0 } });
-      return;
-    }
-    if (path === "/api/swarm/activity") {
-      await fulfillJson(route, { rows: [] });
-      return;
-    }
-    if (path === "/api/marketplace/earnings") {
-      await fulfillJson(route, { agents: {} });
-      return;
-    }
-    if (path.includes("/api/cycle/pending/")) {
-      await fulfillJson(route, null);
-      return;
-    }
-    if (path.includes("/api/marketplace") || path.includes("/api/cycle")) {
-      await fulfillJson(route, path.includes("history") ? [] : { agents: [] });
-      return;
-    }
-    await fulfillJson(route, { error: "Not configured in browser fixture" }, 503);
+    return json(route, { error: "Not configured in A5 fixture" }, 503);
   });
 }
 
-async function installInjectedWallet(page: Page, initiallyConnected = false): Promise<void> {
-  await page.addInitScript(({ walletAddress, chainId, initiallyConnected: connectedAtStart }) => {
-    let connected = connectedAtStart;
-    const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+async function installWallet(page: Page, rejectSignature = false): Promise<void> {
+  await page.addInitScript(({ address, reject }) => {
+    let connected = window.sessionStorage.getItem("a5-wallet-connected") === "1";
     const provider = {
       request: async ({ method }: { method: string }): Promise<unknown> => {
-        if (method === "eth_requestAccounts") {
-          connected = true;
-          return [walletAddress];
-        }
-        if (method === "eth_accounts") return connected ? [walletAddress] : [];
-        if (method === "eth_chainId") return chainId;
-        if (method === "wallet_switchEthereumChain" || method === "wallet_addEthereumChain") {
-          return null;
+        if (method === "eth_requestAccounts") { connected = true; window.sessionStorage.setItem("a5-wallet-connected", "1"); return [address]; }
+        if (method === "eth_accounts") return connected ? [address] : [];
+        if (method === "eth_chainId") return "0x4cef52";
+        if (method === "personal_sign") {
+          if (reject) throw { cause: { cause: { code: 4001 } } };
+          return `0x${"1".repeat(130)}`;
         }
         return null;
       },
-      on: (event: string, listener: (...args: unknown[]) => void): void => {
-        const current = listeners.get(event) ?? new Set();
-        current.add(listener);
-        listeners.set(event, current);
-      },
-      removeListener: (event: string, listener: (...args: unknown[]) => void): void => {
-        listeners.get(event)?.delete(listener);
-      },
+      on: (): void => undefined,
+      removeListener: (): void => undefined,
     };
-    Object.defineProperty(window, "ethereum", {
-      configurable: true,
-      value: provider,
-    });
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async (): Promise<void> => undefined },
-    });
-  }, {
-    walletAddress: TEST_WALLET,
-    chainId: "0x4cef52",
-    initiallyConnected,
-  });
+    Object.defineProperty(window, "ethereum", { configurable: true, value: provider });
+  }, { address: TEST_WALLET, reject: rejectSignature });
 }
 
-test.beforeEach(async ({ page }) => {
-  await installApiMocks(page);
+async function connectReady(page: Page, path: string): Promise<void> {
+  await installWallet(page);
+  await page.goto(path);
+  await page.getByRole("button", { name: "Connect Wallet" }).click();
+  await expect(page.getByRole("button", { name: "Disconnect wallet" })).toBeVisible();
+}
+
+function monitorErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+  page.on("pageerror", (error) => errors.push(error.message));
+  return errors;
+}
+
+async function expectNoOverflow(page: Page): Promise<void> {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+}
+
+test.beforeEach(async ({ page }) => { await installApiMocks(page); });
+
+test("landing communicates the protected recurring loop at 375, 768, and 1440", async ({ page }) => {
+  const errors = monitorErrors(page);
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: width === 375 ? 812 : 950 });
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "One goal. A verified agent loop." })).toBeVisible();
+    await expect(page.getByAltText("AlphaDawg").first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /Enter workspace/ })).toBeVisible();
+    await expect(page.getByText("Publish · Hire · Prove")).toBeVisible();
+    await expectNoOverflow(page);
+    await page.screenshot({ path: `test-results/visual/a5-landing-${width}.png`, fullPage: true });
+  }
+  expect(errors).toEqual([]);
 });
 
-test("preserves the product shell without horizontal overflow", async ({ page }) => {
-  const widths = [390, 768, 1024, 1280, 1440];
-  const routes = ["/", "/marketplace", "/dashboard", "/verify", "/infrastructure"];
-  for (const width of widths) {
+test("does not request protected data before ready and normalizes nested signature rejection", async ({ page }) => {
+  const protectedRequests: string[] = [];
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { sessionExpired: true, onProtectedRequest: (path) => protectedRequests.push(path) });
+  await installWallet(page, true);
+  await page.goto("/dashboard");
+  expect(protectedRequests).toEqual([]);
+  await page.getByRole("button", { name: "Connect Wallet" }).click();
+  await expect(page.getByText("WALLET_SIGNATURE_REJECTED: Signature canceled. Retry when ready.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry SIWE" })).toHaveCount(1);
+  expect(protectedRequests).toEqual([]);
+});
+
+test("creates a recurring protected goal with explicit demo boundaries", async ({ page }) => {
+  let created: Record<string, unknown> | null = null;
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { goals: [], runs: [], onGoalCreate: (body) => { created = body; } });
+  await connectReady(page, "/dashboard");
+  await expect(page.getByRole("heading", { name: "Define your first goal" })).toBeVisible();
+  await page.getByLabel("Goal statement").fill("Monitor liquidity evidence and report bounded execution risk");
+  await expect(page.getByLabel("Cadence")).toHaveValue("5");
+  await expect(page.getByLabel("Maximum agents")).toHaveValue("2");
+  await expect(page.getByLabel("Per-run cap, atomic")).toHaveValue("3000");
+  await expect(page.getByLabel("Daily cap, atomic")).toHaveValue("10000");
+  await expect(page.getByLabel("Execution mode")).toHaveValue("PROPOSE_SWAP");
+  await page.getByRole("button", { name: "Activate goal" }).click();
+  await expect.poll(() => created).not.toBeNull();
+  expect(created).toMatchObject({ state: "ACTIVE", policy: POLICY });
+});
+
+test("workspace demonstrates agents, terminal report, proof links, and blocked A6 proposal", async ({ page }) => {
+  const errors = monitorErrors(page);
+  await connectReady(page, "/dashboard");
+  await expect(page.getByRole("heading", { name: GOAL.objective })).toBeVisible();
+  await expect(page.getByText("3000 / run")).toBeVisible();
+  await expect(page.getByText("SCHEDULED", { exact: true })).toBeVisible();
+  await expect(page.getByText("SYNTHESIZING", { exact: true })).toBeVisible();
+  await expect(page.getByText("READY", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(AVAILABLE_AGENT.fullSubname).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Liquidity evidence is sufficient for research, not live execution." })).toBeVisible();
+  await expect(page.getByText("A6_BLOCKED_LIVE")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Wallet execution unavailable" })).toBeDisabled();
+  await expectNoOverflow(page);
+  await page.screenshot({ path: "test-results/visual/a5-dashboard-1440.png", fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test("marketplace preserves URL tabs, dense authority rows, and external hire", async ({ page }) => {
+  await connectReady(page, "/marketplace?view=available");
+  await expect(page.getByRole("tab", { name: "available" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText(AVAILABLE_AGENT.fullSubname).first()).toBeVisible();
+  await expect(page.getByText(/v1 · 44444444/)).toBeVisible();
+  await expect(page.getByText("1000 USDC_ATOMIC").first()).toBeVisible();
+  await page.getByRole("link", { name: "Hire agent" }).click();
+  await expect(page).toHaveURL(new RegExp(`agentId=${AVAILABLE_AGENT.versionId}`));
+  await expect(page.getByRole("dialog", { name: `Run ${AVAILABLE_AGENT.name}` })).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await expect(page).not.toHaveURL(/agentId=/);
+  await page.getByRole("tab", { name: "mine" }).click();
+  await expect(page).toHaveURL(/view=mine/);
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "mine" })).toHaveAttribute("aria-selected", "true");
+});
+
+test("verify deep link shows six honest proof dimensions and exact refusal", async ({ page }) => {
+  await connectReady(page, `/verify?jobId=${JOB_ID}`);
+  for (const title of ["Agent identity", "ENS authority", "0G Compute", "Storage readback", "Canonical receipt", "Settlement or refund"]) {
+    await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  }
+  await expect(page.getByText("STORAGE_READBACK_MISMATCH").first()).toBeVisible();
+  await expect(page.getByText("Readback mismatch")).toBeVisible();
+  await expect(page.getByText("Unavailable", { exact: true }).first()).toBeVisible();
+  await expectNoOverflow(page);
+  await page.screenshot({ path: "test-results/visual/a5-proof-1440.png", fullPage: true });
+});
+
+test("all primary routes remain usable and overflow-free at mobile, tablet, and desktop", async ({ page }) => {
+  await installWallet(page);
+  for (const width of [375, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const path of routes) {
+    for (const path of ["/dashboard", "/marketplace?view=available", "/verify"]) {
       await page.goto(path);
-      await expect(page.locator("main, body").first()).toBeVisible();
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-      expect(overflow, `${path} overflows at ${width}px`).toBeLessThanOrEqual(1);
+      const connect = page.getByRole("button", { name: "Connect Wallet" });
+      if (await connect.isVisible()) await connect.click();
+      await expect(page.locator("main").first()).toBeVisible();
+      await expectNoOverflow(page);
+      await page.screenshot({ path: `test-results/visual/a5-${path.split("?")[0].slice(1)}-${width}.png`, fullPage: true });
     }
   }
 });
 
-test("keeps navigation compact, active, and keyboard operable", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1024 });
-  await page.goto("/dashboard");
-  const activeDashboard = page.getByRole("link", { name: "Workspace", exact: true }).first();
-  await expect(activeDashboard).toHaveAttribute("aria-current", "page");
-  await expect(activeDashboard.locator(".brand-hairline")).toBeVisible();
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  const menuButton = page.getByRole("button", { name: "Open navigation menu" });
-  await menuButton.focus();
+test("mobile navigation, focus return, and reduced motion remain operable", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/");
+  const menu = page.getByRole("button", { name: "Open navigation menu" });
+  await menu.focus();
   await page.keyboard.press("Enter");
-  const mobileNav = page.getByRole("navigation", { name: "Mobile primary" });
-  await expect(mobileNav).toBeVisible();
-  await expect(mobileNav.getByRole("link")).toHaveCount(7);
+  await expect(page.getByRole("navigation", { name: "Mobile primary" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(mobileNav).toBeHidden();
-  await expect(menuButton).toBeFocused();
+  await expect(menu).toBeFocused();
+  await expectNoOverflow(page);
 });
 
-test("prioritizes protected work and keeps network telemetry fail closed", async ({ page }) => {
-  const consoleErrors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
-  });
-  await page.unroute("**/api/**");
-  await installApiMocks(page, { user: DASHBOARD_USER });
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/dashboard");
-
-  await expect(page.getByRole("heading", { name: "Hire immutable agents. Inspect exact proof." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Protected jobs" })).toBeVisible();
-  const orderedRegions = page.locator("[data-dashboard-order]");
-  await expect(orderedRegions.nth(0)).toHaveAttribute("data-dashboard-order", "next-action");
-  await expect(orderedRegions.nth(1)).toHaveAttribute("data-dashboard-order", "protected-jobs");
-  await expect(page.getByText("Network activity is platform-wide telemetry, not personal job evidence.")).toBeHidden();
-  await page.getByRole("button", { name: "Expand evidence" }).click();
-  await expect(page.getByText(/Error code: STORAGE_READBACK_MISMATCH/).first()).toBeVisible();
-  await expect(page.getByTestId("protected-work-hero")).toHaveCSS("opacity", "1");
-  expect(consoleErrors).toEqual([]);
-
-  await page.screenshot({ path: "test-results/visual/a5-dashboard-nav-desktop-1440x900.png" });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByTestId("protected-work-hero")).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-  await page.screenshot({ path: "test-results/visual/a5-dashboard-nav-mobile-390x844.png" });
-});
-
-test("keeps long identity evidence contained", async ({ page }) => {
-  await installInjectedWallet(page);
-  await page.addInitScript(() => {
-    localStorage.setItem("alphadawg_dashboard_tour_v1_done", "1");
-  });
-  await page.unroute("**/api/**");
-  await installApiMocks(page, { user: DASHBOARD_USER });
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/dashboard");
-  await page.getByRole("button", { name: "Connect Wallet" }).click();
-  await page.locator("details > summary").filter({ hasText: /^Account/ }).first().click();
-  await expect(page.getByRole("link", { name: /Connected wallet 0x1111/ })).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-});
-
-test("presents one fail-closed agent-commerce story on the landing page", async ({ page }) => {
-  await installInjectedWallet(page, true);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.setViewportSize({ width: 1440, height: 1024 });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Publish an agent buyers can verify." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Publish an agent" }).first()).toHaveAttribute("href", "/marketplace?create=1");
-  await expect(page.getByRole("link", { name: "Hire an agent" })).toHaveAttribute("href", "/marketplace");
-  await expect(page.getByText("Example only. This draft is not published, hireable, deployed, or verified.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Evidence, never inference." })).toBeVisible();
-  await page.screenshot({
-    path: "test-results/visual/a5-option1-landing-1440x1024.png",
-  });
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Publish an agent buyers can verify." })).toBeVisible();
-  await page.screenshot({
-    path: "test-results/visual/a5-landing-mobile-390x844.png",
-    fullPage: true,
-  });
-});
-
-test("does not gate protected workspace on Telegram or funding", async ({ page }) => {
-  await installInjectedWallet(page);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/dashboard");
-  await page.getByRole("button", { name: "Connect Wallet" }).click();
-  await expect(page.getByRole("dialog", { name: "Link Telegram to this wallet session" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Protected jobs" })).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-});
-
-test("supports keyboard dialog flow and immutable publication copy", async ({ page }) => {
-  const actions: string[] = [];
-  await page.unroute("**/api/**");
-  await installApiMocks(page, { onAgentAction: (action) => actions.push(action) });
-  await page.goto("/marketplace");
-  const publishButton = page.getByRole("button", { name: /Publish agent/ });
-  await publishButton.click();
-  const dialog = page.getByRole("dialog", { name: "Publish a protected agent" });
-  await expect(dialog).toBeVisible();
-  await page.getByLabel("Agent name").fill("Manual Evidence Agent");
-  await page.getByLabel("What should this agent do?").fill("Analyze bounded evidence without inventing execution claims.");
-  await page.getByRole("button", { name: "Review selected capabilities" }).click();
-  await page.screenshot({ path: "test-results/visual/a5-create-capabilities-desktop-1440x900.png" });
-  await page.getByRole("button", { name: "Write manually" }).click();
-  await page.getByRole("textbox", { name: "Markdown instructions" }).fill("Inspect the supplied evidence, state uncertainty, and return a concise result.");
-  await page.getByRole("button", { name: "Review identity" }).click();
-  await page.getByLabel("Your ENS name (creator parent)").fill("maker.eth");
-  await page.getByRole("button", { name: "Prepare immutable draft" }).click();
-  await expect(dialog).toContainText("Server returned");
-  await expect(dialog).toContainText("schema_version: 2");
-  await dialog.evaluate((element) => element.scrollTo({ top: 0 }));
-  await page.screenshot({ path: "test-results/visual/a5-create-review-desktop-1440x900.png" });
-  await page.getByRole("button", { name: "Continue to publish" }).click();
-  await page.getByRole("button", { name: "Publish immutable version" }).click();
-  await expect(dialog).toContainText("Publication receipt");
-  expect(actions).toEqual(["CREATE_DRAFT", "BIND_NAME", "PREPARE_ENS_WRITE", "PUBLISH_VERSION"]);
-  await expect(dialog).not.toContainText(/deployed agent|minted agent|sealed execution/i);
-  await page.getByRole("button", { name: "Close dialog" }).click();
-
-  await publishButton.click();
-  await expect(dialog).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
-  await expect(publishButton).toBeFocused();
-});
-
-test("submits one job and fails closed when receipt and storage verification are absent", async ({ page }) => {
-  await page.goto("/marketplace");
-  await page.getByRole("button", { name: "Submit protected job" }).first().click();
-  const dialog = page.getByRole("dialog", { name: `Run ${AVAILABLE_AGENT.name}` });
-  await page.getByLabel("Task prompt").fill("Assess this evidence boundary.");
-  await dialog.getByRole("button", { name: "Submit protected job" }).click();
-  const submittedDialog = page.getByRole("dialog", { name: "Protected job submitted" });
-  await expect(submittedDialog).toContainText("Job accepted");
-  await expect(submittedDialog).not.toContainText(/sealed|deployed|minted/i);
-
-  await page.goto(`/dashboard/compute/${JOB_ID}`);
-  await expect(page.getByRole("heading", { name: /Risk Boundary Agent/ })).toBeVisible();
-  const receiptSection = page.getByRole("region", { name: "Canonical receipt and delivery" });
-  await expect(receiptSection).toContainText("Failed");
-  await expect(receiptSection.getByText("No canonical verified receipt is available.")).toBeVisible();
-  await expect(page.getByText(/^Refunded 1000 USDC_ATOMIC at/)).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(/sealed execution|deployed agent|minted agent/i);
-});
-
-test("shows verified delivery only with matching receipt and storage evidence", async ({ page }) => {
-  await page.unroute("**/api/**");
-  await installApiMocks(page, {
-    jobList: [VERIFIED_JOB_LIST_ITEM],
-    jobDetail: VERIFIED_JOB_DETAIL,
-  });
-  await page.goto(`/dashboard/compute/${JOB_ID}`);
-
-  const receiptSection = page.getByRole("region", { name: "Canonical receipt and delivery" });
-  await expect(receiptSection).toContainText("Verified");
-  await expect(receiptSection).toContainText("Verified bounded delivery");
-  await expect(page.getByRole("region", { name: "Financial evidence" })).toContainText(
-    "Settled 1000 USDC_ATOMIC",
-  );
-  await expect(page.locator("body")).not.toContainText(/deployed agent|minted agent|sealed execution/i);
-
-  await page.goto(`/verify?jobId=${JOB_ID}`);
-  await expect(page.getByRole("heading", { name: "Proof workbench" })).toBeVisible();
-  await expect(page.getByLabel("Job contract")).toContainText("Release SHA");
-  await page.screenshot({ path: "test-results/visual/a5-proof-workbench-desktop-1440x900.png", fullPage: true });
-});
-
-test("renders an idempotent replay as the original job without a second submission", async ({ page }) => {
-  let submissions = 0;
-  await page.unroute("**/api/**");
-  await installApiMocks(page, {
-    submissionReplayed: true,
-    onJobSubmit: () => {
-      submissions += 1;
-    },
-  });
-  await page.goto("/marketplace");
-  await page.getByRole("button", { name: "Submit protected job" }).first().click();
-  const dialog = page.getByRole("dialog", { name: `Run ${AVAILABLE_AGENT.name}` });
-  await page.getByLabel("Task prompt").fill("Replay this bounded request safely.");
-  await dialog.getByRole("button", { name: "Submit protected job" }).click();
-
-  await expect(page.getByRole("dialog", { name: "Protected job submitted" })).toContainText(
-    "Existing job returned safely",
-  );
-  expect(submissions).toBe(1);
-});
-
-test("supports canceling an active protected job", async ({ page }) => {
-  let cancellations = 0;
-  const queuedJob = {
-    ...JOB_LIST_ITEM,
-    state: "QUEUED",
-    lastErrorCode: null,
-    financialOutcome: null,
-    evidence: {
-      owner: "verified",
-      version: "verified",
-      ens: "pending",
-      compute: "pending",
-      storage: "pending",
-      receipt: "pending",
-    },
-  } as const;
-  await page.unroute("**/api/**");
-  await installApiMocks(page, {
-    jobList: [queuedJob],
-    onCancel: () => {
-      cancellations += 1;
-    },
-  });
-  await page.goto("/dashboard");
-  await page.getByRole("button", { name: "Cancel job" }).click();
-  await expect.poll(() => cancellations).toBe(1);
-});
-
-test("remains operable at 200 percent zoom", async ({ page }) => {
-  // Browser zoom reduces the CSS viewport. A 1280px window at 200% exposes
-  // 640 CSS pixels and activates the same responsive breakpoints as users see.
-  await page.setViewportSize({ width: 640, height: 900 });
-  await page.goto("/marketplace");
-  await expect(page.getByRole("heading", { name: "Protected agent registry" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Publish agent/ })).toBeVisible();
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-});
-
-test("honors reduced motion", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
-  const duration = await page.getByRole("link", { name: "Publish an agent" }).first().evaluate((element) =>
-    getComputedStyle(element).transitionDuration,
-  );
-  expect(Number.parseFloat(duration)).toBeLessThanOrEqual(0.00001);
-});
-
-test("defaults proof to protected discovery and refuses malformed job ids", async ({ page }) => {
-  await page.goto("/verify");
-  await expect(page.getByRole("heading", { name: "Protected proof" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "No protected job selected" })).toBeVisible();
-  await page.goto("/verify?jobId=not-a-uuid");
+test("malformed proof deep links refuse without substituting evidence", async ({ page }) => {
+  await connectReady(page, "/verify?jobId=not-a-uuid");
   await expect(page.getByRole("heading", { name: "Invalid protected job ID" })).toBeVisible();
-  await expect(page.locator("body")).not.toContainText("Legacy cycle evidence | hunt");
-});
-
-test("keeps DELIVERY_READY pending with zero settlement and continues polling", async ({ page }) => {
-  let reads = 0;
-  const readyList = { ...VERIFIED_JOB_LIST_ITEM, state: "DELIVERY_READY", financialOutcome: null } as const;
-  const readyDetail = { ...VERIFIED_JOB_DETAIL, state: "DELIVERY_READY", financialOutcome: null, evidenceDetail: { ...VERIFIED_JOB_DETAIL.evidenceDetail, delivery: null, financial: { settlement: null, refund: null } } } as const;
-  await page.unroute("**/api/**");
-  await installApiMocks(page, { jobList: [readyList], jobDetail: readyDetail });
-  await page.route("**/api/kernel/jobs?jobId=*", async (route) => { reads += 1; await fulfillJson(route, { job: readyDetail }); });
-  await page.goto(`/verify?jobId=${JOB_ID}`);
-  await expect(page.getByText("Verified delivery evidence is ready. Settlement and terminal success remain pending until payment finalization succeeds.")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Financial evidence" })).toContainText("No settlement or refund record is available yet.");
-  await expect.poll(() => reads, { timeout: 5_000 }).toBeGreaterThan(1);
+  await expect(page.getByText("No alternate evidence was substituted.")).toBeVisible();
 });

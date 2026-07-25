@@ -1,5 +1,68 @@
 # A5 Whole-Product UI and Protected Control Surface Evidence
 
+## Protected recurring-goal UI redesign on 2026-07-25
+
+Frontend task `A5-PROTECTED-GOAL-UI-REDESIGN-20260725:W1:B097DBD`
+rewires the primary route family to the accepted protected goal APIs without
+changing any server/API, database, payment, 0G, or ENS owner surface. The
+start/control SHA is `b097dbdc294c802872882079f89516a7ef3b355a`; the exit SHA
+is the commit containing this packet.
+
+The canonical `DawgLogo` and AlphaDawg wordmark remain in the persistent shell.
+The route contract is now `/` entry, `/dashboard` protected goal cockpit,
+`/marketplace?view=available|mine|drafts&agentId=...` protected catalog, and
+`/verify?jobId=...` proof index/detail. Protected queries remain disabled until
+wallet authentication is `ready` and onboarding is present. Auth explicitly
+models disconnected, signing, onboarding, ready, stale, and error; a nested
+EIP-1193 `4001` becomes `WALLET_SIGNATURE_REJECTED` with one explicit retry and
+no automatic re-prompt. `AUTH_USER_REQUIRED` returns to onboarding and
+`AUTH_SESSION_EXPIRED` becomes stale. No chain add/switch is invoked.
+
+The goal flow exposes Objective, Boundaries, and Review with 1-4 capabilities,
+5/15/30/60-minute cadence, bounded or continuous mode, run/daily limits,
+maximum agents, explicit atomic caps, and research-only or proposal mode. The
+cockpit keeps goal, state, next run/action, budget boundary, run stages, agent
+lanes, conclusion, summary, exact refusal, and the disabled
+`A6_BLOCKED_LIVE` proposal visible. Agent hashes, full policy, evidence tuples,
+receipt internals, and history use accessible disclosure. `/verify` exposes six
+evidence-limited dimensions: agent identity, ENS authority, 0G Compute, Storage
+readback, canonical receipt, and settlement/refund. Missing evidence remains
+unavailable or failed; no fixture or HTTP success is presented as deployed,
+online, verified, or hireable beyond the exact protected read model.
+
+The primary routes contain no legacy swarm/cycle/earnings/leaderboard polling,
+legacy agent hire, Arc, iNFT, ELO, or hunt surface. Optional swap execution is
+read-only and disabled; it never signs or broadcasts. The favicon assets were
+already present and the non-reused browser run produced no favicon error, so
+no out-of-scope layout/metadata change was required.
+
+### Local verification
+
+| Check | Result |
+|---|---|
+| `npm run lint` | PASS: zero errors; 23 inherited warnings outside this frontend change |
+| `npm run typecheck` | PASS |
+| `npm test` | PASS: 10/10 |
+| `npm run test:a5` | PASS: 5/5, including auth/query and legacy-primary regressions |
+| `CI=1 npm run test:playwright` | PASS: 9/9 against a non-reused `next build` + `next start` server |
+| `npm run build` | PASS: Next.js 16.2.11, 35 pages |
+| `npm run scan:secrets` | PASS |
+| `git diff --check` | PASS |
+
+Playwright covers nested signature rejection, zero premature protected
+requests, explicit goal creation with 5-minute cadence/two-agent/per-run/daily
+caps and `PROPOSE_SWAP`, terminal report/proof/A6 states, URL-persistent catalog
+tabs and agent selection, six proof dimensions, malformed deep-link refusal,
+keyboard focus return, reduced motion, and zero horizontal overflow across
+375, 768, and 1440 CSS pixels. Captures under `test-results/visual/` are local
+UI evidence only. They are not same-SHA live, sponsor, deployment, release, or
+submission evidence.
+
+Verdict: `PASS_TO_AUDIT; LOCAL_ONLY`. No live API, sponsor, managed migration,
+wallet signature, transaction, upload, deployment, push, form, funding, spend,
+or public claim was authorized or performed. `A6_BLOCKED_LIVE`, release, and
+same-SHA live-journey gates remain closed.
+
 ## Option 1 protected localhost handoff on 2026-07-25
 
 Frontend task `A5-LOCALHOST-CREATOR-HIRE-UX-20260725:W1:62C2F04` aligns the current product with the selected Option 1 reference while preserving the existing shell. The landing now leads with `Publish an agent buyers can verify.`, a truthful schema-v2 Example draft, stable anchors, linear Publish / Hire / Prove, configured-reference evidence index, and no fake metrics or live claims. The workspace leads with next action, owned drafts/published versions, protected jobs, and proof; legacy hunt/funding/telemetry remains collapsed.
