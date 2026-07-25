@@ -27,6 +27,7 @@ function failedJob(job: KernelJobDetail): boolean {
 }
 
 function authoritativeDimension(job: KernelJobDetail, dimension: ProofDimension): ProofDimension {
+  if (dimension.title === "Settlement or refund") return dimension;
   if (!failedJob(job) || dimension.state !== "verified") return dimension;
   return { ...dimension, state: "unavailable", statusLabel: "Recorded before failure" };
 }

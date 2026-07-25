@@ -763,7 +763,8 @@ test("verify deep link shows authoritative MCP and proof failure precedence", as
   await expect(page.getByText(`Block hash: 0x${"5".repeat(64)}`)).toBeVisible();
   await expect(page.getByText("STORAGE_READBACK_MISMATCH").first()).toBeVisible();
   await expect(page.getByText("Readback mismatch")).toBeVisible();
-  await expect(page.getByText("Verified", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Settlement or refund" }).locator("..").getByText("Verified", { exact: true })).toBeVisible();
+  await expect(page.getByText("Verified", { exact: true })).toHaveCount(1);
   await expectNoOverflow(page);
   await page.screenshot({ path: "test-results/visual/a5-proof-1440.png", fullPage: true });
 });

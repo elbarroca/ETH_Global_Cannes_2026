@@ -4,6 +4,39 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Frontend Builder /root
+task_id: MARKETPLACE-V5-FRONTEND-R8-G1
+task_instance_id: MARKETPLACE-V5-FRONTEND-R8-G1:FE019A4
+generation: 1
+sprint: Preserve verified refund and settlement proof after failed jobs
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: fe019a4ee7275c4656f4d01921860a6bfb8e753a
+control_sha: fe019a4ee7275c4656f4d01921860a6bfb8e753a
+token: MARKETPLACE-V5-FRONTEND-R8-G1-FE019A4-20260725T232818Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T23:28:18Z
+expires_at: 2026-07-26T00:28:18Z
+allowed_paths:
+  - components/proof-rail.tsx
+  - tests/playwright/a5-ui.spec.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T23:28:18Z
+deadline: 2026-07-26T00:28:18Z
+expected_exit: failed jobs retain verified finalized refund or settlement evidence
+external_effect_authority: local files deterministic mocked tests and one atomic local commit only; no network push deploy migration signature transaction spend or public claim
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T23:29:49Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+evidence: scoped lint typecheck A5 10 of 10 production build focused Playwright 1 of 1 secret scan and diff check passed
+remaining_block: none inside audited P1 scope; release and live effects remain unauthorized
+verdict: PASS_REMEDIATION; LOCAL_ONLY
+lock_release: release only exact token MARKETPLACE-V5-FRONTEND-R8-G1-FE019A4-20260725T232818Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
+owner: Frontend Builder /root
 task_id: MARKETPLACE-V5-FRONTEND-R8
 task_instance_id: MARKETPLACE-V5-FRONTEND-R8:R8:3DB3D19
 generation: 1
