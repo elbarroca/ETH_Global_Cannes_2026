@@ -3,6 +3,71 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/goal_loop_kernel
+task_id: A5-FOUNDING-MCP-KERNEL-W1
+task_instance_id: A5-FOUNDING-MCP-KERNEL-W1:W1:61142FA
+generation: 1
+sprint: Add protected catalog-derived agent manifests and MCP evidence
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 61142fa319f8e5ad51e5565846695f4cd0222e5b
+control_sha: 61142fa319f8e5ad51e5565846695f4cd0222e5b
+token: A5-FOUNDING-MCP-KERNEL-W1-61142FA-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T17:55:18Z
+expires_at: 2026-07-25T18:54:52Z
+allowed_paths:
+  - src/kernel/types.ts
+  - src/kernel/agent-catalog.ts
+  - src/kernel/policy.ts
+  - src/kernel/lifecycle.ts
+  - src/kernel/goals.ts
+  - src/kernel/service.ts
+  - src/kernel/mcp-context.ts
+  - app/api/kernel/agent-recommendations/route.ts
+  - app/api/kernel/agents/route.ts
+  - tests/kernel/**
+  - prisma/schema.prisma
+  - prisma/migrations/20260725190000_agent_manifest_v3_mcp_evidence/migration.sql
+  - scripts/test-migrations.ts
+  - scripts/prepare-founding-pack.ts
+  - package.json
+  - package-lock.json
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T17:24:52Z
+deadline: 2026-07-25T18:54:52Z
+expected_exit: catalog-derived V3 manifests, fail-closed bounded MCP context evidence, compatible protected APIs, and migration-backed append-only evidence
+external_effect_authority: local files existing dependencies local tests local migration fixtures and one local commit only; no push deploy managed migration live MCP API ENS signature transaction funding form spend release or claim
+completed_at: 2026-07-25T17:55:18Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - immutable founding pack is imported once as the server-owned source for eight catalog-derived manifest-v3 templates; existing custom manifest-v2 bytes and hashes remain unchanged
+  - authenticated recommendation GET returns sanitized categories template and provider capability identifiers plus fail-closed availability without repository URLs credentials raw tool names schemas code or GraphQL
+  - catalog draft admission accepts only templateId plus bounded name and description and rejects client instructions capabilities URLs credentials code tool names endpoints hashes sources MCP bindings and unknown templates
+  - manifest-v3 binds deterministic template and selection hashes category skill snapshots exact reviewed-source revisions allowlisted read-only MCP bindings native A3 connections atomic price proof policy payout and ENS binding
+  - CoinGecko and The Graph registry capabilities are server-owned; no MCP SDK live transport handler-side call generic execute arbitrary GraphQL redirect write tool or fixture fallback was added
+  - MCP context is injected only by the goal runner with four-call eight-second 32-KiB limits abort propagation claim guards canonical evidence and context hashes and no-provider GOAL_MCP_CONTEXT_UNAVAILABLE refusal
+  - MCP-bound manifest-v3 direct public hire is refused unless complete immutable goal-run evidence is bound into the exact job input; replay reuses evidence and job identity without duplicate provider calls
+  - mcp_invocations has restrictive goal-run-job and version lineage append-only update delete and truncate refusal unique idempotency bounded normalized response terminal state exact release SHA and database catalog-binding checks
+  - manifest-v3 publishes through the existing ENS-gated immutable lifecycle; no-provider goal execution records one failed invocation creates zero jobs or effects and terminalizes BLOCKED while partial reports remain swap-free
+  - prepare-founding-pack is loopback read-only and dry-run-only validates an already-onboarded creator emits ordered CREATE_DRAFT BIND_NAME PREPARE_ENS_WRITE PUBLISH_VERSION payloads and refuses --apply
+  - Prisma validate and generate PASS; migration replay PASS all 17 migrations across fresh Cannes populated-goal canonical-W6 and fail-closed noncanonical-W6 lanes
+  - focused founding MCP PASS 4 of 4; goal-loop PASS 10 of 10; test:kernel PASS 43 of 43; test:auth PASS 9 of 9; npm test PASS 10 of 10
+  - test:a4 PASS 12 of 12; test:a5 PASS 5 of 5; test:a6 PASS 24 of 24; test:e2e PASS 4 of 4; test:redaction PASS 3 of 3; test:boot PASS
+  - lint PASS with zero errors and 23 inherited warnings; typecheck PASS; scan:secrets PASS; build PASS 35 static pages; Playwright last-run PASS 9 tests; git diff --check PASS
+remaining_blocks:
+  - immutable exact-SHA independent audit remains required
+  - src/og/strict-a3.ts still admits manifest schema 1 or 2 only so the 0G owner must add minimal schema-v3 admission before executable v3 success can be claimed
+  - aggregate test:integration remains host-blocked because the Go binary is absent causing ten inherited strict-A3 hook failures; migration replay passes independently
+  - live MCP transport and push deploy managed migration provider ENS signature transaction funding form spend release and claims remain unauthorized
+external_effects_attempted: none
+claim_changes: none
+verdict: PASS_TO_AUDIT
+lock_release: release only exact token A5-FOUNDING-MCP-KERNEL-W1-61142FA-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Cycle Wirer /root/founding_skill_catalog
 task_id: A5-FOUNDING-SKILL-CATALOG-CYCLE-W1
 task_instance_id: A5-FOUNDING-SKILL-CATALOG-CYCLE-W1:W1:A07E325

@@ -6,6 +6,7 @@ import type {
   KernelJobInput,
 } from "./types";
 import {
+  buildManifestV3,
   buildManifestV2,
   isSupportedAgentSkill,
   type SupportedAgentSkill,
@@ -99,6 +100,21 @@ export function parseAgentInput(
   };
 }
 
+export function parseCatalogAgentInput(
+  value: unknown,
+  ownerWallet: string,
+): { name: string; manifest: AgentManifest } {
+  const input = objectRecord(value);
+  rejectUnexpectedKeys(input, ["templateId", "name", "description"]);
+  const templateId = boundedString(input.templateId, "templateId", 2, 80);
+  const name = boundedString(input.name, "name", 2, 80);
+  const description = boundedString(input.description, "description", 10, 800);
+  return {
+    name,
+    manifest: buildManifestV3({ templateId, name, description, ownerWallet }),
+  };
+}
+
 function dnsName(value: string): string {
   return `0x${Buffer.from(packetToBytes(value)).toString("hex")}`;
 }
@@ -135,18 +151,25 @@ export function parseAgentAction(value: unknown, ownerWallet: string): ParsedAge
     throw new KernelError("KERNEL_INVALID_REQUEST", "action is required", 400);
   }
   if (body.action === "CREATE_DRAFT") {
-    rejectUnexpectedKeys(body, [
-      "action", "agentId", "name", "description", "instructions", "capabilities",
-    ]);
     if (body.agentId !== undefined && !isKernelUuid(body.agentId)) {
       throw new KernelError("KERNEL_INVALID_REQUEST", "agentId must be a UUID", 400);
     }
-    const { manifest } = parseAgentInput({
-      name: body.name,
-      description: body.description,
-      instructions: body.instructions,
-      capabilities: body.capabilities,
-    }, ownerWallet);
+    const catalogDraft = body.templateId !== undefined;
+    rejectUnexpectedKeys(body, catalogDraft
+      ? ["action", "agentId", "templateId", "name", "description"]
+      : ["action", "agentId", "name", "description", "instructions", "capabilities"]);
+    const { manifest } = catalogDraft
+      ? parseCatalogAgentInput({
+          templateId: body.templateId,
+          name: body.name,
+          description: body.description,
+        }, ownerWallet)
+      : parseAgentInput({
+          name: body.name,
+          description: body.description,
+          instructions: body.instructions,
+          capabilities: body.capabilities,
+        }, ownerWallet);
     return { action: "CREATE_DRAFT", agentId: body.agentId ?? null, manifest };
   }
   if (body.action === "BIND_NAME") {

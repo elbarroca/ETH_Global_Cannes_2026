@@ -154,10 +154,17 @@ const LIFECYCLE_VERSION_KEYS = [
   "refusalReason", "authorityReleaseSha", "publicationDecisionId", "publishedAt",
 ] as const;
 
+const LIFECYCLE_VERSION_V3_KEYS = [
+  ...LIFECYCLE_VERSION_KEYS,
+  "manifestSchemaVersion", "reviewedSources", "skillSummary", "mcpSummary", "mcpAvailability",
+] as const;
+
 function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
   const row = object(value);
+  const legacySnapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_KEYS);
+  const currentSnapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_V3_KEYS);
   if (
-    !row || !exactKeys(row, LIFECYCLE_VERSION_KEYS) ||
+    !row || (!legacySnapshot && !currentSnapshot) ||
     typeof row.agentId !== "string" || !UUID.test(row.agentId) ||
     typeof row.versionId !== "string" || !UUID.test(row.versionId) ||
     !Number.isInteger(row.version) || (row.version as number) < 1 ||
@@ -179,6 +186,26 @@ function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
     !nullableString(row.authorityPolicyVersion) || !nullableString(row.refusalReason) ||
     !nullableString(row.authorityReleaseSha) || !nullableString(row.publicationDecisionId) ||
     !nullableString(row.publishedAt)
+  ) {
+    throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+  }
+  if (legacySnapshot) {
+    return {
+      ...(row as unknown as Omit<AgentLifecycleVersion,
+        "manifestSchemaVersion" | "reviewedSources" | "skillSummary" | "mcpSummary" | "mcpAvailability">),
+      manifestSchemaVersion: 2,
+      reviewedSources: null,
+      skillSummary: null,
+      mcpSummary: null,
+      mcpAvailability: "NOT_REQUIRED",
+    };
+  }
+  if (
+    ![1, 2, 3].includes(Number(row.manifestSchemaVersion)) ||
+    (row.reviewedSources !== null && !Array.isArray(row.reviewedSources)) ||
+    (row.skillSummary !== null && !Array.isArray(row.skillSummary)) ||
+    (row.mcpSummary !== null && !Array.isArray(row.mcpSummary)) ||
+    !["AVAILABLE", "UNAVAILABLE", "NOT_REQUIRED"].includes(String(row.mcpAvailability))
   ) {
     throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
   }
@@ -403,6 +430,23 @@ async function publicationActionClaim(
 }
 
 function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVersion {
+  const reviewedSources = row.manifest.schemaVersion === 3
+    ? row.manifest.reviewedSources.map((source) => ({
+        repository: source.repository,
+        revision: source.revision,
+        use: source.use,
+      }))
+    : null;
+  const skillSummary = row.manifest.schemaVersion === 3
+    ? row.manifest.skills.map((skill) => ({ id: skill.id, category: skill.category }))
+    : null;
+  const mcpSummary = row.manifest.schemaVersion === 3
+    ? row.manifest.mcp.map((binding) => ({
+        bindingId: binding.id,
+        provider: binding.provider,
+        capability: binding.capability,
+      }))
+    : null;
   return {
     agentId: row.agent_id,
     versionId: row.version_id,
@@ -434,6 +478,11 @@ function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVe
     authorityReleaseSha: row.authority_release_sha,
     publicationDecisionId: row.publication_decision_id,
     publishedAt: row.published_at?.toISOString() ?? null,
+    manifestSchemaVersion: row.manifest.schemaVersion,
+    reviewedSources,
+    skillSummary,
+    mcpSummary,
+    mcpAvailability: mcpSummary && mcpSummary.length > 0 ? "UNAVAILABLE" : "NOT_REQUIRED",
   };
 }
 
@@ -934,13 +983,13 @@ export async function publishAgentVersion(
       await markLifecycleActionRetryable(sql, claim, "KERNEL_CONFLICT");
       throw new KernelError("KERNEL_CONFLICT", "Prepare the ENS write before publication", 409);
     }
-    if (current.manifest.schemaVersion !== 2) {
+    if (current.manifest.schemaVersion !== 2 && current.manifest.schemaVersion !== 3) {
       throw await completePublicationDenial(
         sql,
         claim,
         ownerUserId,
         versionId,
-        "MANIFEST_SCHEMA_V2_REQUIRED",
+        "MANIFEST_SCHEMA_V2_OR_V3_REQUIRED",
         now,
       );
     }
@@ -1105,7 +1154,7 @@ export async function publishAgentVersion(
             publication_action_id = ${claim.actionId}::uuid
         FROM ens_publication_decisions d
         WHERE v.id = ${versionId}::uuid AND v.lifecycle_state = 'WRITE_PREPARED'
-          AND v.manifest->>'schemaVersion' = '2'
+          AND v.manifest->>'schemaVersion' IN ('2', '3')
           AND v.published = false AND d.id = ${decision.decision_id}::uuid
         RETURNING
           v.agent_id, v.id AS version_id, v.version, ${locked.name}::text AS name,

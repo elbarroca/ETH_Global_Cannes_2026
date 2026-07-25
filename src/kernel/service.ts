@@ -9,6 +9,7 @@ import {
 } from "./policy";
 import type {
   AgentManifest,
+  AgentManifestV3,
   EvidenceState,
   KernelJobDetail,
   KernelJobEvidenceSummary,
@@ -175,6 +176,21 @@ interface ReceiptFinancialRow {
   refund_asset: string | null;
   refund_reason_code: string | null;
   refund_created_at: Date | null;
+}
+
+interface McpInvocationDetailRow {
+  id: string;
+  binding_id: string;
+  provider: "coingecko" | "the-graph";
+  capability: import("./types").McpCapability;
+  state: "SUCCEEDED" | "FAILED";
+  request_hash: string;
+  response_hash: string | null;
+  context_hash: string | null;
+  response_bytes: number;
+  error_code: string | null;
+  release_sha: string;
+  completed_at: Date;
 }
 
 function mapPublishedAgent(row: AgentVersionRow, viewerUserId: string): PublishedAgent {
@@ -474,6 +490,11 @@ export async function submitJob(
     now?: Date;
     sql?: DatabaseClient;
     mutationGuard?: (sql: DatabaseClient, now: Date) => Promise<boolean>;
+    mcpContext?: {
+      goalRunJobId: string;
+      contextHash: string;
+      invocationIds: readonly string[];
+    };
   } = {},
 ): Promise<SubmittedJob> {
   const sql = options.sql ?? getDb();
@@ -513,8 +534,11 @@ export async function submitJob(
       price_atomic: string;
       asset: string;
       owner_user_id: string;
+      manifest: AgentManifest;
+      manifest_hash: string;
     }[]>`
-      SELECT v.id, v.adapter_key, v.price_atomic::text, v.asset, a.owner_user_id
+      SELECT v.id, v.adapter_key, v.price_atomic::text, v.asset, a.owner_user_id,
+        v.manifest, v.manifest_hash
       FROM agent_versions v
       JOIN kernel_agents a ON a.id = v.agent_id
       WHERE v.id = ${input.agentVersionId}::uuid
@@ -559,6 +583,74 @@ export async function submitJob(
     }
     if (agentVersion.owner_user_id === buyerUserId) {
       throw new KernelError("KERNEL_FORBIDDEN", "Creators cannot hire their own agent version", 403);
+    }
+    if (agentVersion.manifest.schemaVersion === 3 && agentVersion.manifest.mcp.length > 0) {
+      const context = options.mcpContext;
+      if (!context || context.invocationIds.length !== agentVersion.manifest.mcp.length) {
+        throw new KernelError(
+          "KERNEL_FORBIDDEN",
+          "MCP-bound catalog versions require verified internal goal evidence",
+          403,
+        );
+      }
+      const invocations = await tx<{
+        id: string;
+        binding_id: string;
+        request_hash: string;
+        response_hash: string;
+        context_hash: string;
+        normalized_response: CanonicalValue;
+      }[]>`
+        SELECT invocation.id::text, invocation.binding_id, invocation.request_hash,
+          invocation.response_hash, invocation.context_hash, invocation.normalized_response
+        FROM goal_run_jobs link
+        JOIN goal_runs run ON run.id = link.goal_run_id
+        JOIN mcp_invocations invocation ON invocation.goal_run_job_id = link.id
+        WHERE link.id = ${context.goalRunJobId}::uuid
+          AND run.owner_user_id = ${buyerUserId}
+          AND link.agent_version_id = ${input.agentVersionId}::uuid
+          AND link.manifest_hash_snapshot = ${agentVersion.manifest_hash}
+          AND invocation.agent_version_id = link.agent_version_id
+          AND invocation.manifest_hash = link.manifest_hash_snapshot
+          AND invocation.id = ANY(${context.invocationIds}::uuid[])
+          AND invocation.state = 'SUCCEEDED' AND invocation.error_code IS NULL
+          AND invocation.response_hash IS NOT NULL AND invocation.context_hash IS NOT NULL
+          AND invocation.normalized_response IS NOT NULL
+      `;
+      const byBinding = new Map(invocations.map((row) => [row.binding_id, row]));
+      const contextValue = (agentVersion.manifest as AgentManifestV3).mcp.map((binding) => {
+        const invocation = byBinding.get(binding.id);
+        if (!invocation || !context.invocationIds.includes(invocation.id)) {
+          throw new KernelError(
+            "KERNEL_FORBIDDEN",
+            "MCP-bound catalog versions require complete internal evidence",
+            403,
+          );
+        }
+        return {
+          bindingId: binding.id,
+          contextHash: invocation.context_hash,
+          requestHash: invocation.request_hash,
+          responseHash: invocation.response_hash,
+          response: invocation.normalized_response,
+        };
+      });
+      const expectedContextHash = domainHash("mcp-context", contextValue);
+      if (
+        invocations.length !== agentVersion.manifest.mcp.length ||
+        expectedContextHash !== context.contextHash ||
+        !canonicalTask.prompt.includes(context.contextHash) ||
+        invocations.some((row) =>
+          !canonicalTask.prompt.includes(row.request_hash) ||
+          !canonicalTask.prompt.includes(row.response_hash) ||
+          !canonicalTask.prompt.includes(row.context_hash))
+      ) {
+        throw new KernelError(
+          "KERNEL_FORBIDDEN",
+          "MCP evidence is incomplete or not bound into the job input",
+          403,
+        );
+      }
     }
 
     const quoteExpiry = new Date(now.getTime() + KERNEL_QUOTE_TTL_MS);
@@ -669,7 +761,7 @@ export async function getBuyerJobDetail(
   const baseRow = baseRows[0];
   if (!baseRow) return null;
 
-  const [events, ensChecks, journals, effects, financialRows] = await Promise.all([
+  const [events, ensChecks, journals, effects, financialRows, mcpInvocations] = await Promise.all([
     sql<JobEventRow[]>`
       SELECT version, event_type, from_state, to_state, created_at
       FROM job_events
@@ -720,6 +812,17 @@ export async function getBuyerJobDetail(
       LEFT JOIN refunds refund ON refund.job_id = job.id
       WHERE job.id = ${jobId}::uuid
       LIMIT 1
+    `,
+    sql<McpInvocationDetailRow[]>`
+      SELECT invocation.id::text, invocation.binding_id, invocation.provider,
+        invocation.capability, invocation.state, invocation.request_hash,
+        invocation.response_hash, invocation.context_hash, invocation.response_bytes,
+        invocation.error_code, invocation.release_sha, invocation.completed_at
+      FROM goal_run_jobs link
+      JOIN mcp_invocations invocation ON invocation.goal_run_job_id = link.id
+      WHERE link.job_id = ${jobId}::uuid
+      ORDER BY invocation.binding_id ASC, invocation.id ASC
+      LIMIT 4
     `,
   ]);
 
@@ -832,6 +935,21 @@ export async function getBuyerJobDetail(
             }
           : null,
       },
+      mcpInvocations: mcpInvocations.map((invocation) => ({
+        schemaVersion: 1,
+        invocationId: invocation.id,
+        bindingId: invocation.binding_id,
+        provider: invocation.provider,
+        capability: invocation.capability,
+        state: invocation.state,
+        requestHash: invocation.request_hash,
+        responseHash: invocation.response_hash,
+        contextHash: invocation.context_hash,
+        responseBytes: invocation.response_bytes,
+        errorCode: invocation.error_code,
+        releaseSha: invocation.release_sha,
+        completedAt: invocation.completed_at.toISOString(),
+      })),
       errorCode: receiptBindingError
         ? "RECEIPT_EFFECT_HASH_MISMATCH"
         : base.lastErrorCode ?? journal?.error_code ?? ens?.error_code ?? null,

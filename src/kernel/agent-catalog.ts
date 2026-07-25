@@ -1,11 +1,18 @@
-import { domainHash, type CanonicalValue } from "./canonical";
+import { FOUNDING_PACK } from "../agents/founding-pack";
+import { canonicalJson, domainHash, type CanonicalValue } from "./canonical";
 import { KernelError } from "./errors";
 import type {
   AgentEnsBinding,
   AgentManifest,
   AgentManifestV2,
+  AgentManifestV3,
   AgentNativeConnection,
+  AgentSkillSnapshotV1,
+  McpBindingV1,
+  McpCapability,
+  McpProviderId,
   PinnedAgentSkill,
+  ReviewedSourceV1,
 } from "./types";
 
 export const SUPPORTED_AGENT_SKILLS = [
@@ -44,7 +51,51 @@ const SKILL_CATALOG: Readonly<Record<SupportedAgentSkill, PinnedAgentSkill>> = {
   },
 };
 
-function manifestConfig(manifest: Omit<AgentManifestV2, "reviewedConfigHash">): CanonicalValue {
+const MCP_REGISTRY = {
+  coingecko: [
+    "search",
+    "spot-price",
+    "market-snapshot",
+    "trending",
+    "token-by-address",
+    "pool-snapshot",
+    "ohlcv",
+  ],
+  "the-graph": [
+    "pinned-deployment-lookup",
+    "schema-read",
+    "bounded-query",
+    "liquidity-volume-snapshot",
+  ],
+} as const satisfies Readonly<Record<McpProviderId, readonly McpCapability[]>>;
+
+const SELECTED_MCP_BINDINGS: Readonly<Record<string, readonly McpBindingV1[]>> = {
+  "data.coingecko.market": [
+    binding("coingecko", "spot-price"),
+    binding("coingecko", "market-snapshot"),
+  ],
+  "data.the-graph.read": [
+    binding("the-graph", "pinned-deployment-lookup"),
+    binding("the-graph", "liquidity-volume-snapshot"),
+  ],
+};
+
+function binding(provider: McpProviderId, capability: McpCapability): McpBindingV1 {
+  if (!(MCP_REGISTRY[provider] as readonly string[]).includes(capability)) {
+    throw new Error("KERNEL_MCP_REGISTRY_INVALID");
+  }
+  return {
+    schemaVersion: 1,
+    id: `mcp.${provider}.${capability}`,
+    provider,
+    capability,
+    access: "read-only",
+    timeoutMs: 8000,
+    maxResponseBytes: 32768,
+  };
+}
+
+function manifestConfigV2(manifest: Omit<AgentManifestV2, "reviewedConfigHash">): CanonicalValue {
   return {
     adapterKey: manifest.adapterKey,
     capabilities: manifest.capabilities,
@@ -58,6 +109,164 @@ function manifestConfig(manifest: Omit<AgentManifestV2, "reviewedConfigHash">): 
     priceAtomic: manifest.priceAtomic,
     proofPolicy: manifest.proofPolicy,
     skills: manifest.skills,
+  };
+}
+
+function manifestConfigV3(manifest: Omit<AgentManifestV3, "reviewedConfigHash">): CanonicalValue {
+  return {
+    adapterKey: manifest.adapterKey,
+    capabilities: manifest.capabilities,
+    catalogSelectionHash: manifest.catalogSelectionHash,
+    catalogTemplateId: manifest.catalogTemplateId,
+    connectorKey: manifest.connectorKey,
+    endpoint: manifest.endpoint,
+    ensBinding: manifest.ensBinding,
+    ensBindingHash: manifest.ensBindingHash,
+    mcp: manifest.mcp,
+    nativeConnections: manifest.nativeConnections,
+    payoutAddress: manifest.payoutAddress,
+    priceAtomic: manifest.priceAtomic,
+    proofPolicy: manifest.proofPolicy,
+    reviewedSources: manifest.reviewedSources,
+    skills: manifest.skills,
+  };
+}
+
+function foundingTemplate(templateId: string) {
+  const template = FOUNDING_PACK.templates.find((entry) => entry.id === templateId);
+  if (!template) throw new KernelError("KERNEL_INVALID_REQUEST", "Unknown founding template", 400);
+  return template;
+}
+
+function skillConstraints(skill: (typeof FOUNDING_PACK.skills)[keyof typeof FOUNDING_PACK.skills]): string[] {
+  const constraints: string[] = [];
+  if ("readOnly" in skill && skill.readOnly === true) constraints.push("read-only");
+  if ("proposalOnly" in skill && skill.proposalOnly === true) constraints.push("proposal-only");
+  if ("walletApprovalRequired" in skill && skill.walletApprovalRequired === true) {
+    constraints.push("wallet-approval-required");
+  }
+  if ("signing" in skill && skill.signing === "forbidden") constraints.push("signing-forbidden");
+  if ("broadcasting" in skill && skill.broadcasting === "forbidden") {
+    constraints.push("broadcasting-forbidden");
+  }
+  if ("protectedGate" in skill && skill.protectedGate === "A3") {
+    constraints.push("protected-a3-required");
+  }
+  if ("allowedNetworks" in skill) {
+    for (const network of skill.allowedNetworks) constraints.push(`network:${network}`);
+  }
+  return constraints.sort();
+}
+
+function snapshotSkill(skillId: string): AgentSkillSnapshotV1 {
+  const skill = FOUNDING_PACK.skills[skillId as keyof typeof FOUNDING_PACK.skills];
+  if (!skill || skill.id !== skillId) throw new Error("KERNEL_FOUNDING_SKILL_INVALID");
+  const snapshot = {
+    schemaVersion: 1,
+    id: skill.id,
+    category: skill.category,
+    capabilities: [...skill.capabilities],
+    constraints: skillConstraints(skill),
+  } as const;
+  return {
+    ...snapshot,
+    snapshotHash: domainHash("agent-skill-snapshot", snapshot),
+  };
+}
+
+function reviewedSourcesFor(skillIds: readonly string[]): readonly ReviewedSourceV1[] {
+  const repositories = new Set<string>();
+  if (skillIds.includes("data.the-graph.read")) repositories.add("graphops/subgraph-mcp");
+  if (skillIds.includes("data.coingecko.market")) repositories.add("coingecko/skills");
+  if (skillIds.includes("action.uniswap.propose-swap")) {
+    repositories.add("circlefin/skills");
+    repositories.add("Uniswap/uniswap-ai");
+  }
+  return FOUNDING_PACK.reviewedSources
+    .filter((source) => repositories.has(source.repository))
+    .map((source) => ({
+      schemaVersion: 1,
+      repository: source.repository,
+      revision: source.revision,
+      license: source.license,
+      use: source.use,
+      files: source.files.map((file) => ({ path: file.path, sha256: file.sha256 })),
+    }));
+}
+
+function mcpBindingsFor(dataIds: readonly string[]): readonly McpBindingV1[] {
+  return dataIds.flatMap((id) => SELECTED_MCP_BINDINGS[id] ?? []).slice(0, 4);
+}
+
+function v3NativeConnections(skillIds: readonly string[]): readonly AgentNativeConnection[] {
+  const connections: AgentNativeConnection[] = [
+    { id: "zero-g-compute", required: true },
+    { id: "zero-g-storage", required: true },
+  ];
+  if (skillIds.includes("action.uniswap.propose-swap")) {
+    connections.push({ id: "uniswap-api", required: true });
+  }
+  return connections;
+}
+
+function selectionFor(templateId: string): CanonicalValue {
+  const template = foundingTemplate(templateId);
+  return {
+    capabilities: template.capabilities,
+    connections: template.connections,
+    data: template.data,
+    priceAtomic: template.price,
+    skills: template.skills,
+    templateId: template.id,
+  };
+}
+
+function withV3EnsBinding(manifest: AgentManifestV3, ensBinding: AgentEnsBinding): AgentManifestV3 {
+  const updated = {
+    ...manifest,
+    ensBinding,
+    ensBindingHash: domainHash("agent-ens-binding", ensBinding),
+  };
+  return {
+    ...updated,
+    reviewedConfigHash: domainHash("agent-config", manifestConfigV3(updated)),
+  };
+}
+
+export function buildManifestV3(input: {
+  templateId: string;
+  name: string;
+  description: string;
+  ownerWallet: string;
+}): AgentManifestV3 {
+  const template = foundingTemplate(input.templateId);
+  const manifest = {
+    schemaVersion: 3,
+    catalogTemplateId: template.id,
+    catalogSelectionHash: domainHash("agent-catalog-selection", selectionFor(template.id)),
+    name: input.name,
+    description: input.description,
+    instructions: template.prompt,
+    capabilities: [...template.capabilities].sort(),
+    adapterKey: "protected-a3",
+    endpoint: null,
+    connectorKey: null,
+    ownerWallet: input.ownerWallet,
+    payoutAddress: input.ownerWallet,
+    priceAtomic: template.price,
+    asset: "USDC_ATOMIC",
+    proofPolicy: "verified-receipt-required",
+    ensBinding: null,
+    ensBindingHash: null,
+    reviewedPromptHash: domainHash("agent-prompt", template.prompt),
+    skills: template.skills.map(snapshotSkill),
+    reviewedSources: reviewedSourcesFor(template.skills),
+    nativeConnections: v3NativeConnections(template.skills),
+    mcp: mcpBindingsFor(template.data),
+  } as const;
+  return {
+    ...manifest,
+    reviewedConfigHash: domainHash("agent-config", manifestConfigV3(manifest)),
   };
 }
 
@@ -135,21 +344,35 @@ export function buildManifestV2(input: {
   } as const;
   return {
     ...manifest,
-    reviewedConfigHash: domainHash("agent-config", manifestConfig(manifest)),
+    reviewedConfigHash: domainHash("agent-config", manifestConfigV2(manifest)),
   };
 }
 
-export function bindManifestEns(manifest: AgentManifest, binding: AgentEnsBinding): AgentManifest {
-  if (manifest.schemaVersion === 1) return { ...manifest, ensBinding: binding };
+export function bindManifestEns(manifest: AgentManifest, bindingValue: AgentEnsBinding): AgentManifest {
+  if (manifest.schemaVersion === 1) return { ...manifest, ensBinding: bindingValue };
+  if (manifest.schemaVersion === 3) return withV3EnsBinding(manifest, bindingValue);
   const updated = {
     ...manifest,
-    ensBinding: binding,
-    ensBindingHash: domainHash("agent-ens-binding", binding),
+    ensBinding: bindingValue,
+    ensBindingHash: domainHash("agent-ens-binding", bindingValue),
   };
   return {
     ...updated,
-    reviewedConfigHash: domainHash("agent-config", manifestConfig(updated)),
+    reviewedConfigHash: domainHash("agent-config", manifestConfigV2(updated)),
   };
+}
+
+function assertCatalogManifestV3(manifest: AgentManifestV3): void {
+  let expected = buildManifestV3({
+    templateId: manifest.catalogTemplateId,
+    name: manifest.name,
+    description: manifest.description,
+    ownerWallet: manifest.ownerWallet,
+  });
+  if (manifest.ensBinding) expected = withV3EnsBinding(expected, manifest.ensBinding);
+  if (canonicalJson(manifest) !== canonicalJson(expected)) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "Catalog manifest does not match its reviewed template", 400);
+  }
 }
 
 export function deriveManifestHashes(manifest: AgentManifest): {
@@ -168,13 +391,16 @@ export function deriveManifestHashes(manifest: AgentManifest): {
         priceAtomic: manifest.priceAtomic,
         proofPolicy: manifest.proofPolicy,
       })
-    : domainHash("agent-config", manifestConfig(manifest));
+    : manifest.schemaVersion === 2
+      ? domainHash("agent-config", manifestConfigV2(manifest))
+      : domainHash("agent-config", manifestConfigV3(manifest));
   if (
-    manifest.schemaVersion === 2 &&
+    manifest.schemaVersion !== 1 &&
     (manifest.reviewedPromptHash !== promptHash || manifest.reviewedConfigHash !== configHash)
   ) {
     throw new KernelError("KERNEL_INVALID_REQUEST", "Manifest review hashes do not match", 400);
   }
+  if (manifest.schemaVersion === 3) assertCatalogManifestV3(manifest);
   return {
     manifestHash: domainHash("agent-manifest", manifest),
     promptHash,
@@ -218,4 +444,36 @@ export function recommendationFor(ids: readonly SupportedAgentSkill[]): {
     readiness: "READY",
     reasons: [],
   };
+}
+
+export function foundingCatalogProjection(): CanonicalValue {
+  return {
+    categories: FOUNDING_PACK.categories,
+    skills: Object.values(FOUNDING_PACK.skills).map((skill) => ({
+      id: skill.id,
+      category: skill.category,
+      capabilities: skill.capabilities,
+      constraints: skillConstraints(skill),
+      providerAvailability: skill.id.startsWith("data.") ? "UNAVAILABLE" : "NOT_REQUIRED",
+    })),
+    templates: FOUNDING_PACK.templates.map((template) => ({
+      id: template.id,
+      label: template.name,
+      capabilities: template.capabilities,
+      skillIds: template.skills,
+      priceAtomic: template.price,
+    })),
+    mcpProviders: Object.entries(MCP_REGISTRY).map(([provider, capabilities]) => ({
+      provider,
+      availability: "UNAVAILABLE",
+      capabilities,
+    })),
+  };
+}
+
+export function isMcpBindingAllowlisted(bindingValue: McpBindingV1): boolean {
+  return bindingValue.schemaVersion === 1 && bindingValue.access === "read-only" &&
+    bindingValue.timeoutMs === 8000 && bindingValue.maxResponseBytes === 32768 &&
+    bindingValue.id === `mcp.${bindingValue.provider}.${bindingValue.capability}` &&
+    (MCP_REGISTRY[bindingValue.provider] as readonly string[] | undefined)?.includes(bindingValue.capability) === true;
 }

@@ -49,6 +49,54 @@ export interface AgentNativeConnection extends Record<string, CanonicalValue> {
   required: true;
 }
 
+export interface ReviewedSourceFileV1 extends Record<string, CanonicalValue> {
+  path: string;
+  sha256: string;
+}
+
+export interface ReviewedSourceV1 extends Record<string, CanonicalValue> {
+  schemaVersion: 1;
+  repository: string;
+  revision: string;
+  license: "Apache-2.0" | "MIT";
+  use: "integration" | "guidance-only";
+  files: readonly ReviewedSourceFileV1[];
+}
+
+export type McpProviderId = "coingecko" | "the-graph";
+
+export type McpCapability =
+  | "search"
+  | "spot-price"
+  | "market-snapshot"
+  | "trending"
+  | "token-by-address"
+  | "pool-snapshot"
+  | "ohlcv"
+  | "pinned-deployment-lookup"
+  | "schema-read"
+  | "bounded-query"
+  | "liquidity-volume-snapshot";
+
+export interface McpBindingV1 extends Record<string, CanonicalValue> {
+  schemaVersion: 1;
+  id: string;
+  provider: McpProviderId;
+  capability: McpCapability;
+  access: "read-only";
+  timeoutMs: 8000;
+  maxResponseBytes: 32768;
+}
+
+export interface AgentSkillSnapshotV1 extends Record<string, CanonicalValue> {
+  schemaVersion: 1;
+  id: string;
+  category: "PERSONA" | "DATA" | "ACTION" | "CONNECTION";
+  capabilities: readonly string[];
+  constraints: readonly string[];
+  snapshotHash: string;
+}
+
 export interface AgentManifestV2 extends AgentManifestBase {
   schemaVersion: 2;
   reviewedPromptHash: string;
@@ -60,7 +108,38 @@ export interface AgentManifestV2 extends AgentManifestBase {
   ensBindingHash: string | null;
 }
 
-export type AgentManifest = AgentManifestV1 | AgentManifestV2;
+export interface AgentManifestV3 extends AgentManifestBase {
+  schemaVersion: 3;
+  catalogTemplateId: string;
+  catalogSelectionHash: string;
+  reviewedPromptHash: string;
+  reviewedConfigHash: string;
+  skills: readonly AgentSkillSnapshotV1[];
+  reviewedSources: readonly ReviewedSourceV1[];
+  nativeConnections: readonly AgentNativeConnection[];
+  mcp: readonly McpBindingV1[];
+  payoutAddress: string;
+  ensBindingHash: string | null;
+}
+
+export type AgentManifest = AgentManifestV1 | AgentManifestV2 | AgentManifestV3;
+
+export interface AgentReviewedSourceSummary {
+  repository: string;
+  revision: string;
+  use: "integration" | "guidance-only";
+}
+
+export interface AgentSkillSummary {
+  id: string;
+  category: "PERSONA" | "DATA" | "ACTION" | "CONNECTION";
+}
+
+export interface AgentMcpSummary {
+  bindingId: string;
+  provider: McpProviderId;
+  capability: McpCapability;
+}
 
 export const AGENT_LIFECYCLE_STATES = [
   "DRAFT",
@@ -124,6 +203,11 @@ export interface AgentLifecycleVersion {
   authorityReleaseSha: string | null;
   publicationDecisionId: string | null;
   publishedAt: string | null;
+  manifestSchemaVersion: 1 | 2 | 3;
+  reviewedSources: readonly AgentReviewedSourceSummary[] | null;
+  skillSummary: readonly AgentSkillSummary[] | null;
+  mcpSummary: readonly AgentMcpSummary[] | null;
+  mcpAvailability: "AVAILABLE" | "UNAVAILABLE" | "NOT_REQUIRED";
 }
 
 export interface ProtectedPublishedAgent extends AgentLifecycleVersion {
@@ -225,6 +309,7 @@ export interface GoalSnapshot extends Record<string, CanonicalValue> {
 }
 
 export interface GoalRunJobSnapshot {
+  goalRunJobId: string;
   agentVersionId: string;
   jobId: string | null;
   role: "ANALYSIS" | "SYNTHESIS";
@@ -233,6 +318,22 @@ export interface GoalRunJobSnapshot {
   priceAtomic: string;
   manifestHash: string;
   fullSubname: string;
+}
+
+export interface McpEvidenceV1 extends Record<string, CanonicalValue> {
+  schemaVersion: 1;
+  invocationId: string;
+  bindingId: string;
+  provider: McpProviderId;
+  capability: McpCapability;
+  state: "SUCCEEDED" | "FAILED";
+  requestHash: string;
+  responseHash: string | null;
+  contextHash: string | null;
+  responseBytes: number;
+  errorCode: string | null;
+  releaseSha: string;
+  completedAt: string;
 }
 
 export interface GoalRunSnapshot {
@@ -437,6 +538,7 @@ export interface KernelJobEvidence {
   receipt: KernelVerifiedReceipt | null;
   delivery: KernelDeliveryResult | null;
   financial: KernelFinancialEvidence;
+  mcpInvocations: readonly McpEvidenceV1[];
   errorCode: string | null;
 }
 

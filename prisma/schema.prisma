@@ -412,6 +412,7 @@ model AgentVersion {
   uniswapToolReceipts UniswapToolReceipt[]
   provenance     AgentVersionProvenance?
   goalRunJobs    GoalRunJob[]
+  mcpInvocations McpInvocation[]
 
   @@unique([agentId, version], map: "uniq_agent_versions_agent_version")
   @@index([published, createdAt], map: "idx_agent_versions_published_created")
@@ -633,6 +634,7 @@ model GoalRunJob {
   run                   GoalRun      @relation(fields: [goalRunId], references: [id], onDelete: Restrict)
   agentVersion          AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
   job                   Job?         @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  mcpInvocations        McpInvocation[]
 
   @@unique([goalRunId, role, agentVersionId], map: "uniq_goal_run_jobs_role_version")
   @@index([goalRunId, selectionRank], map: "idx_goal_run_jobs_rank")
@@ -653,6 +655,34 @@ model AgentVersionProvenance {
 
   @@index([chainId, contractAddress, tokenId], map: "idx_agent_version_provenance_token")
   @@map("agent_version_provenance")
+}
+
+model McpInvocation {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  goalRunJobId       String       @map("goal_run_job_id") @db.Uuid
+  agentVersionId     String       @map("agent_version_id") @db.Uuid
+  manifestHash       String       @map("manifest_hash")
+  bindingId          String       @map("binding_id")
+  provider           String
+  capability         String
+  idempotencyKey     String       @unique @map("idempotency_key")
+  requestHash        String       @map("request_hash")
+  responseHash       String?      @map("response_hash")
+  contextHash        String?      @map("context_hash")
+  normalizedResponse Json?        @map("normalized_response")
+  responseBytes      Int          @default(0) @map("response_bytes")
+  state              String
+  errorCode          String?      @map("error_code")
+  releaseSha         String       @map("release_sha")
+  startedAt          DateTime     @map("started_at") @db.Timestamptz(6)
+  completedAt        DateTime     @map("completed_at") @db.Timestamptz(6)
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  goalRunJob         GoalRunJob   @relation(fields: [goalRunJobId], references: [id], onDelete: Restrict)
+  agentVersion       AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([goalRunJobId, bindingId], map: "uniq_mcp_invocations_run_job_binding")
+  @@index([agentVersionId, createdAt], map: "idx_mcp_invocations_version_created")
+  @@map("mcp_invocations")
 }
 
 model JobEvent {

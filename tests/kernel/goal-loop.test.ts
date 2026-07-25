@@ -8,6 +8,7 @@ import {
   type EnsPublicationAuthority,
 } from "../../src/ens/authority";
 import { domainHash, type CanonicalValue } from "../../src/kernel/canonical";
+import { buildManifestV3 } from "../../src/kernel/agent-catalog";
 import { KernelError } from "../../src/kernel/errors";
 import {
   createGoal,
@@ -135,15 +136,28 @@ async function publicationAuthority(
 async function publishAgent(
   database: DisposableDatabase,
   owner: { id: string; wallet: string },
-  input: { name: string; parent: string; label: string; capabilities: string[] },
+  input: {
+    name: string;
+    parent: string;
+    label: string;
+    capabilities: string[];
+    templateId?: string;
+  },
 ): Promise<string> {
   const publishedAt = new Date();
-  const manifest = parseAgentInput({
-    name: input.name,
-    description: "A bounded protected goal-loop specialist for deterministic tests.",
-    instructions: "## Task\n\nReturn a concise evidence-backed goal analysis result.",
-    capabilities: input.capabilities,
-  }, owner.wallet).manifest;
+  const manifest = input.templateId
+    ? buildManifestV3({
+        templateId: input.templateId,
+        name: input.name,
+        description: "A bounded protected goal-loop specialist for deterministic tests.",
+        ownerWallet: owner.wallet,
+      })
+    : parseAgentInput({
+        name: input.name,
+        description: "A bounded protected goal-loop specialist for deterministic tests.",
+        instructions: "## Task\n\nReturn a concise evidence-backed goal analysis result.",
+        capabilities: input.capabilities,
+      }, owner.wallet).manifest;
   const draft = await createAgentDraft(
     { userId: owner.id, walletAddress: owner.wallet },
     manifest,
@@ -683,6 +697,50 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
           '0xNOTANADDRESS', '007', ${"b".repeat(64)}, ${at(51_000)}
         )
       `, /agent_version_provenance_address_check|agent_version_provenance_token_check/);
+    });
+
+    await t.test("catalog v3 publishes through the same lifecycle and blocks without MCP context", async () => {
+      const swapVersion = await publishAgent(database, {
+        id: CREATOR_B_ID, wallet: CREATOR_B_WALLET,
+      }, {
+        name: "Catalog Swap Strategist", parent: "bob.eth", label: "catalog-swap",
+        capabilities: ["market-analysis", "risk-analysis", "uniswap-swap"],
+        templateId: "swap-strategist",
+      });
+      const catalog = await listAgentLifecycle(BUYER_ID, { sql: database.sql });
+      const published = catalog.agents.find((agent) => agent.versionId === swapVersion);
+      assert.equal(published?.manifestSchemaVersion, 3);
+      assert.equal(published?.mcpAvailability, "UNAVAILABLE");
+      assert.equal(published?.mcpSummary?.length, 4);
+      assert.equal(published?.reviewedSources?.length, 4);
+
+      const created = await createGoal(BUYER_ID, activeGoal({
+        objective: "Propose a bounded swap analysis only when MCP evidence is available.",
+        capabilities: ["uniswap-swap"],
+        runLimit: 1,
+        maxAgents: 1,
+        perRunCapAtomic: "1000",
+      }), "goal-v3-mcp-create-01", { now: NOW, sql: database.sql });
+      const run = await createGoalRun(
+        BUYER_ID,
+        created.goal.goalId,
+        "goal-v3-mcp-run-01",
+        { now: at(45_000), sql: database.sql },
+      );
+      assert.equal(run.run.state, "BLOCKED");
+      assert.equal(run.run.errorCode, "GOAL_MCP_CONTEXT_UNAVAILABLE");
+      assert.equal(run.run.jobs.length, 1);
+      assert.equal(run.run.jobs[0]?.jobId, null);
+      const counts = await database.sql<{ invocations: number; jobs: number }[]>`
+        SELECT
+          (SELECT count(*)::int FROM mcp_invocations invocation
+            JOIN goal_run_jobs link ON link.id = invocation.goal_run_job_id
+            WHERE link.goal_run_id = ${run.run.runId}::uuid) AS invocations,
+          (SELECT count(*)::int FROM jobs job
+            JOIN goal_run_jobs link ON link.job_id = job.id
+            WHERE link.goal_run_id = ${run.run.runId}::uuid) AS jobs
+      `;
+      assert.deepEqual(counts[0], { invocations: 1, jobs: 0 });
     });
 
     await t.test("terminal runs are immutable and every persisted report is revalidated on read", async () => {

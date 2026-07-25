@@ -38,6 +38,7 @@ const A6_UNISWAP_TOOL_RECEIPT_MIGRATION = "20260725100000_a6_uniswap_tool_receip
 const A5_A6_KERNEL_FOUNDATION_MIGRATION = "20260725113000_a5_a6_kernel_foundation";
 const PROTECTED_GOAL_LOOP_MIGRATION = "20260725163000_protected_goal_loop";
 const GOAL_LOOP_HARDENING_MIGRATION = "20260725173000_goal_loop_hardening";
+const AGENT_MANIFEST_V3_MCP_EVIDENCE_MIGRATION = "20260725190000_agent_manifest_v3_mcp_evidence";
 const GOAL_LOOP_PREDECESSOR_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -882,6 +883,7 @@ async function verifyDatabase(
       goal_run_jobs: string | null;
       agent_version_provenance: string | null;
       goal_mutations: string | null;
+      mcp_invocations: string | null;
       cost_reserved_at: string | null;
       user_count: string;
       migration_count: string;
@@ -926,6 +928,9 @@ async function verifyDatabase(
       goal_loop_hardening_count: string;
       goal_loop_hardening_constraint_count: string;
       goal_loop_hardening_trigger_count: string;
+      agent_manifest_v3_mcp_evidence_count: string;
+      agent_manifest_v3_mcp_constraint_count: string;
+      agent_manifest_v3_mcp_trigger_count: string;
       sequence_type: string;
       sequence_start: string;
       sequence_min: string;
@@ -955,6 +960,7 @@ async function verifyDatabase(
         to_regclass('public.goal_run_jobs')::text AS goal_run_jobs,
         to_regclass('public.agent_version_provenance')::text AS agent_version_provenance,
         to_regclass('public.goal_mutations')::text AS goal_mutations,
+        to_regclass('public.mcp_invocations')::text AS mcp_invocations,
         (
           SELECT is_nullable FROM information_schema.columns
           WHERE table_schema = 'public' AND table_name = 'goal_runs'
@@ -1328,6 +1334,31 @@ async function verifyDatabase(
             'goal_run_jobs_terminal_mutation_guard'
           )
         ) AS goal_loop_hardening_trigger_count,
+        (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${AGENT_MANIFEST_V3_MCP_EVIDENCE_MIGRATION}
+            AND finished_at IS NOT NULL
+        ) AS agent_manifest_v3_mcp_evidence_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'agent_versions_manifest_v3_shape_check',
+            'mcp_invocations_goal_run_job_id_fkey',
+            'mcp_invocations_agent_version_id_fkey',
+            'mcp_invocations_hash_check',
+            'mcp_invocations_binding_check',
+            'mcp_invocations_terminal_check',
+            'mcp_invocations_state_check'
+          )
+        ) AS agent_manifest_v3_mcp_constraint_count,
+        (
+          SELECT count(*)::text FROM pg_trigger
+          WHERE NOT tgisinternal AND tgname IN (
+            'mcp_invocations_lineage',
+            'mcp_invocations_append_only',
+            'mcp_invocations_no_truncate'
+          )
+        ) AS agent_manifest_v3_mcp_trigger_count,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
         seq.min_value::text AS sequence_min,
@@ -1360,9 +1391,10 @@ async function verifyDatabase(
       result.goal_run_jobs !== "goal_run_jobs" ||
       result.agent_version_provenance !== "agent_version_provenance" ||
       result.goal_mutations !== "goal_mutations" ||
+      result.mcp_invocations !== "mcp_invocations" ||
       result.cost_reserved_at !== "YES" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 16 ||
+      Number(result.migration_count) !== 17 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1402,6 +1434,9 @@ async function verifyDatabase(
       Number(result.goal_loop_hardening_count) !== 1 ||
       Number(result.goal_loop_hardening_constraint_count) !== 5 ||
       Number(result.goal_loop_hardening_trigger_count) !== 5 ||
+      Number(result.agent_manifest_v3_mcp_evidence_count) !== 1 ||
+      Number(result.agent_manifest_v3_mcp_constraint_count) !== 7 ||
+      Number(result.agent_manifest_v3_mcp_trigger_count) !== 3 ||
       result.receipt_authority_nullable !== "NO" ||
       result.lifecycle_action_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||
