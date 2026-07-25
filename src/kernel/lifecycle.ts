@@ -1012,7 +1012,7 @@ export async function publishAgentVersion(
     }
     if (
       current.manifest.schemaVersion !== 2 && current.manifest.schemaVersion !== 3 &&
-      current.manifest.schemaVersion !== 4
+      current.manifest.schemaVersion !== 4 && current.manifest.schemaVersion !== 5
     ) {
       throw await completePublicationDenial(
         sql,
@@ -1184,7 +1184,7 @@ export async function publishAgentVersion(
             publication_action_id = ${claim.actionId}::uuid
         FROM ens_publication_decisions d
         WHERE v.id = ${versionId}::uuid AND v.lifecycle_state = 'WRITE_PREPARED'
-          AND v.manifest->>'schemaVersion' IN ('2', '3', '4')
+          AND v.manifest->>'schemaVersion' IN ('2', '3', '4', '5')
           AND v.published = false AND d.id = ${decision.decision_id}::uuid
         RETURNING
           v.agent_id, v.id AS version_id, v.version, ${locked.name}::text AS name,

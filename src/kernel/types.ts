@@ -307,6 +307,9 @@ export interface HireRequestSnapshot extends Record<string, CanonicalValue> {
   jobId: string | null;
   contextHash: string | null;
   errorCode: string | null;
+  claimEpoch: string | null;
+  claimVersion: number;
+  claimExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
   replayed: boolean;

@@ -1,18 +1,31 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildManifestV5, deriveManifestHashes } from "../../src/kernel/agent-catalog";
+import { buildManifestV5 } from "../../src/kernel/agent-catalog";
 import { domainHash } from "../../src/kernel/canonical";
 import {
   claimHireRequestContext,
   completeHireRequestContext,
   createHireRequest,
   listHireRequests,
+  processHireRequest,
 } from "../../src/kernel/hire-requests";
-import { listAgentLifecycle } from "../../src/kernel/lifecycle";
-import { collectMcpContext, type McpContextProvider } from "../../src/kernel/mcp-context";
-import { parseAgentListFilters, parseHireRequestInput } from "../../src/kernel/policy";
+import {
+  bindAgentName,
+  createAgentDraft,
+  listAgentLifecycle,
+  prepareAgentEnsWrite,
+  publishAgentVersion,
+} from "../../src/kernel/lifecycle";
+import type { McpContextProvider } from "../../src/kernel/mcp-context";
+import {
+  parseAgentInput,
+  parseAgentListFilters,
+  parseEnsBinding,
+  parseHireRequestInput,
+} from "../../src/kernel/policy";
 import { createOgSpendBudget, reserveOgSpend } from "../../src/kernel/service";
 import { configureDatabaseEnvironment, startDisposableDatabase } from "../helpers/postgres";
+import { publicationAuthority } from "./lifecycle.cases";
 
 const CREATOR_ID = "v5-creator";
 const BUYER_ID = "v5-buyer";
@@ -22,7 +35,10 @@ const BUYER_WALLET = "0x2222222222222222222222222222222222222222";
 const OTHER_WALLET = "0x3333333333333333333333333333333333333333";
 
 class FixedProvider implements McpContextProvider {
+  calls = 0;
+
   async invoke(binding: Parameters<McpContextProvider["invoke"]>[0]): Promise<unknown> {
+    this.calls += 1;
     return { bindingId: binding.id, observed: true };
   }
 }
@@ -44,39 +60,28 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
       ownerWallet: CREATOR_WALLET,
       riskTiers: ["LOW", "MID"],
     });
-    const hashes = deriveManifestHashes(manifest);
-    const agents = await database.sql<{ id: string }[]>`
-      INSERT INTO kernel_agents (owner_user_id, name) VALUES (${CREATOR_ID}, ${manifest.name})
-      RETURNING id::text
-    `;
-    const agentId = agents[0]?.id;
-    assert.ok(agentId);
-    await database.sql`SET session_replication_role = replica`;
-    const versions = await database.sql<{ id: string }[]>`
-      INSERT INTO agent_versions (
-        agent_id, version, manifest, manifest_hash, prompt_hash, config_hash,
-        capabilities, adapter_key, endpoint, connector_key, owner_wallet,
-        payout_address, price_atomic, asset, proof_policy, lifecycle_state,
-        creator_parent, agent_label, full_subname, write_plan, write_plan_hash,
-        canonical_state, authority_owner, authority_policy_version,
-        authority_record_hash, authority_observed_at, authority_fresh_until,
-        authority_release_sha, publication_decision_id, publication_action_id,
-        published, published_at
-      ) VALUES (
-        ${agentId}::uuid, 1, ${database.sql.json(JSON.parse(JSON.stringify(manifest)))},
-        ${hashes.manifestHash}, ${hashes.promptHash}, ${hashes.configHash},
-        ${manifest.capabilities}, 'protected-a3', NULL, NULL, ${CREATOR_WALLET},
-        ${CREATOR_WALLET}, 1000, 'USDC_ATOMIC', 'verified-receipt-required', 'PUBLISHED',
-        'creator.eth', 'v5-market', 'v5-market.creator.eth', ${database.sql.json({ local: true })},
-        ${"a".repeat(64)}, 'CANONICAL', ${CREATOR_WALLET}, 'ens-publication-v1',
-        ${"b".repeat(64)}, clock_timestamp(), clock_timestamp() + interval '1 hour',
-        ${"c".repeat(40)}, '10000000-0000-4000-8000-000000000001'::uuid,
-        '10000000-0000-4000-8000-000000000002'::uuid, true, clock_timestamp()
-      ) RETURNING id::text
-    `;
-    await database.sql`SET session_replication_role = origin`;
-    const versionId = versions[0]?.id;
-    assert.ok(versionId);
+    const draft = await createAgentDraft(
+      { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
+      manifest,
+      { idempotencyKey: "v5-real-draft-01", sql: database.sql },
+    );
+    const binding = parseEnsBinding({ creatorParent: "creator.eth", agentLabel: "v5-market" });
+    await bindAgentName(CREATOR_ID, draft.versionId, binding, {
+      idempotencyKey: "v5-real-bind-01",
+      sql: database.sql,
+    });
+    await prepareAgentEnsWrite(CREATOR_ID, draft.versionId, {
+      idempotencyKey: "v5-real-prepare-01",
+      sql: database.sql,
+    });
+    const authority = await publicationAuthority(database, draft.versionId);
+    const published = await publishAgentVersion(CREATOR_ID, draft.versionId, {
+      authority: authority.authority,
+      idempotencyKey: "v5-real-publish-01",
+      sql: database.sql,
+    });
+    await authority.close();
+    const versionId = published.versionId;
 
     const filters = parseAgentListFilters(new URL(
       "http://localhost/api/kernel/agents?capability=market-analysis&skill=persona.market-analyst&mcpProvider=coingecko&riskTier=LOW&limit=1",
@@ -115,54 +120,119 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
       sql: database.sql,
     }), []);
 
+    await assert.rejects(database.sql`
+      UPDATE hire_requests SET state = 'JOB_QUEUED', version = version + 1
+      WHERE id = ${created.hireRequestId}::uuid
+    `, /job_id|transition|queued hire request/);
+    const provider = new FixedProvider();
     const expiresAt = new Date(Date.now() + 60_000);
-    const claimed = await claimHireRequestContext({
+    const completed = await processHireRequest({
       hireRequestId: created.hireRequestId,
       workerId: "v5-worker",
       workerEpoch: 1n,
       leaseExpiresAt: expiresAt,
+      mcpProvider: provider,
       sql: database.sql,
     });
-    assert.equal(claimed?.state, "CONTEXT_RUNNING");
-    const context = await collectMcpContext({
-      sql: database.sql,
+    assert.equal(completed?.state, "JOB_QUEUED");
+    assert.ok(completed?.jobId);
+    assert.equal(provider.calls, manifest.mcp.length);
+    const retries = await Promise.all(Array.from({ length: 10 }, () => processHireRequest({
       hireRequestId: created.hireRequestId,
-      hireFence: {
-        workerId: "v5-worker",
-        workerEpoch: 1n,
-        claimVersion: 1,
-        claimExpiresAt: expiresAt,
-      },
-      agentVersionId: versionId,
-      manifestHash: hashes.manifestHash,
-      bindings: manifest.mcp,
-      objective: "Analyze this market.",
-      requiredCapabilities: manifest.capabilities,
-      releaseSha: "d".repeat(40),
-      provider: new FixedProvider(),
-    });
-    assert.equal(context.evidence.length, manifest.mcp.length);
+      workerId: "retry-worker",
+      workerEpoch: 2n,
+      leaseExpiresAt: new Date(Date.now() + 60_000),
+      mcpProvider: provider,
+      sql: database.sql,
+    })));
+    assert.ok(retries.every((entry) => entry?.jobId === completed.jobId));
+    assert.equal(provider.calls, manifest.mcp.length);
+    const jobCount = await database.sql<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM jobs WHERE id = ${completed.jobId}::uuid
+    `;
+    assert.equal(jobCount[0]?.count, 1);
     await assert.rejects(database.sql`
       UPDATE mcp_invocations SET hire_request_id = NULL
       WHERE hire_request_id = ${created.hireRequestId}::uuid
     `);
-    assert.equal(await completeHireRequestContext({
-      hireRequestId: created.hireRequestId,
-      workerId: "wrong-worker",
+
+    const reclaimable = await createHireRequest(BUYER_ID, {
+      agentVersionId: versionId,
+      idempotencyKey: "buyer-hire-v5-reclaim-01",
+      prompt: "Analyze a second market snapshot.",
+    }, { sql: database.sql });
+    const firstClaim = await claimHireRequestContext({
+      hireRequestId: reclaimable.hireRequestId,
+      workerId: "stale-worker",
       workerEpoch: 1n,
-      claimVersion: claimed?.version ?? 0,
-      contextHash: context.contextHash,
-      sql: database.sql,
-    }), null);
-    const completed = await completeHireRequestContext({
-      hireRequestId: created.hireRequestId,
-      workerId: "v5-worker",
-      workerEpoch: 1n,
-      claimVersion: 1,
-      contextHash: context.contextHash,
+      leaseExpiresAt: new Date(Date.now() + 100),
       sql: database.sql,
     });
-    assert.equal(completed?.state, "JOB_QUEUED");
+    assert.equal(firstClaim?.claimVersion, 1);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const reclaimed = await processHireRequest({
+      hireRequestId: reclaimable.hireRequestId,
+      workerId: "replacement-worker",
+      workerEpoch: 2n,
+      leaseExpiresAt: new Date(Date.now() + 60_000),
+      mcpProvider: provider,
+      sql: database.sql,
+    });
+    assert.equal(reclaimed?.claimVersion, 2);
+    assert.equal(reclaimed?.state, "JOB_QUEUED");
+    assert.ok(reclaimed.jobId);
+    assert.equal(await completeHireRequestContext({
+      hireRequestId: reclaimable.hireRequestId,
+      workerId: "stale-worker",
+      workerEpoch: 1n,
+      claimVersion: 1,
+      contextHash: null,
+      jobId: reclaimed.jobId,
+      sql: database.sql,
+    }), null);
+
+    const nonMcpManifest = parseAgentInput({
+      name: "Non MCP Hire Agent",
+      description: "A real lifecycle fixture without MCP bindings.",
+      instructions: "## Task\n\nReturn one bounded evidence-backed answer.",
+      capabilities: ["research"],
+    }, CREATOR_WALLET).manifest;
+    const nonMcpDraft = await createAgentDraft(
+      { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
+      nonMcpManifest,
+      { idempotencyKey: "non-mcp-real-draft-01", sql: database.sql },
+    );
+    await bindAgentName(CREATOR_ID, nonMcpDraft.versionId, parseEnsBinding({
+      creatorParent: "creator.eth",
+      agentLabel: "non-mcp-hire",
+    }), { idempotencyKey: "non-mcp-real-bind-01", sql: database.sql });
+    await prepareAgentEnsWrite(CREATOR_ID, nonMcpDraft.versionId, {
+      idempotencyKey: "non-mcp-real-prepare-01",
+      sql: database.sql,
+    });
+    const nonMcpAuthority = await publicationAuthority(database, nonMcpDraft.versionId);
+    const nonMcpPublished = await publishAgentVersion(CREATOR_ID, nonMcpDraft.versionId, {
+      authority: nonMcpAuthority.authority,
+      idempotencyKey: "non-mcp-real-publish-01",
+      sql: database.sql,
+    });
+    await nonMcpAuthority.close();
+    const nonMcpHire = await createHireRequest(BUYER_ID, {
+      agentVersionId: nonMcpPublished.versionId,
+      idempotencyKey: "non-mcp-hire-request-01",
+      prompt: "Produce a bounded research answer.",
+    }, { sql: database.sql });
+    assert.equal(nonMcpHire.state, "PENDING_CONTEXT");
+    assert.equal(nonMcpHire.jobId, null);
+    const nonMcpProcessed = await processHireRequest({
+      hireRequestId: nonMcpHire.hireRequestId,
+      workerId: "non-mcp-worker",
+      workerEpoch: 1n,
+      leaseExpiresAt: new Date(Date.now() + 60_000),
+      sql: database.sql,
+    });
+    assert.equal(nonMcpProcessed?.state, "JOB_QUEUED");
+    assert.ok(nonMcpProcessed?.jobId);
 
     const releaseSha = "e".repeat(40);
     await createOgSpendBudget(releaseSha, 10n, { sql: database.sql });
@@ -192,7 +262,6 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
       WHERE id = ${reservation.value.reservationId}::uuid
     `);
   } finally {
-    await database.sql`SET session_replication_role = origin`.catch(() => undefined);
     await database.close();
   }
 });

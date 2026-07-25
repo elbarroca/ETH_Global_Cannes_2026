@@ -8,7 +8,7 @@ import {
   type EnsPublicationAuthority,
 } from "../../src/ens/authority";
 import { domainHash, type CanonicalValue } from "../../src/kernel/canonical";
-import { buildManifestV3, buildManifestV4 } from "../../src/kernel/agent-catalog";
+import { buildManifestV3, buildManifestV4, buildManifestV5 } from "../../src/kernel/agent-catalog";
 import { patchAugmentedLayerPolicy } from "../../src/kernel/augmented-layer-policy";
 import { KernelError } from "../../src/kernel/errors";
 import {
@@ -151,11 +151,12 @@ async function publishAgent(
     capabilities: string[];
     templateId?: string;
     riskTiers?: readonly RiskLane[];
+    manifestVersion?: 4 | 5;
   },
 ): Promise<string> {
   const publishedAt = new Date();
   const manifest = input.templateId && input.riskTiers
-    ? buildManifestV4({
+    ? (input.manifestVersion === 5 ? buildManifestV5 : buildManifestV4)({
         templateId: input.templateId,
         name: input.name,
         description: "A bounded protected goal-loop specialist for deterministic tests.",
@@ -760,7 +761,7 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       assert.deepEqual(counts[0], { invocations: 1, jobs: 0 });
     });
 
-    await t.test("TRI_RISK_V1 selects exactly three distinct V4 lanes before execution", async () => {
+    await t.test("TRI_RISK_V1 selects V4 and V5 lanes and executes V5 MCP context", async () => {
       const lowVersion = await publishAgent(database, {
         id: CREATOR_A_ID, wallet: CREATOR_A_WALLET,
       }, {
@@ -778,7 +779,7 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       }, {
         name: "Tri High Swap", parent: "alice.eth", label: "tri-high",
         capabilities: ["market-analysis", "risk-analysis", "uniswap-swap"],
-        templateId: "swap-strategist", riskTiers: ["HIGH"],
+        templateId: "swap-strategist", riskTiers: ["HIGH"], manifestVersion: 5,
       });
       const selfVersion = await publishAgent(database, {
         id: BUYER_ID, wallet: BUYER_WALLET,

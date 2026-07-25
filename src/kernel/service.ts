@@ -492,11 +492,19 @@ export async function submitJob(
     now?: Date;
     sql?: DatabaseClient;
     mutationGuard?: (sql: DatabaseClient, now: Date) => Promise<boolean>;
-    mcpContext?: {
-      goalRunJobId: string;
-      contextHash: string;
-      invocationIds: readonly string[];
-    };
+    mcpContext?: (
+      | { goalRunJobId: string; hireRequestId?: never; hireFence?: never }
+      | {
+          goalRunJobId?: never;
+          hireRequestId: string;
+          hireFence: {
+            workerId: string;
+            workerEpoch: bigint;
+            claimVersion: number;
+            claimExpiresAt: Date;
+          };
+        }
+    ) & { contextHash: string; invocationIds: readonly string[] };
   } = {},
 ): Promise<SubmittedJob> {
   const sql = options.sql ?? getDb();
@@ -592,37 +600,76 @@ export async function submitJob(
       agentVersion.manifest.mcp.length > 0
     ) {
       const context = options.mcpContext;
-      if (!context || context.invocationIds.length !== agentVersion.manifest.mcp.length) {
+      if (
+        !context || context.invocationIds.length !== agentVersion.manifest.mcp.length ||
+        ((context.goalRunJobId ? 1 : 0) + (context.hireRequestId ? 1 : 0) !== 1)
+      ) {
         throw new KernelError(
           "KERNEL_FORBIDDEN",
           "MCP-bound catalog versions require verified internal goal evidence",
           403,
         );
       }
-      const invocations = await tx<{
+      type Invocation = {
         id: string;
         binding_id: string;
         request_hash: string;
         response_hash: string;
         context_hash: string;
         normalized_response: CanonicalValue;
-      }[]>`
-        SELECT invocation.id::text, invocation.binding_id, invocation.request_hash,
-          invocation.response_hash, invocation.context_hash, invocation.normalized_response
-        FROM goal_run_jobs link
-        JOIN goal_runs run ON run.id = link.goal_run_id
-        JOIN mcp_invocations invocation ON invocation.goal_run_job_id = link.id
-        WHERE link.id = ${context.goalRunJobId}::uuid
-          AND run.owner_user_id = ${buyerUserId}
-          AND link.agent_version_id = ${input.agentVersionId}::uuid
-          AND link.manifest_hash_snapshot = ${agentVersion.manifest_hash}
-          AND invocation.agent_version_id = link.agent_version_id
-          AND invocation.manifest_hash = link.manifest_hash_snapshot
-          AND invocation.id = ANY(${context.invocationIds}::uuid[])
-          AND invocation.state = 'SUCCEEDED' AND invocation.error_code IS NULL
-          AND invocation.response_hash IS NOT NULL AND invocation.context_hash IS NOT NULL
-          AND invocation.normalized_response IS NOT NULL
-      `;
+      };
+      let invocations: Invocation[];
+      if (context.goalRunJobId) {
+        invocations = await tx<Invocation[]>`
+            SELECT invocation.id::text, invocation.binding_id, invocation.request_hash,
+              invocation.response_hash, invocation.context_hash, invocation.normalized_response
+            FROM goal_run_jobs link
+            JOIN goal_runs run ON run.id = link.goal_run_id
+            JOIN mcp_invocations invocation ON invocation.goal_run_job_id = link.id
+            WHERE link.id = ${context.goalRunJobId}::uuid
+              AND run.owner_user_id = ${buyerUserId}
+              AND link.agent_version_id = ${input.agentVersionId}::uuid
+              AND link.manifest_hash_snapshot = ${agentVersion.manifest_hash}
+              AND invocation.agent_version_id = link.agent_version_id
+              AND invocation.manifest_hash = link.manifest_hash_snapshot
+              AND invocation.id = ANY(${context.invocationIds}::uuid[])
+              AND invocation.state = 'SUCCEEDED' AND invocation.error_code IS NULL
+              AND invocation.response_hash IS NOT NULL AND invocation.context_hash IS NOT NULL
+              AND invocation.normalized_response IS NOT NULL
+          `;
+      } else {
+        const hireRequestId = context.hireRequestId;
+        const hireFence = context.hireFence;
+        if (!hireRequestId || !hireFence) {
+          throw new KernelError("KERNEL_FORBIDDEN", "MCP hire fence is incomplete", 403);
+        }
+        invocations = await tx<Invocation[]>`
+            SELECT invocation.id::text, invocation.binding_id, invocation.request_hash,
+              invocation.response_hash, invocation.context_hash, invocation.normalized_response
+            FROM hire_requests hire
+            JOIN mcp_invocations invocation ON invocation.hire_request_id = hire.id
+            WHERE hire.id = ${hireRequestId}::uuid
+              AND hire.buyer_user_id = ${buyerUserId}
+              AND hire.agent_version_id = ${input.agentVersionId}::uuid
+              AND hire.manifest_hash = ${agentVersion.manifest_hash}
+              AND hire.state = 'CONTEXT_RUNNING'
+              AND hire.claim_owner = ${hireFence.workerId}
+              AND hire.claim_epoch = ${hireFence.workerEpoch.toString()}::bigint
+              AND hire.claim_version = ${hireFence.claimVersion}
+              AND hire.claim_expires_at = ${hireFence.claimExpiresAt}
+              AND hire.claim_expires_at > clock_timestamp()
+              AND invocation.agent_version_id = hire.agent_version_id
+              AND invocation.manifest_hash = hire.manifest_hash
+              AND invocation.hire_claim_owner = hire.claim_owner
+              AND invocation.hire_claim_epoch = hire.claim_epoch
+              AND invocation.hire_claim_version = hire.claim_version
+              AND invocation.hire_claim_expires_at = hire.claim_expires_at
+              AND invocation.id = ANY(${context.invocationIds}::uuid[])
+              AND invocation.state = 'SUCCEEDED' AND invocation.error_code IS NULL
+              AND invocation.response_hash IS NOT NULL AND invocation.context_hash IS NOT NULL
+              AND invocation.normalized_response IS NOT NULL
+          `;
+      }
       const byBinding = new Map(invocations.map((row) => [row.binding_id, row]));
       const contextValue = (agentVersion.manifest as AgentManifestV3 | AgentManifestV4 | AgentManifestV5).mcp.map((binding) => {
         const invocation = byBinding.get(binding.id);

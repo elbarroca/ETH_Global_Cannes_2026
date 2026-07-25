@@ -38,7 +38,7 @@ const OTHER_WALLET = "0x5555555555555555555555555555555555555555";
 const NOW = new Date("2026-07-25T02:00:00.000Z");
 const RELEASE_SHA = "9c6e37d169ac6ddee2439602551deaca5347c41a";
 
-interface PublicationAuthorityFixture {
+export interface PublicationAuthorityFixture {
   authority: EnsPublicationAuthority;
   resolverCalls: () => number;
   close: () => Promise<void>;
@@ -65,7 +65,7 @@ async function executeRoleCommand(
   await database.sql.unsafe(command);
 }
 
-async function publicationAuthority(
+export async function publicationAuthority(
   database: DisposableDatabase,
   versionId: string,
   options: { mutator?: EnsPublicationFixtureMutator } = {},

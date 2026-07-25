@@ -3,6 +3,55 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/marketplace_kernel_v5
+task_id: MARKETPLACE-LANGCHAIN-KERNEL-V5-R1
+task_instance_id: MARKETPLACE-LANGCHAIN-KERNEL-V5-R1:R1:3EC298A
+generation: 1
+sprint: Remediate V5 publication hire processing reclaim and goal admission audit findings
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 3ec298abfa7276e98def0801e5c4f781f521ed97
+control_sha: 3ec298abfa7276e98def0801e5c4f781f521ed97
+token: MARKETPLACE-LANGCHAIN-KERNEL-V5-R1-3EC298A-20260725T212806Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T21:38:02Z
+expires_at: 2026-07-26T00:28:06Z
+allowed_paths:
+  - src/kernel/lifecycle.ts
+  - src/kernel/hire-requests.ts
+  - src/kernel/goals.ts
+  - src/kernel/service.ts
+  - src/kernel/types.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260725220000_agent_runtime_v5/migration.sql
+  - tests/kernel/**
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T21:28:06Z
+deadline: 2026-07-26T00:28:06Z
+expected_exit: real V5 publication and exactly-once fenced hire processing with reclaim and goal-loop admission
+external_effect_authority: local files existing dependencies deterministic tests disposable loopback PostgreSQL and one atomic local commit only; no managed migration network sponsor call signature transaction deployment push spend claim or public proof
+path_amendment: C0 added src/kernel/service.ts and directly related tests/kernel service coverage for discriminated goal-or-hire MCP context admission without fabricated lineage
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T21:38:02Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - V5 publication uses the canonical lifecycle with fresh ENS authority and no replication-role bypass
+  - every hire begins PENDING_CONTEXT and reaches JOB_QUEUED only after an exact jobs row is durably bound
+  - MCP collection and submitJob admission re-prove hire identity manifest claim owner epoch version and expiry
+  - expired claims require a higher epoch and incremented claim version; stale completion is refused
+  - retries converge on one deterministic job and stored MCP evidence without duplicate provider calls
+  - goal matching and MCP collection admit published schema 5 while preserving V4 and non-MCP lanes
+  - focused marketplace and goal-loop tests PASS 12; full kernel PASS 53; auth PASS 9; base PASS 10; e2e PASS 5; redaction PASS 3
+  - migration replay PASS across all 20 migrations; Prisma validation typecheck lint boot build secret scan and diff check PASS
+remaining_blocks:
+  - managed migration push deployment sponsor or live calls signatures transactions spend claims and public proof remain unauthorized and unattempted
+verdict: PASS_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token MARKETPLACE-LANGCHAIN-KERNEL-V5-R1-3EC298A-20260725T212806Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: 0G Integrator /root/og_langchain_runtime_v5
 task_id: OG-LANGCHAIN-RUNTIME-V5-W2
 task_instance_id: OG-LANGCHAIN-RUNTIME-V5-W2:W2:B2EB3D0

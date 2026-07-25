@@ -1174,7 +1174,7 @@ async function selectRunAgents(
     const candidates = await tx<CandidateRow[]>`
       SELECT v.id AS version_id, v.capabilities, v.price_atomic::text,
         v.manifest_hash, v.full_subname,
-        CASE WHEN v.manifest->>'schemaVersion' = '4' THEN ARRAY(
+        CASE WHEN v.manifest->>'schemaVersion' IN ('4', '5') THEN ARRAY(
           SELECT jsonb_array_elements_text(v.manifest->'riskTiers')
         ) ELSE ARRAY[]::text[] END AS risk_tiers,
         COALESCE(hires.verified_external_hires, '0') AS verified_external_hires
@@ -1194,8 +1194,8 @@ async function selectRunAgents(
         AND v.published = true AND v.lifecycle_state = 'PUBLISHED'
         AND v.canonical_state = 'CANONICAL' AND v.price_atomic > 0
         AND (
-          (${triRisk} AND v.manifest->>'schemaVersion' = '4') OR
-          (${!triRisk} AND v.manifest->>'schemaVersion' IN ('1', '2', '3'))
+          (${triRisk} AND v.manifest->>'schemaVersion' IN ('4', '5')) OR
+          (${!triRisk} AND v.manifest->>'schemaVersion' IN ('1', '2', '3', '5'))
         )
         AND v.full_subname IS NOT NULL AND v.publication_decision_id IS NOT NULL
         AND v.publication_action_id IS NOT NULL
@@ -1600,10 +1600,11 @@ async function ensureJob(
     invocationIds: readonly string[];
   } | undefined;
   if (
-    (version.manifest.schemaVersion === 3 || version.manifest.schemaVersion === 4) &&
+    (version.manifest.schemaVersion === 3 || version.manifest.schemaVersion === 4 ||
+      version.manifest.schemaVersion === 5) &&
     version.manifest.mcp.length > 0
   ) {
-    if (version.manifest.schemaVersion === 4 && !mcpProvider) return;
+    if ((version.manifest.schemaVersion === 4 || version.manifest.schemaVersion === 5) && !mcpProvider) return;
     const context = await collectMcpContext({
       sql,
       goalRunJobId: row.id,
