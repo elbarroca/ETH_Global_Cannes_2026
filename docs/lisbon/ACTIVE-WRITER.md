@@ -4,6 +4,87 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Release Integrator /root
+task_id: R3-LATE-WRITE-RECONCILE
+task_instance_id: R3-LATE-WRITE-RECONCILE:R1:4287EC6
+generation: 1
+sprint: Reconcile the coherent protected hire-worker diff written after R3 cancellation
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 4287ec608318d36655fd69f3bba333007e010114
+control_sha: 4287ec608318d36655fd69f3bba333007e010114
+token: R3-LATE-WRITE-RECONCILE-4287EC6-20260725T215000Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T21:50:00Z
+expires_at: 2026-07-26T00:50:00Z
+allowed_paths:
+  - prisma/schema.prisma
+  - prisma/migrations/20260725220000_agent_runtime_v5/migration.sql
+  - src/kernel/hire-requests.ts
+  - src/kernel/mcp-context.ts
+  - src/worker/runner.ts
+  - tests/kernel/**
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T21:50:00Z
+deadline: 2026-07-26T00:50:00Z
+expected_exit: validate and atomically preserve or reject the coherent late R3 hire-worker change set
+external_effect_authority: local inspection deterministic tests disposable databases and one atomic local commit only; no managed migration network push deploy sponsor call signature transaction spend claim or public proof
+late_writer_attribution: unknown concurrent actor; all five protected files share mtime 2026-07-25T21:49:24Z and match cancelled R3 intent while src/worker/runner.ts exceeded its recorded paths
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T21:55:17Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - the late five-file diff shared one post-cancellation timestamp and formed one coherent hire-worker implementation despite unknown actor identity
+  - MCP evidence uniqueness is fenced per hire claim and same-owner same-epoch expired claims recover with a higher claim version
+  - worker batch processing propagates cancellation and terminalizes bounded provider failures without blocking unrelated hires
+  - Prisma validation typecheck marketplace V5 test kernel 53 migration replay 20 base 10 auth 9 e2e 5 lint build secret scan and diff check PASS
+remaining_blocks:
+  - actor identity for the 2026-07-25T21:49:24Z protected write remains unknown and is recorded rather than inferred
+  - preserved UI Playwright A3 recovery and EXTERNAL-EFFECTS changes remain outside this reconciliation
+  - no managed migration push deploy network sponsor call signature transaction spend claim or public proof is authorized
+verdict: PASS_TO_AUDIT_WITH_UNKNOWN_LATE_ACTOR; LOCAL_ONLY
+lock_release: release only exact token R3-LATE-WRITE-RECONCILE-4287EC6-20260725T215000Z after reconciliation
+status: completed
+```
+
+```yaml
+owner: Release Integrator /root
+task_id: KERNEL-HIRE-WORKER-R3
+task_instance_id: KERNEL-HIRE-WORKER-R3:R3:4287EC6
+generation: 1
+sprint: Repair immutable-SHA hire reclaim and worker wiring audit findings
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 4287ec608318d36655fd69f3bba333007e010114
+control_sha: 4287ec608318d36655fd69f3bba333007e010114
+token: KERNEL-HIRE-WORKER-R3-4287EC6-20260725T214712Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T21:47:12Z
+expires_at: 2026-07-26T00:47:12Z
+allowed_paths:
+  - src/kernel/mcp-context.ts
+  - src/kernel/hire-requests.ts
+  - src/kernel/worker.ts
+  - app/api/kernel/hire-requests/route.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260725220000_agent_runtime_v5/migration.sql
+  - tests/kernel/**
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T21:47:12Z
+deadline: 2026-07-26T00:47:12Z
+expected_exit: reclaim-safe MCP evidence and committed asynchronous hire processing
+external_effect_authority: local files deterministic tests disposable loopback PostgreSQL and one atomic local commit only; no managed migration network sponsor call signature transaction deployment push spend claim or public proof
+external_effects_attempted: none
+claim_changes: none
+cancelled_at: 2026-07-25T21:48:48Z
+cancel_reason: superseded before task-owned code or schema mutation by the Graph Continuity sprint
+verdict: CANCELLED_SUPERSEDED; NO_TASK_CODE_CHANGES
+lock_release: release only exact token KERNEL-HIRE-WORKER-R3-4287EC6-20260725T214712Z after the task-owned containing commit
+status: cancelled
+```
+
+```yaml
+owner: Release Integrator /root
 task_id: RELEASE-V5-LOCAL-R2
 task_instance_id: RELEASE-V5-LOCAL-R2:R2:74BF5FE
 generation: 1

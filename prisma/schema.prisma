@@ -725,7 +725,7 @@ model McpInvocation {
   agentVersion       AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
 
   @@unique([goalRunJobId, bindingId], map: "uniq_mcp_invocations_run_job_binding")
-  @@unique([hireRequestId, bindingId], map: "uniq_mcp_invocations_hire_binding")
+  @@unique([hireRequestId, bindingId, hireClaimVersion], map: "uniq_mcp_invocations_hire_claim_binding")
   @@index([agentVersionId, createdAt], map: "idx_mcp_invocations_version_created")
   @@map("mcp_invocations")
 }

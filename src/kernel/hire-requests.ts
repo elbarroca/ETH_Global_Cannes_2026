@@ -1,7 +1,11 @@
 import { getDb } from "../config/database";
 import { canonicalJson, domainHash } from "./canonical";
 import { KernelError } from "./errors";
-import { collectMcpContext, type McpContextProvider } from "./mcp-context";
+import {
+  collectMcpContext,
+  McpContextError,
+  type McpContextProvider,
+} from "./mcp-context";
 import { submitJob, type DatabaseClient } from "./service";
 import type { AgentManifest, HireRequestSnapshot, HireRequestState } from "./types";
 
@@ -151,10 +155,15 @@ export async function claimHireRequestContext(input: {
       claim_version = claim_version + 1, claim_expires_at = ${input.leaseExpiresAt},
       updated_at = ${now}
     WHERE id = ${input.hireRequestId}::uuid AND (
-        state = 'PENDING_CONTEXT'
-        OR (state = 'CONTEXT_RUNNING' AND claim_expires_at <= clock_timestamp())
+        (state = 'PENDING_CONTEXT'
+          AND ${input.workerEpoch.toString()}::bigint > COALESCE(claim_epoch, 0))
+        OR (state = 'CONTEXT_RUNNING' AND claim_expires_at <= clock_timestamp()
+          AND (
+            ${input.workerEpoch.toString()}::bigint > claim_epoch
+            OR (${input.workerEpoch.toString()}::bigint = claim_epoch
+              AND claim_owner = ${input.workerId})
+          ))
       )
-      AND ${input.workerEpoch.toString()}::bigint > COALESCE(claim_epoch, 0)
       AND ${input.leaseExpiresAt} > clock_timestamp()
     RETURNING id::text, agent_version_id::text, prompt_hash, state, version,
       job_id::text, context_hash, error_code, claim_epoch::text, claim_version,
@@ -222,6 +231,7 @@ export async function processHireRequest(input: {
   mcpProvider?: McpContextProvider;
   now?: Date;
   sql?: DatabaseClient;
+  signal?: AbortSignal;
 }): Promise<HireRequestSnapshot | null> {
   const sql = input.sql ?? getDb();
   const now = input.now ?? new Date();
@@ -279,6 +289,7 @@ export async function processHireRequest(input: {
       releaseSha: hire.release_sha ?? "",
       provider: input.mcpProvider,
       now,
+      signal: input.signal,
       mutationGuard: (tx) => hireClaimHeld(tx, {
         hireRequestId: input.hireRequestId,
         workerId: input.workerId,
@@ -339,4 +350,91 @@ export async function processHireRequest(input: {
     now,
     sql,
   });
+}
+
+const BLOCKED_HIRE_CODES = new Set([
+  "GOAL_MCP_BINDING_UNALLOWLISTED",
+  "GOAL_MCP_CALL_LIMIT_EXCEEDED",
+  "GOAL_MCP_CONTEXT_UNAVAILABLE",
+  "GOAL_MCP_PARENT_INVALID",
+]);
+
+function hireFailure(error: unknown): { code: string; state: "BLOCKED" | "FAILED" } {
+  const code = error instanceof McpContextError || error instanceof KernelError
+    ? error.code
+    : "KERNEL_HIRE_PROCESSING_FAILED";
+  return { code, state: BLOCKED_HIRE_CODES.has(code) ? "BLOCKED" : "FAILED" };
+}
+
+async function terminalizeCurrentHireClaim(input: {
+  hireRequestId: string;
+  workerId: string;
+  workerEpoch: bigint;
+  state: "BLOCKED" | "FAILED";
+  errorCode: string;
+  now: Date;
+  sql: DatabaseClient;
+}): Promise<boolean> {
+  const rows = await input.sql<{ id: string }[]>`
+    UPDATE hire_requests
+    SET state = ${input.state}, version = version + 1,
+      error_code = ${input.errorCode}, updated_at = ${input.now}
+    WHERE id = ${input.hireRequestId}::uuid AND state = 'CONTEXT_RUNNING'
+      AND claim_owner = ${input.workerId}
+      AND claim_epoch = ${input.workerEpoch.toString()}::bigint
+      AND claim_expires_at > clock_timestamp()
+    RETURNING id::text
+  `;
+  return rows.length === 1;
+}
+
+export async function processPendingHireRequests(input: {
+  workerId: string;
+  workerEpoch: bigint;
+  leaseExpiresAt: Date;
+  limit: number;
+  mcpProvider?: McpContextProvider;
+  now?: Date;
+  sql?: DatabaseClient;
+  signal?: AbortSignal;
+}): Promise<number> {
+  const sql = input.sql ?? getDb();
+  const now = input.now ?? new Date();
+  if (input.signal?.aborted) return 0;
+  const rows = await sql<{ id: string }[]>`
+    SELECT id::text
+    FROM hire_requests
+    WHERE state = 'PENDING_CONTEXT'
+      OR (state = 'CONTEXT_RUNNING' AND claim_expires_at <= clock_timestamp())
+    ORDER BY created_at, id
+    LIMIT ${input.limit}
+  `;
+  await Promise.all(rows.map(async ({ id }) => {
+    if (input.signal?.aborted) return;
+    try {
+      await processHireRequest({
+        hireRequestId: id,
+        workerId: input.workerId,
+        workerEpoch: input.workerEpoch,
+        leaseExpiresAt: input.leaseExpiresAt,
+        mcpProvider: input.mcpProvider,
+        now,
+        sql,
+        signal: input.signal,
+      });
+    } catch (error) {
+      if (input.signal?.aborted) return;
+      const failure = hireFailure(error);
+      await terminalizeCurrentHireClaim({
+        hireRequestId: id,
+        workerId: input.workerId,
+        workerEpoch: input.workerEpoch,
+        state: failure.state,
+        errorCode: failure.code,
+        now,
+        sql,
+      });
+    }
+  }));
+  return rows.length;
 }

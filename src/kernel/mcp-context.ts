@@ -178,6 +178,10 @@ async function invocationForBinding(input: {
     bindingId: input.binding.id,
     manifestHash: input.manifestHash,
     requestHash,
+    hireClaimOwner: input.hireFence?.workerId ?? null,
+    hireClaimEpoch: input.hireFence?.workerEpoch.toString() ?? null,
+    hireClaimVersion: input.hireFence?.claimVersion ?? null,
+    hireClaimExpiresAt: input.hireFence?.claimExpiresAt.toISOString() ?? null,
   });
   const result = await input.sql.begin(async (transaction): Promise<
     | { evidence: McpEvidenceV1; response: CanonicalValue }

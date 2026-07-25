@@ -8,6 +8,7 @@ import {
   createHireRequest,
   listHireRequests,
   processHireRequest,
+  processPendingHireRequests,
 } from "../../src/kernel/hire-requests";
 import {
   bindAgentName,
@@ -172,8 +173,8 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
     await new Promise((resolve) => setTimeout(resolve, 150));
     const reclaimed = await processHireRequest({
       hireRequestId: reclaimable.hireRequestId,
-      workerId: "replacement-worker",
-      workerEpoch: 2n,
+      workerId: "stale-worker",
+      workerEpoch: 1n,
       leaseExpiresAt: new Date(Date.now() + 60_000),
       mcpProvider: provider,
       sql: database.sql,
@@ -224,11 +225,15 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
     }, { sql: database.sql });
     assert.equal(nonMcpHire.state, "PENDING_CONTEXT");
     assert.equal(nonMcpHire.jobId, null);
-    const nonMcpProcessed = await processHireRequest({
-      hireRequestId: nonMcpHire.hireRequestId,
+    assert.equal(await processPendingHireRequests({
       workerId: "non-mcp-worker",
       workerEpoch: 1n,
       leaseExpiresAt: new Date(Date.now() + 60_000),
+      limit: 1,
+      sql: database.sql,
+    }), 1);
+    const [nonMcpProcessed] = await listHireRequests(BUYER_ID, {
+      hireRequestId: nonMcpHire.hireRequestId,
       sql: database.sql,
     });
     assert.equal(nonMcpProcessed?.state, "JOB_QUEUED");

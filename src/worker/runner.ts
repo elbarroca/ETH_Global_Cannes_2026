@@ -17,6 +17,8 @@ import {
   type ClaimedJob,
 } from "./store";
 import type { DatabaseClient } from "../kernel/service";
+import { processPendingHireRequests } from "../kernel/hire-requests";
+import type { McpContextProvider } from "../kernel/mcp-context";
 import { getDb } from "../config/database";
 import {
   checkFreshEnsAuthority,
@@ -33,6 +35,7 @@ export interface WorkerRunOptions {
   authority?: EnsAuthorityRuntime;
   signal?: AbortSignal;
   afterTerminalEffectPersisted?: (job: ClaimedJob) => Promise<void>;
+  mcpProvider?: McpContextProvider;
 }
 
 function adapterAuthority(adapter: KernelAdapter): EnsAuthorityRuntime | null {
@@ -203,6 +206,18 @@ export async function runWorkerOnce(options: WorkerRunOptions): Promise<{
     sql: options.sql,
   });
   if (!lease.acquired) return { leaseAcquired: false, claimed: 0 };
+  if (!lease.epoch || !lease.expiresAt) throw new Error("WORKER_LEASE_INVALID");
+  if (options.signal?.aborted) return { leaseAcquired: true, claimed: 0 };
+  await processPendingHireRequests({
+    workerId: options.ownerId,
+    workerEpoch: BigInt(lease.epoch),
+    leaseExpiresAt: lease.expiresAt,
+    limit: options.concurrency,
+    mcpProvider: options.mcpProvider,
+    now: options.now,
+    sql: options.sql,
+    signal: options.signal,
+  });
   if (options.signal?.aborted) return { leaseAcquired: true, claimed: 0 };
   await reconcileExpiredJobs({ now: options.now, sql: options.sql });
   if (options.signal?.aborted) return { leaseAcquired: true, claimed: 0 };
@@ -273,6 +288,7 @@ export function startKernelWorker(options: {
   concurrency: number;
   leaseSeconds: number;
   pollIntervalMs?: number;
+  mcpProvider?: McpContextProvider;
 }): { ownerId: string; stop: () => Promise<void> } {
   const ownerId = randomUUID();
   const pollIntervalMs = options.pollIntervalMs ?? 1_000;
@@ -289,6 +305,7 @@ export function startKernelWorker(options: {
           ownerId,
           concurrency: options.concurrency,
           leaseSeconds: options.leaseSeconds,
+          mcpProvider: options.mcpProvider,
           signal: controller.signal,
         });
         if (stopped || controller.signal.aborted) return;
