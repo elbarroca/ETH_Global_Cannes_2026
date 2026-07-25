@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - A4 durable ENS publication decision
+
+- Added an ENS-owned append-only publication decision keyed only by immutable `agentVersionId`, with canonical binding/record bytes and hashes, exact version/manifest/name/DNS/hierarchy/role/resolver/CCIP/block/time/release evidence, and no job/effect/receipt dependency.
+- Added one server-composed publication checker whose per-call request admits only `agentVersionId`; database, resolver, policy, release SHA, and test clock stay server-owned. Missing runtime, caller evidence, malformed/outage/timeout, transfer, expiry, drift, alias, broken link, wrong Registry/root/chain/owner/role/resolver, and CCIP failure deny.
+- Added six-migration append-only/FK/lineage/shape/database-time constraints and triggers. Twenty identical checks converge to one decision; later drift appends `DENY` without overwriting `ALLOW`; exact expiry and normal-role test-clock activation are rejected.
+- Added five focused publication families and a 43-case denial matrix. A4 passes 21/21; combined integration passes 38/38 plus both six-migration lanes; the complete local floor, production build, and loopback HTTP 200 pass.
+- Refreshed official Universal Resolver/CCIP/ENSv2 guidance and installed viem `2.47.6` declarations without changing live calls. ENSv2 remains pre-final and live-blocked. The next sequential Kernel owner must consume the decision atomically and pass immutable audit; `A4_ACCEPTED`, A5/A6 entry, release, live ENS, and claims remain closed.
+- Used only the explicitly authorized official Go 1.23.10 darwin/arm64 temporary archive after exact SHA-256 verification; no ENS/0G/sponsor/shared database call, managed migration, signature, transaction, push, deployment, form, funding, upload, spend, public identifier, live proof, or claim promotion occurred.
+
 ## 2026-07-25 - Six-stage README and mandatory A6 contract
 
 - Simplified the root architecture to six protected stages: wallet, ENSv2 identity, immutable agent, marketplace hire, verified 0G delivery, and receipt/UI. Kept the different buyer and Telegram as secondary inputs.

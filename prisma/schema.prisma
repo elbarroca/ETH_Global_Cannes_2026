@@ -396,6 +396,7 @@ model AgentVersion {
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   agent          KernelAgent @relation(fields: [agentId], references: [id], onDelete: Restrict)
   lifecycleEvents AgentVersionEvent[]
+  ensPublicationDecisions EnsPublicationDecision[]
 
   @@unique([agentId, version], map: "uniq_agent_versions_agent_version")
   @@index([published, createdAt], map: "idx_agent_versions_published_created")
@@ -684,4 +685,62 @@ model EnsAuthorityCheck {
   @@index([effectId, phase, id], map: "idx_ens_checks_effect_phase")
   @@index([jobId, decision, createdAt], map: "idx_ens_checks_job_decision")
   @@map("ens_authority_checks")
+}
+
+model EnsPublicationDecision {
+  id                       String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  decisionKey              String       @unique @map("decision_key")
+  agentVersionId           String       @map("agent_version_id") @db.Uuid
+  agentVersion             Int          @map("agent_version")
+  bindingBytes             String       @map("binding_bytes") @db.Text
+  bindingHash              String       @map("binding_hash")
+  manifestHash             String       @map("manifest_hash")
+  capabilities             String[]
+  service                  String       @db.Text
+  priceAtomic              BigInt       @map("price_atomic")
+  payout                   String
+  creatorName              String       @map("creator_name")
+  creatorNode              String       @map("creator_node")
+  creatorDnsName           String       @map("creator_dns_name")
+  agentLabel               String       @map("agent_label")
+  agentName                String       @map("agent_name")
+  agentNode                String       @map("agent_node")
+  agentDnsName             String       @map("agent_dns_name")
+  owner                    String
+  delegate                 String
+  chainId                  Int          @map("chain_id")
+  rootRegistry             String       @map("root_registry")
+  universalResolver        String       @map("universal_resolver")
+  creatorCanonicalRegistry String       @map("creator_canonical_registry")
+  agentParentRegistry      String       @map("agent_parent_registry")
+  agentCanonicalRegistry   String?      @map("agent_canonical_registry")
+  roles                    Json
+  externalGrants           Json         @default("[]") @map("external_grants")
+  parentExpiry             DateTime     @map("parent_expiry") @db.Timestamptz(6)
+  agentExpiry              DateTime     @map("agent_expiry") @db.Timestamptz(6)
+  parentLink               Json         @map("parent_link")
+  alias                    Boolean
+  creatorResolverAddress   String       @map("creator_resolver_address")
+  resolverAddress          String       @map("resolver_address")
+  resolverSuffix           String       @map("resolver_suffix")
+  resolverMode             String       @map("resolver_mode")
+  ccipGateway              String       @map("ccip_gateway") @db.Text
+  policyVersion            String       @map("policy_version")
+  maxAgeSeconds            Int          @map("max_age_seconds")
+  recordBytes              String?      @map("record_bytes") @db.Text
+  recordHash               String?      @map("record_hash")
+  blockNumber              Decimal?     @map("block_number") @db.Decimal(20, 0)
+  blockTimestamp           DateTime?     @map("block_timestamp") @db.Timestamptz(6)
+  transactionHash          String?      @map("transaction_hash")
+  observedAt               DateTime     @map("observed_at") @db.Timestamptz(6)
+  freshUntil               DateTime?    @map("fresh_until") @db.Timestamptz(6)
+  releaseSha               String       @map("release_sha")
+  decision                 String
+  errorCode                String?      @map("error_code")
+  disposableTestClock      Boolean      @default(false) @map("disposable_test_clock")
+  createdAt                DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  agentVersionRecord       AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+
+  @@index([agentVersionId, createdAt], map: "idx_ens_publication_version_created")
+  @@map("ens_publication_decisions")
 }

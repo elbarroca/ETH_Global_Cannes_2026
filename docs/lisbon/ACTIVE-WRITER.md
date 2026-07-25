@@ -3,6 +3,44 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: ENS Integrator /root/a4_ensv2_gap_inventory
+task_id: A4-ENS-PUBLICATION-DECISION-20260725
+task_instance_id: A4-ENS-PUBLICATION-DECISION-20260725:W4:70307D0
+generation: 4
+sprint: A4_publication_authority_prerequisite
+mode: sole_writer_remediation
+branch: Eth_global_lisbon_
+start_sha: 70307d045d1b1af327ef7a2f4c55fec4b2ff5bc9
+control_sha: 70307d045d1b1af327ef7a2f4c55fec4b2ff5bc9
+token: A4-ENS-PUB-W4-70307D0-DA1DD6C8-F9C2-4AC9-9EED-6D680496DC97
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T03:31:28Z
+expires_at: 2026-07-25T04:30:00Z
+allowed_paths:
+  - src/ens/**
+  - tests/a4/**
+  - tests/helpers/ens.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260725042000_a4_publication_decision/**
+  - scripts/test-migrations.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T02:51:41Z
+deadline: 2026-07-25T04:30:00Z
+expected_exit: add one durable append-only ENS-owned pre-publication authority decision keyed only by immutable agent version with strict server-owned resolution and no live-client invention
+external_effect_authority: safe local allowed files disposable loopback PostgreSQL and processes generated ignored output checksum-pinned temporary Go tooling and one local atomic commit only
+completed_at: 2026-07-25T03:31:28Z
+result: PASS_TO_AUDIT; PUBLICATION_DECISION_READY_FOR_KERNEL_HANDOFF; LOCAL_ONLY
+checks: A4 21/21; integration 38/38 plus both six-migration lanes; full local floor; build 31 pages; loopback HTTP 200
+effects: disposable loopback PostgreSQL and checksum-pinned temporary Go only; no live ENS/0G/sponsor/shared DB/signature/transaction/push/deploy/claim effect
+status: released
+```
+
+```yaml
 owner: Root README task 019f9691-557e-73d2-bc5f-30b9fe6a6154
 task_id: README-SIMPLE-FLOW-A6-CONTRACT-20260725
 task_instance_id: README-SIMPLE-FLOW-A6-CONTRACT-20260725:W1:D1CF3FC

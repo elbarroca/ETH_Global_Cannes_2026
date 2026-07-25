@@ -271,3 +271,40 @@ The prescribed floor stopped at `npm run test:go` with exit `127`: `sh: go: comm
 Schema review is surgical: `git diff --numstat -- prisma/schema.prisma` is exactly `30 0`. The remaining hunks are only fifteen additive lifecycle/authority fields plus one relation on `AgentVersion`, and the fourteen-line append-only `AgentVersionEvent` model. All pre-existing schema formatting outside those required additions remains byte-identical to the pinned start SHA.
 
 External effects attempted: none. Local effects were limited to allowed repository files, generated ignored Prisma output, and disposable loopback PostgreSQL clusters. No ENS/0G/sponsor/API call, managed/shared migration, signature, transaction, push, deployment, form, funding, upload, spend, public identifier, live proof, or claim promotion occurred.
+
+## ENS-owned durable publication-decision prerequisite
+
+- Task: `A4-ENS-PUBLICATION-DECISION-20260725`
+- Task instance: `A4-ENS-PUBLICATION-DECISION-20260725:W4:70307D0`
+- Generation: `4`
+- Start/control SHA: `70307d045d1b1af327ef7a2f4c55fec4b2ff5bc9`
+- Observed through: `2026-07-25T03:20:16Z`
+- Writer result: `PASS_TO_AUDIT; PUBLICATION_DECISION_READY_FOR_KERNEL_HANDOFF; LOCAL_ONLY`
+- Live result: `NOT_RUN; ENSV2_LIVE_BLOCKED; LIVE_EFFECT_BLOCKED`
+
+W4 adds an ENS-owned, append-only `ens_publication_decisions` relation keyed by a generated decision UUID, a deterministic convergence key, and a restrictive foreign key to `agent_versions.id`. It is independent of jobs, effects, worker claims, receipts, delivery, and settlement. Migration `20260725042000_a4_publication_decision` has SHA-256 `79334c82de4f0a28fdea14df771639e21b65780a956481cdf00375e5758de999` and extends both replay lanes from five to six migrations while preserving synthetic Cannes sentinel SHA-256 `fb8aece1677586a330f0cfeb0850b71488849302324eb1d6a079673e35e3829e`.
+
+Each decision persists canonical server-derived binding bytes/hash for the exact version, manifest, normalized creator parent, agent label/full subname, DNS encodings, capabilities, service, price, payout, chain, owner/delegate, root Registry, canonical Universal Resolver, canonical creator and exact parent/optional-agent Registries, roles/admin roles/grants, expiry, forward/back links, alias policy, resolver provenance, CCIP gateway, maximum age, and policy. It separately preserves canonical resolved record bytes/hash, block/time/freshness, optional transaction hash, release SHA, and bounded `ALLOW`/`DENY` error. Database constraints and the append-only trigger reject mutation, deletion, foreign-lineage substitution, malformed shapes, duplicate semantic evidence, caller time in production, expired/exact-boundary `ALLOW`, unexpected grants/aliases/links, and normal-role activation of the disposable fixed clock.
+
+`createEnsPublicationAuthority` is the single production-facing server-composition function. Server composition owns the database, resolver, runtime policy, release SHA, and optional test clock. Its per-call request has exactly one admitted key, `agentVersionId`; caller-supplied manifests, bindings, hashes, owner/delegate, timestamps, records, release identity, or other evidence are refused before resolution. It loads the `WRITE_PREPARED` version and manifest binding, normalizes then DNS-encodes names through the accepted viem path, resolves schema-v2 evidence through the shared A4 parser and hierarchy validator, persists a decision, and returns only decision ID plus bounded verdict/error. Missing runtime, malformed input/response, transfer, replacement, stale/expired evidence, wrong root/chain/owner/role, alias, broken link, CCIP failure, timeout, and outage fail closed. Twenty simultaneous identical checks converge to one row; later drift creates a new `DENY` and never overwrites the prior `ALLOW`.
+
+Official ENS guidance was refreshed. It still requires normalization before DNS encoding, treats `0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe` as the canonical Universal Resolver, relies on CCIP Read, and retains `ur.integration-tests.eth -> 0x2222222222222222222222222222222222222222` as the readiness vector. The ENSv2 contract overview still labels the design work-in-progress pending final design and audits. Installed viem `2.47.6` declarations confirm the explicit Universal Resolver and CCIP-aware ENS calls; no live call or viem call signature changed. Sources: [Universal Resolver](https://docs.ens.domains/resolvers/universal/), [ENSv2 readiness](https://docs.ens.domains/web/ensv2-readiness/), [CCIP Read](https://docs.ens.domains/resolvers/ccip-read/), and [ENSv2 overview](https://docs.ens.domains/contracts/ensv2/overview/).
+
+Focused A4 passes 21/21. The new coverage proves exact accepted persistence with zero commerce rows; a 43-case immutable/name/hierarchy/Registry/owner/role/admin/grant/expiry/link/alias/resolver/CCIP/chain/root/stale/malformed denial matrix; exact expiry refusal; twenty-way convergence; missing runtime and caller-fabrication refusal; outage/timeout/malformed persistence; drift without overwrite; and append-only, FK, database-time, duplicate-evidence, and normal-role fixed-clock enforcement. Combined integration passes 38/38 plus both six-migration lanes.
+
+| Command/check | Exit | Observed |
+|---|---:|---|
+| `npm ci --legacy-peer-deps` | 0 | 1,231 packages installed from lock SHA-256 `8120e3abb0fa75a6e6a1336a72975c717155fc387f0becb213fd18ebcd891162`; inherited npm audit reports 41 findings: 22 low, 13 moderate, 6 high. |
+| loopback-placeholder `npx prisma validate` / `npx prisma generate` | 0 | Schema valid; Prisma Client `6.19.3` generated. |
+| `npx tsx scripts/test-migrations.ts` | 0 | Empty and synthetic Cannes-shaped six-migration lanes passed with exact sentinel preservation. |
+| `npm run validate:env` / `npm run lint` / `npm run typecheck` | 0 | Offline environment passed; lint has zero errors and 23 inherited warnings; strict TypeScript passed. |
+| `npm test` / `npm run test:auth` / `npm run test:kernel` | 0 | 9/9 foundation, 9/9 authentication, and 17/17 reported Kernel tests passed. |
+| checksum-pinned `npm run test:go` | 0 | Exact official Go `1.23.10 darwin/arm64` passed verifier tests/build under `GOTOOLCHAIN=local`. |
+| `npm run test:a4` / checksum-pinned `npm run test:integration` | 0 | A4 21/21 and integration 38/38 plus both six-migration lanes passed. |
+| `npm run test:a5` / `npm run test:e2e` / `npm run test:resilience` / `npm run test:redaction` | 0 | 3/3, 4/4, 1/1, and 3/3 passed. |
+| `npm run test:boot` / `npm run scan:secrets` / `bash -n docker-entrypoint.sh` | 0 | Protected boot, tracked secret scan, and shell syntax passed. |
+| `npm run build` / loopback `next start` | 0 | Next `16.2.11` compiled/typechecked, generated 31/31 pages, became ready on loopback, and served `/` with HTTP `200` and 32,236 bytes. |
+
+The host initially had no Go executable, so the first integration attempt failed only the A3 Go fixture hook. Under exact W4 authorization, official `go1.23.10.darwin-arm64.tar.gz` was downloaded only to a task-specific `/tmp` tree, matched SHA-256 `25c64bfa8a8fd8e7f62fb54afa4354af8409a4bb2358c2699a1003b733e6fce5`, reported exact `go1.23.10 darwin/arm64`, and made the full rerun green. The archive, extracted toolchain/cache/module tree, verifier binary, and HTTP smoke artifacts are deleted at closeout.
+
+W4 repairs only the ENS-owned durable-decision prerequisite. Kernel/API ownership remains untouched. A later sequential Kernel handoff must consume the decision by foreign key, recheck freshness with database time in the same publication transaction, append the matching lifecycle event, repair action idempotency/body bounds, and pass immutable audit. Therefore `A4_ACCEPTED`, frozen `A5_ACCEPTED`, mandatory A6 entry, live ENS, sponsor qualification, release, push, deployment, public identifiers, and claim promotion remain closed.

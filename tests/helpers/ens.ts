@@ -2,6 +2,9 @@ import {
   type EnsAuthorityResolutionRequest,
   type EnsAuthorityResolver,
   type EnsAuthorityRuntime,
+  type EnsPublicationResolutionRequest,
+  type EnsPublicationResolver,
+  type EnsPublicationRuntime,
 } from "../../src/ens/authority";
 
 const REGISTRY = "0x1111111111111111111111111111111111111111";
@@ -194,4 +197,179 @@ export function createEnsAuthorityFixture(options: {
     ...options.runtime,
   };
   return { resolver, runtime };
+}
+
+export type EnsPublicationFixtureMutator = (
+  response: Record<string, unknown>,
+  request: EnsPublicationResolutionRequest,
+  call: number,
+) => unknown;
+
+export class FixtureEnsPublicationResolver implements EnsPublicationResolver {
+  readonly calls: EnsPublicationResolutionRequest[] = [];
+  private readonly clock: () => Date;
+  private mutator: EnsPublicationFixtureMutator | null;
+  private beforeResolve: (
+    (request: EnsPublicationResolutionRequest, call: number) => Promise<void>
+  ) | null;
+
+  constructor(options: {
+    now: Date | (() => Date);
+    mutator?: EnsPublicationFixtureMutator;
+    beforeResolve?: (
+      request: EnsPublicationResolutionRequest,
+      call: number,
+    ) => Promise<void>;
+  }) {
+    const suppliedNow = options.now;
+    this.clock = suppliedNow instanceof Date
+      ? () => new Date(suppliedNow.getTime())
+      : suppliedNow;
+    this.mutator = options.mutator ?? null;
+    this.beforeResolve = options.beforeResolve ?? null;
+  }
+
+  setMutator(mutator: EnsPublicationFixtureMutator | null): void {
+    this.mutator = mutator;
+  }
+
+  async resolvePublication(
+    request: EnsPublicationResolutionRequest,
+    signal: AbortSignal,
+  ): Promise<unknown> {
+    if (signal.aborted) throw signal.reason ?? new Error("ENS_FIXTURE_ABORTED");
+    const call = this.calls.push(request);
+    await this.beforeResolve?.(request, call);
+    const { binding } = request;
+    const now = this.clock();
+    const authorityRecord: Record<string, unknown> = {
+      schemaVersion: 2,
+      creator: {
+        name: binding.creatorName,
+        node: binding.creatorNode,
+        owner: binding.creatorOwner,
+        delegate: binding.creatorDelegate,
+        registry: binding.registry,
+        resolver: binding.creatorResolver,
+      },
+      agent: {
+        name: binding.agentName,
+        node: binding.agentNode,
+        owner: binding.agentOwner,
+        delegate: binding.agentDelegate,
+        registry: binding.registry,
+        resolver: binding.agentResolver,
+      },
+      agentVersionId: binding.agentVersionId,
+      agentVersion: binding.agentVersion,
+      manifestHash: binding.manifestHash,
+      capabilities: binding.capabilities,
+      service: binding.service,
+      chainId: binding.chainId,
+      payout: binding.payout,
+      policyVersion: binding.policyVersion,
+      freshUntil: new Date(now.getTime() + binding.maxAgeSeconds * 500).toISOString(),
+      creatorDnsName: binding.creatorDnsName,
+      agentLabel: binding.agentLabel,
+      agentDnsName: binding.agentDnsName,
+      priceAtomic: binding.priceAtomic,
+      rootRegistry: binding.rootRegistry,
+      universalResolver: binding.universalResolver,
+      ensv2: {
+        creatorCanonicalRegistry: binding.ensv2.creatorCanonicalRegistry,
+        agentParentRegistry: binding.ensv2.agentParentRegistry,
+        agentCanonicalRegistry: binding.ensv2.agentCanonicalRegistry,
+        owner: binding.agentOwner,
+        delegate: binding.agentDelegate,
+        roles: binding.ensv2.roles,
+        externalGrants: [],
+        parentExpiry: binding.ensv2.parentExpiry,
+        agentExpiry: binding.ensv2.agentExpiry,
+        parentLink: {
+          parentName: binding.creatorName,
+          childName: binding.agentName,
+          forward: true,
+          back: true,
+        },
+        alias: false,
+        resolver: {
+          address: binding.agentResolver,
+          suffix: binding.ensv2.resolverSuffix,
+          mode: binding.ensv2.resolverMode,
+        },
+        ccip: {
+          universalResolver: binding.universalResolver,
+          gateway: binding.ensv2.ccipGateway,
+          status: "VERIFIED",
+          responseHash: CCIP_RESPONSE_HASH,
+        },
+      },
+    };
+    const response: Record<string, unknown> = {
+      schemaVersion: 2,
+      observation: {
+        blockNumber: "12345",
+        blockTimestamp: now.toISOString(),
+        chainId: binding.chainId,
+        transactionHash: RECORD_TX,
+      },
+      record: authorityRecord,
+    };
+    return this.mutator ? this.mutator(response, request, call) : response;
+  }
+}
+
+export function createEnsPublicationAuthorityFixture(options: {
+  now: Date | (() => Date);
+  mutator?: EnsPublicationFixtureMutator;
+  beforeResolve?: (
+    request: EnsPublicationResolutionRequest,
+    call: number,
+  ) => Promise<void>;
+  disposableTestClock?: boolean;
+  resolutionTimeoutMs?: number;
+  runtime?: Partial<Omit<EnsPublicationRuntime, "resolver">>;
+}): { resolver: FixtureEnsPublicationResolver; runtime: EnsPublicationRuntime } {
+  const resolver = new FixtureEnsPublicationResolver(options);
+  const initialNow = options.now instanceof Date ? options.now : options.now();
+  const expiry = new Date(initialNow.getTime() + 60 * 60 * 1_000).toISOString();
+  return {
+    resolver,
+    runtime: {
+      resolver,
+      chainId: 11_155_111,
+      registry: REGISTRY,
+      creatorResolver: RESOLVER,
+      agentResolver: RESOLVER,
+      maxAgeSeconds: 300,
+      policyVersion: "ens-publication-v1",
+      ensv2: {
+        creatorCanonicalRegistry: CREATOR_REGISTRY,
+        agentCanonicalRegistry: AGENT_REGISTRY,
+        resolverMode: "EXPLICIT",
+        ccipGateway: CCIP_GATEWAY,
+        parentExpiry: expiry,
+        agentExpiry: expiry,
+        roles: [
+          {
+            scope: "CONTRACT",
+            role: CONTRACT_ROLE,
+            adminRole: ADMIN_ROLE,
+            account: "OWNER",
+            expiresAt: expiry,
+          },
+          {
+            scope: "NAME",
+            role: NAME_ROLE,
+            adminRole: ADMIN_ROLE,
+            account: "DELEGATE",
+            expiresAt: expiry,
+          },
+        ],
+      },
+      disposableTestClock: options.disposableTestClock ?? options.now instanceof Date,
+      resolutionTimeoutMs: options.resolutionTimeoutMs,
+      ...options.runtime,
+    },
+  };
 }

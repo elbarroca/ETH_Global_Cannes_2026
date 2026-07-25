@@ -73,9 +73,7 @@ export type EnsAuthorityOperation =
 
 export type EnsAuthorityPhase = "PRE_EXECUTION" | "PRE_DELIVERY";
 
-interface EnsAuthorityBindingBase {
-  effectId: string;
-  jobId: string;
+interface EnsAuthorityBindingCore {
   agentVersionId: string;
   agentVersion: number;
   manifestHash: string;
@@ -98,11 +96,16 @@ interface EnsAuthorityBindingBase {
   policyVersion: string;
 }
 
-interface LegacyEnsAuthorityBinding extends EnsAuthorityBindingBase {
+interface EnsExecutionBindingContext {
+  effectId: string;
+  jobId: string;
+}
+
+interface LegacyEnsAuthorityBinding extends EnsAuthorityBindingCore, EnsExecutionBindingContext {
   schemaVersion: 1;
 }
 
-interface EnsV2AuthorityBinding extends EnsAuthorityBindingBase {
+interface EnsV2AuthorityBinding extends EnsAuthorityBindingCore, EnsExecutionBindingContext {
   schemaVersion: 2;
   priceAtomic: string;
   creatorDnsName: `0x${string}`;
@@ -114,6 +117,7 @@ interface EnsV2AuthorityBinding extends EnsAuthorityBindingBase {
 }
 
 export type EnsAuthorityBinding = LegacyEnsAuthorityBinding | EnsV2AuthorityBinding;
+export type EnsPublicationBinding = Omit<EnsV2AuthorityBinding, keyof EnsExecutionBindingContext>;
 
 export interface EnsAuthorityResolutionRequest {
   binding: EnsAuthorityBinding;
@@ -123,6 +127,17 @@ export interface EnsAuthorityResolutionRequest {
 
 export interface EnsAuthorityResolver {
   resolve(request: EnsAuthorityResolutionRequest, signal: AbortSignal): Promise<unknown>;
+}
+
+export interface EnsPublicationResolutionRequest {
+  binding: EnsPublicationBinding;
+}
+
+export interface EnsPublicationResolver {
+  resolvePublication(
+    request: EnsPublicationResolutionRequest,
+    signal: AbortSignal,
+  ): Promise<unknown>;
 }
 
 export interface EnsAuthorityRuntime {
@@ -141,11 +156,44 @@ export interface EnsAuthorityRuntime {
   resolutionTimeoutMs?: number;
 }
 
+type EnsAuthorityRuntimePolicy = Omit<EnsAuthorityRuntime, "resolver">;
+
+export interface EnsPublicationRuntime {
+  resolver: EnsPublicationResolver;
+  chainId: number;
+  registry: string;
+  creatorResolver: string;
+  agentResolver: string;
+  maxAgeSeconds: number;
+  policyVersion: string;
+  ensv2: EnsV2RuntimePolicy;
+  disposableTestClock?: boolean;
+  resolutionTimeoutMs?: number;
+}
+
 export interface EnsAuthorityCheckResult {
   allowed: boolean;
   checkId: string | null;
   errorCode: string | null;
 }
+
+export interface EnsPublicationDecisionResult {
+  allowed: boolean;
+  decisionId: string | null;
+  errorCode: string | null;
+}
+
+export interface EnsPublicationAuthorityConfig {
+  sql: DatabaseClient;
+  runtime: EnsPublicationRuntime | null;
+  releaseSha: string;
+  now?: Date | (() => Date);
+}
+
+export type EnsPublicationAuthority = (
+  request: Readonly<{ agentVersionId: string }>,
+  signal?: AbortSignal,
+) => Promise<EnsPublicationDecisionResult>;
 
 interface AuthorityLineageRow {
   agent_version: number;
@@ -156,6 +204,15 @@ interface AuthorityLineageRow {
   price_atomic: string;
   owner_wallet: string;
   payout_address: string | null;
+}
+
+interface PublicationLineageRow extends AuthorityLineageRow {
+  lifecycle_state: string | null;
+  published: boolean;
+  creator_parent: string | null;
+  agent_label: string | null;
+  full_subname: string | null;
+  manifest: unknown;
 }
 
 interface ValidatedResolution {
@@ -272,6 +329,38 @@ async function resolveWithTimeout(
   }
 }
 
+async function resolvePublicationWithTimeout(
+  resolver: EnsPublicationResolver,
+  request: EnsPublicationResolutionRequest,
+  signal: AbortSignal,
+  timeoutMs: number,
+): Promise<unknown> {
+  if (signal.aborted) throw signal.reason ?? new Error("ENS_AUTHORITY_ABORTED");
+  const controller = new AbortController();
+  const abort = (): void => controller.abort(signal.reason ?? new Error("ENS_AUTHORITY_ABORTED"));
+  signal.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(() => {
+    controller.abort(new EnsAuthorityResolverError("ENS_AUTHORITY_TIMEOUT"));
+  }, timeoutMs);
+  try {
+    return await Promise.race([
+      resolver.resolvePublication(request, controller.signal),
+      new Promise<never>((_resolve, reject) => {
+        if (controller.signal.aborted) {
+          reject(controller.signal.reason ?? new Error("ENS_AUTHORITY_ABORTED"));
+          return;
+        }
+        controller.signal.addEventListener("abort", () => {
+          reject(controller.signal.reason ?? new Error("ENS_AUTHORITY_ABORTED"));
+        }, { once: true });
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", abort);
+  }
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
@@ -331,7 +420,7 @@ function supportedAsciiLabel(value: string): boolean {
   return ASCII_LABEL.test(value) && !value.startsWith("xn--") && !value.includes("--[");
 }
 
-function prepareLegacyNames(runtime: EnsAuthorityRuntime): {
+function prepareLegacyNames(runtime: EnsAuthorityRuntimePolicy): {
   creatorName: string;
   agentName: string;
 } {
@@ -343,7 +432,7 @@ function prepareLegacyNames(runtime: EnsAuthorityRuntime): {
   return { creatorName, agentName };
 }
 
-function prepareEnsV2Names(runtime: EnsAuthorityRuntime): {
+function prepareEnsV2Names(runtime: EnsAuthorityRuntimePolicy): {
   creatorName: string;
   creatorDnsName: `0x${string}`;
   agentLabel: string;
@@ -416,7 +505,7 @@ function validateRolePolicy(role: EnsV2RolePolicy): EnsV2RolePolicy {
   };
 }
 
-function validateRuntimeBase(runtime: EnsAuthorityRuntime): ValidatedRuntimePolicyBase {
+function validateRuntimeBase(runtime: EnsAuthorityRuntimePolicy): ValidatedRuntimePolicyBase {
   if (!Number.isSafeInteger(runtime.chainId) || runtime.chainId < 1) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_INVALID");
   }
@@ -448,7 +537,7 @@ function validateRuntimeBase(runtime: EnsAuthorityRuntime): ValidatedRuntimePoli
   };
 }
 
-function validateRuntime(runtime: EnsAuthorityRuntime): ValidatedRuntimePolicy {
+function validateRuntime(runtime: EnsAuthorityRuntimePolicy): ValidatedRuntimePolicy {
   if (!runtime.ensv2) {
     const names = prepareLegacyNames(runtime);
     return { ...names, ...validateRuntimeBase(runtime), ensv2: null };
@@ -584,6 +673,125 @@ async function deriveBinding(
     agentDnsName: policy.agentDnsName,
     rootRegistry: policy.rootRegistry,
     universalResolver: policy.universalResolver,
+    ensv2: {
+      creatorCanonicalRegistry: policy.ensv2.creatorCanonicalRegistry,
+      agentParentRegistry: policy.ensv2.creatorCanonicalRegistry,
+      agentCanonicalRegistry: policy.ensv2.agentCanonicalRegistry,
+      resolverMode: policy.ensv2.resolverMode,
+      resolverSuffix: policy.ensv2.resolverMode === "EXPLICIT" ? policy.agentName : policy.creatorName,
+      ccipGateway: policy.ensv2.ccipGateway,
+      parentExpiry: policy.ensv2.parentExpiry,
+      agentExpiry: policy.ensv2.agentExpiry,
+      roles: policy.ensv2.roles.map((role) => ({
+        scope: role.scope,
+        name: role.scope === "NAME" ? policy.agentName : null,
+        role: role.role,
+        adminRole: role.adminRole,
+        account: role.account === "OWNER" ? owner : delegate,
+        expiresAt: role.expiresAt,
+      })),
+    },
+  };
+}
+
+async function derivePublicationBinding(
+  sql: DatabaseClient,
+  agentVersionId: string,
+  runtime: EnsPublicationRuntime,
+): Promise<EnsPublicationBinding> {
+  const rows = await sql<PublicationLineageRow[]>`
+    SELECT
+      v.version AS agent_version, v.manifest_hash, v.capabilities,
+      v.endpoint, v.adapter_key, v.price_atomic::text, v.owner_wallet, v.payout_address,
+      v.lifecycle_state, v.published, v.creator_parent, v.agent_label,
+      v.full_subname, v.manifest
+    FROM agent_versions v
+    JOIN kernel_agents a ON a.id = v.agent_id
+    WHERE v.id = ${agentVersionId}::uuid
+      AND v.lifecycle_state = 'WRITE_PREPARED'
+      AND v.published = false
+      AND v.adapter_key = 'protected-a3'
+    FOR SHARE
+  `;
+  const lineage = rows[0];
+  if (!lineage || !HASH.test(lineage.manifest_hash)) {
+    throw new EnsAuthorityValidationError("ENS_PUBLICATION_LINEAGE_MISSING");
+  }
+  if (!lineage.creator_parent || !lineage.agent_label || !lineage.full_subname) {
+    throw new EnsAuthorityValidationError("ENS_PUBLICATION_BINDING_MISSING");
+  }
+  const manifest = record(lineage.manifest);
+  const manifestBinding = record(manifest?.ensBinding);
+  if (!manifestBinding || !exactKeys(manifestBinding, [
+    "agentDnsName", "agentLabel", "creatorDnsName", "creatorParent", "fullSubname",
+  ])) {
+    throw new EnsAuthorityValidationError("ENS_PUBLICATION_BINDING_MISSING");
+  }
+  const policy = validateRuntime({
+    ...runtime,
+    creatorName: lineage.creator_parent,
+    agentLabel: lineage.agent_label,
+    agentName: lineage.full_subname,
+  });
+  if (policy.ensv2 === null) {
+    throw new EnsAuthorityValidationError("ENS_PUBLICATION_POLICY_INVALID");
+  }
+  if (
+    manifestBinding.creatorParent !== policy.creatorName ||
+    manifestBinding.agentLabel !== policy.agentLabel ||
+    manifestBinding.fullSubname !== policy.agentName ||
+    manifestBinding.creatorDnsName !== policy.creatorDnsName ||
+    manifestBinding.agentDnsName !== policy.agentDnsName
+  ) {
+    throw new EnsAuthorityValidationError("ENS_PUBLICATION_BINDING_MISMATCH");
+  }
+  const owner = address(lineage.owner_wallet, "ENS_PUBLICATION_LINEAGE_INVALID");
+  const delegate = address(
+    lineage.payout_address ?? lineage.owner_wallet,
+    "ENS_PUBLICATION_LINEAGE_INVALID",
+  );
+  const capabilities = [...new Set(lineage.capabilities)].sort();
+  if (
+    capabilities.length < 1 || capabilities.length > 32 ||
+    capabilities.some((capability) => !/^[a-z][a-z0-9-]{0,63}$/.test(capability))
+  ) {
+    throw new EnsAuthorityValidationError("ENS_PUBLICATION_LINEAGE_INVALID");
+  }
+  const service = lineage.endpoint ?? lineage.adapter_key;
+  if (service.length < 1 || Buffer.byteLength(service, "utf8") > 2_048) {
+    throw new EnsAuthorityValidationError("ENS_PUBLICATION_LINEAGE_INVALID");
+  }
+  if (!ATOMIC_AMOUNT.test(lineage.price_atomic) || BigInt(lineage.price_atomic) < 1n) {
+    throw new EnsAuthorityValidationError("ENS_PUBLICATION_LINEAGE_INVALID");
+  }
+  return {
+    schemaVersion: 2,
+    agentVersionId,
+    agentVersion: lineage.agent_version,
+    manifestHash: lineage.manifest_hash,
+    capabilities,
+    service,
+    priceAtomic: lineage.price_atomic,
+    payout: delegate,
+    chainId: policy.chainId,
+    creatorName: policy.creatorName,
+    creatorNode: namehash(policy.creatorName),
+    creatorDnsName: policy.creatorDnsName,
+    agentLabel: policy.agentLabel,
+    agentName: policy.agentName,
+    agentNode: namehash(policy.agentName),
+    agentDnsName: policy.agentDnsName,
+    registry: policy.registry,
+    rootRegistry: policy.rootRegistry,
+    universalResolver: policy.universalResolver,
+    creatorResolver: policy.creatorResolver,
+    agentResolver: policy.agentResolver,
+    creatorOwner: owner,
+    creatorDelegate: delegate,
+    agentOwner: owner,
+    agentDelegate: delegate,
+    maxAgeSeconds: policy.maxAgeSeconds,
+    policyVersion: policy.policyVersion,
     ensv2: {
       creatorCanonicalRegistry: policy.ensv2.creatorCanonicalRegistry,
       agentParentRegistry: policy.ensv2.creatorCanonicalRegistry,
@@ -839,12 +1047,16 @@ function parseEnsV2Evidence(value: unknown): {
   };
 }
 
-function parseResolution(value: unknown): ParsedResolution {
+function parseResolution(
+  value: unknown,
+  context: "EXECUTION" | "PUBLICATION" = "EXECUTION",
+): ParsedResolution {
   const response = record(value);
   if (
     !response ||
     !exactKeys(response, ["observation", "record", "schemaVersion"]) ||
-    response.schemaVersion !== 1 && response.schemaVersion !== 2
+    response.schemaVersion !== 1 && response.schemaVersion !== 2 ||
+    context === "PUBLICATION" && response.schemaVersion !== 2
   ) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
   }
@@ -855,7 +1067,7 @@ function parseResolution(value: unknown): ParsedResolution {
     !authorityRecord ||
     authorityRecord.schemaVersion !== response.schemaVersion ||
     !exactKeys(observation, ["blockNumber", "blockTimestamp", "chainId", "transactionHash"]) ||
-    !(authorityRecord.schemaVersion === 1
+    !(authorityRecord.schemaVersion === 1 && context === "EXECUTION"
       ? exactKeys(authorityRecord, [
       "agent",
       "agentVersion",
@@ -882,10 +1094,8 @@ function parseResolution(value: unknown): ParsedResolution {
         "chainId",
         "creator",
         "creatorDnsName",
-        "effectId",
         "ensv2",
         "freshUntil",
-        "jobId",
         "manifestHash",
         "payout",
         "policyVersion",
@@ -894,6 +1104,7 @@ function parseResolution(value: unknown): ParsedResolution {
         "schemaVersion",
         "service",
         "universalResolver",
+        ...(context === "EXECUTION" ? ["effectId", "jobId"] : []),
       ]))
   ) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
@@ -913,10 +1124,14 @@ function parseResolution(value: unknown): ParsedResolution {
     !Number.isSafeInteger(authorityRecord.chainId) || (authorityRecord.chainId as number) < 1 ||
     typeof authorityRecord.payout !== "string" || !ADDRESS.test(authorityRecord.payout.toLowerCase()) ||
     typeof authorityRecord.policyVersion !== "string" ||
-    !/^[a-z][a-z0-9-]{2,63}$/.test(authorityRecord.policyVersion) ||
+    !/^[a-z][a-z0-9-]{2,63}$/.test(authorityRecord.policyVersion)
+  ) {
+    throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
+  }
+  if (context === "EXECUTION" && (
     typeof authorityRecord.jobId !== "string" || !UUID.test(authorityRecord.jobId) ||
     typeof authorityRecord.effectId !== "string" || !HASH.test(authorityRecord.effectId)
-  ) {
+  )) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_MALFORMED");
   }
   if (authorityRecord.schemaVersion === 2) {
@@ -964,7 +1179,7 @@ function parseResolution(value: unknown): ParsedResolution {
 
 function validateResolution(
   parsed: ParsedResolution,
-  binding: EnsAuthorityBinding,
+  binding: EnsAuthorityBinding | EnsPublicationBinding,
   now: Date,
 ): ValidatedResolution {
   const { authorityRecord, observation } = parsed;
@@ -999,8 +1214,10 @@ function validateResolution(
   if (authorityRecord.service !== binding.service) throw new EnsAuthorityValidationError("ENS_AUTHORITY_SERVICE_MISMATCH");
   if (authorityRecord.payout !== binding.payout) throw new EnsAuthorityValidationError("ENS_AUTHORITY_PAYOUT_MISMATCH");
   if (authorityRecord.policyVersion !== binding.policyVersion) throw new EnsAuthorityValidationError("ENS_AUTHORITY_POLICY_MISMATCH");
-  if (authorityRecord.jobId !== binding.jobId) throw new EnsAuthorityValidationError("ENS_AUTHORITY_JOB_MISMATCH");
-  if (authorityRecord.effectId !== binding.effectId) throw new EnsAuthorityValidationError("ENS_AUTHORITY_EFFECT_MISMATCH");
+  if ("jobId" in binding) {
+    if (authorityRecord.jobId !== binding.jobId) throw new EnsAuthorityValidationError("ENS_AUTHORITY_JOB_MISMATCH");
+    if (authorityRecord.effectId !== binding.effectId) throw new EnsAuthorityValidationError("ENS_AUTHORITY_EFFECT_MISMATCH");
+  }
   if (authorityRecord.chainId !== binding.chainId || observation.chainId !== binding.chainId) {
     throw new EnsAuthorityValidationError("ENS_AUTHORITY_CHAIN_MISMATCH");
   }
@@ -1216,4 +1433,230 @@ export async function checkFreshEnsAuthority(
     policy.disposableTestClock === true,
   );
   return { allowed: errorCode === null, checkId, errorCode };
+}
+
+function publicationDecisionBinding(binding: EnsPublicationBinding): CanonicalValue {
+  return {
+    schemaVersion: 1,
+    agentVersionId: binding.agentVersionId,
+    agentVersion: binding.agentVersion,
+    manifestHash: binding.manifestHash,
+    capabilities: binding.capabilities,
+    service: binding.service,
+    priceAtomic: binding.priceAtomic,
+    payout: binding.payout,
+    chainId: binding.chainId,
+    creatorName: binding.creatorName,
+    creatorNode: binding.creatorNode,
+    creatorDnsName: binding.creatorDnsName,
+    agentLabel: binding.agentLabel,
+    agentName: binding.agentName,
+    agentNode: binding.agentNode,
+    agentDnsName: binding.agentDnsName,
+    owner: binding.agentOwner,
+    delegate: binding.agentDelegate,
+    rootRegistry: binding.rootRegistry,
+    universalResolver: binding.universalResolver,
+    creatorCanonicalRegistry: binding.ensv2.creatorCanonicalRegistry,
+    agentParentRegistry: binding.ensv2.agentParentRegistry,
+    agentCanonicalRegistry: binding.ensv2.agentCanonicalRegistry,
+    roles: binding.ensv2.roles.map((role) => ({
+      scope: role.scope,
+      name: role.name,
+      role: role.role,
+      adminRole: role.adminRole,
+      account: role.account,
+      expiresAt: role.expiresAt,
+    })),
+    externalGrants: [],
+    parentExpiry: binding.ensv2.parentExpiry,
+    agentExpiry: binding.ensv2.agentExpiry,
+    parentLink: {
+      parentName: binding.creatorName,
+      childName: binding.agentName,
+      forward: true,
+      back: true,
+    },
+    alias: false,
+    creatorResolverAddress: binding.creatorResolver,
+    resolverAddress: binding.agentResolver,
+    resolverSuffix: binding.ensv2.resolverSuffix,
+    resolverMode: binding.ensv2.resolverMode,
+    ccipGateway: binding.ensv2.ccipGateway,
+    policyVersion: binding.policyVersion,
+    maxAgeSeconds: binding.maxAgeSeconds,
+  };
+}
+
+async function persistPublicationDecision(
+  sql: DatabaseClient,
+  binding: EnsPublicationBinding,
+  releaseSha: string,
+  observedAt: Date,
+  resolution: ValidatedResolution | null,
+  errorCode: string | null,
+  disposableTestClock: boolean,
+): Promise<string> {
+  const bindingValue = publicationDecisionBinding(binding);
+  const bindingBytes = canonicalJson(bindingValue);
+  const bindingHash = sha256(bindingBytes);
+  const decision = errorCode === null ? "ALLOW" : "DENY";
+  const decisionKey = sha256(canonicalJson({
+    schemaVersion: 1,
+    agentVersionId: binding.agentVersionId,
+    bindingHash,
+    releaseSha,
+    decision,
+    errorCode,
+    recordHash: resolution?.recordHash ?? null,
+    blockNumber: resolution?.blockNumber ?? null,
+    blockTimestamp: resolution?.blockTimestamp.toISOString() ?? null,
+    freshUntil: resolution?.freshUntil.toISOString() ?? null,
+    transactionHash: resolution?.transactionHash ?? null,
+  }));
+  const parentLink = {
+    parentName: binding.creatorName,
+    childName: binding.agentName,
+    forward: true,
+    back: true,
+  };
+  const roles = binding.ensv2.roles.map((role) => ({
+    scope: role.scope,
+    name: role.name,
+    role: role.role,
+    adminRole: role.adminRole,
+    account: role.account,
+    expiresAt: role.expiresAt,
+  }));
+  const rows = await sql<{ id: string; decision: string; error_code: string | null }[]>`
+    INSERT INTO ens_publication_decisions (
+      decision_key, agent_version_id, agent_version, binding_bytes, binding_hash,
+      manifest_hash, capabilities, service, price_atomic, payout,
+      creator_name, creator_node, creator_dns_name, agent_label, agent_name,
+      agent_node, agent_dns_name, owner, delegate, chain_id, root_registry,
+      universal_resolver, creator_canonical_registry, agent_parent_registry,
+      agent_canonical_registry, roles, external_grants, parent_expiry, agent_expiry,
+      parent_link, alias, creator_resolver_address, resolver_address, resolver_suffix, resolver_mode,
+      ccip_gateway, policy_version, max_age_seconds, record_bytes, record_hash,
+      block_number, block_timestamp, transaction_hash, observed_at, fresh_until,
+      release_sha, decision, error_code, disposable_test_clock, created_at
+    ) VALUES (
+      ${decisionKey}, ${binding.agentVersionId}::uuid, ${binding.agentVersion},
+      ${bindingBytes}, ${bindingHash}, ${binding.manifestHash}, ${binding.capabilities},
+      ${binding.service}, ${binding.priceAtomic}::bigint, ${binding.payout},
+      ${binding.creatorName}, ${binding.creatorNode}, ${binding.creatorDnsName},
+      ${binding.agentLabel}, ${binding.agentName}, ${binding.agentNode},
+      ${binding.agentDnsName}, ${binding.agentOwner}, ${binding.agentDelegate},
+      ${binding.chainId}, ${binding.rootRegistry}, ${binding.universalResolver},
+      ${binding.ensv2.creatorCanonicalRegistry}, ${binding.ensv2.agentParentRegistry},
+      ${binding.ensv2.agentCanonicalRegistry}, ${sql.json(roles)},
+      ${sql.json([])}, ${binding.ensv2.parentExpiry}, ${binding.ensv2.agentExpiry},
+      ${sql.json(parentLink)}, false, ${binding.creatorResolver}, ${binding.agentResolver},
+      ${binding.ensv2.resolverSuffix}, ${binding.ensv2.resolverMode},
+      ${binding.ensv2.ccipGateway}, ${binding.policyVersion}, ${binding.maxAgeSeconds},
+      ${resolution?.recordBytes ?? null}, ${resolution?.recordHash ?? null},
+      ${resolution?.blockNumber ?? null}::numeric, ${resolution?.blockTimestamp ?? null},
+      ${resolution?.transactionHash ?? null}, ${observedAt}, ${resolution?.freshUntil ?? null},
+      ${releaseSha}, ${decision}, ${errorCode}, ${disposableTestClock}, ${observedAt}
+    ) ON CONFLICT (decision_key) DO NOTHING
+    RETURNING id::text, decision, error_code
+  `;
+  const selected = rows[0] ?? (await sql<{
+    id: string;
+    decision: string;
+    error_code: string | null;
+  }[]>`
+    SELECT id::text, decision, error_code
+    FROM ens_publication_decisions
+    WHERE decision_key = ${decisionKey}
+  `)[0];
+  if (!selected || selected.decision !== decision || selected.error_code !== errorCode) {
+    throw new Error("ENS_PUBLICATION_DECISION_PERSIST_FAILED");
+  }
+  return selected.id;
+}
+
+/**
+ * Creates the server-composed pre-publication boundary. Runtime policy, resolver,
+ * database, clock, and release identity are fixed by server composition; the
+ * per-call request accepts only the immutable agent-version identifier.
+ */
+export function createEnsPublicationAuthority(
+  config: EnsPublicationAuthorityConfig,
+): EnsPublicationAuthority {
+  return async (request, suppliedSignal): Promise<EnsPublicationDecisionResult> => {
+    const input = record(request);
+    if (
+      !input || !exactKeys(input, ["agentVersionId"]) ||
+      typeof input.agentVersionId !== "string" || !UUID.test(input.agentVersionId)
+    ) {
+      return { allowed: false, decisionId: null, errorCode: "ENS_PUBLICATION_INVALID_REQUEST" };
+    }
+    if (!config.runtime) {
+      return { allowed: false, decisionId: null, errorCode: "ENS_PUBLICATION_NOT_CONFIGURED" };
+    }
+    if (!/^[0-9a-f]{40}$/.test(config.releaseSha)) {
+      return { allowed: false, decisionId: null, errorCode: "ENS_PUBLICATION_RELEASE_INVALID" };
+    }
+    const runtime = config.runtime;
+    const currentTime = clock(config.now, runtime.disposableTestClock === true);
+    let binding: EnsPublicationBinding;
+    let policy: ValidatedRuntimePolicy;
+    try {
+      binding = await derivePublicationBinding(config.sql, input.agentVersionId, runtime);
+      policy = validateRuntime({
+        ...runtime,
+        creatorName: binding.creatorName,
+        agentLabel: binding.agentLabel,
+        agentName: binding.agentName,
+      });
+      if (policy.ensv2 === null) throw new EnsAuthorityValidationError("ENS_PUBLICATION_POLICY_INVALID");
+    } catch (error) {
+      const errorCode = error instanceof EnsAuthorityValidationError
+        ? error.code
+        : "ENS_PUBLICATION_LINEAGE_UNAVAILABLE";
+      return { allowed: false, decisionId: null, errorCode };
+    }
+
+    const signal = suppliedSignal ?? new AbortController().signal;
+    let observedAt = currentTime();
+    let resolution: ValidatedResolution | null = null;
+    let errorCode: string | null = null;
+    try {
+      const raw = await resolvePublicationWithTimeout(
+        runtime.resolver,
+        { binding },
+        signal,
+        policy.resolutionTimeoutMs,
+      );
+      observedAt = currentTime();
+      if (signal.aborted) throw signal.reason ?? new Error("ENS_AUTHORITY_ABORTED");
+      const parsed = parseResolution(raw, "PUBLICATION");
+      resolution = parsed;
+      validateResolution(parsed, binding, observedAt);
+    } catch (error) {
+      observedAt = currentTime();
+      if (signal.aborted) {
+        return { allowed: false, decisionId: null, errorCode: "ENS_PUBLICATION_ABORTED" };
+      }
+      errorCode = error instanceof EnsAuthorityValidationError || error instanceof EnsAuthorityResolverError
+        ? error.code
+        : "ENS_AUTHORITY_RESOLVER_OUTAGE";
+    }
+
+    try {
+      const decisionId = await persistPublicationDecision(
+        config.sql,
+        binding,
+        config.releaseSha,
+        observedAt,
+        resolution,
+        errorCode,
+        runtime.disposableTestClock === true,
+      );
+      return { allowed: errorCode === null, decisionId, errorCode };
+    } catch {
+      return { allowed: false, decisionId: null, errorCode: "ENS_PUBLICATION_PERSIST_FAILED" };
+    }
+  };
 }
