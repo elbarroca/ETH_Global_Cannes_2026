@@ -15,7 +15,9 @@ export type KernelErrorCode =
   | "A6_TOKEN_NOT_ALLOWLISTED"
   | "A6_RECEIPT_IMMUTABLE"
   | "A6_QUOTE_EXPIRED"
-  | "A6_CONFIRMATION_REQUIRED";
+  // Buyer confirmation cannot be verified: wallet-signed transaction-hash
+  // verification is not implemented, so no confirmation value is acceptable.
+  | "A6_CONFIRMATION_UNVERIFIABLE";
 
 export class KernelError extends Error {
   readonly code: KernelErrorCode;

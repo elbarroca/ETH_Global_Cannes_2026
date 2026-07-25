@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import test from "node:test";
 import { PrismaClient } from "@prisma/client";
+import { POST as postSwapExecute } from "../../app/api/kernel/swap/execute/route";
+import { sha256 } from "../../src/auth/service";
+import { getPrisma } from "../../src/config/prisma";
 import {
   UNICHAIN_SEPOLIA,
   isAllowlistedToken,
@@ -152,7 +155,7 @@ test("A6 KernelError codes are constructable without type errors", () => {
     "A6_TOKEN_NOT_ALLOWLISTED",
     "A6_RECEIPT_IMMUTABLE",
     "A6_QUOTE_EXPIRED",
-    "A6_CONFIRMATION_REQUIRED",
+    "A6_CONFIRMATION_UNVERIFIABLE",
   ];
   for (const code of codes) {
     const err = new KernelError(code, `test: ${code}`, 400);
@@ -379,58 +382,184 @@ test("A6 terminal status check: CONFIRMED and FAILED are immutable states", () =
   }
 });
 
-// ── Application layer: A6_CONFIRMATION_REQUIRED ──────────────────────────────
+// ── Route: /api/kernel/swap/execute is fail-closed ───────────────────────────
+//
+// These exercise the real route handler. The previous version of this test
+// replicated the route's parser inline, which is exactly why a confirmationSig
+// accepted on `length >= 4` shipped with a green suite. Never assert against a
+// copy of the logic under test.
 
-test("A6 execute route rejects missing confirmationSig", () => {
-  // Replicate the validation logic from the route's parseExecuteBody
-  function parseExecuteBody(body: unknown): { quoteRequestId: string; confirmationSig: string } {
-    if (typeof body !== "object" || body === null) {
-      throw new KernelError("KERNEL_INVALID_REQUEST", "Request body must be an object", 400);
-    }
-    const b = body as Record<string, unknown>;
-    if (typeof b.quoteRequestId !== "string" || b.quoteRequestId.length < 8) {
-      throw new KernelError("KERNEL_INVALID_REQUEST", "quoteRequestId is required", 400);
-    }
-    if (typeof b.confirmationSig !== "string" || b.confirmationSig.length < 4) {
-      throw new KernelError(
-        "A6_CONFIRMATION_REQUIRED",
-        "confirmationSig is required — buyer must explicitly sign the swap",
-        400,
-      );
-    }
-    return { quoteRequestId: b.quoteRequestId, confirmationSig: b.confirmationSig };
-  }
+const EXECUTE_URL = "http://localhost:3000/api/kernel/swap/execute";
 
-  const validId = randomUUID();
-
-  // Missing confirmationSig
-  assert.throws(
-    () => parseExecuteBody({ quoteRequestId: validId }),
-    (err: unknown) => {
-      assert.ok(err instanceof KernelError);
-      assert.equal(err.code, "A6_CONFIRMATION_REQUIRED");
-      assert.equal(err.status, 400);
-      return true;
-    },
-  );
-
-  // Empty confirmationSig
-  assert.throws(
-    () => parseExecuteBody({ quoteRequestId: validId, confirmationSig: "" }),
-    (err: unknown) => {
-      assert.ok(err instanceof KernelError);
-      assert.equal(err.code, "A6_CONFIRMATION_REQUIRED");
-      return true;
-    },
-  );
-
-  // Valid case should not throw
-  const result = parseExecuteBody({
-    quoteRequestId: validId,
-    confirmationSig: "0xdeadbeef",
+async function seedAuthenticatedSession(
+  database: DisposableDatabase,
+  buyerAddress: string,
+): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  const users = await database.sql<{ id: string }[]>`
+    SELECT id FROM users WHERE wallet_address = ${buyerAddress}
+  `;
+  const userId = users[0]?.id;
+  assert.ok(userId, "fixture must seed a buyer user");
+  await database.sql.begin(async (tx) => {
+    const sql = tx as unknown as DisposableDatabase["sql"];
+    await sql`SET LOCAL session_replication_role = replica`;
+    await sql`
+      INSERT INTO auth_sessions (
+        challenge_id, token_hash, wallet_address, user_id, action, expires_at
+      ) VALUES (
+        ${randomUUID()}::uuid, ${sha256(token)}, ${buyerAddress}, ${userId},
+        'authenticate', clock_timestamp() + interval '10 minutes'
+      )
+    `;
   });
-  assert.equal(result.quoteRequestId, validId);
-  assert.equal(result.confirmationSig, "0xdeadbeef");
+  return token;
+}
+
+async function seedReceipt(
+  database: DisposableDatabase,
+  context: { jobId: string; agentVersionId: string },
+  buyerAddress: string,
+  overrides: { txStatus?: string; deadline?: number } = {},
+): Promise<string> {
+  const quoteRequestId = randomUUID();
+  await database.sql`
+    INSERT INTO uniswap_tool_receipts (
+      job_id, buyer_address, agent_version_id, quote_request_id, chain_id,
+      token_in, token_out, amount_in, amount_out, slippage_bps, deadline, spender,
+      request_hash, route_hash, calldata_hash, release_sha, tx_status
+    ) VALUES (
+      ${context.jobId}::uuid, ${buyerAddress}, ${context.agentVersionId}::uuid,
+      ${quoteRequestId}, 1301,
+      ${UNICHAIN_SEPOLIA.tokens.USDC}, ${UNICHAIN_SEPOLIA.tokens.WETH},
+      1000000, 500000000000000, 50,
+      ${overrides.deadline ?? Math.floor(Date.now() / 1000) + 120},
+      ${UNICHAIN_SEPOLIA.swapRouter},
+      ${"5".repeat(64)}, ${"6".repeat(64)}, ${"c".repeat(64)}, 'test-sha',
+      ${overrides.txStatus ?? "QUOTED"}
+    )
+  `;
+  return quoteRequestId;
+}
+
+function executeRequest(token: string, body: Record<string, unknown>): Request {
+  return new Request(EXECUTE_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: `alphadawg_session=${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+async function receiptRow(
+  database: DisposableDatabase,
+  quoteRequestId: string,
+): Promise<{ tx_status: string; confirmation_sig: string | null; tx_hash: string | null }> {
+  const rows = await database.sql<
+    { tx_status: string; confirmation_sig: string | null; tx_hash: string | null }[]
+  >`
+    SELECT tx_status, confirmation_sig, tx_hash
+    FROM uniswap_tool_receipts WHERE quote_request_id = ${quoteRequestId}
+  `;
+  assert.ok(rows[0], "receipt must exist");
+  return rows[0];
+}
+
+test("A6 execute route fails closed and never mutates UniswapToolReceipt", async (t) => {
+  let database: DisposableDatabase | undefined;
+  try {
+    database = await startDisposableDatabase("a6-execute-failclosed");
+    configureDatabaseEnvironment(database.url);
+    const db = database;
+    const buyerAddress = "0x7777777777777777777777777777777777777777";
+    const context = await seedUniswapContext(db, buyerAddress);
+    const token = await seedAuthenticatedSession(db, buyerAddress);
+
+    await t.test("every confirmation value is refused and the receipt stays QUOTED", async () => {
+      const bodies: Record<string, unknown>[] = [
+        {},
+        { confirmationSig: "" },
+        { confirmationSig: "0xdeadbeef" },
+        { confirmationSig: "confirmed-by-abcd1234-at-1784822400000" },
+        { confirmationSig: `0x${"a".repeat(130)}` },
+        { confirmationSig: 12345 },
+      ];
+      for (const extra of bodies) {
+        const quoteRequestId = await seedReceipt(db, context, buyerAddress);
+        const response = await postSwapExecute(
+          executeRequest(token, { quoteRequestId, ...extra }),
+        );
+        assert.equal(response.status, 403);
+        const payload = await response.json() as { code: string; error: string };
+        assert.equal(payload.code, "A6_CONFIRMATION_UNVERIFIABLE");
+        assert.ok(typeof payload.error === "string" && payload.error.length > 0);
+        assert.deepEqual(await receiptRow(db, quoteRequestId), {
+          tx_status: "QUOTED",
+          confirmation_sig: null,
+          tx_hash: null,
+        });
+      }
+    });
+
+    await t.test("an expired quote is refused without becoming FAILED", async () => {
+      const quoteRequestId = await seedReceipt(db, context, buyerAddress, {
+        deadline: Math.floor(Date.now() / 1000) - 1,
+      });
+      const response = await postSwapExecute(
+        executeRequest(token, { quoteRequestId, confirmationSig: "0xdeadbeef" }),
+      );
+      assert.equal(response.status, 410);
+      assert.equal((await response.json() as { code: string }).code, "A6_QUOTE_EXPIRED");
+      const row = await receiptRow(db, quoteRequestId);
+      assert.equal(row.tx_status, "QUOTED");
+      assert.notEqual(row.tx_status, "FAILED");
+    });
+
+    await t.test("a pre-existing SUBMITTED row is refused, not reported as executed", async () => {
+      const quoteRequestId = await seedReceipt(db, context, buyerAddress, {
+        txStatus: "SUBMITTED",
+      });
+      const response = await postSwapExecute(
+        executeRequest(token, { quoteRequestId, confirmationSig: "0xdeadbeef" }),
+      );
+      assert.equal(response.status, 409);
+      const payload = await response.json() as Record<string, unknown>;
+      assert.equal(payload.code, "A6_CONFIRMATION_UNVERIFIABLE");
+      assert.equal("txStatus" in payload, false);
+      assert.equal("txHash" in payload, false);
+      assert.equal((await receiptRow(db, quoteRequestId)).tx_status, "SUBMITTED");
+    });
+
+    await t.test("a quote owned by another buyer is refused before any write", async () => {
+      const otherAddress = "0x8888888888888888888888888888888888888888";
+      const otherContext = await seedUniswapContext(db, otherAddress);
+      const quoteRequestId = await seedReceipt(db, otherContext, otherAddress);
+      const response = await postSwapExecute(
+        executeRequest(token, { quoteRequestId, confirmationSig: "0xdeadbeef" }),
+      );
+      assert.equal(response.status, 403);
+      assert.equal((await response.json() as { code: string }).code, "KERNEL_FORBIDDEN");
+      assert.equal((await receiptRow(db, quoteRequestId)).tx_status, "QUOTED");
+    });
+
+    await t.test("an unauthenticated request is refused before any write", async () => {
+      const quoteRequestId = await seedReceipt(db, context, buyerAddress);
+      const response = await postSwapExecute(new Request(EXECUTE_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ quoteRequestId, confirmationSig: "0xdeadbeef" }),
+      }));
+      assert.equal(response.status, 401);
+      assert.equal((await receiptRow(db, quoteRequestId)).tx_status, "QUOTED");
+    });
+  } finally {
+    // The route uses the lazy Prisma singleton; close it before the disposable
+    // cluster stops or the shutdown surfaces as a FATAL connection error.
+    await getPrisma().$disconnect();
+    await database?.close();
+  }
 });
 
 // ── Application layer: A6_QUOTE_EXPIRED deadline logic ───────────────────────

@@ -7,11 +7,14 @@ import { isUnichainSepolia } from "@/src/config/unichain-sepolia";
 
 export const runtime = "nodejs";
 
-// Execute a previously quoted Uniswap swap after explicit buyer confirmation.
-// Advances UniswapToolReceipt: QUOTED → SUBMITTED (→ CONFIRMED | FAILED async).
-// A6_BLOCKED_LIVE: live transaction submission requires UNICHAIN_SEPOLIA_RPC_URL
-// authorized in EXTERNAL-EFFECTS.md. This route records buyer confirmation and
-// advances local state only.
+// Execute is FAIL-CLOSED. Wallet-signed transaction-hash verification does not
+// exist, so no buyer confirmation value can be verified and none is accepted.
+// This route performs ZERO UniswapToolReceipt writes on every path: it reads the
+// receipt only to apply buyer, terminal-state and chain refusals, then refuses.
+// A receipt therefore never leaves QUOTED through this route, an expired quote is
+// never marked FAILED here, and a pre-existing SUBMITTED row — recorded before
+// this gate under the removed unverifiable-confirmation scheme — is refused
+// rather than reported as executed on-chain state.
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const body = await readBoundedKernelJson(request);
@@ -25,7 +28,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const { quoteRequestId, confirmationSig } = parseExecuteBody(body);
+    const { quoteRequestId } = parseExecuteBody(body);
 
     const prisma = getPrisma();
     const receipt = await prisma.uniswapToolReceipt.findUnique({
@@ -46,52 +49,36 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
     if (receipt.txStatus === "SUBMITTED") {
-      // Idempotent — return current state
-      return NextResponse.json({ quoteRequestId, txStatus: receipt.txStatus, txHash: receipt.txHash });
+      throw new KernelError(
+        "A6_CONFIRMATION_UNVERIFIABLE",
+        "UniswapToolReceipt is SUBMITTED from an unverifiable confirmation and is not evidence of an executed transaction",
+        409,
+      );
     }
     if (!isUnichainSepolia(receipt.chainId)) {
       throw new KernelError("A6_CHAIN_NOT_AUTHORIZED", "Receipt chain is not Unichain Sepolia", 403);
     }
 
-    // Deadline check
+    // Deadline check — refusal only. Marking the receipt FAILED here would be a
+    // write, and this route never mutates UniswapToolReceipt.
     const nowSeconds = Math.floor(Date.now() / 1000);
     if (nowSeconds > receipt.deadline) {
-      await prisma.uniswapToolReceipt.update({
-        where: { quoteRequestId },
-        data: { txStatus: "FAILED", failureReason: "QUOTE_EXPIRED" },
-      });
       throw new KernelError("A6_QUOTE_EXPIRED", "Quote deadline has passed", 410);
     }
 
-    // Record buyer confirmation and advance to SUBMITTED.
-    // A6_BLOCKED_LIVE: actual on-chain submission requires authorized
-    // UNICHAIN_SEPOLIA_RPC_URL + funded wallet. Local floor records intent only.
-    const updated = await prisma.uniswapToolReceipt.update({
-      where: { quoteRequestId },
-      data: {
-        confirmationSig,
-        txStatus: "SUBMITTED",
-        updatedAt: new Date(),
-      },
-    });
-
-    const liveBlocked = !process.env.UNICHAIN_SEPOLIA_RPC_URL;
-
-    return NextResponse.json({
-      quoteRequestId,
-      txStatus: updated.txStatus,
-      txHash: updated.txHash,
-      liveBlocked,
-      message: liveBlocked
-        ? "Buyer confirmation recorded. Live transaction submission requires A6_BLOCKED_LIVE authorization in EXTERNAL-EFFECTS.md."
-        : "Submitted. Awaiting finality confirmation.",
-    });
+    throw new KernelError(
+      "A6_CONFIRMATION_UNVERIFIABLE",
+      "Swap execution is unavailable: wallet-signed transaction-hash verification is not implemented",
+      403,
+    );
   } catch (error) {
     return kernelErrorResponse(error, "kernel.swap.execute");
   }
 }
 
-function parseExecuteBody(body: unknown): { quoteRequestId: string; confirmationSig: string } {
+// The request body carries no confirmation value. There is no signature string,
+// pattern or placeholder that this route will accept, so none is parsed.
+function parseExecuteBody(body: unknown): { quoteRequestId: string } {
   if (typeof body !== "object" || body === null) {
     throw new KernelError("KERNEL_INVALID_REQUEST", "Request body must be an object", 400);
   }
@@ -99,12 +86,5 @@ function parseExecuteBody(body: unknown): { quoteRequestId: string; confirmation
   if (typeof b.quoteRequestId !== "string" || b.quoteRequestId.length < 8) {
     throw new KernelError("KERNEL_INVALID_REQUEST", "quoteRequestId is required", 400);
   }
-  if (typeof b.confirmationSig !== "string" || b.confirmationSig.length < 4) {
-    throw new KernelError(
-      "A6_CONFIRMATION_REQUIRED",
-      "confirmationSig is required — buyer must explicitly sign the swap",
-      400,
-    );
-  }
-  return { quoteRequestId: b.quoteRequestId, confirmationSig: b.confirmationSig };
+  return { quoteRequestId: b.quoteRequestId };
 }

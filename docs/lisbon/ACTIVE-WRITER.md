@@ -3,6 +3,58 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /claude-code/swap_failclosed_w1
+task_id: A6-SWAP-EXECUTE-FAIL-CLOSED-20260725
+task_instance_id: A6-SWAP-EXECUTE-FAIL-CLOSED-20260725:W1:A0DEB54
+generation: 1
+sprint: Fail closed on /api/kernel/swap/execute until wallet-signed transaction-hash verification exists
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: a0deb54546ded96e389665cfe8eff065d17db58e
+control_sha: a0deb54546ded96e389665cfe8eff065d17db58e
+token: A6-SWAP-FAILCLOSED-W1-A0DEB54-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T16:58:00Z
+expires_at: 2026-07-25T18:30:00Z
+allowed_paths:
+  - app/api/kernel/swap/execute/route.ts
+  - src/kernel/errors.ts
+  - tests/a6/uniswap-tool.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T16:58:00Z
+deadline: 2026-07-25T18:30:00Z
+expected_exit: swap execute refuses every request with A6_CONFIRMATION_UNVERIFIABLE and performs zero UniswapToolReceipt writes on every path
+external_effect_authority: local files existing dependencies local tests loopback processes and one local commit only; no push deploy managed migration live API webhook signature transaction funding form spend release or claim
+completed_at: 2026-07-25T17:12:00Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - route parses no confirmation value at all; parseExecuteBody returns quoteRequestId only
+  - every request that passes auth is refused with A6_CONFIRMATION_UNVERIFIABLE 403
+  - zero prisma.uniswapToolReceipt writes remain on any path; findUnique is the only receipt call
+  - expired quote returns A6_QUOTE_EXPIRED 410 and leaves the row QUOTED instead of FAILED
+  - pre-existing SUBMITTED row returns A6_CONFIRMATION_UNVERIFIABLE 409 with no txStatus or txHash in the body
+  - buyer mismatch, terminal state, chain and auth guards preserved as read-only refusals
+  - route-level regression asserts six confirmation shapes including a 130-char hex string leave tx_status QUOTED and confirmation_sig NULL
+  - raw Prisma QUOTED to SUBMITTED transition test left unchanged
+  - npx tsx --test tests/a6/uniswap-tool.test.ts PASS 24 of 24 exit 0
+  - npm run lint PASS 0 errors 23 inherited warnings exit 0
+  - npm run typecheck PASS exit 0
+  - npm test PASS 10 of 10 exit 0
+  - npm run scan:secrets PASS exit 0
+  - git diff --check PASS exit 0
+  - npm run build PASS exit 0
+remaining_blocks:
+  - docs/lisbon/EVIDENCE.md A6-UNISWAP-TOOLING-003 still documents QUOTED to SUBMITTED advancement and A6_CONFIRMATION_REQUIRED; outside allowed paths and now stale
+  - docs/lisbon/EXTERNAL-EFFECTS.md cannot receive an OBSERVED_UNRECONCILED row for pre-existing fabricated-confirmation receipts; outside allowed paths
+  - wallet-signed transaction-hash verification remains unimplemented and authority-gated; Uniswap signature/transaction stays NOT_AUTHORIZED
+external_effects_attempted: none
+claim_changes: none
+verdict: PASS_TO_AUDIT
+lock_release: release only exact token A6-SWAP-FAILCLOSED-W1-A0DEB54-20260725 after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Frontend Builder /root/frontend_readonly_audit
 task_id: A5-PROTECTED-GOAL-UI-REDESIGN-20260725
 task_instance_id: A5-PROTECTED-GOAL-UI-REDESIGN-20260725:W1:B097DBD
