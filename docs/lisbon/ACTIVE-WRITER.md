@@ -3,6 +3,30 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 /root
+task_id: NEON-PROD-MIGRATE-W2
+task_instance_id: NEON-PROD-MIGRATE-W2:W2:2F67D33
+generation: 2
+sprint: Apply the frozen protected schema to managed Neon
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 2f67d331c4da17328cede6e7ecc8d62edcaaaf16
+control_sha: 2f67d331c4da17328cede6e7ecc8d62edcaaaf16
+token: NEON-PROD-MIGRATE-W2-2F67D33-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T19:29:03Z
+expires_at: 2026-07-25T20:29:03Z
+allowed_paths:
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T19:29:03Z
+deadline: 2026-07-25T20:29:03Z
+expected_exit: exact pending-set verification, one managed Neon migrate deploy through DIRECT_URL, up-to-date readback, and localhost protected-route smoke
+external_effect_authority: project owner explicitly authorized the managed Neon production migration in the current authenticated task; exact scope is NEON-PROD-MIGRATE-20260725-02 in EXTERNAL-EFFECTS.md; no provisioning reset seed push deploy signature transaction provider call outside Neon or public claim
+status: active
+```
+
+```yaml
 owner: Frontend Builder /root/premium_protected_story
 task_id: A5-PREMIUM-PROTECTED-STORY-W3
 task_instance_id: A5-PREMIUM-PROTECTED-STORY-W3:W3:4B79F1A
