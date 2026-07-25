@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { runLifecycleCases } from "./lifecycle.cases";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { NextRequest } from "next/server";
@@ -515,6 +516,7 @@ test("A2 authenticated kernel invariants hold end to end", async (t) => {
         assert.ok(capabilityIndex < 0 || authIndex < capabilityIndex, `${path} imports capability before auth`);
       }
     });
+    await runLifecycleCases(t, database);
   } finally {
     await database.close();
   }

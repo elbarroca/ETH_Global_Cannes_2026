@@ -30,6 +30,114 @@ export interface AgentManifest extends Record<string, CanonicalValue> {
   priceAtomic: string;
   asset: "USDC_ATOMIC";
   proofPolicy: "verified-receipt-required";
+  ensBinding: AgentEnsBinding | null;
+}
+
+export const AGENT_LIFECYCLE_STATES = [
+  "DRAFT",
+  "NAME_BOUND",
+  "WRITE_PREPARED",
+  "PUBLISHED",
+] as const;
+
+export type AgentLifecycleState = (typeof AGENT_LIFECYCLE_STATES)[number];
+
+export interface AgentEnsBinding extends Record<string, CanonicalValue> {
+  creatorParent: string;
+  agentLabel: string;
+  fullSubname: string;
+  creatorDnsName: string;
+  agentDnsName: string;
+}
+
+export interface AgentEnsWritePlan extends Record<string, CanonicalValue> {
+  schemaVersion: 1;
+  kind: "LOCAL_ONLY_UNAUTHORIZED";
+  agentVersionId: string;
+  manifestHash: string;
+  creatorParent: string;
+  agentLabel: string;
+  fullSubname: string;
+  creatorDnsName: string;
+  agentDnsName: string;
+  operations: readonly ["CREATE_OR_UPDATE_SUBNAME", "SET_IMMUTABLE_MANIFEST_BINDING"];
+  requiresAuthorization: true;
+  requiresWalletSignature: true;
+}
+
+export interface A4PublicationReadback {
+  allowed: boolean;
+  errorCode: string | null;
+  agentVersionId: string;
+  manifestHash: string;
+  creatorParent: string;
+  agentLabel: string;
+  fullSubname: string;
+  canonical: boolean;
+  owner: string | null;
+  delegate: string | null;
+  policyVersion: string;
+  recordHash: string | null;
+  observedAt: string;
+  freshUntil: string;
+  releaseSha: string;
+}
+
+export interface A4PublicationAuthority {
+  verify(
+    request: {
+      agentVersionId: string;
+      manifestHash: string;
+      binding: AgentEnsBinding;
+      ownerWallet: string;
+    },
+    signal: AbortSignal,
+  ): Promise<unknown>;
+}
+
+export interface AgentLifecycleVersion {
+  agentId: string;
+  versionId: string;
+  version: number;
+  name: string;
+  description: string;
+  capabilities: readonly string[];
+  manifestHash: string;
+  promptHash: string;
+  configHash: string;
+  adapterKey: "protected-a3";
+  ownerWallet: string;
+  priceAtomic: string;
+  asset: "USDC_ATOMIC";
+  proofPolicy: "verified-receipt-required";
+  lifecycleState: AgentLifecycleState;
+  hireable: boolean;
+  ownedByViewer: boolean;
+  creatorParent: string | null;
+  agentLabel: string | null;
+  fullSubname: string | null;
+  writePlanHash: string | null;
+  canonicalState: "UNVERIFIED" | "CANONICAL" | "REFUSED";
+  authorityOwner: string | null;
+  authorityDelegate: string | null;
+  authorityPolicyVersion: string | null;
+  refusalReason: string | null;
+  authorityReleaseSha: string | null;
+  publishedAt: string | null;
+}
+
+export interface ProtectedPublishedAgent extends AgentLifecycleVersion {
+  lifecycleState: "PUBLISHED";
+  hireable: true;
+  canonicalState: "CANONICAL";
+  creatorParent: string;
+  agentLabel: string;
+  fullSubname: string;
+  writePlanHash: string;
+  authorityOwner: string;
+  authorityPolicyVersion: string;
+  authorityReleaseSha: string;
+  publishedAt: string;
 }
 
 export interface PublishedAgent {
@@ -109,6 +217,14 @@ export interface KernelJobAgentIdentity {
   priceAtomic: string;
   asset: "USDC_ATOMIC";
   proofPolicy: "verified-receipt-required";
+  creatorParent: string | null;
+  fullSubname: string | null;
+  canonicalState: "UNVERIFIED" | "CANONICAL" | "REFUSED" | null;
+  authorityOwner: string | null;
+  authorityDelegate: string | null;
+  authorityPolicyVersion: string | null;
+  refusalReason: string | null;
+  authorityReleaseSha: string | null;
 }
 
 export interface KernelJobListItem extends JobSnapshot {

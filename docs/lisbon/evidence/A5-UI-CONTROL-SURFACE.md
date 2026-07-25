@@ -95,3 +95,9 @@ Playwright `1.61.1` runs Chromium against `next build` plus `next start` with mo
 - Residual moderate/low production advisories and six dev-only high advisories remain explicitly classified; incompatible majors require a separately admitted migration. Earlier README/release claim drift remains release-blocking and outside this remediation.
 
 External effects attempted: none. Local effects were limited to repository files, package installation, generated build/test output, the release-candidate screenshot, loopback production servers, disposable PostgreSQL clusters, and one authorized local commit.
+
+## Protected lifecycle handoff on 2026-07-25
+
+Kernel task `A5-KERNEL-LIFECYCLE-20260725:W2:B41F3ED` replaces the historical immediate-publish API behavior with typed private draft, name binding, inert ENS write preparation, and A4-gated immutable publication. The read model adds creator parent, full subname, canonical state, owner/delegate, policy/refusal, and release SHA without raw ENS evidence. Protected jobs admit only canonical lifecycle publications on real API calls and require a different server-derived buyer.
+
+This is `IMPLEMENTED; FOCUSED_PASS; VERIFICATION_BLOCKED_GO; LOCAL_ONLY`, not A5 acceptance. The existing UI has not yet been independently proven against the new four-action API. The current-generation floor passed through kernel 17/17 and both five-migration lanes, then stopped at `test:go` because no Go executable exists and no download was authorized. Browser, full integration, live journey, deployment, sponsor, release, and claim gates remain closed.

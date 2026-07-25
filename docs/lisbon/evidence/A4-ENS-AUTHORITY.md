@@ -234,3 +234,25 @@ The audit verified origin remained exactly at unattributed partial W3 `7d9dad5`,
 - Stable local ENS causality does not establish ENS qualification, production readiness, release validity, Lisbon-window classification, or expected winnings.
 
 External effects attempted in the ENSv2 owner-layer task: one explicitly authorized checksum-pinned official Go toolchain download to task-specific temporary storage, deleted before closeout. Sponsor/ENS/0G/API calls: none. Managed/shared database effects: none. User signatures, network transactions, deployments, pushes, forms, funding, uploads, spend, mainnet value, public identifiers, live proof, and claim promotion: none.
+
+## Sequential Kernel publication handoff
+
+- Task: `A5-KERNEL-LIFECYCLE-20260725`
+- Task instance: `A5-KERNEL-LIFECYCLE-20260725:W2:B41F3ED`
+- Start/control SHA: `b41f3ed522670db020c4a2dba0402584dca803dc`
+- Result: `IMPLEMENTED; FOCUSED_PASS; VERIFICATION_BLOCKED_GO; LOCAL_ONLY`
+- Live result: `NOT_RUN; LIVE_EFFECT_BLOCKED`
+
+The protected `/api/kernel/agents` boundary now accepts only `CREATE_DRAFT`, `BIND_NAME`, `PREPARE_ENS_WRITE`, and `PUBLISH_VERSION`. Draft identity is server-derived, private, non-hireable, and backed by bounded inert Markdown. Name binding adds the normalized creator parent, deterministic label/full subname, DNS names, and exact manifest hash. The prepared plan is canonical and local-only, contains no invented ABI/calldata, and states that authorization and wallet signature are still required.
+
+Publication is fail-closed unless a server-only A4 verifier returns one fresh exact readback matching version, manifest, creator parent, label, full subname, and the server-derived owner/delegate. The Kernel validates only this typed A4 handoff summary; it does not duplicate hierarchy, Registry, role, resolver, CCIP, or freshness-resolution logic. A refused, transferred, role-drifted, resolver-drifted, stale, or substituted readback leaves the version unpublished and records only a bounded refusal code in append-only lifecycle evidence. A successful local fixture atomically freezes the version and protected listing state; later changes require a new version.
+
+The protected jobs query now admits only canonical lifecycle publications on real API calls, rejects self-hire, and retains the exact immutable `agentVersionId`. Existing worker execution still re-proves lease owner, epoch, claim version, effect identity, claim/worker expiry, fresh A4 authority before remaining A3 effects and before delivery, verified A3 receipt binding, one effect, and exclusive settlement/refund with receipt-matched commission. Legacy direct-publish compatibility remains reachable only through explicitly injected disposable test SQL and cannot satisfy the production API predicate.
+
+Focused evidence passed: environment validation; Prisma validate/generate; both fresh and synthetic Cannes five-migration lanes with sentinel SHA-256 `fb8aece1677586a330f0cfeb0850b71488849302324eb1d6a079673e35e3829e`; lint with zero errors and 23 inherited warnings; typecheck; foundation 9/9; auth 9/9; and kernel 17/17. Kernel cases cover privacy/non-hireability, invalid actions and active Markdown, exact plan/binding, missing/transferred/role/resolver/stale/substituted A4 refusal with zero job/effect, publication immutability/new version, self/cross-user refusal, twenty submissions/one effect, replay, and cancellation.
+
+The prescribed floor stopped at `npm run test:go` with exit `127`: `sh: go: command not found`. `command -v go` returned no executable. No toolchain download was authorized or attempted. An earlier direct `npm run test:a3` confirmed the same environment failure: 3 non-Go tests passed and 9 tests failed at the Go fixture build hook. A3/A4/A5/integration/e2e/resilience/redaction/boot/secret/shell/build lanes after the fail-fast stop are not current-generation acceptance evidence. Therefore current `A4_ACCEPTED`, A5 acceptance, live ENS, sponsor, push, release, and claim gates remain closed pending environment repair, a complete rerun, commit-SHA evidence, and independent audit.
+
+Schema review is surgical: `git diff --numstat -- prisma/schema.prisma` is exactly `30 0`. The remaining hunks are only fifteen additive lifecycle/authority fields plus one relation on `AgentVersion`, and the fourteen-line append-only `AgentVersionEvent` model. All pre-existing schema formatting outside those required additions remains byte-identical to the pinned start SHA.
+
+External effects attempted: none. Local effects were limited to allowed repository files, generated ignored Prisma output, and disposable loopback PostgreSQL clusters. No ENS/0G/sponsor/API call, managed/shared migration, signature, transaction, push, deployment, form, funding, upload, spend, public identifier, live proof, or claim promotion occurred.

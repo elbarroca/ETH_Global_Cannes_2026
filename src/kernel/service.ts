@@ -80,6 +80,14 @@ interface JobListRow extends JobRow {
   price_atomic: string;
   asset: "USDC_ATOMIC";
   proof_policy: "verified-receipt-required";
+  creator_parent: string | null;
+  full_subname: string | null;
+  canonical_state: "UNVERIFIED" | "CANONICAL" | "REFUSED" | null;
+  authority_owner: string | null;
+  authority_delegate: string | null;
+  authority_policy_version: string | null;
+  authority_refusal: string | null;
+  authority_release_sha: string | null;
   latest_ens_decision: "ALLOW" | "DENY" | null;
   a3_stage: string | null;
   response_hash: string | null;
@@ -275,6 +283,14 @@ function mapJobListItem(row: JobListRow): KernelJobListItem {
       priceAtomic: row.price_atomic,
       asset: row.asset,
       proofPolicy: row.proof_policy,
+      creatorParent: row.creator_parent,
+      fullSubname: row.full_subname,
+      canonicalState: row.canonical_state,
+      authorityOwner: row.authority_owner,
+      authorityDelegate: row.authority_delegate,
+      authorityPolicyVersion: row.authority_policy_version,
+      refusalReason: row.authority_refusal,
+      authorityReleaseSha: row.authority_release_sha,
     },
     evidence: mapEvidenceSummary(row),
   };
@@ -316,6 +332,9 @@ async function loadBuyerJobRows(
       COALESCE(v.manifest->>'description', '') AS agent_description,
       v.version AS agent_version, v.owner_wallet, v.capabilities,
       v.price_atomic::text, v.asset, v.proof_policy,
+      v.creator_parent, v.full_subname, v.canonical_state,
+      v.authority_owner, v.authority_delegate, v.authority_policy_version,
+      v.authority_refusal, v.authority_release_sha,
       latest_ens.decision AS latest_ens_decision,
       journal.stage AS a3_stage, journal.response_hash, journal.compute_receipt_digest,
       journal.expected_root, journal.expected_digest, journal.expected_size,
@@ -449,6 +468,7 @@ export async function submitJob(
 ): Promise<SubmittedJob> {
   const sql = options.sql ?? getDb();
   const now = options.now ?? new Date();
+  const allowLegacyFixture = options.sql !== undefined && process.env.NODE_ENV === "test";
   const canonicalTask = { prompt: input.task.prompt };
   const inputHash = domainHash("job-input", canonicalTask);
   const lockKey = domainHash("submission-lock", {
@@ -479,15 +499,28 @@ export async function submitJob(
       adapter_key: "protected-a3";
       price_atomic: string;
       asset: string;
+      owner_user_id: string;
     }[]>`
-      SELECT id, adapter_key, price_atomic::text, asset
-      FROM agent_versions
-      WHERE id = ${input.agentVersionId}::uuid AND published = true
-      FOR SHARE
+      SELECT v.id, v.adapter_key, v.price_atomic::text, v.asset, a.owner_user_id
+      FROM agent_versions v
+      JOIN kernel_agents a ON a.id = v.agent_id
+      WHERE v.id = ${input.agentVersionId}::uuid
+        AND v.published = true
+        AND (
+          (
+            v.lifecycle_state = 'PUBLISHED' AND v.canonical_state = 'CANONICAL'
+            AND v.write_plan_hash IS NOT NULL AND v.authority_record_hash IS NOT NULL
+          )
+          OR (${allowLegacyFixture} AND v.lifecycle_state IS NULL)
+        )
+      FOR SHARE OF v
     `;
     const agentVersion = versions[0];
     if (!agentVersion) {
       throw new KernelError("KERNEL_NOT_FOUND", "Published agent version not found", 404);
+    }
+    if (agentVersion.owner_user_id === buyerUserId) {
+      throw new KernelError("KERNEL_FORBIDDEN", "Creators cannot hire their own agent version", 403);
     }
 
     const quoteExpiry = new Date(now.getTime() + KERNEL_QUOTE_TTL_MS);

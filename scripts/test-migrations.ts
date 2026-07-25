@@ -16,6 +16,7 @@ const BASELINE_MIGRATION = "20260724011500_baseline";
 const A2_MIGRATION = "20260724024500_authenticated_kernel";
 const A3_MIGRATION = "20260724041000_strict_0g";
 const A4_MIGRATION = "20260724130000_ens_authority";
+const A5_MIGRATION = "20260725020000_a5_protected_lifecycle";
 const BASELINE_SQL = resolve(ROOT, "prisma/migrations", BASELINE_MIGRATION, "migration.sql");
 const SENTINEL_ID = "a1-cannes-sentinel";
 const SENTINEL_WALLET = "0xa1cannessentinel";
@@ -292,14 +293,17 @@ async function verifyDatabase(
       a3_execution_journals: string | null;
       ens_authority_bindings: string | null;
       ens_authority_checks: string | null;
+      agent_version_events: string | null;
       user_count: string;
       migration_count: string;
       baseline_count: string;
       a2_count: string;
       a3_count: string;
       a4_count: string;
+      a5_count: string;
       invariant_trigger_count: string;
       a4_constraint_count: string;
+      a5_constraint_count: string;
       receipt_authority_nullable: string;
       sequence_type: string;
       sequence_start: string;
@@ -320,6 +324,7 @@ async function verifyDatabase(
         to_regclass('public.a3_execution_journals')::text AS a3_execution_journals,
         to_regclass('public.ens_authority_bindings')::text AS ens_authority_bindings,
         to_regclass('public.ens_authority_checks')::text AS ens_authority_checks,
+        to_regclass('public.agent_version_events')::text AS agent_version_events,
         (SELECT count(*)::text FROM users) AS user_count,
         (
           SELECT count(*)::text
@@ -343,6 +348,10 @@ async function verifyDatabase(
           WHERE migration_name = ${A4_MIGRATION} AND finished_at IS NOT NULL
         ) AS a4_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${A5_MIGRATION} AND finished_at IS NOT NULL
+        ) AS a5_count,
+        (
           SELECT count(*)::text FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN (
             'agent_versions_immutable_published',
@@ -355,7 +364,9 @@ async function verifyDatabase(
             'a3_journals_legal_transitions',
             'ens_authority_bindings_immutable',
             'ens_authority_checks_append_only',
-            'receipts_require_ens_authority'
+            'receipts_require_ens_authority',
+            'agent_versions_legal_lifecycle',
+            'agent_version_events_append_only'
           )
         ) AS invariant_trigger_count,
         (
@@ -369,6 +380,22 @@ async function verifyDatabase(
             'ens_checks_decision_check', 'ens_checks_observation_check'
           )
         ) AS a4_constraint_count,
+        (
+          SELECT count(*)::text FROM pg_constraint
+          WHERE conname IN (
+            'agent_versions_lifecycle_state_check',
+            'agent_versions_canonical_state_check',
+            'agent_versions_name_binding_check',
+            'agent_versions_write_plan_check',
+            'agent_versions_hash_shape_check',
+            'agent_versions_authority_address_check',
+            'agent_versions_authority_time_check',
+            'agent_versions_protected_publish_check',
+            'agent_version_events_version_fkey',
+            'agent_version_events_sequence_check',
+            'agent_version_events_action_check'
+          )
+        ) AS a5_constraint_count,
         (
           SELECT is_nullable FROM information_schema.columns
           WHERE table_schema = 'public' AND table_name = 'receipts'
@@ -396,14 +423,17 @@ async function verifyDatabase(
       result.a3_execution_journals !== "a3_execution_journals" ||
       result.ens_authority_bindings !== "ens_authority_bindings" ||
       result.ens_authority_checks !== "ens_authority_checks" ||
+      result.agent_version_events !== "agent_version_events" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 4 ||
+      Number(result.migration_count) !== 5 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
       Number(result.a4_count) !== 1 ||
-      Number(result.invariant_trigger_count) !== 11 ||
+      Number(result.a5_count) !== 1 ||
+      Number(result.invariant_trigger_count) !== 13 ||
       Number(result.a4_constraint_count) !== 14 ||
+      Number(result.a5_constraint_count) !== 11 ||
       result.receipt_authority_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||
       result.sequence_start !== "1" ||

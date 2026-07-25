@@ -376,14 +376,44 @@ model AgentVersion {
   priceAtomic    BigInt      @map("price_atomic")
   asset          String
   proofPolicy    String      @map("proof_policy")
+  lifecycleState String?     @map("lifecycle_state")
+  creatorParent  String?     @map("creator_parent")
+  agentLabel     String?     @map("agent_label")
+  fullSubname    String?     @map("full_subname")
+  writePlan      Json?       @map("write_plan")
+  writePlanHash  String?     @map("write_plan_hash")
+  canonicalState String      @default("UNVERIFIED") @map("canonical_state")
+  authorityOwner String?     @map("authority_owner")
+  authorityDelegate String?  @map("authority_delegate")
+  authorityPolicyVersion String? @map("authority_policy_version")
+  authorityRefusal String?   @map("authority_refusal")
+  authorityRecordHash String? @map("authority_record_hash")
+  authorityObservedAt DateTime? @map("authority_observed_at") @db.Timestamptz(6)
+  authorityFreshUntil DateTime? @map("authority_fresh_until") @db.Timestamptz(6)
+  authorityReleaseSha String? @map("authority_release_sha")
   published      Boolean     @default(false)
   publishedAt    DateTime?   @map("published_at") @db.Timestamptz(6)
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   agent          KernelAgent @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  lifecycleEvents AgentVersionEvent[]
 
   @@unique([agentId, version], map: "uniq_agent_versions_agent_version")
   @@index([published, createdAt], map: "idx_agent_versions_published_created")
   @@map("agent_versions")
+}
+
+model AgentVersionEvent {
+  id             BigInt       @id @default(autoincrement())
+  agentVersionId String       @map("agent_version_id") @db.Uuid
+  sequence       Int
+  action         String
+  payload        Json         @default("{}")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  agentVersion   AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([agentVersionId, sequence], map: "uniq_agent_version_events_sequence")
+  @@index([agentVersionId, createdAt], map: "idx_agent_version_events_created")
+  @@map("agent_version_events")
 }
 
 model Quote {

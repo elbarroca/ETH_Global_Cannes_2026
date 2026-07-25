@@ -3,6 +3,62 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/a5_kernel_lifecycle
+task_id: A5-KERNEL-LIFECYCLE-20260725
+task_instance_id: A5-KERNEL-LIFECYCLE-20260725:W2:B41F3ED
+generation: 2
+sprint: A4_kernel_handoff_and_A5_lifecycle
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: b41f3ed522670db020c4a2dba0402584dca803dc
+control_sha: b41f3ed522670db020c4a2dba0402584dca803dc
+token: A5-KERNEL-W2-B41F3ED-C45C5FAF-706C-4C62-B08E-739442BCB408
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T01:37:29Z
+expires_at: 2026-07-25T04:30:00Z
+allowed_paths:
+  - src/kernel/**
+  - src/auth/** only if strictly required
+  - src/worker/**
+  - app/api/kernel/**
+  - tests/kernel/**
+  - tests/auth/** only if affected
+  - tests/integration/worker-fencing.test.ts
+  - prisma/schema.prisma
+  - prisma/migrations/20260725020000_a5_protected_lifecycle/**
+  - scripts/test-migrations.ts only to extend the deterministic migration harness from four to five migrations
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - docs/lisbon/evidence/A5-UI-CONTROL-SURFACE.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T01:37:29Z
+deadline: 2026-07-25T04:30:00Z
+expected_exit: minimum protected creator draft name binding local ENS write plan immutable publication and authoritative external-buyer job lifecycle using accepted A4 authority
+external_effect_authority: safe local allowed files deterministic checks loopback processes disposable databases generated ignored output and one atomic commit only; no live ENS or 0G managed migration webhook push deploy signature transaction form funding upload spend public claim or gate advancement
+completed_at: 2026-07-25T01:57:27Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - private server-derived drafts bind inert Markdown deterministic names an exact immutable manifest and a local-only unauthorized ENS write plan
+  - server-only fresh A4 summaries gate atomic protected publication without duplicating Registry role resolver CCIP or hierarchy validation
+  - published changes require a new version and real protected jobs reject self-hire legacy versions cross-user access version substitution and replay mutation
+  - append-only lifecycle events and database checks preserve immutability protected listing shape and canonical owner policy refusal and release-SHA state
+  - environment Prisma both five-migration lanes lint typecheck foundation auth and kernel 17 of 17 passed with the synthetic Cannes sentinel hash unchanged
+  - prisma schema diff is exactly 30 additions and zero deletions with no unrelated formatting churn
+remaining_blocks:
+  - npm run test:go exits 127 because the host has no go executable and no download is authorized
+  - A3 A4 A5 integration e2e resilience redaction boot secret shell build and immutable-SHA audit remain unaccepted after the fail-fast stop
+  - current A4_ACCEPTED A5 live sponsor push release and claim gates remain closed
+external_effects_attempted: none
+result: BLOCKED_GO_AFTER_FOCUSED_PASS_LOCAL_ONLY
+clean_status: EXPECT_ALLOWED_PATHS_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token A5-KERNEL-W2-B41F3ED-C45C5FAF-706C-4C62-B08E-739442BCB408 after the containing commit and allowed-path clean verification
+status: closed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-A4-W3-AUDIT-RECONCILIATION-20260725
 task_instance_id: C0-A4-W3-AUDIT-RECONCILIATION-20260725:D2824C0

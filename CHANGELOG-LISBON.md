@@ -2,6 +2,15 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - A5 protected Kernel lifecycle and A4 publication handoff
+
+- Replaced immediate protected publication with typed `CREATE_DRAFT`, `BIND_NAME`, `PREPARE_ENS_WRITE`, and `PUBLISH_VERSION` actions. Drafts are server-owned, private, non-hireable, and use bounded inert Markdown.
+- Added exact creator-parent/full-subname/manifest binding, a deterministic local-only ENS write plan with no invented ABI or transaction, a server-only fresh A4 readback boundary, immutable protected publication, append-only lifecycle evidence, and new-version-only post-publication changes.
+- Restricted real protected hires to canonical lifecycle publications, rejected self-hire, retained exact version/idempotency/one-effect semantics, and extended agent/job read models with bounded authority state rather than raw ENS evidence.
+- Added a five-migration constraint/trigger layer and extended both deterministic migration lanes without changing the synthetic Cannes sentinel hash. The schema diff is exactly 30 additions and zero deletions outside the new migration.
+- Passed environment, Prisma, both migration lanes, lint, typecheck, foundation 9/9, auth 9/9, and kernel 17/17. The prescribed floor then stopped at `test:go` exit 127 because `go` is not installed; no download was authorized or attempted.
+- Returned only `IMPLEMENTED; FOCUSED_PASS; VERIFICATION_BLOCKED_GO; LOCAL_ONLY`. No live ENS/0G, managed migration, push, deployment, signature, transaction, form, funding, upload, spend, public identifier, claim promotion, A4 acceptance, or A5 gate opening occurred.
+
 ## 2026-07-25 - A4 W3 immutable-range audit
 
 - Independent detached-clone audit accepted exact target `9288ab265323248c7ff3bbaaa75b184f66887521` and full W3 range `8839d26b0b62824baec2211b4c8767d91e58a0a8..196ed92b5b29db381118ba41c703eebbb6d7540b` with no W3 finding.
