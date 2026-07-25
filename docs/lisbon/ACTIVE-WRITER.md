@@ -4,6 +4,79 @@ At most one record may have `status: active`.
 
 ```yaml
 owner: Release Integrator /root
+task_id: R6-LATE-WRITE
+task_instance_id: R6-LATE-WRITE:R6:107A522
+generation: 1
+sprint: Reconcile late MCP-RUNTIME-R6 writes after cancellation race
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 107a5222f3ce10c40eb7efeecbd18ac3d12c6c78
+control_sha: 107a5222f3ce10c40eb7efeecbd18ac3d12c6c78
+token: R6-LATE-WRITE-107A522-20260725T222024Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T22:23:34Z
+expires_at: 2026-07-26T01:20:24Z
+allowed_paths:
+  - src/index.ts
+  - src/kernel/hire-requests.ts
+  - src/kernel/production-mcp.ts
+  - tests/kernel/production-mcp.test.ts
+  - tests/kernel/marketplace-v5.test.ts
+  - tests/kernel/runtime-lifecycle.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T22:20:24Z
+deadline: 2026-07-26T01:20:24Z
+expected_exit: validate and atomically contain only coherent late R6 writes or preserve and report invalid work
+external_effect_authority: local files deterministic mocked-network tests disposable loopback PostgreSQL and one atomic local commit only; no live provider call managed migration network push deploy sponsor call signature transaction spend claim or public proof
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T22:23:34Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+evidence: focused R6 9/9, kernel 59/59, base 10/10, typecheck, scoped and full lint, production build, secret scan, and diff check passed; source and tests stabilized under the remediation lease
+remaining_block: The Graph typed-input provider remains intentionally unavailable for the superseding Graph-owned implementation
+verdict: PASS_TO_AUDIT; LOCAL_ONLY
+lock_release: release only exact token R6-LATE-WRITE-107A522-20260725T222024Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
+owner: Release Integrator /root
+task_id: MCP-RUNTIME-R6
+task_instance_id: MCP-RUNTIME-R6:R6:107A522
+generation: 1
+sprint: Wire bounded production MCP context and exact terminal hire fencing
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 107a5222f3ce10c40eb7efeecbd18ac3d12c6c78
+control_sha: 107a5222f3ce10c40eb7efeecbd18ac3d12c6c78
+token: MCP-RUNTIME-R6-107A522-20260725T221800Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T22:19:01Z
+expires_at: 2026-07-26T01:18:00Z
+allowed_paths:
+  - src/kernel/production-mcp.ts
+  - src/kernel/hire-requests.ts
+  - src/index.ts
+  - tests/kernel/production-mcp.test.ts
+  - tests/kernel/marketplace-v5.test.ts
+  - tests/kernel/runtime-lifecycle.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T22:18:00Z
+deadline: 2026-07-26T01:18:00Z
+expected_exit: Railway worker receives a bounded native-fetch provider and stale failures cannot terminalize newer hire claims
+external_effect_authority: local files deterministic mocked-network tests disposable loopback PostgreSQL and one atomic local commit only; no live provider call managed migration network push deploy sponsor call signature transaction spend claim or public proof
+external_effects_attempted: none
+claim_changes: none
+cancelled_at: 2026-07-25T22:19:01Z
+exit_sha: 107a5222f3ce10c40eb7efeecbd18ac3d12c6c78
+remaining_block: no owned changes were visible at cancellation, but late task writes subsequently appeared and were fenced under R6-LATE-WRITE
+verdict: CANCELLED_SUPERSEDED
+lock_release: exact token MCP-RUNTIME-R6-107A522-20260725T221800Z released after the empty pre-removal check; late writes were contained separately
+status: cancelled
+```
+
+```yaml
+owner: Release Integrator /root
 task_id: OWNER-EARNINGS-R5
 task_instance_id: OWNER-EARNINGS-R5:R5:8651EF3
 generation: 1

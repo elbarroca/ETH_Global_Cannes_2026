@@ -186,10 +186,13 @@ test("health boot failure drains already-started protected workers", async () =>
       ownerId: "goal-owner",
       stop: async () => { goalStops += 1; },
     }),
-    startKernelWorker: () => ({
-      ownerId: "kernel-owner",
-      stop: async () => { kernelStops += 1; },
-    }),
+    startKernelWorker: (options) => {
+      assert.ok(options.mcpProvider);
+      return {
+        ownerId: "kernel-owner",
+        stop: async () => { kernelStops += 1; },
+      };
+    },
     startWorkerHealth: async () => {
       throw new Error("WORKER_HEALTH_LISTEN_FAILED");
     },

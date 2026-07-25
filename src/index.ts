@@ -4,6 +4,7 @@ import { startGoalRunner } from "./agents/goal-runner";
 import { startWorkerHealth } from "./agents/worker-health";
 import { validateEnvironment } from "./config/env";
 import { startKernelWorker } from "./worker/runner";
+import { createProductionMcpProvider } from "./kernel/production-mcp";
 
 dotenv.config();
 
@@ -120,6 +121,7 @@ export async function bootRuntime(
   }
 
   const boot = (async (): Promise<RuntimeHandle> => {
+    const mcpProvider = workersEnabled ? createProductionMcpProvider(source) : undefined;
     const goalRunner = workersEnabled
       ? dependencies.startGoalRunner({ leaseSeconds: environment.kernelWorkerLeaseSeconds })
       : null;
@@ -127,6 +129,7 @@ export async function bootRuntime(
       ? dependencies.startKernelWorker({
           concurrency: environment.kernelWorkerConcurrency,
           leaseSeconds: environment.kernelWorkerLeaseSeconds,
+          mcpProvider,
         })
       : null;
     let health = null;

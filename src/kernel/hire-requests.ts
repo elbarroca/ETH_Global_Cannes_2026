@@ -245,6 +245,7 @@ export async function processHireRequest(input: {
     `;
     return rows[0]?.state === "JOB_QUEUED" ? snapshot(rows[0], true) : null;
   }
+  try {
   const rows = await sql<{
     buyer_user_id: string;
     agent_version_id: string;
@@ -340,7 +341,7 @@ export async function processHireRequest(input: {
       claimExpiresAt: input.leaseExpiresAt,
     }),
   });
-  return completeHireRequestContext({
+  return await completeHireRequestContext({
     hireRequestId: input.hireRequestId,
     workerId: input.workerId,
     workerEpoch: input.workerEpoch,
@@ -350,6 +351,21 @@ export async function processHireRequest(input: {
     now,
     sql,
   });
+  } catch (error) {
+    if (input.signal?.aborted) throw error;
+    const failure = hireFailure(error);
+    return terminalizeCurrentHireClaim({
+      hireRequestId: input.hireRequestId,
+      workerId: input.workerId,
+      workerEpoch: input.workerEpoch,
+      claimVersion: claim.claimVersion,
+      claimExpiresAt: input.leaseExpiresAt,
+      state: failure.state,
+      errorCode: failure.code,
+      now,
+      sql,
+    });
+  }
 }
 
 const BLOCKED_HIRE_CODES = new Set([
@@ -370,22 +386,28 @@ async function terminalizeCurrentHireClaim(input: {
   hireRequestId: string;
   workerId: string;
   workerEpoch: bigint;
+  claimVersion: number;
+  claimExpiresAt: Date;
   state: "BLOCKED" | "FAILED";
   errorCode: string;
   now: Date;
   sql: DatabaseClient;
-}): Promise<boolean> {
-  const rows = await input.sql<{ id: string }[]>`
+}): Promise<HireRequestSnapshot | null> {
+  const rows = await input.sql<HireRequestRow[]>`
     UPDATE hire_requests
     SET state = ${input.state}, version = version + 1,
       error_code = ${input.errorCode}, updated_at = ${input.now}
     WHERE id = ${input.hireRequestId}::uuid AND state = 'CONTEXT_RUNNING'
       AND claim_owner = ${input.workerId}
       AND claim_epoch = ${input.workerEpoch.toString()}::bigint
+      AND claim_version = ${input.claimVersion}
+      AND claim_expires_at = ${input.claimExpiresAt}
       AND claim_expires_at > clock_timestamp()
-    RETURNING id::text
+    RETURNING id::text, agent_version_id::text, prompt_hash, state, version,
+      job_id::text, context_hash, error_code, claim_epoch::text, claim_version,
+      claim_expires_at, created_at, updated_at
   `;
-  return rows.length === 1;
+  return rows[0] ? snapshot(rows[0], false) : null;
 }
 
 export async function processPendingHireRequests(input: {
@@ -422,18 +444,13 @@ export async function processPendingHireRequests(input: {
         sql,
         signal: input.signal,
       });
-    } catch (error) {
+    } catch {
       if (input.signal?.aborted) return;
-      const failure = hireFailure(error);
-      await terminalizeCurrentHireClaim({
-        hireRequestId: id,
-        workerId: input.workerId,
-        workerEpoch: input.workerEpoch,
-        state: failure.state,
-        errorCode: failure.code,
-        now,
-        sql,
-      });
+      console.error(JSON.stringify({
+        level: "error",
+        context: "kernel.hire-worker",
+        code: "KERNEL_HIRE_TERMINALIZE_FAILED",
+      }));
     }
   }));
   return rows.length;

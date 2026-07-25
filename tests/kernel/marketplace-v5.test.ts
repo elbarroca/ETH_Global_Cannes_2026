@@ -17,7 +17,10 @@ import {
   prepareAgentEnsWrite,
   publishAgentVersion,
 } from "../../src/kernel/lifecycle";
-import type { McpContextProvider } from "../../src/kernel/mcp-context";
+import {
+  collectMcpContext,
+  type McpContextProvider,
+} from "../../src/kernel/mcp-context";
 import {
   parseAgentInput,
   parseAgentListFilters,
@@ -162,14 +165,33 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
       idempotencyKey: "buyer-hire-v5-reclaim-01",
       prompt: "Analyze a second market snapshot.",
     }, { sql: database.sql });
+    const firstExpiry = new Date(Date.now() + 100);
     const firstClaim = await claimHireRequestContext({
       hireRequestId: reclaimable.hireRequestId,
       workerId: "stale-worker",
       workerEpoch: 1n,
-      leaseExpiresAt: new Date(Date.now() + 100),
+      leaseExpiresAt: firstExpiry,
       sql: database.sql,
     });
     assert.equal(firstClaim?.claimVersion, 1);
+    const callsBeforeStaleEvidence = provider.calls;
+    await collectMcpContext({
+      sql: database.sql,
+      hireRequestId: reclaimable.hireRequestId,
+      hireFence: {
+        workerId: "stale-worker",
+        workerEpoch: 1n,
+        claimVersion: 1,
+        claimExpiresAt: firstExpiry,
+      },
+      agentVersionId: versionId,
+      manifestHash: published.manifestHash,
+      bindings: manifest.mcp,
+      objective: "Analyze a second market snapshot.",
+      requiredCapabilities: manifest.capabilities,
+      releaseSha: published.authorityReleaseSha ?? "",
+      provider,
+    });
     await new Promise((resolve) => setTimeout(resolve, 150));
     const reclaimed = await processHireRequest({
       hireRequestId: reclaimable.hireRequestId,
@@ -182,6 +204,16 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
     assert.equal(reclaimed?.claimVersion, 2);
     assert.equal(reclaimed?.state, "JOB_QUEUED");
     assert.ok(reclaimed.jobId);
+    assert.equal(provider.calls, callsBeforeStaleEvidence + manifest.mcp.length * 2);
+    const invocationClaims = await database.sql<{ claim_version: number }[]>`
+      SELECT hire_claim_version AS claim_version FROM mcp_invocations
+      WHERE hire_request_id = ${reclaimable.hireRequestId}::uuid
+      ORDER BY hire_claim_version, binding_id
+    `;
+    assert.deepEqual(
+      invocationClaims.map((entry) => entry.claim_version),
+      [...manifest.mcp.map(() => 1), ...manifest.mcp.map(() => 2)],
+    );
     assert.equal(await completeHireRequestContext({
       hireRequestId: reclaimable.hireRequestId,
       workerId: "stale-worker",
@@ -238,6 +270,102 @@ test("V5 marketplace hires are idempotent, fenced, exclusive, and release-budget
     });
     assert.equal(nonMcpProcessed?.state, "JOB_QUEUED");
     assert.ok(nonMcpProcessed?.jobId);
+
+    const blockedHire = await createHireRequest(BUYER_ID, {
+      agentVersionId: versionId,
+      idempotencyKey: "buyer-hire-v5-blocked-01",
+      prompt: "Record an explicit missing-provider state.",
+    }, { sql: database.sql });
+    await processPendingHireRequests({
+      workerId: "missing-provider-worker",
+      workerEpoch: 2n,
+      leaseExpiresAt: new Date(Date.now() + 60_000),
+      limit: 1,
+      sql: database.sql,
+    });
+    const [blocked] = await listHireRequests(BUYER_ID, {
+      hireRequestId: blockedHire.hireRequestId,
+      sql: database.sql,
+    });
+    assert.equal(blocked?.state, "BLOCKED");
+    assert.equal(blocked?.errorCode, "GOAL_MCP_CONTEXT_UNAVAILABLE");
+
+    const failedHire = await createHireRequest(BUYER_ID, {
+      agentVersionId: versionId,
+      idempotencyKey: "buyer-hire-v5-failed-01",
+      prompt: "Record an explicit provider failure.",
+    }, { sql: database.sql });
+    await processPendingHireRequests({
+      workerId: "failed-provider-worker",
+      workerEpoch: 3n,
+      leaseExpiresAt: new Date(Date.now() + 60_000),
+      limit: 1,
+      mcpProvider: { invoke: async () => { throw new Error("provider unavailable"); } },
+      sql: database.sql,
+    });
+    const [failed] = await listHireRequests(BUYER_ID, {
+      hireRequestId: failedHire.hireRequestId,
+      sql: database.sql,
+    });
+    assert.equal(failed?.state, "FAILED");
+    assert.equal(failed?.errorCode, "GOAL_MCP_PROVIDER_FAILED");
+
+    const abortedHire = await createHireRequest(BUYER_ID, {
+      agentVersionId: versionId,
+      idempotencyKey: "buyer-hire-v5-aborted-01",
+      prompt: "Remain pending when the worker is already stopping.",
+    }, { sql: database.sql });
+    const aborted = new AbortController();
+    aborted.abort();
+    assert.equal(await processPendingHireRequests({
+      workerId: "aborted-worker",
+      workerEpoch: 4n,
+      leaseExpiresAt: new Date(Date.now() + 60_000),
+      limit: 1,
+      mcpProvider: provider,
+      signal: aborted.signal,
+      sql: database.sql,
+    }), 0);
+    assert.equal((await listHireRequests(BUYER_ID, {
+      hireRequestId: abortedHire.hireRequestId,
+      sql: database.sql,
+    }))[0]?.state, "PENDING_CONTEXT");
+
+    const staleFailureHire = await createHireRequest(BUYER_ID, {
+      agentVersionId: versionId,
+      idempotencyKey: "buyer-hire-v5-stale-failure-01",
+      prompt: "A stale failure must not terminalize a newer claim.",
+    }, { sql: database.sql });
+    const staleExpiry = new Date(Date.now() + 100);
+    const staleProcessing = processHireRequest({
+      hireRequestId: staleFailureHire.hireRequestId,
+      workerId: "same-worker",
+      workerEpoch: 5n,
+      leaseExpiresAt: staleExpiry,
+      mcpProvider: {
+        invoke: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          throw new Error("stale provider failure");
+        },
+      },
+      sql: database.sql,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const newerClaim = await claimHireRequestContext({
+      hireRequestId: staleFailureHire.hireRequestId,
+      workerId: "same-worker",
+      workerEpoch: 5n,
+      leaseExpiresAt: new Date(Date.now() + 60_000),
+      sql: database.sql,
+    });
+    assert.equal(newerClaim?.claimVersion, 2);
+    assert.equal(await staleProcessing, null);
+    const [stillRunning] = await listHireRequests(BUYER_ID, {
+      hireRequestId: staleFailureHire.hireRequestId,
+      sql: database.sql,
+    });
+    assert.equal(stillRunning?.state, "CONTEXT_RUNNING");
+    assert.equal(stillRunning?.claimVersion, 2);
 
     const releaseSha = "e".repeat(40);
     await createOgSpendBudget(releaseSha, 10n, { sql: database.sql });
