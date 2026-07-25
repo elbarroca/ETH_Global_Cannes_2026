@@ -3,6 +3,49 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/graph_ui_reconcile
+task_id: GRAPH-UI-PREFLIGHT-R1
+task_instance_id: GRAPH-UI-PREFLIGHT-R1:R2:9956BCD
+generation: 2
+sprint: Graph Liquidity Agent Continuity UI reconciliation preflight
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 9956bcde374f1aaae60f27277e8de4b9356fe10f
+control_sha: 9956bcde374f1aaae60f27277e8de4b9356fe10f
+token: GRAPH-UI-PREFLIGHT-R1-G2-9956BCD-20260725T220059Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T22:07:54Z
+expires_at: 2026-07-25T23:45:00Z
+allowed_paths:
+  - app/globals.css
+  - app/marketplace/page.tsx
+  - app/verify/page.tsx
+  - components/goal-workspace.tsx
+  - tests/playwright/a5-ui.spec.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T22:00:59Z
+deadline: 2026-07-25T23:45:00Z
+expected_exit: coherent accessible UI reconciliation committed without touching excluded dirty paths
+external_effect_authority: local files deterministic checks and one atomic local commit only; no network live sponsor call push deploy migration signature transaction spend form public claim or release gate
+external_effects_attempted: none
+claim_changes: none
+completed_at: 2026-07-25T22:07:54Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - scoped ESLint typecheck and full diff check PASS
+  - focused rebuilt Playwright PASS 22 of 22 including keyboard mobile overflow reduced motion refusal and protected evidence states
+  - full lint PASS with zero errors and 23 inherited warnings base tests PASS 10 of 10 production build PASS full Playwright PASS 22 of 22 and secret scan PASS
+  - excluded EXTERNAL-EFFECTS and A3 recovery test hashes remained byte-identical and unstaged
+remaining_blocks:
+  - proportional A5 source lane is 8 of 9 because the inherited create-agent modal min-h-32 class conflicts with an out-of-scope static assertion
+  - excluded EXTERNAL-EFFECTS and A3 recovery changes remain dirty outside this lease
+  - no network live sponsor call push deploy migration signature transaction spend form public claim or release gate was authorized or attempted
+verdict: PASS_TO_AUDIT_WITH_INHERITED_A5_ASSERTION; LOCAL_ONLY
+lock_release: release only exact token GRAPH-UI-PREFLIGHT-R1-G2-9956BCD-20260725T220059Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Release Integrator /root
 task_id: MCP-FORWARD-MIGRATION-R4
 task_instance_id: MCP-FORWARD-MIGRATION-R4:R4:6B21502

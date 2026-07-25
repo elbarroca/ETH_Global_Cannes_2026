@@ -45,7 +45,7 @@ function VerifyContent() {
       {jobs.isLoading && <VerifyLoading />}
       {jobs.error && <div role="alert" className="mt-6 flex justify-between gap-3 border-l-2 border-blood-500 pl-3"><p className="text-sm text-blood-300">{jobs.error.message}</p><button type="button" onClick={() => void jobs.refetch()} className="text-sm font-semibold text-void-200">Retry</button></div>}
       {jobs.data && !jobs.data.length && <div className="border-b border-void-800 py-12 text-center"><ShieldCheckIcon size={28} className="mx-auto text-dawg-400" aria-hidden /><h2 className="mt-3 text-xl font-semibold text-void-100">No protected jobs yet</h2><p className="mt-2 text-sm text-void-400">Run an external immutable version from Agents first.</p><Link href="/marketplace" className="instrument-button instrument-button-primary mt-5">Open agents</Link></div>}
-      {jobs.data && <ul className="divide-y divide-void-800 border-b border-void-800">{jobs.data.map((job) => <JobRow key={job.jobId} job={job} />)}</ul>}
+      {jobs.data && Boolean(jobs.data.length) && <ul className="mt-5 grid gap-3">{jobs.data.map((job) => <JobRow key={job.jobId} job={job} />)}</ul>}
     </main>
   );
 }
@@ -60,7 +60,7 @@ function jobState(job: KernelJobListItem): EvidenceState {
 }
 
 function JobRow({ job }: { job: KernelJobListItem }) {
-  return <li className="grid gap-3 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-void-100">{job.agent.name} <span className="font-mono text-xs text-void-500">v{job.agent.version}</span></h2><EvidenceStatus state={jobState(job)} label={job.state} /></div><p className="mt-2 break-all font-mono text-xs text-void-400">{job.agent.fullSubname ?? "Agent subname unavailable"}</p>{job.lastErrorCode && <p className="mt-2 break-all font-mono text-xs text-blood-300">{job.lastErrorCode}</p>}</div><Link href={`/verify?jobId=${encodeURIComponent(job.jobId)}`} className="instrument-button instrument-button-secondary">Inspect proof</Link></li>;
+  return <li className="grid gap-3 rounded-[16px] border border-void-800 bg-void-900/40 p-5 transition-colors hover:border-void-700 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-void-100">{job.agent.name} <span className="font-mono text-xs text-void-500">v{job.agent.version}</span></h2><EvidenceStatus state={jobState(job)} label={job.state} /></div><p className="mt-2 break-all font-mono text-xs text-void-400">{job.agent.fullSubname ?? "Agent subname unavailable"}</p>{job.lastErrorCode && <p className="mt-2 break-all font-mono text-xs text-blood-300">{job.lastErrorCode}</p>}</div><Link href={`/verify?jobId=${encodeURIComponent(job.jobId)}`} className="instrument-button instrument-button-secondary">Inspect proof</Link></li>;
 }
 
 function CompactJobRow({ job, selected }: { job: KernelJobListItem; selected: boolean }) {

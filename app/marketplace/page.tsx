@@ -14,7 +14,7 @@ import {
   type AgentLifecycleVersion,
   type ProtectedPublishedAgentRead,
 } from "@/lib/api";
-import { formatUsdcAtomic } from "@/lib/format-usdc";
+import { formatUsdc, formatUsdcAtomic } from "@/lib/format-usdc";
 
 type AgentTab = "available" | "mine" | "drafts";
 const AGENT_VIEWS = [
@@ -99,9 +99,9 @@ function MarketplaceContent() {
         <Link href={queryHref({ create: "1" })} scroll={false} className="instrument-button instrument-button-primary"><PlusIcon size={17} aria-hidden />Create agent</Link>
       </header>
 
-      <nav aria-label="Agent views" className="mt-5 flex gap-1 border-b border-void-800">
+      <nav aria-label="Agent views" className="mt-5 inline-flex gap-1 rounded-[12px] border border-void-800/70 bg-void-900/50 p-1">
         {AGENT_VIEWS.map(({ value, label }) => (
-          <Link key={value} href={queryHref({ view: value, agentId: null })} scroll={false} aria-current={tab === value ? "page" : undefined} className={`inline-flex min-h-11 items-center px-4 text-sm font-semibold ${tab === value ? "border-b-2 border-dawg-500 text-dawg-300" : "text-void-400 hover:text-void-100"}`}>
+          <Link key={value} href={queryHref({ view: value, agentId: null })} scroll={false} aria-current={tab === value ? "page" : undefined} className={`inline-flex min-h-9 items-center rounded-[9px] px-4 text-sm font-semibold transition-colors ${tab === value ? "bg-gradient-to-b from-dawg-300 to-dawg-500 text-void-950" : "text-void-400 hover:text-void-100"}`}>
             {label}
           </Link>
         ))}
@@ -129,30 +129,31 @@ function MarketplaceLoading() {
 }
 
 function AgentList({ agents, empty, agentHref }: { agents: ProtectedPublishedAgentRead[]; empty: string; agentHref: (agent: ProtectedPublishedAgentRead) => string }) {
-  if (!agents.length) return <p className="border-y border-void-800 py-10 text-center text-sm text-void-500">{empty}</p>;
-  return <ul className="divide-y divide-void-800 border-y border-void-800">{agents.map((agent) => <AgentRow key={agent.versionId} agent={agent} href={agentHref(agent)} />)}</ul>;
+  if (!agents.length) return <p className="rounded-[14px] border border-dashed border-void-800 py-12 text-center text-sm text-void-500">{empty}</p>;
+  return <ul className="grid gap-3">{agents.map((agent) => <AgentRow key={agent.versionId} agent={agent} href={agentHref(agent)} />)}</ul>;
 }
 
 function AgentRow({ agent, href }: { agent: ProtectedPublishedAgentRead; href: string }) {
   return (
-    <li className="py-5">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+    <li className="rounded-[16px] border border-void-800 bg-void-900/40 p-5 transition-colors hover:border-void-700">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-void-100">{agent.name}</h2><EvidenceStatus state={agent.hireable ? "verified" : "unavailable"} label={agent.hireable ? "ELIGIBLE" : "REFUSED"} /></div>
-          <p className="mt-1 break-all font-mono text-sm text-dawg-300">{agent.fullSubname}</p>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-void-400"><span>{agent.capabilities.join(", ")}</span><span className="font-mono">Version {agent.version}</span><span className="font-mono">ID {agent.versionId.slice(0, 8)}</span></div>
-          <dl className="mt-4 grid gap-3 rounded-[12px] border border-void-800 bg-void-950 p-4 text-xs sm:grid-cols-3">
-            <div><dt className="font-semibold text-void-500">Price per protected hire</dt><dd className="mt-1 font-mono text-void-200">{formatUsdcAtomic(agent.priceAtomic)}</dd></div>
-            <div><dt className="font-semibold text-void-500">Verified external hires</dt><dd className="mt-1 text-void-200">{agent.verifiedExternalHires} receipt-backed job{agent.verifiedExternalHires === 1 ? "" : "s"}</dd></div>
-            <div><dt className="font-semibold text-void-500">Settled earnings</dt><dd className="mt-1 text-void-400">Unavailable until the protected owner projection lands</dd></div>
+          <div className="flex flex-wrap items-center gap-2.5"><h2 className="text-lg font-semibold tracking-tight text-void-100">{agent.name}</h2><EvidenceStatus state={agent.hireable ? "verified" : "unavailable"} label={agent.hireable ? "ELIGIBLE" : "REFUSED"} /></div>
+          <p className="mt-1.5 break-all font-mono text-sm text-dawg-300">{agent.fullSubname}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">{agent.capabilities.map((cap) => <span key={cap} className="rounded-full border border-void-800 bg-void-950 px-2.5 py-0.5 text-xs text-void-300">{cap}</span>)}</div>
+          <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+            <div><dt className="text-xs font-medium text-void-500">Price / hire</dt><dd className="mt-0.5 font-mono text-void-100 tnums">{formatUsdc(agent.priceAtomic)}</dd></div>
+            <div><dt className="text-xs font-medium text-void-500">Verified external hires</dt><dd className="mt-0.5 font-mono text-void-100 tnums">{agent.verifiedExternalHires}</dd></div>
+            <div><dt className="text-xs font-medium text-void-500">Version</dt><dd className="mt-0.5 font-mono text-void-300">{agent.version}</dd></div>
+            <div><dt className="text-xs font-medium text-void-500">Settled earnings</dt><dd className="mt-0.5 text-void-400">Unavailable until the protected owner projection lands</dd></div>
           </dl>
-          <p className="mt-2 text-xs leading-relaxed text-void-500">Published eligibility is registry state. Runtime proof and financial outcome remain attached to each job.</p>
-          <div className="mt-3 flex flex-wrap gap-2"><EvidenceStatus state={agent.mcpAvailability === "AVAILABLE" ? "verified" : "unavailable"} label={`MCP ${agent.mcpAvailability.toLowerCase()}`} />{agent.provenance && <EvidenceStatus state="verified" label="Provenance recorded" />}</div>
+          <p className="mt-2 text-xs leading-relaxed text-void-500">Runtime proof and financial outcome remain attached to each job.</p>
+          <div className="mt-4 flex flex-wrap gap-2"><EvidenceStatus state={agent.mcpAvailability === "AVAILABLE" ? "verified" : "unavailable"} label={`MCP ${agent.mcpAvailability.toLowerCase()}`} />{agent.provenance && <EvidenceStatus state="verified" label="Provenance recorded" />}</div>
           {agent.refusalReason && <p className="mt-3 break-words font-mono text-sm text-blood-300">{agent.refusalReason}</p>}
         </div>
         {agent.ownedByViewer || !agent.hireable ? <button type="button" disabled className="instrument-button instrument-button-primary lg:min-w-36">{agent.ownedByViewer ? "Published by you" : "Hire refused"}</button> : <Link href={href} scroll={false} className="instrument-button instrument-button-primary lg:min-w-36">Hire agent</Link>}
       </div>
-      <details className="mt-3">
+      <details className="mt-4 border-t border-void-800/70 pt-1">
         <summary className="flex min-h-11 cursor-pointer items-center gap-2 py-2 text-sm text-void-400">Identity, authority, and provenance <CaretRightIcon size={15} aria-hidden /></summary>
         <dl className="grid gap-x-6 gap-y-3 border-t border-void-800 py-4 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <Meta label="Creator ENS" value={agent.creatorParent} />
@@ -179,8 +180,8 @@ function AgentRow({ agent, href }: { agent: ProtectedPublishedAgentRead; href: s
 }
 
 function DraftList({ drafts }: { drafts: AgentLifecycleVersion[] }) {
-  if (!drafts.length) return <p className="border-y border-void-800 py-10 text-center text-sm text-void-500">No persisted drafts.</p>;
-  return <ul className="divide-y divide-void-800 border-y border-void-800">{drafts.map((draft) => <li key={draft.versionId} className="py-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-void-100">{draft.name}</h2><p className="mt-1 text-sm text-void-400">Draft version {draft.version}. Not published or hireable.</p>{draft.refusalReason && <p className="mt-2 break-words font-mono text-sm text-blood-300">{draft.refusalReason}</p>}</div><EvidenceStatus state="unavailable" label={draft.lifecycleState} /></div><details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm text-void-400">Draft identifiers and catalog snapshot</summary><dl className="grid gap-3 border-t border-void-800 py-4 text-xs sm:grid-cols-2"><Meta label="Version ID" value={draft.versionId} /><Meta label="Manifest hash" value={draft.manifestHash} /><Meta label="Manifest schema" value={String(draft.manifestSchemaVersion)} /><Meta label="MCP availability" value={draft.mcpAvailability} /><Meta label="Skills" value={draft.skillSummary?.map((skill) => `${skill.category}: ${skill.id}`).join(", ") || "Unavailable"} /><Meta label="Reviewed sources" value={draft.reviewedSources?.map((source) => `${source.repository} ${source.revision} (${source.use})`).join(", ") || "Unavailable"} /></dl></details></li>)}</ul>;
+  if (!drafts.length) return <p className="rounded-[14px] border border-dashed border-void-800 py-12 text-center text-sm text-void-500">No persisted drafts.</p>;
+  return <ul className="grid gap-3">{drafts.map((draft) => <li key={draft.versionId} className="rounded-[16px] border border-void-800 bg-void-900/40 p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-void-100">{draft.name}</h2><p className="mt-1 text-sm text-void-400">Draft version {draft.version}. Not published or hireable.</p>{draft.refusalReason && <p className="mt-2 break-words font-mono text-sm text-blood-300">{draft.refusalReason}</p>}</div><EvidenceStatus state="unavailable" label={draft.lifecycleState} /></div><details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm text-void-400">Draft identifiers and catalog snapshot</summary><dl className="grid gap-3 border-t border-void-800 py-4 text-xs sm:grid-cols-2"><Meta label="Version ID" value={draft.versionId} /><Meta label="Manifest hash" value={draft.manifestHash} /><Meta label="Manifest schema" value={String(draft.manifestSchemaVersion)} /><Meta label="MCP availability" value={draft.mcpAvailability} /><Meta label="Skills" value={draft.skillSummary?.map((skill) => `${skill.category}: ${skill.id}`).join(", ") || "Unavailable"} /><Meta label="Reviewed sources" value={draft.reviewedSources?.map((source) => `${source.repository} ${source.revision} (${source.use})`).join(", ") || "Unavailable"} /></dl></details></li>)}</ul>;
 }
 
 function Meta({ label, value }: { label: string; value: string }) { return <div className="min-w-0"><dt className="font-semibold uppercase tracking-wide text-void-500">{label}</dt><dd className="mt-1 break-all font-mono text-void-300">{value}</dd></div>; }

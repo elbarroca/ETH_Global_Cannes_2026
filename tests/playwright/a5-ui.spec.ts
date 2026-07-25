@@ -449,9 +449,16 @@ test("creates a recurring protected goal with explicit demo boundaries", async (
   await page.getByLabel("Goal statement").fill("Monitor liquidity evidence and report bounded execution risk");
   await expect(page.getByLabel("Cadence")).toHaveValue("5");
   await expect(page.getByLabel("Maximum agents")).toHaveValue("2");
-  await expect(page.getByLabel("Per-run cap, atomic")).toHaveValue("3000");
-  await expect(page.getByLabel("Daily cap, atomic")).toHaveValue("10000");
+  await expect(page.getByLabel("Per-run cap")).toHaveValue("3000");
+  await expect(page.getByLabel("Daily cap")).toHaveValue("10000");
   await expect(page.getByLabel("Execution mode")).toHaveValue("PROPOSE_SWAP");
+  const research = page.getByLabel("Research", { exact: true });
+  await research.focus();
+  await expect(research).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(research).not.toBeChecked();
+  await page.keyboard.press("Space");
+  await expect(research).toBeChecked();
   await page.getByRole("button", { name: "Activate goal" }).click();
   await expect.poll(() => created).not.toBeNull();
   expect(created).toMatchObject({ state: "ACTIVE", policy: POLICY });
@@ -461,9 +468,9 @@ test("workspace demonstrates agents, terminal report, proof links, and blocked A
   const errors = monitorErrors(page);
   await connectReady(page, "/dashboard");
   await expect(page.getByRole("heading", { name: GOAL.objective })).toBeVisible();
-  await expect(page.getByText("3000 / run")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Goal to converged evidence" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Parallel selected-agent lanes" })).toBeVisible();
+  await expect(page.getByText("0.003 USDC per run")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Latest run" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Selected agent lanes" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Converged report" })).toBeVisible();
   await expect(page.getByText("READY", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(AVAILABLE_AGENT.fullSubname).first()).toBeVisible();
@@ -499,15 +506,18 @@ test("workspace renders partial output without promoting it to verified", async 
   await expect(page.getByText("A6_BLOCKED_LIVE")).toHaveCount(0);
 });
 
-test("marketplace preserves URL tabs, dense authority rows, and external hire", async ({ page }) => {
+test("marketplace preserves URL tabs, authority evidence, and external hire", async ({ page }) => {
   await connectReady(page, "/marketplace?view=available");
   await expect(page.getByRole("link", { name: "Available" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByText(AVAILABLE_AGENT.fullSubname).first()).toBeVisible();
-  await expect(page.getByText("Version 1").first()).toBeVisible();
-  await expect(page.getByText("ID 44444444")).toBeVisible();
-  await expect(page.getByText("0.001 USDC (1,000 atomic units)").first()).toBeVisible();
-  await expect(page.getByText("Unavailable until the protected owner projection lands").first()).toBeVisible();
-  await expect(page.getByText("Provenance recorded")).toBeVisible();
+  const card = page.getByRole("listitem").filter({ hasText: AVAILABLE_AGENT.fullSubname });
+  await expect(card.getByText(AVAILABLE_AGENT.fullSubname).first()).toBeVisible();
+  await expect(card.getByText("Version", { exact: true })).toBeVisible();
+  await expect(card.getByText(String(AVAILABLE_AGENT.version), { exact: true })).toBeVisible();
+  await expect(card.getByText("Unavailable until the protected owner projection lands")).toBeVisible();
+  await expect(card.getByText("Provenance recorded")).toBeVisible();
+  await card.getByText("Identity, authority, and provenance").click();
+  await expect(card.getByText(AVAILABLE_AGENT.versionId, { exact: true })).toBeVisible();
+  await expect(card.getByText("0.001 USDC (1,000 atomic units)")).toBeVisible();
   await page.getByRole("link", { name: "Hire agent" }).click();
   await expect(page).toHaveURL(new RegExp(`agentId=${AVAILABLE_AGENT.versionId}`));
   await expect(page.getByRole("dialog", { name: `Run ${AVAILABLE_AGENT.name}` })).toBeVisible();
@@ -536,7 +546,7 @@ test("catalog V3 creation sends only template identity fields and publishes the 
   const stageBox = await page.getByTestId("agent-stage").boundingBox();
   const descriptionBox = await page.getByLabel("Description").boundingBox();
   expect(dialogBox?.height).toBeLessThan(760);
-  expect(stageBox?.height).toBeLessThan(380);
+  expect(stageBox?.height).toBeLessThan(420);
   expect(descriptionBox?.height).toBeLessThan(140);
   await page.getByLabel("Agent name").focus();
   await expect(page.getByLabel("Agent name")).toBeFocused();
@@ -555,7 +565,8 @@ test("catalog V3 creation sends only template identity fields and publishes the 
   await expect(page.getByText("Read-only sources the protected runtime may query.")).toBeVisible();
   await expect(page.getByText("Included by template").first()).toBeVisible();
   await expect(page.getByText("Provider readiness is separate from the selected skills.", { exact: false })).toBeVisible();
-  await expect(page.getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
+  const providerReadiness = page.locator("details").filter({ hasText: "Inspect catalog provider readiness" });
+  await expect(providerReadiness.getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
   await page.locator('[data-category-icon="PERSONA"]').scrollIntoViewIfNeeded();
   await page.screenshot({ path: "test-results/visual/a5-create-capabilities-1440.png" });
   await page.getByRole("button", { name: /Continue/ }).click();
