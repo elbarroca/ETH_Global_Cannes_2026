@@ -24,7 +24,7 @@ export function WalletConnectButton() {
           : "Connect Wallet";
 
     return (
-      <>
+      <div className="relative flex items-center">
         <button
           type="button"
           disabled={!connector || connect.isPending}
@@ -34,16 +34,19 @@ export function WalletConnectButton() {
             connect.reset();
             connect.mutate({ connector, chainId: arcTestnet.id });
           }}
-          className="shine-sweep flex items-center gap-2 rounded-lg bg-dawg-500 px-3 py-1.5 text-sm font-bold text-void-950 transition-colors hover:bg-dawg-400 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl bg-dawg-500 px-4 py-2 text-sm font-bold text-void-950 transition-[background-color,transform] hover:bg-dawg-400 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
         >
           {label}
         </button>
         {connect.error && (
-          <span className="sr-only" role="alert">
-            Wallet connection failed. Try again.
-          </span>
+          <p
+            className="identifier-value fixed left-4 right-4 top-16 z-[80] max-h-24 overflow-auto rounded-xl border border-blood-700 bg-void-900 px-3 py-2 text-xs leading-relaxed text-blood-200 md:absolute md:left-auto md:right-0 md:top-[calc(100%+0.5rem)] md:w-80"
+            role="alert"
+          >
+            Wallet connection failed: {connect.error.message}
+          </p>
         )}
-      </>
+      </div>
     );
   }
 
@@ -54,7 +57,7 @@ export function WalletConnectButton() {
       : "Disconnect wallet";
 
   return (
-    <>
+    <div className="relative flex items-center">
       <button
         type="button"
         disabled={disconnect.isPending}
@@ -65,15 +68,18 @@ export function WalletConnectButton() {
           disconnect.reset();
           disconnect.mutate();
         }}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-void-700/60 bg-void-800 text-void-400 transition-colors hover:bg-void-700 hover:text-void-200 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex h-11 w-11 items-center justify-center rounded-xl border border-void-700 bg-void-800 text-void-300 transition-[background-color,color,transform] hover:bg-void-700 hover:text-void-100 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span aria-hidden="true">×</span>
       </button>
       {disconnect.error && (
-        <span className="sr-only" role="alert">
-          Wallet disconnect failed. Try again.
-        </span>
+        <p
+          className="identifier-value fixed left-4 right-4 top-16 z-[80] max-h-24 overflow-auto rounded-xl border border-blood-700 bg-void-900 px-3 py-2 text-xs leading-relaxed text-blood-200 md:absolute md:left-auto md:right-0 md:top-[calc(100%+0.5rem)] md:w-80"
+          role="alert"
+        >
+          Wallet disconnect failed: {disconnect.error.message}
+        </p>
       )}
-    </>
+    </div>
   );
 }

@@ -30,6 +30,37 @@ const AVAILABLE_AGENT = {
 
 const JOB_ID = "55555555-5555-4555-8555-555555555555";
 const EFFECT_ID = "d".repeat(64);
+const TEST_WALLET = "0x1111111111111111111111111111111111111111";
+const TELEGRAM_LINK_CODE = "A5LINK42";
+const TELEGRAM_CODE_TTL_MS = 10 * 60 * 1000;
+
+const TELEGRAM_USER = {
+  id: "telegram-user",
+  walletAddress: TEST_WALLET,
+  telegram: {
+    chatId: null,
+    username: null,
+    verified: false,
+    notifyPreference: "every_cycle",
+  },
+  agent: {
+    active: false,
+    riskProfile: "balanced",
+    maxTradePercent: 5,
+    lastCycleId: 0,
+    lastCycleAt: null,
+    approvalMode: "always",
+    approvalTimeoutMin: 10,
+  },
+  fund: {
+    depositedUsdc: 0,
+    htsShareBalance: 0,
+    currentNav: 0,
+  },
+  hotWalletIndex: null,
+  hotWalletAddress: null,
+  inftTokenId: null,
+} as const;
 
 const JOB_LIST_ITEM = {
   jobId: JOB_ID,
@@ -229,6 +260,31 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}): Promis
     const url = new URL(request.url());
     const path = url.pathname;
 
+    if (path === "/api/auth/session") {
+      await fulfillJson(route, {
+        authenticated: true,
+        walletAddress: TEST_WALLET,
+        userId: TELEGRAM_USER.id,
+        expiresAt: "2026-07-25T02:00:00.000Z",
+      });
+      return;
+    }
+    if (path === "/api/onboard") {
+      await fulfillJson(route, {
+        userId: TELEGRAM_USER.id,
+        walletAddress: TEST_WALLET,
+        proxyWalletAddress: null,
+        telegramLinkCode: TELEGRAM_LINK_CODE,
+        inftTokenId: null,
+        existing: true,
+      });
+      return;
+    }
+    if (path.startsWith("/api/user/")) {
+      await fulfillJson(route, TELEGRAM_USER);
+      return;
+    }
+
     if (path === "/api/kernel/agents") {
       if (request.method() === "POST") {
         await fulfillJson(route, { agent: OWNER_AGENT }, 201);
@@ -274,11 +330,55 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}): Promis
       await fulfillJson(route, { agents: {} });
       return;
     }
+    if (path.includes("/api/cycle/pending/")) {
+      await fulfillJson(route, null);
+      return;
+    }
     if (path.includes("/api/marketplace") || path.includes("/api/cycle")) {
       await fulfillJson(route, path.includes("history") ? [] : { agents: [] });
       return;
     }
     await fulfillJson(route, { error: "Not configured in browser fixture" }, 503);
+  });
+}
+
+async function installInjectedWallet(page: Page): Promise<void> {
+  await page.addInitScript(({ walletAddress, chainId }) => {
+    let connected = false;
+    const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+    const provider = {
+      request: async ({ method }: { method: string }): Promise<unknown> => {
+        if (method === "eth_requestAccounts") {
+          connected = true;
+          return [walletAddress];
+        }
+        if (method === "eth_accounts") return connected ? [walletAddress] : [];
+        if (method === "eth_chainId") return chainId;
+        if (method === "wallet_switchEthereumChain" || method === "wallet_addEthereumChain") {
+          return null;
+        }
+        return null;
+      },
+      on: (event: string, listener: (...args: unknown[]) => void): void => {
+        const current = listeners.get(event) ?? new Set();
+        current.add(listener);
+        listeners.set(event, current);
+      },
+      removeListener: (event: string, listener: (...args: unknown[]) => void): void => {
+        listeners.get(event)?.delete(listener);
+      },
+    };
+    Object.defineProperty(window, "ethereum", {
+      configurable: true,
+      value: provider,
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (): Promise<void> => undefined },
+    });
+  }, {
+    walletAddress: TEST_WALLET,
+    chainId: "0x4cef52",
   });
 }
 
@@ -298,6 +398,86 @@ test("preserves the product shell without horizontal overflow", async ({ page })
       expect(overflow, `${path} overflows at ${width}px`).toBeLessThanOrEqual(1);
     }
   }
+});
+
+test("presents one fail-closed agent-commerce story on the landing page", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Hire agents. Verify every outcome." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open dashboard" })).toHaveAttribute("href", "/dashboard");
+  await expect(page.getByRole("link", { name: "Browse agents" })).toHaveAttribute("href", "/marketplace");
+  await expect(page.getByText(/Local product capture with fixture data/)).toBeVisible();
+  await expect(page.getByText(/Drafts, fixtures, caches, and HTTP 200 responses/)).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/Observed HCS sequence|Configured explorer identifiers|How a hunt flows/);
+  await page.screenshot({
+    path: "test-results/visual/a5-landing-desktop-1440x900.png",
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.screenshot({
+    path: "test-results/visual/a5-landing-mobile-390x844.png",
+    fullPage: true,
+  });
+});
+
+test("keeps Telegram linking explicit, contained, and fail-closed", async ({ page }) => {
+  await page.clock.install();
+  await installInjectedWallet(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Connect Wallet" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Link Telegram to this wallet session" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toBeFocused();
+  await expect(dialog).toContainText("It never replaces wallet authority.");
+  await expect(dialog.getByLabel(`One-time Telegram code ${TELEGRAM_LINK_CODE}`)).toHaveText(
+    TELEGRAM_LINK_CODE,
+  );
+  await page.screenshot({ path: "test-results/visual/a5-telegram-mobile-390x844.png" });
+  const mobileOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(mobileOverflow).toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: "test-results/visual/a5-telegram-desktop-1440x900.png" });
+
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("link", { name: "Open Telegram" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "Copy code" })).toBeFocused();
+
+  await dialog.getByRole("button", { name: "Copy code" }).click();
+  await expect(dialog.getByText("Code copied to the clipboard.")).toBeVisible();
+
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (): Promise<void> => {
+          throw new Error("Clipboard permission denied");
+        },
+      },
+    });
+  });
+  await dialog.getByRole("button", { name: "Copied" }).click();
+  await expect(dialog.getByText(/Clipboard access was refused/)).toBeVisible();
+
+  await page.clock.fastForward(TELEGRAM_CODE_TTL_MS + 1_000);
+  await expect(dialog.getByText("This code expired without linking an account.")).toBeVisible();
+
+  await page.route("**/api/onboard", async (route) => {
+    await fulfillJson(route, { error: "Fresh authorization required" }, 401);
+  });
+  await dialog.getByRole("button", { name: "Create new code" }).click();
+  await expect(dialog.getByText("A new code could not be created. Try again.")).toBeVisible();
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test("supports keyboard dialog flow and immutable publication copy", async ({ page }) => {
@@ -422,8 +602,8 @@ test("remains operable at 200 percent zoom", async ({ page }) => {
 test("honors reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const duration = await page.locator(".fade-in-up").first().evaluate((element) =>
-    getComputedStyle(element).animationDuration,
+  const duration = await page.getByRole("link", { name: "Open dashboard" }).evaluate((element) =>
+    getComputedStyle(element).transitionDuration,
   );
   expect(Number.parseFloat(duration)).toBeLessThanOrEqual(0.00001);
 });

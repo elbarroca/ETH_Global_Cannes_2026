@@ -1,25 +1,23 @@
 import Link from "next/link";
+import { landingPrimaryClass } from "@/components/landing/landing-cta";
 
 export function LandingMarketplaceSection() {
   return (
-    <section className="w-full max-w-5xl mx-auto px-6 pb-24 pt-4">
-      <div className="rounded-2xl border border-dawg-500/20 bg-gradient-to-br from-void-900/80 via-void-950/90 to-blood-900/10 p-8 md:p-10 space-y-4 shadow-[0_0_60px_-24px_rgba(220,38,38,0.15)]">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div className="space-y-3 max-w-2xl">
-            <p className="text-xs font-mono uppercase tracking-widest text-gold-400/90">Published agent registry</p>
-            <h2 className="text-xl md:text-2xl font-semibold text-void-100">Choose an immutable specialist version</h2>
-            <p className="text-sm md:text-base text-void-400 leading-relaxed">
-              Compare owner, version, price, capabilities, and evidence state before submitting a protected job.
-              Delivery and financial outcomes appear only when the authenticated kernel record supports them.
-            </p>
-          </div>
-          <Link
-            href="/marketplace"
-            className="shrink-0 inline-flex items-center justify-center rounded-xl bg-dawg-500/90 hover:bg-dawg-400 px-6 py-3 font-semibold text-void-950 transition-colors"
-          >
-            Browse the Pack →
-          </Link>
+    <section id="registry" className="mx-auto w-full max-w-7xl px-5 pb-20 md:px-8 md:pb-28">
+      <div className="grid items-end gap-8 border-y border-void-800 py-10 md:grid-cols-[1fr_auto] md:py-12">
+        <div className="max-w-3xl">
+          <h2 className="text-3xl font-bold tracking-[-0.03em] text-void-100 md:text-4xl">
+            Choose the exact agent version.
+          </h2>
+          <p className="mt-4 max-w-[64ch] text-sm leading-relaxed text-void-400 md:text-base">
+            Compare owner, immutable version, price, capabilities, and hire eligibility before
+            submitting a protected job. The registry displays the exact refusal when a version
+            cannot be hired.
+          </p>
         </div>
+        <Link href="/marketplace" className={landingPrimaryClass}>
+          Browse agents
+        </Link>
       </div>
     </section>
   );

@@ -3,6 +3,52 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/a5_taste_audit
+task_id: A5-UI-TASTE-REMEDIATION-20260725
+task_instance_id: A5-UI-TASTE-REMEDIATION-20260725:W1:A22BBB3
+generation: 1
+sprint: A5_local_design_remediation
+mode: sole_writer
+branch: Eth_global_lisbon_
+start_sha: a22bbb3b7d049c0a9827b87fb4ce7cb634a43d82
+control_sha: a22bbb3b7d049c0a9827b87fb4ce7cb634a43d82
+token: A5-TASTE-W1-A22BBB3-20260725
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T00:16:16Z
+expires_at: 2026-07-25T02:15:00Z
+allowed_paths:
+  - app/page.tsx
+  - components/landing/landing-cta.tsx
+  - components/landing/landing-marketplace-section.tsx
+  - components/telegram-modal.tsx
+  - components/wallet-connect.tsx
+  - tests/playwright/a5-ui.spec.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T00:16:16Z
+deadline: 2026-07-25T02:15:00Z
+expected_exit: cohesive fail-closed landing and Telegram authentication redesign with exact local verification and one atomic commit
+external_effect_authority: safe local allowed files, deterministic checks, loopback browser verification, screenshots as UI evidence only, and one atomic commit; no push deploy sponsor call signature transaction form spend upload public claim or gate advancement
+completed_at: 2026-07-25T00:28:40Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - landing now presents one asymmetric protected-commerce story with one dashboard CTA one authority-path CTA and one marketplace CTA
+  - local fixture screenshot remains explicitly non-promotable and missing or stale evidence remains unavailable rather than verified online deployed or hireable
+  - Telegram dialog preserves the existing deep link and refresh callbacks while adding semantic modal focus containment scroll restoration coherent code rendering and explicit loading copy error expiry refresh and refusal states
+  - wallet connect and disconnect retain the installed Wagmi mutation flow and stable labels while refusals are visible
+  - lint passed with zero errors and 23 inherited warnings; typecheck foundation 9 of 9 A5 3 of 3 Playwright 10 of 10 secret scan 31-page production build and diff check passed
+  - Chromium visual evidence was captured at 390x844 and 1440x900 for both landing and Telegram modal under test-results/visual as local UI evidence only
+remaining_blocks:
+  - independent immutable-SHA design remediation audit
+  - live Telegram bot link and same-SHA protected journey evidence
+  - every A5 acceptance release sponsor bounty deployment push and public claim gate
+external_effects_attempted: none
+result: PASS_TO_AUDIT_DESIGN_REMEDIATION_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token A5-TASTE-W1-A22BBB3-20260725 after the containing commit and clean allowed-path verification
+status: closed
+```
+
+```yaml
 owner: C0 coordinator /root
 task_id: C0-OG-TRANSFER-RECONCILIATION-20260725
 task_instance_id: C0-OG-TRANSFER-RECONCILIATION-20260725:E9B0E78B
