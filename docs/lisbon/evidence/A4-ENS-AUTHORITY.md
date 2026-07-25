@@ -681,7 +681,15 @@ live ENS/0G/Uniswap/sponsor call, shared or managed database effect, managed
 migration deploy, wallet signature, transaction, push, deployment, form, funding, upload,
 spend, public identifier, live proof, or claim promotion was attempted.
 
-W8 returns only `PASS_TO_AUDIT_REMEDIATION`. Until immutable W8 audit passes,
-the sequential Kernel owner may not consume publication decisions.
-`A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor
-qualification, push, release, and public claims remain closed.
+## W8 immutable upgrade-preflight audit
+
+- Audit SHA: `9b70f246ec91e3475851b873ed43152ebfa36d75`
+- Tree: `fdb9ad188a1ff65019673ae6f7c92b5fe0b151ba`
+- Audited range: `439ec3fe5ca5013abedb8b463a9e6d29dac0453a..9b70f246ec91e3475851b873ed43152ebfa36d75`
+- Result: `PASS_TO_NEXT_GATE; LOCAL_ONLY`
+
+The independent audit found no W8 defect. Exact W7 canonical-key/null semantics, canonical W6 upgrade/replay, noncanonical scale-alias refusal, immutable row preservation, ACL/marker rollback, access-exclusive fencing, readiness boundary, and stop-the-world W7/W8 deployment prerequisite all passed. Fresh/Cannes, unsafe-role, canonical/noncanonical upgrade, and same-database repeat-deploy lanes preserved migration counts, marker state, decision counts, and normalized schema hash.
+
+All available independent lanes passed, including environment/Prisma, ten-migration replay, lint/typecheck, foundation/auth/Kernel/A4/A5, integration-only, e2e/resilience/redaction, boot, secret/shell/diff checks, build 31 pages, and HTTP 200. The audit host lacked Go, so Go-dependent A3 and aggregate integration were not independently promoted; W8 writer evidence records their checksum-pinned pass. Audit cleanup left no repository mutation or external effect.
+
+W8 now opens only the sequential Kernel owner to consume durable publication decisions and repair transaction-time freshness, publication event, SQL integrity, lifecycle idempotency, and request bounds. `A4_ACCEPTED`, A5 acceptance, mandatory A6 entry, live ENS, sponsor qualification, push, release, and public claims remain closed.

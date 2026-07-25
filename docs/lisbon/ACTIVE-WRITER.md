@@ -3,6 +3,56 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 coordinator /root
+task_id: C0-A4-W8-AUDIT-RECONCILIATION-20260725
+task_instance_id: C0-A4-W8-AUDIT-RECONCILIATION-20260725:9B70F24
+generation: 1
+sprint: A4_publication_upgrade_preflight_audit_reconciliation
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: 9b70f246ec91e3475851b873ed43152ebfa36d75
+control_sha: 9b70f246ec91e3475851b873ed43152ebfa36d75
+audit_sha: 9b70f246ec91e3475851b873ed43152ebfa36d75
+token: C0-A4-W8-AUDIT-RECONCILE-9B70F24-7745E29C-3506-48B4-A90A-F127B1E5DBB8
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-25T06:40:57Z
+expires_at: 2026-07-25T07:40:57Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EVIDENCE.md
+  - docs/lisbon/CLAIM-MATRIX.md
+  - docs/lisbon/TRACK-MATRIX.md
+  - docs/lisbon/evidence/A4-ENS-AUTHORITY.md
+  - CHANGELOG-LISBON.md
+started_at: 2026-07-25T06:40:57Z
+deadline: 2026-07-25T07:40:57Z
+expected_exit: record exact W8 PASS_TO_NEXT_GATE and open only sequential Kernel remediation
+acceptance_items:
+  - bind audit target 9b70f24 tree fdb9ad1 parent 439ec3f and zero findings
+  - record canonical/noncanonical upgrade rollback repeat deploy and stop-the-world proof
+  - record independent Go limitation without erasing writer checksum-pinned evidence
+  - keep A4_ACCEPTED A5 A6 live sponsor push release and claims closed
+external_effect_authority: safe local control files deterministic checks and one atomic local commit only; no product change push deploy managed migration live call signature transaction form funding upload spend or public claim
+completed_at: 2026-07-25T06:44:00Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+acceptance_evidence:
+  - W8 audit bound target 9b70f24 tree fdb9ad1 parent 439ec3f and returned PASS_TO_NEXT_GATE with zero findings
+  - canonical and noncanonical upgrade rollback locks readiness stop-the-world and repeat deploy passed
+  - audit Go limitation recorded without erasing writer checksum-pinned evidence
+  - reconciliation diff check lint zero errors with 23 inherited warnings typecheck foundation 9 of 9 secret scan and 31-page build passed
+  - only sequential Kernel remediation opens; A4_ACCEPTED A5 A6 live sponsor push release and claims remain closed
+remaining_blocks:
+  - Kernel publication decision consumption event SQL idempotency and body-bound remediation
+  - immutable Kernel audit before A4 acceptance
+  - every live ENS sponsor push release and public claim gate
+external_effects_attempted: none
+result: A4_W8_AUDIT_PASS_RECONCILED_LOCAL_ONLY
+clean_status: EXPECT_CLEAN_AFTER_CONTAINING_COMMIT
+lock_release: release only matching token C0-A4-W8-AUDIT-RECONCILE-9B70F24-7745E29C-3506-48B4-A90A-F127B1E5DBB8 after containing commit and clean verification
+status: closed
+```
+
+```yaml
 owner: ENS Integrator /root/a4_ensv2_gap_inventory
 task_id: A4-ENS-PUBLICATION-UPGRADE-PREFLIGHT-20260725
 task_instance_id: A4-ENS-PUBLICATION-UPGRADE-PREFLIGHT-20260725:W8:439EC3F

@@ -2,6 +2,13 @@
 
 Prior-state boundary: `bfa7bd37c573e2e49525d965f7f937210e170d72`.
 
+## 2026-07-25 - W8 upgrade-preflight immutable audit
+
+- Independent audit accepted exact SHA `9b70f246ec91e3475851b873ed43152ebfa36d75`, tree `fdb9ad188a1ff65019673ae6f7c92b5fe0b151ba`, with no W8 finding.
+- Proved exact W7 key/null semantics, canonical upgrade/replay, noncanonical fail-closed rollback with unchanged evidence/ACL/marker, access-exclusive fencing, stop-the-world deployment boundary, all four migration lanes, and same-database no-op repeat deploy/schema stability.
+- The audit host lacked Go, so Go-dependent A3/aggregate results were not independently promoted; W8 writer checksum-pinned evidence remains recorded. No external effect occurred.
+- Opened only sequential Kernel consumption remediation. `A4_ACCEPTED`, A5, mandatory A6 entry, live ENS, sponsor, push, release, and claims remain closed.
+
 ## 2026-07-25 - W8 publication upgrade preflight
 
 - Added only additive migration `20260725064000_a4_publication_upgrade_preflight`. Under one PostgreSQL transaction and an access-exclusive decision-table lock, it revokes runtime admission, recomputes the exact W7 key for every immutable decision, and refuses noncanonical evidence before installing its readiness marker or restoring admission.
