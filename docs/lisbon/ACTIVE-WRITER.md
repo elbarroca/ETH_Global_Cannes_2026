@@ -5297,7 +5297,13 @@ external_effects_denied:
   - funding signing transaction or faucet
   - secret output
   - push or deploy
-status: active
+completed_at: 2026-07-26T01:35:49Z
+evidence:
+  - configured wallet-set read succeeded with exact ID match and DEVELOPER custody
+  - exact agent-refId and UNI-SEPOLIA wallet list succeeded with zero wallets
+  - no Circle mutation occurred and no secret was emitted
+remaining_block: wallet creation refusal requires Payments-owner adapter diagnosis; no create replay is authorized by this probe
+status: complete
 ```
 
 ```yaml
