@@ -354,11 +354,25 @@ export async function getAuthSession(): Promise<AuthSessionResponse> {
   return apiFetch<AuthSessionResponse>("/api/auth/session", { cache: "no-store" });
 }
 
-export interface LegacyCreateAgentDraftInput {
+export type AgentCapability =
+  | "research"
+  | "market-analysis"
+  | "risk-analysis"
+  | "uniswap-swap";
+
+export type CreatorMcpBindingInput =
+  | { provider: "coingecko"; capability: "spot-price" | "market-snapshot" }
+  | {
+      provider: "the-graph";
+      capability: "pinned-deployment-lookup" | "liquidity-volume-snapshot";
+    };
+
+export interface CreatorCreateAgentDraftInput {
   name: string;
   description: string;
   instructions: string;
-  capabilities: readonly string[];
+  capabilities: readonly AgentCapability[];
+  mcp: readonly CreatorMcpBindingInput[];
   agentId?: string;
 }
 
@@ -369,7 +383,7 @@ export interface CatalogCreateAgentDraftInput {
   agentId?: string;
 }
 
-export type CreateAgentDraftInput = LegacyCreateAgentDraftInput | CatalogCreateAgentDraftInput;
+export type CreateAgentDraftInput = CreatorCreateAgentDraftInput | CatalogCreateAgentDraftInput;
 
 export type AgentCatalogCategory = "PERSONA" | "DATA" | "ACTION" | "CONNECTION";
 export type AgentCatalogAvailability = "AVAILABLE" | "CONFIGURED" | "UNAVAILABLE" | "NOT_REQUIRED";
@@ -578,8 +592,33 @@ export async function createAgentDraft(
           description: input.description,
           instructions: input.instructions,
           capabilities: input.capabilities,
+          mcp: input.mcp.map(({ provider, capability }) => ({ provider, capability })),
           ...(input.agentId ? { agentId: input.agentId } : {}),
         }),
+  });
+  return response.version;
+}
+
+export async function attachAgentWallet(
+  versionId: string,
+  idempotencyKey?: string,
+): Promise<AgentLifecycleVersion> {
+  const response = await apiFetch<{ action: string; version: AgentLifecycleVersion }>("/api/kernel/agents", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey ?? kernelIdempotencyKey() },
+    body: JSON.stringify({ action: "ATTACH_AGENT_WALLET", versionId }),
+  });
+  return response.version;
+}
+
+export async function publishWalletAgentVersion(
+  versionId: string,
+  idempotencyKey?: string,
+): Promise<AgentLifecycleVersion> {
+  const response = await apiFetch<{ action: string; version: AgentLifecycleVersion }>("/api/kernel/agents", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey ?? kernelIdempotencyKey() },
+    body: JSON.stringify({ action: "PUBLISH_WALLET_VERSION", versionId }),
   });
   return response.version;
 }

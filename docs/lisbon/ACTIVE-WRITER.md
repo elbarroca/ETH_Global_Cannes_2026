@@ -3,6 +3,51 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Frontend Builder /root/wallet_authority_modal
+task_id: WALLET-AUTHORITY-UI-R1
+task_instance_id: WALLET-AUTHORITY-UI-R1:R1:0D438A4
+generation: 1
+sprint: Graph Continuity wallet-authority creator flow
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 0d438a47f23141f183c423aef9111333916187bf
+control_sha: 0d438a47f23141f183c423aef9111333916187bf
+token: WALLET-AUTHORITY-UI-R1-0D438A4-20260726T003055Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-26T01:04:47Z
+expires_at: 2026-07-26T01:45:55Z
+allowed_paths:
+  - components/create-agent-modal.tsx
+  - app/marketplace/page.tsx
+  - lib/api.ts
+  - tests/a5/auth-state-regression.test.ts
+  - tests/playwright/a5-ui.spec.ts
+  - design-qa.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-26T00:30:55Z
+deadline: 2026-07-26T01:45:55Z
+expected_exit: protected wallet-authority creator flow with Graph capability selection and fail-closed receipt evidence
+external_effect_authority: local files deterministic mocked tests screenshots and one atomic local commit only; no live Circle Graph 0G ENS call managed migration push deploy signature transaction funding upload submission or claim
+external_effects_attempted: none
+claim_changes: none; local and mocked UI evidence is not live sponsor or release proof
+completed_at: 2026-07-26T01:04:47Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - scoped ESLint PASS and full npm run lint PASS with zero errors and 23 inherited warnings
+  - npm run typecheck PASS
+  - npm run test:a5 11 of 11 PASS
+  - npm test 10 of 10 PASS
+  - CI=1 npm run test:playwright build PASS and Chromium 32 of 32 PASS
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+  - local mocked 1440 stack and wallet captures plus 375 768 and 1440 overflow checks PASS
+remaining_block: managed wallet-authority migration 0G generation route hardening deploy and same-SHA external-buyer live journey remain separately gated and unauthorized
+verdict: PASS_TO_AUDIT; LOCAL_ONLY; LIVE_EFFECT_BLOCKED
+lock_release: release only exact token WALLET-AUTHORITY-UI-R1-0D438A4-20260726T003055Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/wallet_authority_kernel
 task_id: WALLET-AUTHORITY-KERNEL-R1
 task_instance_id: WALLET-AUTHORITY-KERNEL-R1:R1:FD8752A

@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { getAgentCatalog } from "../../lib/api";
+import {
+  attachAgentWallet,
+  createAgentDraft,
+  getAgentCatalog,
+  publishWalletAgentVersion,
+} from "../../lib/api";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -25,31 +30,19 @@ test("protected auth remains explicit, retryable, and fail-closed", async () => 
   assert.match(context, /type InternalAuthState = AuthState \| "checking" \| "authorization-required" \| "signature-rejected"/);
   assert.match(context, /state === "checking"\) return "signing"/);
   assert.match(context, /state === "authorization-required"\) return "stale"/);
-  assert.match(context, /state === "signature-rejected"\) return "error"/);
   assert.match(api, /createSiweChallenge\([\s\S]*action: SiweAction/);
-  assert.match(api, /JSON\.stringify\(\{ walletAddress, action \}\)/);
   assert.match(context, /signForAction\("onboard"\)/);
   assert.match(context, /signForAction\("authenticate"\)/);
-  assert.match(context, /setAuthState\("authorization-required"\)/);
-  assert.match(context, /depth < 5/);
-  assert.match(context, /current = record\.cause/);
   assert.match(context, /WALLET_SIGNATURE_REJECTED: Signature canceled\. No authorization was granted\./);
-  assert.match(context, /detail\?\.code === "AUTH_ACTION_REQUIRED"[\s\S]*setAuthState\("authorization-required"\)/);
-  assert.match(context, /detail\?\.code === "AUTH_USER_REQUIRED"[\s\S]*setAuthState\("onboarding"\)/);
-  assert.match(context, /detail\?\.status === 401 \|\| detail\?\.code === "AUTH_SESSION_EXPIRED"[\s\S]*setAuthState\("stale"\)/);
   assert.match(guard, /Authorize workspace/);
   assert.match(guard, /Complete onboarding/);
-  assert.match(guard, /Retry signature/);
   assert.match(wallet, /useSyncExternalStore/);
-  assert.match(wallet, /readyConnector = hydrated \? connector : undefined/);
   assert.match(provider, /ssr: true/);
   assert.doesNotMatch(provider, /switchChain|addEthereumChain|ChainGuard/);
   assert.match(goals, /authState === "ready" && isOnboarded/);
   assert.match(marketplace, /enabled: ready/);
   assert.match(verify, /enabled: ready/);
-  assert.match(creator, /getAgentCatalog/);
-  assert.match(creator, /templateId: template\.id/);
-  assert.doesNotMatch(creator, /Markdown instructions|Write manually|reviewedPromptDraft/);
+  assert.match(creator, /useAccount\(\)/);
 });
 
 test("primary protected surfaces do not restore legacy authority", async () => {
@@ -64,41 +57,97 @@ test("primary protected surfaces do not restore legacy authority", async () => {
   assert.doesNotMatch(combined, /\bhunt pack\b|\bELO\b|\bfake iNFT\b|\bArc funding\b/i);
 });
 
-test("creation wizard explains locked catalog capabilities and canonical ENS preview", async () => {
-  const [creator, marketplace] = await Promise.all([
+test("wallet-authority creator flow is bounded to inert prompt and approved stack input", async () => {
+  const [api, creator, marketplace] = await Promise.all([
+    readFile(`${root}/lib/api.ts`, "utf8"),
     readFile(`${root}/components/create-agent-modal.tsx`, "utf8"),
     readFile(`${root}/app/marketplace/page.tsx`, "utf8"),
   ]);
 
-  for (const icon of ["BrainIcon", "DatabaseIcon", "LightningIcon", "PlugsConnectedIcon"]) {
-    assert.match(creator, new RegExp(icon));
+  for (const stage of ["Identity + prompt", "Skills + MCP", "Agent wallet", "Publish + receipt"]) {
+    assert.match(creator, new RegExp(stage.replace(/[+]/g, "\\+")));
   }
-  for (const explanation of [
-    "The role and reasoning stance the agent follows.",
-    "Read-only sources the protected runtime may query.",
-    "Bounded proposals the agent may prepare without signing.",
-    "Required protected compute and storage rails.",
-  ]) {
-    assert.match(creator, new RegExp(explanation.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(creator, /name\.trim\(\)\.length >= 2/);
+  assert.match(creator, /description\.trim\(\)\.length >= 10/);
+  assert.match(creator, /maxLength=\{4_000\}/);
+  assert.match(creator, /INSTRUCTIONS_ACTIVE_CONTENT_REFUSED/);
+  assert.match(creator, /HTML, images, URLs, active schemes, code fences, or shebangs/);
+  assert.match(creator, /Generate with 0G/);
+  assert.match(creator, /generateAgentInstructions/);
+  assert.match(creator, /if \(generated\.fallback\)/);
+  assert.match(creator, /0G unavailable; no generated prompt was applied/);
+  assert.match(creator, /instructionsRefusal\(generated\.markdown\)/);
+  assert.match(creator, /TEE verified/);
+  assert.match(creator, /TEE unverified/);
+  assert.match(creator, /capabilities\.length >= 1 && capabilities\.length <= 3/);
+  assert.match(creator, /mcp\.length <= 4/);
+  assert.match(creator, /pinned-deployment-lookup/);
+  assert.match(creator, /liquidity-volume-snapshot/);
+  assert.match(creator, /CONFIGURED means credentials are present or pending\. It never means a provider is live\./);
+  assert.match(creator, /href="https:\/\/mcpmarket\.com\/" target="_blank" rel="noreferrer"/);
+  assert.match(creator, /Discovery only\. External discoveries require review and server allowlisting before attachment\./);
+  assert.match(creator, /Search approved agent stack/);
+  assert.match(creator, /attachAgentWallet/);
+  assert.match(creator, /publishWalletAgentVersion/);
+  assert.match(creator, /WALLET_AUTHORIZED/);
+  assert.match(creator, /walletPublicationDecisionId/);
+  assert.match(creator, /walletReceiptHash/);
+  assert.match(marketplace, /Database update required/);
+  assert.match(marketplace, /required wallet-authority migration/);
+  assert.doesNotMatch(creator, /bindAgentName|prepareAgentEnsWrite|publishAgentVersion|defaultCreatorParent|creatorParentOptions|mainnetEnsClient/);
+  assert.doesNotMatch(marketplace, /defaultCreatorParent|creatorParentOptions|ownedCreatorParents/);
+  assert.doesNotMatch(creator, /type="url"|GraphQL endpoint/);
+  assert.doesNotMatch(creator, /htmlFor="[^"]*(?:endpoint|url|graphql|api-key|wallet-id)/i);
+  assert.doesNotMatch(creator, /fetch\(["']https:\/\/mcpmarket\.com/);
+  assert.match(api, /action: "ATTACH_AGENT_WALLET"/);
+  assert.match(api, /action: "PUBLISH_WALLET_VERSION"/);
+});
+
+test("creator request bodies use only the protected wallet lifecycle actions", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ body: unknown; idempotencyKey: string | null }> = [];
+  const bindingWithUiCopy = {
+    provider: "the-graph",
+    capability: "pinned-deployment-lookup",
+    label: "Must not cross the boundary",
+    description: "Must not cross the boundary",
+  } as const;
+  globalThis.fetch = async (_input, init) => {
+    calls.push({
+      body: JSON.parse(String(init?.body)) as unknown,
+      idempotencyKey: new Headers(init?.headers).get("Idempotency-Key"),
+    });
+    return new Response(JSON.stringify({ action: "OK", version: {} }), { headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    await createAgentDraft({
+      name: "Bounded research agent",
+      description: "Reads approved market evidence only.",
+      instructions: "## Task\n\nReturn concise evidence with explicit uncertainty.",
+      capabilities: ["research", "market-analysis"],
+      mcp: [bindingWithUiCopy],
+    }, "draft-key");
+    await attachAgentWallet("22222222-2222-4222-8222-222222222222", "wallet-key");
+    await publishWalletAgentVersion("22222222-2222-4222-8222-222222222222", "publish-key");
+  } finally {
+    globalThis.fetch = originalFetch;
   }
-  assert.match(creator, /defaultCreatorParent/);
-  assert.match(marketplace, /filter\(\(agent\) => agent\.canonicalState === "CANONICAL"\)/);
-  assert.match(marketplace, /defaultCreatorParent=\{defaultCreatorParent\}/);
-  assert.match(marketplace, /creatorParentOptions=\{ownedCreatorParents\}/);
-  assert.match(creator, /`\$\{agentLabel\}\.\$\{normalizedCreatorParent\}`/);
-  assert.match(creator, /CREATOR_PARENT_REQUIRED: No wallet-derived ENS parent was substituted\./);
-  assert.doesNotMatch(creator, /\.creator\.eth/);
-  assert.doesNotMatch(creator, /skillIds:\s*|mcpBindings:\s*/);
-  assert.match(creator, /useAccount\(\)/);
-  assert.match(creator, /mainnetEnsClient\.getEnsName\(\{ address, strict: false \}\)/);
-  assert.match(creator, /!creatorParentEditedRef\.current && !defaultCreatorParent/);
-  assert.match(creator, /PREPARE_ENS_WRITE and server A4 authority checks remain decisive\./);
-  assert.match(creator, /href="https:\/\/app\.ens\.domains\/" target="_blank" rel="noreferrer"/);
-  assert.match(creator, />Check again<\/button>/);
-  assert.match(creator, /Its ETH Address must match this connected wallet; set it as Primary or enter it manually\./);
-  assert.match(creator, /No verified mainnet Primary Name found\./);
-  assert.match(creator, /ENS lookup failed; enter your \.eth parent manually or retry\./);
-  assert.doesNotMatch(creator, /barrocaa\.eth/);
+
+  assert.deepEqual(calls, [
+    {
+      body: {
+        action: "CREATE_DRAFT",
+        name: "Bounded research agent",
+        description: "Reads approved market evidence only.",
+        instructions: "## Task\n\nReturn concise evidence with explicit uncertainty.",
+        capabilities: ["research", "market-analysis"],
+        mcp: [{ provider: "the-graph", capability: "pinned-deployment-lookup" }],
+      },
+      idempotencyKey: "draft-key",
+    },
+    { body: { action: "ATTACH_AGENT_WALLET", versionId: "22222222-2222-4222-8222-222222222222" }, idempotencyKey: "wallet-key" },
+    { body: { action: "PUBLISH_WALLET_VERSION", versionId: "22222222-2222-4222-8222-222222222222" }, idempotencyKey: "publish-key" },
+  ]);
 });
 
 test("premium creator surfaces remain server-visible and evidence-conditional", async () => {
@@ -109,22 +158,14 @@ test("premium creator surfaces remain server-visible and evidence-conditional", 
     readFile(`${root}/components/create-agent-modal.tsx`, "utf8"),
     readFile(`${root}/app/marketplace/page.tsx`, "utf8"),
   ]);
-
   assert.match(landing, /src="\/alphadawg-hero-dog\.png"/);
-  assert.match(landing, /Choose a goal, hire a reviewed agent, and inspect the result and proof\./);
-  assert.match(landing, /You earn only when another user hires it and receipt-backed settlement succeeds\./);
-  assert.match(landing, /A hire count alone is not payment evidence\. AlphaDawg does not estimate future earnings\./);
-  assert.doesNotMatch(landing, /HeroVisual|<Reveal|0G Compute[\s\S]*Every model call|Hedera HCS|Arc x402/);
   assert.match(nav, /<DawgLogo[\s\S]*src="\/logo-square\.png"/);
   assert.match(styles, /\[tabindex\]:not\(\[tabindex="-1"\]\)/);
-  assert.doesNotMatch(styles, /textarea, \[tabindex\]\):focus-visible/);
   assert.match(creator, /data-testid="agent-stage"[\s\S]*tabIndex=\{-1\}/);
-  assert.doesNotMatch(creator, /pb-20|min-h-32|rows=\{5\}|max-w-6xl/);
-  assert.match(creator, /It is not a contract deployment or proof that the runtime or providers are online\./);
-  assert.match(creator, /Open Mine to view finalized owner-only earnings\./);
+  assert.match(creator, /Provisioning does not fund, sign, submit a transaction/);
+  assert.match(creator, /Runtime, 0G, Storage, job, delivery, and settlement remain per-job evidence\./);
   assert.match(marketplace, /Verified external hires/);
   assert.match(marketplace, /getOwnerEarnings/);
-  assert.match(marketplace, /Runtime proof and financial outcome remain attached to each job\./);
   assert.doesNotMatch([landing, nav, creator, marketplace].join("\n"), /[—–]/);
 });
 

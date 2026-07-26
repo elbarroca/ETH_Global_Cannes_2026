@@ -1,13 +1,12 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { encodeFunctionResult } from "viem";
 
 const TEST_WALLET = "0x1111111111111111111111111111111111111111";
+const AGENT_WALLET = "0x6666666666666666666666666666666666666666";
 const GOAL_ID = "12121212-1212-4121-8121-121212121212";
 const RUN_ID = "13131313-1313-4131-8131-131313131313";
 const JOB_ID = "55555555-5555-4555-8555-555555555555";
 const SECOND_JOB_ID = "56565656-5656-4565-8565-565656565656";
 const HIRE_REQUEST_ID = "57575757-5757-4575-8575-575757575757";
-const ENS_REVERSE_ABI = [{ name: "reverseWithGateways", type: "function", stateMutability: "view", inputs: [{ type: "bytes", name: "reverseName" }, { type: "uint256", name: "coinType" }, { type: "string[]", name: "gateways" }], outputs: [{ type: "string", name: "resolvedName" }, { type: "address", name: "resolver" }, { type: "address", name: "reverseResolver" }] }] as const;
 
 const USER = {
   id: "protected-user",
@@ -31,26 +30,43 @@ const OWNER_AGENT = {
   promptHash: "b".repeat(64),
   configHash: "c".repeat(64),
   adapterKey: "protected-a3",
-  ownerWallet: "0x3333333333333333333333333333333333333333",
+  ownerWallet: TEST_WALLET,
   priceAtomic: "1000",
   asset: "USDC_ATOMIC",
   proofPolicy: "verified-receipt-required",
   lifecycleState: "PUBLISHED",
+  publicationMode: "WALLET",
   hireable: true,
   ownedByViewer: true,
-  creatorParent: "maker.eth",
-  agentLabel: "evidence-researcher",
-  fullSubname: "evidence-researcher.maker.eth",
-  writePlanHash: "e".repeat(64),
-  canonicalState: "CANONICAL",
-  authorityOwner: TEST_WALLET,
+  creatorParent: "",
+  agentLabel: "",
+  fullSubname: "",
+  writePlanHash: null,
+  canonicalState: "WALLET_AUTHORIZED",
+  authorityState: "WALLET_AUTHORIZED",
+  authorityOwner: "",
   authorityDelegate: null,
-  authorityPolicyVersion: "1",
+  authorityPolicyVersion: "",
   refusalReason: null,
-  authorityReleaseSha: "f".repeat(40),
-  publicationDecisionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  authorityReleaseSha: "",
+  publicationDecisionId: null,
+  walletPublicationDecisionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  walletReceiptHash: "8".repeat(64),
+  agentWallet: {
+    provider: "circle",
+    walletId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    address: AGENT_WALLET,
+    network: "UNI-SEPOLIA",
+    accountType: "SCA",
+    state: "LIVE",
+    evidenceHash: "6".repeat(64),
+    observedAt: "2026-07-25T09:59:00.000Z",
+    walletIdentityId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    identityHash: "7".repeat(64),
+    attachedAt: "2026-07-25T09:59:30.000Z",
+  },
   publishedAt: "2026-07-25T10:00:00.000Z",
-  manifestSchemaVersion: 3,
+  manifestSchemaVersion: 2,
   reviewedSources: [{ repository: "coingecko/skills", revision: "0a15620", use: "integration" }],
   skillSummary: [{ id: "persona.researcher", category: "PERSONA" }, { id: "data.coingecko.market", category: "DATA" }],
   mcpSummary: [{ bindingId: "mcp.coingecko.spot-price", provider: "coingecko", capability: "spot-price" }],
@@ -65,7 +81,20 @@ const AVAILABLE_AGENT = {
   versionId: "44444444-4444-4444-8444-444444444444",
   name: "Risk Boundary Agent",
   ownerWallet: "0x4444444444444444444444444444444444444444",
+  publicationMode: "ENS",
+  creatorParent: "maker.eth",
+  agentLabel: "risk-boundary",
   fullSubname: "risk-boundary.maker.eth",
+  writePlanHash: "e".repeat(64),
+  canonicalState: "CANONICAL",
+  authorityState: "CANONICAL_ENS",
+  authorityOwner: "0x4444444444444444444444444444444444444444",
+  authorityPolicyVersion: "1",
+  authorityReleaseSha: "f".repeat(40),
+  publicationDecisionId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+  walletPublicationDecisionId: null,
+  walletReceiptHash: null,
+  agentWallet: null,
   ownedByViewer: false,
   verifiedExternalHires: 8,
   provenance: { protocol: "INFT", chainId: 11155111, contractAddress: "0x5555555555555555555555555555555555555555", tokenId: "42", metadataUri: null, evidenceHash: "9".repeat(64), observedAt: "2026-07-25T09:00:00.000Z" },
@@ -215,16 +244,19 @@ interface MockOptions {
   actionRequiredOnce?: boolean;
   noAgents?: boolean;
   lifecycleStatus?: 500 | 503;
+  schemaNotReady?: boolean;
+  agentActionFailure?: "CREATE_DRAFT" | "ATTACH_AGENT_WALLET" | "PUBLISH_WALLET_VERSION";
+  agentActionLost?: "CREATE_DRAFT" | "ATTACH_AGENT_WALLET" | "PUBLISH_WALLET_VERSION";
+  generatedInstructions?: unknown;
+  generationDelayMs?: number;
   hireTerminal?: "JOB_QUEUED" | "BLOCKED" | "FAILED";
   hirePollStatus?: 503;
   earningsStatus?: 403;
-  ensPrimaryName?: string | null;
-  ensPrimaryNames?: readonly (string | null)[];
-  ensRpcFailure?: boolean;
   catalog?: unknown;
   onGoalCreate?: (body: Record<string, unknown>) => void;
   onGoalAction?: (body: Record<string, unknown>) => void;
   onAgentCreate?: (body: Record<string, unknown>) => void;
+  onAgentAction?: (body: Record<string, unknown>, idempotencyKey: string | null) => void;
   onChallenge?: (body: Record<string, unknown>) => void;
   onProtectedRequest?: (path: string) => void;
 }
@@ -242,19 +274,7 @@ async function installApiMocks(page: Page, options: MockOptions = {}): Promise<v
   let actionRequiredRemaining = options.actionRequiredOnce === true;
   let drafts: unknown[] = [];
   let hirePolls = 0;
-  let ensLookups = 0;
-  await page.unroute("https://eth.merkle.io/**");
-  await page.route("https://eth.merkle.io/**", async (route) => {
-    if (options.ensRpcFailure) return route.fulfill({ status: 503, body: "unavailable" });
-    const request = route.request().postDataJSON() as { id?: number; method?: string };
-    const primaryName = options.ensPrimaryNames?.[Math.min(ensLookups++, options.ensPrimaryNames.length - 1)] ?? options.ensPrimaryName ?? "";
-    const result = request.method === "eth_chainId" ? "0x1" : encodeFunctionResult({
-      abi: ENS_REVERSE_ABI,
-      functionName: "reverseWithGateways",
-      result: [primaryName, "0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"],
-    });
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: request.id ?? 1, result }) });
-  });
+  const lostActionCalls = new Map<string, number>();
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -278,6 +298,16 @@ async function installApiMocks(page: Page, options: MockOptions = {}): Promise<v
       return json(route, { userId: USER.id, walletAddress: TEST_WALLET, proxyWalletAddress: null, telegramLinkCode: "A5LINK42", inftTokenId: null, existing: false });
     }
     if (path.startsWith("/api/user/")) return json(route, USER);
+    if (path === "/api/marketplace/generate-instructions") {
+      if (options.generationDelayMs) await new Promise((resolve) => setTimeout(resolve, options.generationDelayMs));
+      return json(route, options.generatedInstructions ?? {
+        markdown: "## Generated role\n\nReturn bounded evidence and state uncertainty.",
+        reasoning: "Generated by the mocked protected test boundary.",
+        attestationHash: "a".repeat(64),
+        teeVerified: true,
+        fallback: false,
+      });
+    }
 
     if (path.startsWith("/api/kernel/")) options.onProtectedRequest?.(path);
     if (path.startsWith("/api/kernel/") && (sessionAction !== "authenticate" || actionRequiredRemaining)) {
@@ -312,26 +342,33 @@ async function installApiMocks(page: Page, options: MockOptions = {}): Promise<v
     if (path === "/api/kernel/agents") {
       if (request.method() === "POST") {
         const body = request.postDataJSON() as Record<string, unknown>;
+        const action = String(body.action);
+        options.onAgentAction?.(body, request.headers()["idempotency-key"] ?? null);
+        if (options.agentActionLost === action) {
+          const calls = (lostActionCalls.get(action) ?? 0) + 1;
+          lostActionCalls.set(action, calls);
+          if (calls <= 3) return route.abort("failed");
+        }
+        if (options.agentActionFailure === action) {
+          return json(route, { error: "Wallet lifecycle action refused", code: action === "ATTACH_AGENT_WALLET" ? "KERNEL_WALLET_PROVIDER_UNAVAILABLE" : "KERNEL_PUBLICATION_REFUSED" }, 503);
+        }
         if (body.action === "CREATE_DRAFT") {
           options.onAgentCreate?.(body);
-          const draft = { ...OWNER_AGENT, name: body.name, description: body.description, lifecycleState: "DRAFT", hireable: false, fullSubname: null, creatorParent: null, agentLabel: null, canonicalState: "UNVERIFIED", authorityOwner: null, authorityReleaseSha: null, publicationDecisionId: null, publishedAt: null };
+          const selectedMcp = Array.isArray(body.mcp) ? body.mcp as Array<{ provider: string; capability: string }> : [];
+          const draft = { ...OWNER_AGENT, name: body.name, description: body.description, capabilities: body.capabilities, lifecycleState: "DRAFT", publicationMode: null, hireable: false, agentWallet: null, canonicalState: "UNVERIFIED", authorityState: "UNVERIFIED", walletPublicationDecisionId: null, walletReceiptHash: null, mcpSummary: selectedMcp.map((binding) => ({ bindingId: `mcp.${binding.provider}.${binding.capability}`, ...binding })), publishedAt: null };
           drafts = [draft];
           return json(route, { action: "CREATE_DRAFT", version: draft }, 201);
         }
-        if (body.action === "BIND_NAME") {
-          const bound = { ...(drafts[0] as typeof OWNER_AGENT), lifecycleState: "NAME_BOUND", creatorParent: body.creatorParent, agentLabel: body.agentLabel, fullSubname: `${body.agentLabel}.${String(body.creatorParent).replace(/\.eth$/, "")}.eth` };
-          drafts = [bound];
-          return json(route, { action: "BIND_NAME", version: bound });
+        if (body.action === "ATTACH_AGENT_WALLET") {
+          const attached = { ...(drafts[0] as typeof OWNER_AGENT), lifecycleState: "WALLET_ATTACHED", agentWallet: OWNER_AGENT.agentWallet };
+          drafts = [attached];
+          return json(route, { action: "ATTACH_AGENT_WALLET", version: attached });
         }
-        if (body.action === "PREPARE_ENS_WRITE") {
-          const prepared = { ...(drafts[0] as typeof OWNER_AGENT), lifecycleState: "WRITE_PREPARED" };
-          drafts = [prepared];
-          return json(route, { action: "PREPARE_ENS_WRITE", version: prepared, plan: { kind: "LOCAL_ONLY_UNAUTHORIZED" }, planHash: OWNER_AGENT.writePlanHash });
-        }
-        const published = { ...(drafts[0] as typeof OWNER_AGENT), lifecycleState: "PUBLISHED", hireable: true, canonicalState: "CANONICAL", authorityOwner: TEST_WALLET, authorityReleaseSha: "f".repeat(40), publicationDecisionId: OWNER_AGENT.publicationDecisionId, publishedAt: OWNER_AGENT.publishedAt };
+        const published = { ...(drafts[0] as typeof OWNER_AGENT), lifecycleState: "PUBLISHED", publicationMode: "WALLET", hireable: true, canonicalState: "WALLET_AUTHORIZED", authorityState: "WALLET_AUTHORIZED", walletPublicationDecisionId: OWNER_AGENT.walletPublicationDecisionId, walletReceiptHash: OWNER_AGENT.walletReceiptHash, publishedAt: OWNER_AGENT.publishedAt };
         drafts = [];
-        return json(route, { action: "PUBLISH_VERSION", version: published });
+        return json(route, { action: "PUBLISH_WALLET_VERSION", version: published });
       }
+      if (options.schemaNotReady) return json(route, { error: "Service temporarily unavailable", code: "KERNEL_SCHEMA_NOT_READY" }, 503);
       if (options.lifecycleStatus) return json(route, { error: `Protected catalog returned ${options.lifecycleStatus}`, code: "KERNEL_UNAVAILABLE" }, options.lifecycleStatus);
       return json(route, { agents: options.noAgents ? [] : [OWNER_AGENT, AVAILABLE_AGENT], drafts });
     }
@@ -396,11 +433,10 @@ async function expectNoOverflow(page: Page): Promise<void> {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
 }
 
-async function reachFirstAgentEns(page: Page, name: string): Promise<void> {
+async function fillCreatorIdentity(page: Page, name: string): Promise<void> {
   await page.getByLabel("Agent name").fill(name);
-  await page.getByLabel("Description").fill("Exercises the first-agent primary ENS convenience boundary.");
-  await page.getByRole("button", { name: /Continue/ }).click();
-  await page.getByRole("button", { name: /Alpha Researcher/ }).click();
+  await page.getByLabel("Description").fill("Exercises the protected wallet-authority creator boundary.");
+  await page.getByLabel("Markdown instructions").fill("## Task\n\nReturn bounded evidence and state uncertainty.");
   await page.getByRole("button", { name: /Continue/ }).click();
 }
 
@@ -571,6 +607,8 @@ test("marketplace preserves URL tabs, authority evidence, and external hire", as
   await card.getByText("Identity, authority, and provenance").click();
   await expect(card.getByText(AVAILABLE_AGENT.versionId, { exact: true })).toBeVisible();
   await expect(card.getByText("0.001 USDC (1,000 atomic units)")).toBeVisible();
+  await expect(card.getByText("Creator ENS", { exact: true })).toBeVisible();
+  await expect(card.getByText("Subname", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Hire agent" }).click();
   await expect(page).toHaveURL(new RegExp(`agentId=${AVAILABLE_AGENT.versionId}`));
   await expect(page.getByRole("dialog", { name: `Run ${AVAILABLE_AGENT.name}` })).toBeVisible();
@@ -587,9 +625,12 @@ test("marketplace preserves URL tabs, authority evidence, and external hire", as
   await expect(page.getByRole("link", { name: "Mine" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByLabel("Owner settled earnings").getByText("3", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Owner settled earnings").getByText(/9,007,199,254,740,993,000 atomic units/)).toBeVisible();
-  await page.getByText("Identity, authority, and provenance").click();
-  await expect(page.getByText("Provenance", { exact: true })).toBeVisible();
-  await expect(page.getByText("Unavailable", { exact: true }).first()).toBeVisible();
+  const ownerCard = page.getByRole("listitem").filter({ hasText: OWNER_AGENT.agentWallet.address });
+  await expect(ownerCard.getByText(`Agent wallet ${OWNER_AGENT.agentWallet.address}`)).toBeVisible();
+  await ownerCard.getByText("Wallet authority and provenance").click();
+  await expect(ownerCard.getByText("Creator ENS", { exact: true })).toHaveCount(0);
+  await expect(ownerCard.getByText("Subname", { exact: true })).toHaveCount(0);
+  await expect(ownerCard.getByText("Provenance", { exact: true })).toBeVisible();
 });
 
 for (const terminalState of ["BLOCKED", "FAILED"] as const) {
@@ -622,133 +663,218 @@ test("owner earnings denial remains explicit and retryable", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Retry earnings" })).toBeVisible();
 });
 
-test("catalog V3 creation sends only template identity fields and publishes the returned version", async ({ page }) => {
+test("custom creator flow sends exact stack, attaches a wallet, and publishes its receipt", async ({ page }) => {
   const errors = monitorErrors(page);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  let createBody: Record<string, unknown> | null = null;
+  const actions: Record<string, unknown>[] = [];
   await page.unroute("**/api/**");
-  await installApiMocks(page, { onAgentCreate: (body) => { createBody = body; } });
+  await installApiMocks(page, { onAgentAction: (body) => actions.push(body) });
   await connectReady(page, "/marketplace?view=mine&create=1");
   await expect(page.getByRole("dialog", { name: "Create a protected agent" })).toBeVisible();
   await expect(page.getByRole("list", { name: "Publication progress" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Identity" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Identity + prompt" })).toBeVisible();
   const dialogBox = await page.getByRole("dialog", { name: "Create a protected agent" }).boundingBox();
-  const stageBox = await page.getByTestId("agent-stage").boundingBox();
-  const descriptionBox = await page.getByLabel("Description").boundingBox();
-  expect(dialogBox?.height).toBeLessThan(760);
-  expect(stageBox?.height).toBeLessThan(420);
-  expect(descriptionBox?.height).toBeLessThan(140);
+  expect(dialogBox?.height).toBeLessThanOrEqual(970);
   await page.getByLabel("Agent name").focus();
   await expect(page.getByLabel("Agent name")).toBeFocused();
   expect(await page.getByLabel("Agent name").evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("solid");
   await page.getByLabel("Agent name").fill("Bounded Market Researcher");
   await page.getByLabel("Description").fill("Researches bounded market evidence with explicit source and execution limits.");
+  await expect(page.getByLabel("Markdown instructions")).toHaveValue("");
+  await page.getByRole("button", { name: "Generate with 0G" }).click();
+  await expect(page.getByLabel("Markdown instructions")).toHaveValue(/## Generated role/);
+  await expect(page.getByText("TEE verified", { exact: true })).toBeVisible();
+  await expect(page.getByText(`Attestation ${"a".repeat(64)}`)).toBeVisible();
   await page.getByRole("button", { name: /Continue/ }).click();
   await expect(page.getByTestId("agent-stage")).toBeFocused();
   expect(await page.getByTestId("agent-stage").evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("none");
-  await expect(page.getByRole("button", { name: /Alpha Researcher/ })).toBeVisible();
-  await page.getByRole("button", { name: /Alpha Researcher/ }).click();
-  await page.getByText("Inspect exact skills and constraints").click();
-  await page.getByText("Inspect catalog provider readiness").click();
-  await expect(page.locator("[data-category-heading-icon]")).toHaveCount(4);
-  await expect(page.getByText("The role and reasoning stance the agent follows.")).toBeVisible();
-  await expect(page.getByText("Read-only sources the protected runtime may query.")).toBeVisible();
-  await expect(page.getByText("Included by template").first()).toBeVisible();
-  await expect(page.getByText("CONFIGURED means server credentials are present", { exact: false })).toBeVisible();
-  const providerReadiness = page.locator("details").filter({ hasText: "Inspect catalog provider readiness" });
-  await expect(providerReadiness.getByText("UNAVAILABLE", { exact: true }).first()).toBeVisible();
-  await expect(providerReadiness.getByText("CONFIGURED", { exact: true })).toBeVisible();
-  await page.locator('[data-category-icon="PERSONA"]').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "test-results/visual/a5-create-capabilities-1440.png" });
+  await page.getByRole("button", { name: "Select Research" }).click();
+  await page.getByRole("button", { name: "Select Market analysis" }).click();
+  await page.getByLabel("Search approved agent stack").fill("the graph");
+  await expect(page.getByText("No approved skills match this search.")).toBeVisible();
+  await page.getByRole("button", { name: "Connect The Graph deployment lookup" }).click();
+  await page.getByRole("button", { name: "Connect The Graph liquidity and volume" }).click();
+  await expect(page.getByText("2 / 4 connected")).toBeVisible();
+  await expect(page.getByText("CONFIGURED means credentials are present or pending. It never means a provider is live.")).toBeVisible();
+  await page.screenshot({ path: "test-results/visual/a5-create-stack-1440.png" });
   await page.getByRole("button", { name: /Continue/ }).click();
-  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("maker.eth");
-  await expect(page.getByTestId("agent-subname-preview")).toHaveText("bounded-market-researcher.maker.eth");
-  await page.waitForTimeout(250);
-  await page.screenshot({ path: "test-results/visual/a5-create-ens-1440.png" });
-  await page.getByRole("button", { name: "Prepare immutable draft" }).click();
-  await expect(page.getByLabel("Immutable server preview")).toBeVisible();
-  expect(Object.keys(createBody ?? {}).sort()).toEqual(["action", "description", "name", "templateId"]);
-  expect(createBody).toMatchObject({ action: "CREATE_DRAFT", templateId: "alpha-researcher", name: "Bounded Market Researcher" });
+  await expect(page.getByRole("heading", { name: "Agent wallet" })).toBeVisible();
+  await expect(page.locator(`code[title="${TEST_WALLET}"]`).first()).toBeVisible();
+  await page.getByRole("button", { name: "Provision agent wallet" }).click();
+  await expect(page.getByText("Server-returned Circle wallet")).toBeVisible();
+  const walletStage = page.getByTestId("agent-stage");
+  await expect(walletStage.locator(`code[title="${AGENT_WALLET}"]`)).toBeVisible();
+  await expect(walletStage.getByText("UNI-SEPOLIA", { exact: true })).toBeVisible();
+  await expect(walletStage.getByText("SCA", { exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/visual/a5-create-wallet-1440.png" });
+  expect(actions[0]).toEqual({
+    action: "CREATE_DRAFT",
+    name: "Bounded Market Researcher",
+    description: "Researches bounded market evidence with explicit source and execution limits.",
+    instructions: expect.stringContaining("## Generated role"),
+    capabilities: ["research", "market-analysis"],
+    mcp: [
+      { provider: "the-graph", capability: "pinned-deployment-lookup" },
+      { provider: "the-graph", capability: "liquidity-volume-snapshot" },
+    ],
+  });
+  expect(actions[1]).toEqual({ action: "ATTACH_AGENT_WALLET", versionId: OWNER_AGENT.versionId });
+  expect(JSON.stringify(actions[0])).not.toMatch(/label|description":"Must not|endpoint|graphql|apiKey/i);
   await page.getByRole("button", { name: /Continue/ }).click();
-  await page.getByRole("button", { name: "Publish immutable version" }).click();
+  await page.getByRole("button", { name: "Publish wallet version" }).click();
   await expect(page.getByRole("heading", { name: "Publication receipt" })).toBeVisible();
   await expect(page.getByLabel("Publication receipt").getByText("ELIGIBLE", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Publication receipt").getByText("0.001 USDC (1,000 atomic units)")).toBeVisible();
-  await expect(page.getByLabel("Publication receipt").getByText("Open Mine to view finalized owner-only earnings.")).toBeVisible();
+  const receiptStage = page.getByTestId("agent-stage");
+  await expect(receiptStage.locator('code[title="0.001 USDC (1,000 atomic units)"]')).toBeVisible();
+  await expect(receiptStage.locator(`code[title="${OWNER_AGENT.walletPublicationDecisionId}"]`)).toBeVisible();
+  await expect(receiptStage.locator(`code[title="${OWNER_AGENT.walletReceiptHash}"]`)).toBeVisible();
+  expect(actions[2]).toEqual({ action: "PUBLISH_WALLET_VERSION", versionId: OWNER_AGENT.versionId });
   await page.getByRole("button", { name: /View my agents/ }).click();
   await expect(page).toHaveURL(/view=mine/);
   expect(errors).toEqual([]);
 });
 
-test("agent catalog empty state and provider availability remain explicit", async ({ page }) => {
+test("approved stack search, selection limits, MCP Market boundary, and dedupe are explicit", async ({ page }) => {
   await page.unroute("**/api/**");
-  await installApiMocks(page, { noAgents: true, catalog: { ...CATALOG, mcpProviders: [{ ...CATALOG.mcpProviders[0], availability: "AVAILABLE" }, CATALOG.mcpProviders[1]] } });
-  await connectReady(page, "/marketplace?view=available");
-  await expect(page.getByText("No external canonical versions are available.")).toBeVisible();
-  await page.getByRole("link", { name: "Create agent" }).click();
-  await page.getByLabel("Agent name").fill("Provider Availability Agent");
-  await page.getByLabel("Description").fill("Shows exact provider availability from the authenticated catalog response.");
+  await installApiMocks(page);
+  await connectReady(page, "/marketplace?view=mine&create=1");
+  await fillCreatorIdentity(page, "Approved Stack Agent");
+  const market = page.getByRole("link", { name: "Browse MCP Market" });
+  await expect(market).toHaveAttribute("href", "https://mcpmarket.com/");
+  await expect(market).toHaveAttribute("target", "_blank");
+  await expect(market).toHaveAttribute("rel", "noreferrer");
+  await expect(page.getByText("External discoveries require review and server allowlisting before attachment.", { exact: false })).toBeVisible();
+  await expect(page.getByLabel(/endpoint|url|graphql|api key|wallet id/i)).toHaveCount(0);
+  const search = page.getByLabel("Search approved agent stack");
+  await search.fill("liquidity");
+  await expect(page.getByRole("button", { name: "Connect The Graph liquidity and volume" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect The Graph deployment lookup" })).toHaveCount(0);
+  await search.fill("");
+  for (const label of ["Research", "Market analysis", "Risk analysis"]) await page.getByRole("button", { name: `Select ${label}` }).click();
+  await expect(page.getByText("3 / 3 selected")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Select Swap proposal" })).toBeDisabled();
+  for (const label of ["CoinGecko spot price", "CoinGecko market snapshot", "The Graph deployment lookup", "The Graph liquidity and volume"]) await page.getByRole("button", { name: `Connect ${label}` }).click();
+  await expect(page.getByText("4 / 4 connected")).toBeVisible();
+  await page.getByRole("button", { name: "Disconnect The Graph deployment lookup" }).click();
+  await page.getByRole("button", { name: "Connect The Graph deployment lookup" }).click();
+  await expect(page.getByText("4 / 4 connected")).toBeVisible();
+  await expect(page.getByLabel("Selected agent stack preview").getByText(/the-graph:pinned-deployment-lookup/)).toHaveCount(1);
+});
+
+test("prompt limits refuse active content while local drafting stays explicit", async ({ page }) => {
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { noAgents: true });
+  await connectReady(page, "/marketplace?view=mine&create=1");
+  const generate = page.getByRole("button", { name: "Generate with 0G" });
+  await expect(generate).toBeDisabled();
+  await page.getByLabel("Agent name").fill("Prompt Boundary Agent");
+  await page.getByLabel("Description").fill("Exercises deterministic inert prompt boundary behavior.");
+  await expect(generate).toBeEnabled();
+  await page.getByLabel("Markdown instructions").fill("five!");
+  await expect(page.getByText("INSTRUCTIONS_LENGTH_REFUSED: Instructions must be 20-4,000 characters.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Continue/ })).toBeDisabled();
+  await page.getByLabel("Markdown instructions").fill("<script>active content is forbidden</script>");
+  await expect(page.getByText("INSTRUCTIONS_ACTIVE_CONTENT_REFUSED", { exact: false })).toBeVisible();
+  await page.getByLabel("Markdown instructions").fill("## Manual\n\nKeep this user-edited inert instruction exactly.");
+  await page.getByLabel("Description").fill("Changed description must not auto-overwrite manual instructions.");
+  await expect(page.getByLabel("Markdown instructions")).toHaveValue("## Manual\n\nKeep this user-edited inert instruction exactly.");
+  await generate.click();
+  await expect(page.getByLabel("Markdown instructions")).toHaveValue(/## Generated role/);
+  await expect(page.getByText("TEE verified", { exact: true })).toBeVisible();
+});
+
+test("0G fallback and active output never overwrite the editable prompt", async ({ page }) => {
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { generatedInstructions: { markdown: "## Fallback\n\nDo not apply this prompt.", reasoning: "fallback", attestationHash: null, teeVerified: false, fallback: true } });
+  await connectReady(page, "/marketplace?view=mine&create=1");
+  await page.getByLabel("Agent name").fill("Fallback Boundary Agent");
+  await page.getByLabel("Description").fill("Keeps explicit user instructions when 0G is unavailable.");
+  await page.getByLabel("Markdown instructions").fill("## Manual\n\nPreserve this prompt without silent replacement.");
+  await page.getByRole("button", { name: "Generate with 0G" }).click();
+  await expect(page.getByText("0G unavailable; no generated prompt was applied")).toBeVisible();
+  await expect(page.getByLabel("Markdown instructions")).toHaveValue("## Manual\n\nPreserve this prompt without silent replacement.");
+  await expect(page.getByText(/TEE verified|TEE unverified/)).toHaveCount(0);
+
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { generatedInstructions: { markdown: "<script>active generated content is forbidden</script>", reasoning: "invalid", attestationHash: "b".repeat(64), teeVerified: true, fallback: false } });
+  await page.getByRole("button", { name: "Generate with 0G" }).click();
+  await expect(page.getByText("0G_RESPONSE_REFUSED: INSTRUCTIONS_ACTIVE_CONTENT_REFUSED", { exact: false })).toBeVisible();
+  await expect(page.getByLabel("Markdown instructions")).toHaveValue("## Manual\n\nPreserve this prompt without silent replacement.");
+  await expect(page.getByText("TEE verified", { exact: true })).toHaveCount(0);
+});
+
+test("0G generation exposes loading and unverified evidence without proof promotion", async ({ page }) => {
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { generationDelayMs: 250, generatedInstructions: { markdown: "## Unverified\n\nReturn bounded evidence with clear uncertainty.", reasoning: "unverified", attestationHash: "not-a-bounded-hash", teeVerified: false, fallback: false } });
+  await connectReady(page, "/marketplace?view=mine&create=1");
+  await page.getByLabel("Agent name").fill("Unverified Generation Agent");
+  await page.getByLabel("Description").fill("Shows an explicit unverified generation result without proof claims.");
+  await page.getByRole("button", { name: "Generate with 0G" }).click({ noWaitAfter: true });
+  await expect(page.getByRole("button", { name: "Generating with 0G" })).toBeDisabled();
+  await expect(page.getByText("TEE unverified", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Attestation/)).toHaveCount(0);
+  await expect(page.getByLabel("Markdown instructions")).toHaveValue(/## Unverified/);
+});
+
+test("wallet provisioning refusal remains exact and retryable", async ({ page }) => {
+  await page.unroute("**/api/**");
+  await installApiMocks(page, { agentActionFailure: "ATTACH_AGENT_WALLET" });
+  await connectReady(page, "/marketplace?view=mine&create=1");
+  await fillCreatorIdentity(page, "Wallet Refusal Agent");
+  await page.getByRole("button", { name: "Select Research" }).click();
   await page.getByRole("button", { name: /Continue/ }).click();
-  await page.getByRole("button", { name: /Alpha Researcher/ }).click();
-  const providerSummary = page.getByText("Inspect catalog provider readiness");
-  await providerSummary.click();
-  const availability = providerSummary.locator("..");
-  await expect(availability.getByText("AVAILABLE", { exact: true }).first()).toBeVisible();
-  await expect(availability.getByText("CONFIGURED", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Provision agent wallet" }).click();
+  await expect(page.getByText("KERNEL_WALLET_PROVIDER_UNAVAILABLE: Wallet lifecycle action refused")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry wallet provisioning" })).toBeVisible();
 });
 
-test("first agent keeps ENS parent blank and never invents a wallet-derived name", async ({ page }) => {
+test("lost wallet response replays the same protected request identity", async ({ page }) => {
+  const walletKeys: string[] = [];
   await page.unroute("**/api/**");
-  await installApiMocks(page, { noAgents: true, ensPrimaryName: null });
+  await installApiMocks(page, { agentActionLost: "ATTACH_AGENT_WALLET", onAgentAction: (body, key) => { if (body.action === "ATTACH_AGENT_WALLET" && key) walletKeys.push(key); } });
   await connectReady(page, "/marketplace?view=mine&create=1");
-  await reachFirstAgentEns(page, "First Evidence Agent");
-  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("");
-  await expect(page.getByTestId("agent-subname-preview")).toHaveText("Unavailable until a canonical creator parent is entered.");
-  await expect(page.getByText("No verified mainnet Primary Name found.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Get or manage ENS" })).toHaveAttribute("href", "https://app.ens.domains/");
-  await expect(page.getByRole("link", { name: "Get or manage ENS" })).toHaveAttribute("target", "_blank");
-  await expect(page.getByText("CREATOR_PARENT_REQUIRED: No wallet-derived ENS parent was substituted.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Prepare immutable draft" })).toBeDisabled();
+  await fillCreatorIdentity(page, "Wallet Replay Agent");
+  await page.getByRole("button", { name: "Select Research" }).click();
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await page.getByRole("button", { name: "Provision agent wallet" }).click();
+  await expect(page.getByText("RESPONSE_LOST: The result is unknown.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Recover wallet receipt" }).click();
+  await expect(page.getByText("Server-returned Circle wallet")).toBeVisible();
+  expect(walletKeys).toHaveLength(4);
+  expect(new Set(walletKeys).size).toBe(1);
 });
 
-test("mainnet primary ENS prefills a first-agent candidate without granting authority", async ({ page }) => {
+test("lost publication response replays to one eligible receipt", async ({ page }) => {
+  const publicationKeys: string[] = [];
   await page.unroute("**/api/**");
-  await installApiMocks(page, { noAgents: true, ensPrimaryName: "first-agent.eth" });
+  await installApiMocks(page, { agentActionLost: "PUBLISH_WALLET_VERSION", onAgentAction: (body, key) => { if (body.action === "PUBLISH_WALLET_VERSION" && key) publicationKeys.push(key); } });
   await connectReady(page, "/marketplace?view=mine&create=1");
-  await reachFirstAgentEns(page, "Primary Name Agent");
-  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("first-agent.eth");
-  await expect(page.getByText("PREPARE_ENS_WRITE and server A4 authority checks remain decisive.")).toBeVisible();
+  await fillCreatorIdentity(page, "Publication Replay Agent");
+  await page.getByRole("button", { name: "Select Research" }).click();
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await page.getByRole("button", { name: "Provision agent wallet" }).click();
+  await expect(page.getByText("Server-returned Circle wallet")).toBeVisible();
+  await page.getByRole("button", { name: /Continue/ }).click();
+  await page.getByRole("button", { name: "Publish wallet version" }).click();
+  await expect(page.getByText("RESPONSE_LOST: Publication state is unknown.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Recover publication receipt" }).click();
+  await expect(page.getByTestId("agent-stage").getByText("ELIGIBLE", { exact: true })).toBeVisible();
+  expect(publicationKeys).toHaveLength(4);
+  expect(new Set(publicationKeys).size).toBe(1);
 });
 
-test("non-ENS reverse results preserve manual entry and grant no authority", async ({ page }) => {
+test("wallet-authority schema absence blocks empty state and remains retryable", async ({ page }) => {
+  const postedActions: Record<string, unknown>[] = [];
   await page.unroute("**/api/**");
-  await installApiMocks(page, { noAgents: true, ensPrimaryName: "not-an-ens-name.example" });
-  await connectReady(page, "/marketplace?view=mine&create=1");
-  await reachFirstAgentEns(page, "Invalid Reverse Agent");
-  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("");
-  await expect(page.getByRole("button", { name: "Prepare immutable draft" })).toBeDisabled();
-});
-
-test("primary ENS retry detects a newly configured name without reconnecting", async ({ page }) => {
-  await page.unroute("**/api/**");
-  await installApiMocks(page, { noAgents: true, ensPrimaryNames: [null, "retry-agent.eth"] });
-  await connectReady(page, "/marketplace?view=mine&create=1");
-  await reachFirstAgentEns(page, "Retry Primary Agent");
-  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("");
-  await page.getByRole("button", { name: "Check again" }).click();
-  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("retry-agent.eth");
-  await expect(page.getByText("PREPARE_ENS_WRITE and server A4 authority checks remain decisive.")).toBeVisible();
-});
-
-test("primary ENS transport failure stays manual and retryable", async ({ page }) => {
-  await page.unroute("**/api/**");
-  await installApiMocks(page, { noAgents: true, ensRpcFailure: true });
-  await connectReady(page, "/marketplace?view=mine&create=1");
-  await reachFirstAgentEns(page, "ENS Error Agent");
-  await expect(page.getByLabel("Creator ENS parent")).toHaveValue("");
-  await expect(page.getByText("ENS lookup failed; enter your .eth parent manually or retry.", { exact: false })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Get or manage ENS" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Check again" })).toBeVisible();
+  await installApiMocks(page, { schemaNotReady: true, onAgentAction: (body) => postedActions.push(body) });
+  await connectReady(page, "/marketplace?view=available&create=1");
+  await expect(page.getByText("Database update required")).toBeVisible();
+  await expect(page.getByText("required wallet-authority migration", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create unavailable" })).toBeDisabled();
+  await expect(page.getByRole("dialog", { name: "Create a protected agent" })).toHaveCount(0);
+  await expect(page.getByText("No external canonical versions are available.")).toHaveCount(0);
+  expect(postedActions).toEqual([]);
 });
 
 for (const status of [500, 503] as const) {
@@ -764,7 +890,7 @@ for (const status of [500, 503] as const) {
   });
 }
 
-test("creation dialog traps focus, returns focus, and contains no legacy manual flow", async ({ page }) => {
+test("creation dialog traps focus, returns focus, and contains no ENS authority inputs", async ({ page }) => {
   await connectReady(page, "/marketplace?view=available");
   const open = page.getByRole("link", { name: "Create agent" });
   await open.focus();
@@ -772,7 +898,8 @@ test("creation dialog traps focus, returns focus, and contains no legacy manual 
   await expect(page.getByRole("button", { name: "Close dialog" })).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("button", { name: "Cancel" })).toBeFocused();
-  await expect(page.getByText("Markdown instructions")).toHaveCount(0);
+  await expect(page.getByLabel("Markdown instructions")).toBeVisible();
+  await expect(page.getByLabel(/creator ens|agent subname/i)).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(open).toBeFocused();
 });
@@ -819,7 +946,7 @@ test("all primary routes remain usable and overflow-free at mobile, tablet, and 
       await expect(page.locator("main").first()).toBeVisible();
       if (path.includes("create=1")) {
         await expect(page.getByRole("list", { name: "Publication progress" })).toBeVisible();
-        await expect(page.getByRole("heading", { name: "Identity" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Identity + prompt" })).toBeVisible();
       }
       await expectNoOverflow(page);
       await page.screenshot({ path: `test-results/visual/a5-route-${label}-${width}.png`, fullPage: !path.includes("create=1") });
