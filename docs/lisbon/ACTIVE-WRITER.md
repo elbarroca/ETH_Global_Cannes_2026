@@ -3,6 +3,47 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/creator_mcp_trigger_fix
+task_id: CREATOR-MCP-TRIGGER-FIX-R1
+task_instance_id: CREATOR-MCP-TRIGGER-FIX-R1:R1:466155F
+generation: 1
+sprint: wallet-authority creator draft production repair
+mode: LOCAL_ONLY / PASS_TO_AUDIT
+branch: Eth_global_lisbon_
+start_sha: 466155f097371072f4e52f91d06c53acc8b572df
+control_sha: 466155f097371072f4e52f91d06c53acc8b572df
+token: CREATOR-MCP-TRIGGER-FIX-R1-R1-466155F-20260726T012207Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-26T01:28:07Z
+expires_at: 2026-07-26T01:57:07Z
+allowed_paths:
+  - prisma/migrations/20260726011500_creator_mcp_trigger_precedence/migration.sql
+  - scripts/test-migrations.ts
+  - tests/kernel/agent-wallets.test.ts
+  - tests/kernel/**
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-26T01:22:07Z
+deadline: 2026-07-26T01:57:07Z
+expected_exit: creator drafts persist valid server-expanded MCP bindings while arbitrary bindings remain fail closed
+external_effect_authority: local files disposable local databases deterministic tests and one atomic local commit only; no managed migration Circle Graph 0G call push deploy signature transaction funding or claim
+external_effects_attempted: none
+claim_changes: none; local migration and tests are not managed schema live sponsor or release proof
+completed_at: 2026-07-26T01:28:07Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - focused creator MCP and wallet-authority tests 2 of 2 PASS
+  - Kernel lane 88 of 88 PASS
+  - Prisma validate and generate PASS
+  - 23-migration fresh Cannes populated goal-loop populated legacy x402 canonical W6 and noncanonical fail-closed lanes PASS
+  - npm test 10 of 10 auth 9 of 9 e2e 5 of 5 redaction 3 of 3 protected boot typecheck and production build PASS
+  - lint PASS with zero errors and 23 inherited warnings; secret scan and git diff check PASS
+remaining_block: aggregate integration remains red only in out-of-scope A3 Go fixture and inherited A4 execution expectations; worker fencing 3 of 3 passed and the scoped repair is green for immutable audit
+verdict: PASS_TO_AUDIT; LOCAL_ONLY; LIVE_EFFECT_BLOCKED
+lock_release: release only exact token CREATOR-MCP-TRIGGER-FIX-R1-R1-466155F-20260726T012207Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: C0 /root
 task_id: NEON-WALLET-AUTHORITY-MIGRATE-20260726-01
 task_instance_id: NEON-WALLET-AUTHORITY-MIGRATE-20260726-01:R1:86150AEB

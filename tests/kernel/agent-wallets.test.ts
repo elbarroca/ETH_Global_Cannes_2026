@@ -45,6 +45,67 @@ class FakeWalletProvider implements AgentWalletProvider {
   }
 }
 
+test("creator draft persists server-expanded MCP bindings and rejects arbitrary IDs", async () => {
+  const database = await startDisposableDatabase("creator-mcp-trigger");
+  configureDatabaseEnvironment(database.url);
+  try {
+    await database.sql`
+      INSERT INTO users (id, wallet_address) VALUES (${CREATOR_ID}, ${CREATOR_WALLET})
+    `;
+    const manifest = parseAgentInput({
+      name: "Creator MCP Research Agent",
+      description: "A bounded custom agent with server-expanded MCP bindings.",
+      instructions: "## Task\n\nReturn concise evidence from the selected MCP sources.",
+      capabilities: ["research", "market-analysis"],
+      mcp: [
+        { provider: "the-graph", capability: "pinned-deployment-lookup" },
+        { provider: "coingecko", capability: "spot-price" },
+      ],
+    }, CREATOR_WALLET).manifest;
+    const draft = await createAgentDraft(
+      { userId: CREATOR_ID, walletAddress: CREATOR_WALLET },
+      manifest,
+      { idempotencyKey: "creator-mcp-draft-01", sql: database.sql },
+    );
+    const expectedMcp = [
+      {
+        schemaVersion: 1,
+        id: "mcp.coingecko.spot-price",
+        provider: "coingecko",
+        capability: "spot-price",
+        access: "read-only",
+        timeoutMs: 8000,
+        maxResponseBytes: 32768,
+      },
+      {
+        schemaVersion: 1,
+        id: "mcp.the-graph.pinned-deployment-lookup",
+        provider: "the-graph",
+        capability: "pinned-deployment-lookup",
+        access: "read-only",
+        timeoutMs: 8000,
+        maxResponseBytes: 32768,
+      },
+    ];
+    assert.deepEqual(manifest.mcp, expectedMcp);
+    const draftRows = await database.sql<{ manifest: { mcp: unknown } }[]>`
+      SELECT manifest FROM agent_versions WHERE id = ${draft.versionId}::uuid
+    `;
+    assert.deepEqual(draftRows[0]?.manifest.mcp, expectedMcp);
+    await assert.rejects(database.sql`
+      UPDATE agent_versions
+      SET manifest = jsonb_set(manifest, '{mcp,0,id}', '"mcp.arbitrary.shell"'::jsonb)
+      WHERE id = ${draft.versionId}::uuid
+    `, /creator manifest contains an unallowlisted MCP binding/);
+    const unchangedDraftRows = await database.sql<{ manifest: { mcp: unknown } }[]>`
+      SELECT manifest FROM agent_versions WHERE id = ${draft.versionId}::uuid
+    `;
+    assert.deepEqual(unchangedDraftRows[0]?.manifest.mcp, expectedMcp);
+  } finally {
+    await database.close();
+  }
+});
+
 test("wallet authority publishes without ENS and admits external hire and goal selection", async () => {
   const database = await startDisposableDatabase("wallet-authority");
   configureDatabaseEnvironment(database.url);

@@ -44,6 +44,7 @@ const X402_LANE_PAYMENTS_MIGRATION = "20260725210000_x402_lane_payments";
 const AGENT_RUNTIME_V5_MIGRATION = "20260725220000_agent_runtime_v5";
 const MCP_HIRE_CLAIM_REPLAY_MIGRATION = "20260725230000_mcp_hire_claim_replay";
 const WALLET_AUTHORITY_PUBLICATION_MIGRATION = "20260725240000_wallet_authority_publication";
+const CREATOR_MCP_TRIGGER_PRECEDENCE_MIGRATION = "20260726011500_creator_mcp_trigger_precedence";
 const GOAL_LOOP_PREDECESSOR_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -926,7 +927,7 @@ async function verifyPopulatedLegacyX402UpgradeLane(
       row.transaction_hash !== `0x${"b".repeat(64)}` ||
       row.payment_attempt_id !== null ||
       row.gateway_transaction_id !== null ||
-      row.migration_count !== 22
+      row.migration_count !== 23
     ) {
       throw new Error("populated legacy x402 receipt did not upgrade exactly");
     }
@@ -1032,6 +1033,8 @@ async function verifyDatabase(
       agent_runtime_v5_count: string;
       mcp_hire_claim_replay_count: string;
       wallet_authority_publication_count: string;
+      creator_mcp_trigger_precedence_count: string;
+      creator_mcp_trigger_precedence_function_count: string;
       wallet_authority_constraint_count: string;
       wallet_authority_trigger_count: string;
       wallet_authority_function_count: string;
@@ -1544,6 +1547,16 @@ async function verifyDatabase(
           WHERE migration_name = ${WALLET_AUTHORITY_PUBLICATION_MIGRATION} AND finished_at IS NOT NULL
         ) AS wallet_authority_publication_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${CREATOR_MCP_TRIGGER_PRECEDENCE_MIGRATION}
+            AND finished_at IS NOT NULL
+        ) AS creator_mcp_trigger_precedence_count,
+        (
+          SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname = 'enforce_creator_manifest_mcp'
+            AND position($needle$(binding->>'id') <> ('mcp.' || (binding->>'provider') || '.' || (binding->>'capability'))$needle$ in p.prosrc) > 0
+        ) AS creator_mcp_trigger_precedence_function_count,
+        (
           SELECT count(*)::text FROM pg_constraint WHERE conname IN (
             'agent_wallet_identities_shape_check',
             'wallet_publication_decisions_shape_check',
@@ -1629,7 +1642,7 @@ async function verifyDatabase(
       result.x402_payment_attempts !== "x402_payment_attempts" ||
       result.cost_reserved_at !== "YES" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 22 ||
+      Number(result.migration_count) !== 23 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1682,6 +1695,8 @@ async function verifyDatabase(
       Number(result.agent_runtime_v5_count) !== 1 ||
       Number(result.mcp_hire_claim_replay_count) !== 1 ||
       Number(result.wallet_authority_publication_count) !== 1 ||
+      Number(result.creator_mcp_trigger_precedence_count) !== 1 ||
+      Number(result.creator_mcp_trigger_precedence_function_count) !== 1 ||
       Number(result.wallet_authority_constraint_count) !== 6 ||
       Number(result.wallet_authority_trigger_count) !== 10 ||
       Number(result.wallet_authority_function_count) !== 5 ||
