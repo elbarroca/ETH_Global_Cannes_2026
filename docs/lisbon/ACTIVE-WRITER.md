@@ -3,6 +3,39 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: C0 /root
+task_id: NEON-WALLET-AUTHORITY-MIGRATE-20260726-01
+task_instance_id: NEON-WALLET-AUTHORITY-MIGRATE-20260726-01:R1:86150AEB
+generation: 1
+sprint: Wallet-authority managed schema admission
+mode: sole_mutating_writer_and_single_use_effect
+branch: Eth_global_lisbon_
+start_sha: 86150aebb9c3321a2e4fc57186dbcc8e08a3d9df
+control_sha: 86150aebb9c3321a2e4fc57186dbcc8e08a3d9df
+token: C0-NEON-WALLET-MIGRATE-20260726-01-86150AEB
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-26T01:09:54Z
+expires_at: 2026-07-26T01:39:54Z
+allowed_paths:
+  - design-qa.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-26T01:09:54Z
+deadline: 2026-07-26T01:39:54Z
+expected_exit: exact five-migration Neon deployment with status and schema readback
+external_effect_authority: NEON-WALLET-AUTHORITY-MIGRATE-20260726-01 only; no reset seed provisioning credential change push deploy transaction or repeat
+external_effects_attempted: none
+claim_changes: local visual QA terminal normalized to passed; no live or release claim
+completed_at: null
+exit_sha: null
+verification_evidence: pending exact preflight migration and readback
+remaining_block: migration effect pending; all push deploy Circle Graph 0G hiring and submission effects remain separately unauthorized
+verdict: IN_PROGRESS
+lock_release: release only exact token C0-NEON-WALLET-MIGRATE-20260726-01-86150AEB after reconciliation commit
+status: active
+```
+
+```yaml
 owner: Frontend Builder /root/wallet_authority_modal
 task_id: WALLET-AUTHORITY-UI-R1
 task_instance_id: WALLET-AUTHORITY-UI-R1:R1:0D438A4

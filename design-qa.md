@@ -29,4 +29,6 @@
 - MCP Market: discovery-only link, local approved-stack search, 1-3 skill limit, four-binding maximum/dedupe, Graph-only approved capabilities, and arbitrary endpoint absence passed.
 - Accessibility/layout: focus trap and return, stage focus, reduced motion, long content, 375/768/1440 overflow <= 1px, and zero uncaught browser errors passed.
 
-final result: VISUAL_PASS_LOCAL_MOCKED; SAME_SHA_LIVE_JOURNEY_REQUIRED
+final result: passed
+
+Live deployment and same-SHA journey evidence remain separate release gates.
