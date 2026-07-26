@@ -90,9 +90,7 @@ export async function createHireRequest(
       FROM agent_versions version
       JOIN kernel_agents agent ON agent.id = version.agent_id
       WHERE version.id = ${input.agentVersionId}::uuid
-        AND version.published = true
-        AND version.lifecycle_state = 'PUBLISHED'
-        AND version.canonical_state = 'CANONICAL'
+        AND public.agent_version_is_hireable(version.id)
       FOR SHARE OF version
     `;
     const version = versions[0];
@@ -255,9 +253,12 @@ export async function processHireRequest(input: {
     release_sha: string | null;
   }[]>`
     SELECT hire.buyer_user_id, hire.agent_version_id::text, hire.prompt,
-      hire.manifest_hash, version.manifest, version.authority_release_sha AS release_sha
+      hire.manifest_hash, version.manifest,
+      COALESCE(version.authority_release_sha, wallet_decision.release_sha) AS release_sha
     FROM hire_requests hire
     JOIN agent_versions version ON version.id = hire.agent_version_id
+    LEFT JOIN wallet_publication_decisions wallet_decision
+      ON wallet_decision.id = version.wallet_publication_decision_id
     WHERE hire.id = ${input.hireRequestId}::uuid
       AND hire.state = 'CONTEXT_RUNNING'
       AND hire.claim_owner = ${input.workerId}

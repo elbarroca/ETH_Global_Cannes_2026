@@ -48,17 +48,94 @@ async function deliveryAuthority(
   job: ClaimedJob,
   options: WorkerRunOptions,
   signal: AbortSignal,
-): Promise<{ allowed: boolean; checkId: string | null; errorCode: string | null }> {
-  if (!options.authority) {
-    return { allowed: false, checkId: null, errorCode: "ENS_AUTHORITY_NOT_CONFIGURED" };
+): Promise<{
+  allowed: boolean;
+  checkId: string | null;
+  walletPublicationDecisionId: string | null;
+  errorCode: string | null;
+}> {
+  const sql = options.sql ?? getDb();
+  const now = options.now ?? new Date();
+  const versions = await sql<{
+    publication_mode: "ENS" | "WALLET" | null;
+    wallet_publication_decision_id: string | null;
+    wallet_authorized: boolean;
+  }[]>`
+    SELECT version.publication_mode,
+      version.wallet_publication_decision_id::text,
+      public.agent_version_is_hireable(version.id) AS wallet_authorized
+    FROM jobs job
+    JOIN effects effect ON effect.job_id = job.id
+    JOIN agent_versions version ON version.id = job.agent_version_id
+    JOIN kernel_agents agent ON agent.id = version.agent_id
+    JOIN worker_leases lease ON lease.key = 'kernel-worker'
+    WHERE job.id = ${job.jobId}::uuid AND effect.id = ${job.effectId}
+      AND job.agent_version_id = ${job.agentVersionId}::uuid
+      AND agent.owner_user_id = ${job.ownerUserId}
+      AND job.state = 'RUNNING' AND job.version = ${job.claimVersion}
+      AND job.lease_owner = ${job.leaseOwner}
+      AND job.lease_expires_at = ${job.leaseExpiresAt}
+      AND job.lease_expires_at > ${now}
+      AND lease.owner_id = ${job.leaseOwner}
+      AND lease.epoch = ${job.workerEpoch}::bigint AND lease.expires_at > ${now}
+  `;
+  const version = versions[0];
+  if (!version) {
+    return {
+      allowed: false,
+      checkId: null,
+      walletPublicationDecisionId: null,
+      errorCode: "WORKER_CLAIM_LOST",
+    };
   }
-  return checkFreshEnsAuthority(
+  if (version.publication_mode === "WALLET") {
+    const decisionId = version.wallet_publication_decision_id;
+    return version.wallet_authorized && decisionId
+      ? { allowed: true, checkId: null, walletPublicationDecisionId: decisionId, errorCode: null }
+      : {
+          allowed: false,
+          checkId: null,
+          walletPublicationDecisionId: null,
+          errorCode: "WALLET_PUBLICATION_AUTHORITY_DENIED",
+        };
+  }
+  const allowLegacyFixture = version.publication_mode === null &&
+    options.sql !== undefined && process.env.NODE_ENV === "test";
+  if (version.publication_mode !== "ENS" && !allowLegacyFixture) {
+    return {
+      allowed: false,
+      checkId: null,
+      walletPublicationDecisionId: null,
+      errorCode: "PUBLICATION_AUTHORITY_MODE_INVALID",
+    };
+  }
+  if (!options.authority) {
+    return {
+      allowed: false,
+      checkId: null,
+      walletPublicationDecisionId: null,
+      errorCode: "ENS_AUTHORITY_NOT_CONFIGURED",
+    };
+  }
+  const decision = await checkFreshEnsAuthority(
     job,
     options.authority,
     "PRE_DELIVERY",
     "ACCEPT_DELIVERY",
     { now: options.now, signal, sql: options.sql ?? getDb() },
   );
+  return { ...decision, walletPublicationDecisionId: null };
+}
+
+function receiptAuthority(decision: Awaited<ReturnType<typeof deliveryAuthority>>): {
+  authorityCheckId?: string;
+  walletPublicationDecisionId?: string;
+} {
+  return decision.checkId
+    ? { authorityCheckId: decision.checkId }
+    : decision.walletPublicationDecisionId
+      ? { walletPublicationDecisionId: decision.walletPublicationDecisionId }
+      : {};
 }
 
 async function finalizeRecoveredJournal(
@@ -74,7 +151,7 @@ async function finalizeRecoveredJournal(
   if (inspection.status === "verified") {
     const decision = await deliveryAuthority(job, options, signal);
     if (mutationFenced()) return true;
-    if (!decision.allowed || !decision.checkId) {
+    if (!decision.allowed) {
       const persisted = await persistFailedEffect(
         job,
         decision.errorCode ?? "ENS_AUTHORITY_DENIED",
@@ -88,6 +165,18 @@ async function finalizeRecoveredJournal(
       return true;
     }
     authorityCheckId = decision.checkId;
+    const recovery = await recoverVerifiedA3Effect(job, {
+      ...receiptAuthority(decision),
+      now: options.now,
+      sql: options.sql,
+    });
+    if (recovery.status === "none") return false;
+    if (!recovery.persisted || mutationFenced()) return true;
+    await options.afterTerminalEffectPersisted?.(job);
+    if (!mutationFenced()) {
+      await finalizePersistedEffect(job, { now: options.now, sql: options.sql });
+    }
+    return true;
   }
   const recovery = await recoverVerifiedA3Effect(job, {
     authorityCheckId,
@@ -159,7 +248,7 @@ async function processClaimedJob(
     } else {
       const decision = await deliveryAuthority(job, runtimeOptions, signal);
       if (mutationFenced()) return;
-      if (!decision.allowed || !decision.checkId) {
+      if (!decision.allowed) {
         persisted = await persistFailedEffect(
           job,
           decision.errorCode ?? "ENS_AUTHORITY_DENIED",
@@ -167,7 +256,7 @@ async function processClaimedJob(
         );
       } else {
         persisted = await persistSuccessfulEffect(job, result.result, result.proofHash, {
-          authorityCheckId: decision.checkId,
+          ...receiptAuthority(decision),
           now: options.now,
           sql: options.sql,
           requireA3Readback: adapter.requiresVerifiedJournal === true,

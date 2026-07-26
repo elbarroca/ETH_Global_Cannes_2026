@@ -43,6 +43,7 @@ const TRI_RISK_AUGMENTED_LAYER_MIGRATION = "20260725203000_tri_risk_augmented_la
 const X402_LANE_PAYMENTS_MIGRATION = "20260725210000_x402_lane_payments";
 const AGENT_RUNTIME_V5_MIGRATION = "20260725220000_agent_runtime_v5";
 const MCP_HIRE_CLAIM_REPLAY_MIGRATION = "20260725230000_mcp_hire_claim_replay";
+const WALLET_AUTHORITY_PUBLICATION_MIGRATION = "20260725240000_wallet_authority_publication";
 const GOAL_LOOP_PREDECESSOR_MIGRATIONS = [
   BASELINE_MIGRATION,
   A2_MIGRATION,
@@ -925,7 +926,7 @@ async function verifyPopulatedLegacyX402UpgradeLane(
       row.transaction_hash !== `0x${"b".repeat(64)}` ||
       row.payment_attempt_id !== null ||
       row.gateway_transaction_id !== null ||
-      row.migration_count !== 21
+      row.migration_count !== 22
     ) {
       throw new Error("populated legacy x402 receipt did not upgrade exactly");
     }
@@ -960,6 +961,8 @@ async function verifyDatabase(
       ens_publication_authority_policies: string | null;
       agent_version_events: string | null;
       agent_lifecycle_actions: string | null;
+      agent_wallet_identities: string | null;
+      wallet_publication_decisions: string | null;
       goals: string | null;
       goal_runs: string | null;
       goal_run_jobs: string | null;
@@ -1028,6 +1031,10 @@ async function verifyDatabase(
       x402_lane_trigger_count: string;
       agent_runtime_v5_count: string;
       mcp_hire_claim_replay_count: string;
+      wallet_authority_publication_count: string;
+      wallet_authority_constraint_count: string;
+      wallet_authority_trigger_count: string;
+      wallet_authority_function_count: string;
       manifest_v4_function_count: string;
       mcp_v4_function_count: string;
       sequence_type: string;
@@ -1054,6 +1061,8 @@ async function verifyDatabase(
         to_regclass('public.ens_publication_authority_policies')::text AS ens_publication_authority_policies,
         to_regclass('public.agent_version_events')::text AS agent_version_events,
         to_regclass('public.agent_lifecycle_actions')::text AS agent_lifecycle_actions,
+        to_regclass('public.agent_wallet_identities')::text AS agent_wallet_identities,
+        to_regclass('public.wallet_publication_decisions')::text AS wallet_publication_decisions,
         to_regclass('public.goals')::text AS goals,
         to_regclass('public.goal_runs')::text AS goal_runs,
         to_regclass('public.goal_run_jobs')::text AS goal_run_jobs,
@@ -1531,6 +1540,40 @@ async function verifyDatabase(
           WHERE migration_name = ${MCP_HIRE_CLAIM_REPLAY_MIGRATION} AND finished_at IS NOT NULL
         ) AS mcp_hire_claim_replay_count,
         (
+          SELECT count(*)::text FROM "_prisma_migrations"
+          WHERE migration_name = ${WALLET_AUTHORITY_PUBLICATION_MIGRATION} AND finished_at IS NOT NULL
+        ) AS wallet_authority_publication_count,
+        (
+          SELECT count(*)::text FROM pg_constraint WHERE conname IN (
+            'agent_wallet_identities_shape_check',
+            'wallet_publication_decisions_shape_check',
+            'agent_versions_publication_mode_check',
+            'agent_versions_wallet_attachment_state_check',
+            'agent_versions_wallet_publication_decision_fkey',
+            'receipts_authority_mode_check'
+          )
+        ) AS wallet_authority_constraint_count,
+        (
+          SELECT count(*)::text FROM pg_trigger WHERE NOT tgisinternal AND tgname IN (
+            'agent_wallet_identities_integrity', 'agent_wallet_identities_no_truncate',
+            'wallet_publication_decisions_integrity', 'wallet_publication_decisions_no_truncate',
+            'agent_versions_wallet_publication_integrity',
+            'agent_wallet_identities_publication_integrity',
+            'wallet_publication_decisions_publication_integrity',
+            'agent_lifecycle_actions_wallet_publication_integrity',
+            'agent_version_events_wallet_publication_integrity',
+            'agent_versions_creator_manifest_mcp'
+          )
+        ) AS wallet_authority_trigger_count,
+        (
+          SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname = 'public' AND p.proname IN (
+            'enforce_agent_wallet_identity', 'enforce_wallet_publication_decision',
+            'enforce_wallet_publication_integrity', 'agent_version_is_hireable',
+            'enforce_creator_manifest_mcp'
+          )
+        ) AS wallet_authority_function_count,
+        (
           SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname = 'enforce_manifest_v2_publication'
             AND position($needle$NEW.manifest->>'schemaVersion' IN ('3', '4', '5')$needle$ in p.prosrc) > 0
@@ -1541,7 +1584,7 @@ async function verifyDatabase(
         (
           SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
           WHERE n.nspname = 'public' AND p.proname = 'enforce_mcp_invocation_lineage'
-            AND position($needle$NOT IN ('3','4','5')$needle$ in p.prosrc) > 0
+            AND position($needle$NOT IN ('2','3','4','5')$needle$ in p.prosrc) > 0
         ) AS mcp_v4_function_count,
         seq.data_type AS sequence_type,
         seq.start_value::text AS sequence_start,
@@ -1570,6 +1613,8 @@ async function verifyDatabase(
       result.ens_publication_authority_policies !== "ens_publication_authority_policies" ||
       result.agent_version_events !== "agent_version_events" ||
       result.agent_lifecycle_actions !== "agent_lifecycle_actions" ||
+      result.agent_wallet_identities !== "agent_wallet_identities" ||
+      result.wallet_publication_decisions !== "wallet_publication_decisions" ||
       result.goals !== "goals" ||
       result.goal_runs !== "goal_runs" ||
       result.goal_run_jobs !== "goal_run_jobs" ||
@@ -1584,7 +1629,7 @@ async function verifyDatabase(
       result.x402_payment_attempts !== "x402_payment_attempts" ||
       result.cost_reserved_at !== "YES" ||
       Number(result.user_count) !== expectedUsers ||
-      Number(result.migration_count) !== 21 ||
+      Number(result.migration_count) !== 22 ||
       Number(result.baseline_count) !== 1 ||
       Number(result.a2_count) !== 1 ||
       Number(result.a3_count) !== 1 ||
@@ -1636,9 +1681,13 @@ async function verifyDatabase(
       Number(result.x402_lane_trigger_count) !== 3 ||
       Number(result.agent_runtime_v5_count) !== 1 ||
       Number(result.mcp_hire_claim_replay_count) !== 1 ||
+      Number(result.wallet_authority_publication_count) !== 1 ||
+      Number(result.wallet_authority_constraint_count) !== 6 ||
+      Number(result.wallet_authority_trigger_count) !== 10 ||
+      Number(result.wallet_authority_function_count) !== 5 ||
       Number(result.manifest_v4_function_count) !== 1 ||
       Number(result.mcp_v4_function_count) !== 1 ||
-      result.receipt_authority_nullable !== "NO" ||
+      result.receipt_authority_nullable !== "YES" ||
       result.lifecycle_action_nullable !== "NO" ||
       result.sequence_type !== "bigint" ||
       result.sequence_start !== "1" ||

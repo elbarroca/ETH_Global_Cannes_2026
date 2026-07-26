@@ -360,6 +360,7 @@ model KernelAgent {
   name        String
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   versions    AgentVersion[]
+  walletIdentity AgentWalletIdentity?
 
   @@unique([ownerUserId, name], map: "uniq_kernel_agents_owner_name")
   @@index([ownerUserId, createdAt], map: "idx_kernel_agents_owner_created")
@@ -384,6 +385,8 @@ model AgentVersion {
   asset          String
   proofPolicy    String      @map("proof_policy")
   lifecycleState String?     @map("lifecycle_state")
+  publicationMode String?    @map("publication_mode")
+  agentWalletId String?      @map("agent_wallet_id") @db.Uuid
   creatorParent  String?     @map("creator_parent")
   agentLabel     String?     @map("agent_label")
   fullSubname    String?     @map("full_subname")
@@ -399,6 +402,7 @@ model AgentVersion {
   authorityFreshUntil DateTime? @map("authority_fresh_until") @db.Timestamptz(6)
   authorityReleaseSha String? @map("authority_release_sha")
   publicationDecisionId String? @unique @map("publication_decision_id") @db.Uuid
+  walletPublicationDecisionId String? @unique @map("wallet_publication_decision_id") @db.Uuid
   publicationActionId String? @unique @map("publication_action_id") @db.Uuid
   published      Boolean     @default(false)
   publishedAt    DateTime?   @map("published_at") @db.Timestamptz(6)
@@ -407,6 +411,9 @@ model AgentVersion {
   lifecycleEvents AgentVersionEvent[]
   ensPublicationDecisions EnsPublicationDecision[] @relation("EnsPublicationDecisionLineage")
   publicationDecision EnsPublicationDecision? @relation("PublishedByEnsDecision", fields: [publicationDecisionId], references: [id], onDelete: Restrict)
+  walletIdentity AgentWalletIdentity? @relation(fields: [agentWalletId], references: [id], onDelete: Restrict)
+  walletPublicationDecisions WalletPublicationDecision[] @relation("WalletPublicationDecisionLineage")
+  walletPublicationDecision WalletPublicationDecision? @relation("PublishedByWalletDecision", fields: [walletPublicationDecisionId], references: [id], onDelete: Restrict)
   ensPublicationAuthorityPolicies EnsPublicationAuthorityPolicy[]
   lifecycleActions AgentLifecycleAction[] @relation("ActionResultVersion")
   targetedLifecycleActions AgentLifecycleAction[] @relation("ActionTargetVersion")
@@ -463,10 +470,72 @@ model AgentLifecycleAction {
   agentVersion     AgentVersion? @relation("ActionResultVersion", fields: [agentVersionId], references: [id], onDelete: Restrict)
   publicationFor   AgentVersion? @relation("PublishedByLifecycleAction")
   event            AgentVersionEvent? @relation("LifecycleActionEvent")
+  walletAttachment AgentWalletIdentity?
+  walletPublicationDecision WalletPublicationDecision?
 
   @@unique([ownerUserId, action, idempotencyKey], map: "agent_lifecycle_actions_owner_action_key")
   @@index([agentVersionId, createdAt], map: "idx_agent_lifecycle_actions_version_created")
   @@map("agent_lifecycle_actions")
+}
+
+model AgentWalletIdentity {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentId           String   @unique @map("agent_id") @db.Uuid
+  provider          String
+  providerWalletId  String   @unique @map("provider_wallet_id") @db.Uuid
+  address           String   @unique
+  network           String
+  accountType       String   @map("account_type")
+  state             String
+  evidenceHash      String   @map("evidence_hash")
+  identityHash      String   @unique @map("identity_hash")
+  observedAt        DateTime @map("observed_at") @db.Timestamptz(6)
+  attachedAt        DateTime @default(now()) @map("attached_at") @db.Timestamptz(6)
+  lifecycleActionId String   @unique @map("lifecycle_action_id") @db.Uuid
+  agent             KernelAgent @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  lifecycleAction   AgentLifecycleAction @relation(fields: [lifecycleActionId], references: [id], onDelete: Restrict)
+  versions          AgentVersion[]
+  publicationDecisions WalletPublicationDecision[]
+
+  @@map("agent_wallet_identities")
+}
+
+model WalletPublicationDecision {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  decisionKey         String   @unique @map("decision_key")
+  agentVersionId      String   @unique @map("agent_version_id") @db.Uuid
+  agentWalletId       String   @map("agent_wallet_id") @db.Uuid
+  publicationActionId String   @unique @map("publication_action_id") @db.Uuid
+  agentVersion        Int      @map("agent_version")
+  manifestHash        String   @map("manifest_hash")
+  capabilities        String[]
+  service             String
+  adapterKey          String   @map("adapter_key")
+  proofPolicy         String   @map("proof_policy")
+  priceAtomic         BigInt   @map("price_atomic")
+  asset               String
+  payout              String
+  creatorUserId       String   @map("creator_user_id")
+  creatorWallet       String   @map("creator_wallet")
+  walletIdentityHash  String   @map("wallet_identity_hash")
+  provider            String
+  providerWalletId    String   @map("provider_wallet_id") @db.Uuid
+  walletAddress       String   @map("wallet_address")
+  network             String
+  accountType         String   @map("account_type")
+  walletState         String   @map("wallet_state")
+  releaseSha          String   @map("release_sha")
+  policyVersion       String   @map("policy_version")
+  decision            String
+  receiptHash         String   @unique @map("receipt_hash")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  agentVersionRecord  AgentVersion @relation("WalletPublicationDecisionLineage", fields: [agentVersionId], references: [id], onDelete: Restrict)
+  agentWallet         AgentWalletIdentity @relation(fields: [agentWalletId], references: [id], onDelete: Restrict)
+  publicationAction   AgentLifecycleAction @relation(fields: [publicationActionId], references: [id], onDelete: Restrict)
+  publishedVersion    AgentVersion? @relation("PublishedByWalletDecision")
+  deliveryReceipts    Receipt[]
+
+  @@map("wallet_publication_decisions")
 }
 
 model Quote {
@@ -641,7 +710,7 @@ model GoalRunJob {
   coveredCapabilities   String[]     @map("covered_capabilities")
   priceAtomicSnapshot   BigInt       @map("price_atomic_snapshot")
   manifestHashSnapshot  String       @map("manifest_hash_snapshot")
-  fullSubnameSnapshot   String       @map("full_subname_snapshot")
+  fullSubnameSnapshot   String?      @map("full_subname_snapshot")
   createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   run                   GoalRun      @relation(fields: [goalRunId], references: [id], onDelete: Restrict)
   agentVersion          AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
@@ -826,7 +895,8 @@ model Receipt {
   id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   jobId            String   @unique @map("job_id") @db.Uuid
   effectId         String   @unique @map("effect_id")
-  authorityCheckId BigInt   @unique @map("authority_check_id")
+  authorityCheckId BigInt?  @unique @map("authority_check_id")
+  walletPublicationDecisionId String? @unique @map("wallet_publication_decision_id") @db.Uuid
   verified         Boolean
   adapterKey       String   @map("adapter_key")
   proofHash        String   @map("proof_hash")
@@ -834,6 +904,7 @@ model Receipt {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   x402PaymentReceipt X402PaymentReceipt?
   x402PaymentAttempt X402PaymentAttempt?
+  walletPublicationDecision WalletPublicationDecision? @relation(fields: [walletPublicationDecisionId], references: [id], onDelete: Restrict)
 
   @@map("receipts")
 }

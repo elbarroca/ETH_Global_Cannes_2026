@@ -3,6 +3,66 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/wallet_authority_kernel
+task_id: WALLET-AUTHORITY-KERNEL-R1
+task_instance_id: WALLET-AUTHORITY-KERNEL-R1:R1:FD8752A
+generation: 1
+sprint: Final wallet-authority product pivot
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: fd8752adb06d9ffa0bb61d5af84db592ee9d46bf
+control_sha: fd8752adb06d9ffa0bb61d5af84db592ee9d46bf
+token: WALLET-AUTHORITY-KERNEL-R1-FD8752A-20260725T234642Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-26T00:24:13Z
+expires_at: 2026-07-26T03:30:00Z
+allowed_paths:
+  - prisma/schema.prisma
+  - prisma/migrations/20260725240000_wallet_authority_publication/migration.sql
+  - scripts/test-migrations.ts
+  - src/kernel/agent-wallets.ts
+  - src/kernel/types.ts
+  - src/kernel/lifecycle.ts
+  - src/kernel/policy.ts
+  - src/kernel/service.ts
+  - src/kernel/hire-requests.ts
+  - src/kernel/goals.ts
+  - src/worker/runner.ts
+  - src/worker/store.ts
+  - app/api/kernel/agents/route.ts
+  - tests/kernel/agent-wallets.test.ts
+  - tests/kernel/lifecycle.cases.ts
+  - tests/kernel/marketplace-v5.test.ts
+  - tests/kernel/goal-loop.test.ts
+  - tests/kernel/kernel.test.ts
+  - tests/integration/worker-fencing.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-25T23:46:42Z
+deadline: 2026-07-26T03:30:00Z
+expected_exit: local wallet-authority continuity path with ENS dormant and preserved
+external_effect_authority: local files deterministic injected-fake tests disposable local database replay and one atomic local commit only; no real Circle ENS Graph or 0G call managed migration push deploy signature transaction funding transfer spend submission or claim
+external_effects_attempted: none
+claim_changes: none; local wallet authority is not live Circle or sponsor proof
+completed_at: 2026-07-26T00:24:13Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - wallet authority 1 of 1 PASS with zero ENS rows or aliases and external hire plus goal admission
+  - kernel 24 of 24 PASS including dormant ENS lifecycle and legacy test-only compatibility
+  - goal loop 12 of 12 PASS
+  - worker fencing 3 of 3 PASS
+  - 22-migration fresh Cannes populated goal-loop and W6 upgrade replay PASS
+  - Prisma validate PASS
+  - npm run typecheck PASS
+  - npm run lint PASS with zero errors
+  - npm run scan:secrets PASS
+  - git diff --check PASS
+remaining_block: frozen-SHA independent audit and full release verification floor; real Circle ENS Graph 0G and all release effects remain unauthorized
+verdict: PASS_TO_AUDIT; LOCAL_ONLY; ENS_DORMANT; LIVE_EFFECT_BLOCKED
+lock_release: release only exact token WALLET-AUTHORITY-KERNEL-R1-FD8752A-20260725T234642Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: C0 /root
 task_id: GRAPH-DOCS-FREEZE-R1
 task_instance_id: GRAPH-DOCS-FREEZE-R1:R1:E51CADE

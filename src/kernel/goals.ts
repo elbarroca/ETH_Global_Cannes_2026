@@ -116,7 +116,7 @@ interface GoalRunJobRow {
   covered_capabilities: string[];
   price_atomic_snapshot: string;
   manifest_hash_snapshot: string;
-  full_subname_snapshot: string;
+  full_subname_snapshot: string | null;
 }
 
 interface CandidateRow {
@@ -124,7 +124,7 @@ interface CandidateRow {
   capabilities: string[];
   price_atomic: string;
   manifest_hash: string;
-  full_subname: string;
+  full_subname: string | null;
   verified_external_hires: string;
   risk_tiers: RiskLane[];
 }
@@ -1206,30 +1206,14 @@ async function selectRunAgents(
           AND receipt.verified = true AND receipt.result_hash = effect.result_hash
       ) hires ON true
       WHERE agent.owner_user_id <> ${ownerUserId}
-        AND v.published = true AND v.lifecycle_state = 'PUBLISHED'
-        AND v.canonical_state = 'CANONICAL' AND v.price_atomic > 0
+        AND public.agent_version_is_hireable(v.id) AND v.price_atomic > 0
         AND (
           (${triRisk} AND v.manifest->>'schemaVersion' IN ('4', '5')) OR
           (${!triRisk} AND v.manifest->>'schemaVersion' IN ('1', '2', '3', '5'))
         )
-        AND v.full_subname IS NOT NULL AND v.publication_decision_id IS NOT NULL
-        AND v.publication_action_id IS NOT NULL
         AND (
           ${triRisk} OR v.capabilities && ${run.capabilities_snapshot}
           OR 'research' = ANY(v.capabilities)
-        )
-        AND EXISTS (
-          SELECT 1 FROM ens_publication_decisions decision
-          JOIN agent_lifecycle_actions action ON action.id = v.publication_action_id
-          JOIN agent_version_events event ON event.lifecycle_action_id = action.id
-          WHERE decision.id = v.publication_decision_id
-            AND decision.agent_version_id = v.id AND decision.decision = 'ALLOW'
-            AND decision.error_code IS NULL AND action.action = 'PUBLISH_VERSION'
-            AND action.status = 'SUCCEEDED' AND action.owner_user_id = agent.owner_user_id
-            AND action.target_agent_version_id = v.id AND action.agent_version_id = v.id
-            AND action.result_snapshot->>'outcome' = 'SUCCESS'
-            AND event.agent_version_id = v.id AND event.action = 'PUBLISH_VERSION'
-            AND event.payload->>'publicationDecisionId' = decision.id::text
         )
       ORDER BY v.id ASC
       FOR SHARE OF v
@@ -1594,11 +1578,14 @@ async function ensureJob(
   const versions = await sql<{
     manifest: AgentManifest;
     manifest_hash: string;
-    authority_release_sha: string | null;
+    release_sha: string | null;
   }[]>`
-    SELECT version.manifest, version.manifest_hash, version.authority_release_sha
+    SELECT version.manifest, version.manifest_hash,
+      COALESCE(version.authority_release_sha, wallet_decision.release_sha) AS release_sha
     FROM goal_run_jobs link
     JOIN agent_versions version ON version.id = link.agent_version_id
+    LEFT JOIN wallet_publication_decisions wallet_decision
+      ON wallet_decision.id = version.wallet_publication_decision_id
     WHERE link.id = ${row.id}::uuid
       AND link.goal_run_id = ${run.run_id}::uuid
       AND version.id = ${row.agent_version_id}::uuid
@@ -1614,12 +1601,11 @@ async function ensureJob(
     contextHash: string;
     invocationIds: readonly string[];
   } | undefined;
-  if (
-    (version.manifest.schemaVersion === 3 || version.manifest.schemaVersion === 4 ||
-      version.manifest.schemaVersion === 5) &&
-    version.manifest.mcp.length > 0
-  ) {
-    if ((version.manifest.schemaVersion === 4 || version.manifest.schemaVersion === 5) && !mcpProvider) return;
+  if (version.manifest.schemaVersion !== 1 && version.manifest.mcp.length > 0) {
+    if (
+      (version.manifest.schemaVersion === 4 || version.manifest.schemaVersion === 5) &&
+      !mcpProvider
+    ) return;
     const context = await collectMcpContext({
       sql,
       goalRunJobId: row.id,
@@ -1628,7 +1614,7 @@ async function ensureJob(
       bindings: version.manifest.mcp,
       objective: run.objective_snapshot,
       requiredCapabilities: run.capabilities_snapshot,
-      releaseSha: version.authority_release_sha ?? "",
+      releaseSha: version.release_sha ?? "",
       provider: mcpProvider,
       now,
       signal,

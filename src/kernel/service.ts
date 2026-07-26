@@ -6,9 +6,6 @@ import { projectMcpSourceMetadata } from "./mcp-context";
 import { KERNEL_QUOTE_TTL_MS } from "./policy";
 import type {
   AgentManifest,
-  AgentManifestV3,
-  AgentManifestV4,
-  AgentManifestV5,
   EvidenceState,
   KernelJobDetail,
   KernelJobEvidenceSummary,
@@ -44,7 +41,7 @@ interface AgentVersionRow {
   creator_parent?: string | null;
   agent_label?: string | null;
   full_subname?: string | null;
-  canonical_state?: "UNVERIFIED" | "CANONICAL" | "REFUSED" | null;
+  canonical_state?: "UNVERIFIED" | "CANONICAL" | "WALLET_AUTHORIZED" | "REFUSED" | null;
   authority_owner?: string | null;
 }
 
@@ -552,35 +549,7 @@ export async function submitJob(
       WHERE v.id = ${input.agentVersionId}::uuid
         AND v.published = true
         AND (
-          (
-            v.lifecycle_state = 'PUBLISHED' AND v.canonical_state = 'CANONICAL'
-            AND v.write_plan_hash IS NOT NULL AND v.authority_record_hash IS NOT NULL
-            AND v.publication_decision_id IS NOT NULL AND v.publication_action_id IS NOT NULL
-            AND EXISTS (
-              SELECT 1
-              FROM ens_publication_decisions decision
-              JOIN agent_lifecycle_actions publication_action
-                ON publication_action.id = v.publication_action_id
-               AND publication_action.action = 'PUBLISH_VERSION'
-               AND publication_action.status = 'SUCCEEDED'
-               AND publication_action.owner_user_id = a.owner_user_id
-               AND publication_action.target_agent_version_id = v.id
-               AND publication_action.agent_version_id = v.id
-               AND publication_action.result_hash IS NOT NULL
-               AND publication_action.result_snapshot->>'action' = 'PUBLISH_VERSION'
-               AND publication_action.result_snapshot->>'outcome' = 'SUCCESS'
-              JOIN agent_version_events publication_event
-                ON publication_event.agent_version_id = v.id
-               AND publication_event.action = 'PUBLISH_VERSION'
-               AND publication_event.lifecycle_action_id = publication_action.id
-               AND publication_event.payload->>'lifecycleActionId' = publication_action.id::text
-               AND publication_event.payload->>'resultHash' = publication_action.result_hash
-               AND publication_event.payload->>'publicationDecisionId' = decision.id::text
-              WHERE decision.id = v.publication_decision_id
-                AND decision.agent_version_id = v.id
-                AND decision.decision = 'ALLOW' AND decision.error_code IS NULL
-            )
-          )
+          public.agent_version_is_hireable(v.id)
           OR (${allowLegacyFixture} AND v.lifecycle_state IS NULL)
         )
       FOR SHARE OF v
@@ -592,11 +561,7 @@ export async function submitJob(
     if (agentVersion.owner_user_id === buyerUserId) {
       throw new KernelError("KERNEL_FORBIDDEN", "Creators cannot hire their own agent version", 403);
     }
-    if (
-      (agentVersion.manifest.schemaVersion === 3 || agentVersion.manifest.schemaVersion === 4 ||
-        agentVersion.manifest.schemaVersion === 5) &&
-      agentVersion.manifest.mcp.length > 0
-    ) {
+    if (agentVersion.manifest.schemaVersion !== 1 && agentVersion.manifest.mcp.length > 0) {
       const context = options.mcpContext;
       if (
         !context || context.invocationIds.length !== agentVersion.manifest.mcp.length ||
@@ -669,7 +634,7 @@ export async function submitJob(
           `;
       }
       const byBinding = new Map(invocations.map((row) => [row.binding_id, row]));
-      const contextValue = (agentVersion.manifest as AgentManifestV3 | AgentManifestV4 | AgentManifestV5).mcp.map((binding) => {
+      const contextValue = agentVersion.manifest.mcp.map((binding) => {
         const invocation = byBinding.get(binding.id);
         if (!invocation || !context.invocationIds.includes(invocation.id)) {
           throw new KernelError(

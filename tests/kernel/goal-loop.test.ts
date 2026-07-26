@@ -418,7 +418,7 @@ test("protected goals match, hire, synthesize, cap, isolate, and expose optional
       assert.equal(synthesizing.state, "SYNTHESIZING");
       const synthesis = synthesizing.jobs.find((job) => job.role === "SYNTHESIS");
       assert.ok(synthesis?.jobId);
-      await deliverNext(database, synthesis.fullSubname, at(5_000), {
+      await deliverNext(database, synthesis.fullSubname ?? "", at(5_000), {
         schemaVersion: 1,
         summary: "Verified market and risk outputs agree on a cautious bias.",
         conclusion: "Research only; no transaction is authorized.",

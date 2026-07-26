@@ -103,7 +103,7 @@ export interface AgentManifestV2 extends AgentManifestBase {
   reviewedConfigHash: string;
   skills: readonly PinnedAgentSkill[];
   nativeConnections: readonly AgentNativeConnection[];
-  mcp: readonly [];
+  mcp: readonly McpBindingV1[];
   payoutAddress: string;
   ensBindingHash: string | null;
 }
@@ -190,12 +190,38 @@ export interface AgentMcpSummary {
 
 export const AGENT_LIFECYCLE_STATES = [
   "DRAFT",
+  "WALLET_ATTACHED",
   "NAME_BOUND",
   "WRITE_PREPARED",
   "PUBLISHED",
 ] as const;
 
 export type AgentLifecycleState = (typeof AGENT_LIFECYCLE_STATES)[number];
+export type AgentPublicationMode = "ENS" | "WALLET";
+
+export interface AgentWalletIdentity extends Record<string, CanonicalValue> {
+  provider: "circle";
+  walletId: string;
+  address: string;
+  network: "UNI-SEPOLIA";
+  accountType: "SCA";
+  state: "LIVE";
+  evidenceHash: string;
+  observedAt: string;
+}
+
+export interface AttachedAgentWallet extends AgentWalletIdentity {
+  walletIdentityId: string;
+  identityHash: string;
+  attachedAt: string;
+}
+
+export interface AgentWalletProvider {
+  provisionAgentWallet(
+    input: { agentId: string; idempotencyKey: string },
+    signal: AbortSignal,
+  ): Promise<AgentWalletIdentity>;
+}
 
 export interface AgentEnsBinding extends Record<string, CanonicalValue> {
   creatorParent: string;
@@ -236,19 +262,24 @@ export interface AgentLifecycleVersion {
   asset: "USDC_ATOMIC";
   proofPolicy: "verified-receipt-required";
   lifecycleState: AgentLifecycleState;
+  publicationMode: AgentPublicationMode | null;
   hireable: boolean;
   ownedByViewer: boolean;
   creatorParent: string | null;
   agentLabel: string | null;
   fullSubname: string | null;
   writePlanHash: string | null;
-  canonicalState: "UNVERIFIED" | "CANONICAL" | "REFUSED";
+  canonicalState: "UNVERIFIED" | "CANONICAL" | "WALLET_AUTHORIZED" | "REFUSED";
+  authorityState: "UNVERIFIED" | "CANONICAL_ENS" | "WALLET_AUTHORIZED" | "REFUSED";
   authorityOwner: string | null;
   authorityDelegate: string | null;
   authorityPolicyVersion: string | null;
   refusalReason: string | null;
   authorityReleaseSha: string | null;
   publicationDecisionId: string | null;
+  walletPublicationDecisionId: string | null;
+  walletReceiptHash: string | null;
+  agentWallet: AttachedAgentWallet | null;
   publishedAt: string | null;
   manifestSchemaVersion: 1 | 2 | 3 | 4 | 5;
   riskTiers: readonly RiskLane[] | null;
@@ -258,10 +289,12 @@ export interface AgentLifecycleVersion {
   mcpAvailability: "AVAILABLE" | "UNAVAILABLE" | "NOT_REQUIRED";
 }
 
-export interface ProtectedPublishedAgent extends AgentLifecycleVersion {
+export interface EnsProtectedPublishedAgent extends AgentLifecycleVersion {
   lifecycleState: "PUBLISHED";
+  publicationMode: "ENS";
   hireable: true;
   canonicalState: "CANONICAL";
+  authorityState: "CANONICAL_ENS";
   creatorParent: string;
   agentLabel: string;
   fullSubname: string;
@@ -270,8 +303,34 @@ export interface ProtectedPublishedAgent extends AgentLifecycleVersion {
   authorityPolicyVersion: string;
   authorityReleaseSha: string;
   publicationDecisionId: string;
+  walletPublicationDecisionId: null;
+  walletReceiptHash: null;
+  agentWallet: null;
   publishedAt: string;
 }
+
+export interface WalletProtectedPublishedAgent extends AgentLifecycleVersion {
+  lifecycleState: "PUBLISHED";
+  publicationMode: "WALLET";
+  hireable: true;
+  canonicalState: "WALLET_AUTHORIZED";
+  authorityState: "WALLET_AUTHORIZED";
+  creatorParent: "";
+  agentLabel: "";
+  fullSubname: "";
+  writePlanHash: null;
+  authorityOwner: "";
+  authorityDelegate: null;
+  authorityPolicyVersion: "";
+  authorityReleaseSha: "";
+  publicationDecisionId: null;
+  walletPublicationDecisionId: string;
+  walletReceiptHash: string;
+  agentWallet: AttachedAgentWallet;
+  publishedAt: string;
+}
+
+export type ProtectedPublishedAgent = EnsProtectedPublishedAgent | WalletProtectedPublishedAgent;
 
 export interface AgentVersionProvenance {
   protocol: "INFT";
@@ -283,10 +342,10 @@ export interface AgentVersionProvenance {
   observedAt: string;
 }
 
-export interface ProtectedPublishedAgentRead extends ProtectedPublishedAgent {
+export type ProtectedPublishedAgentRead = ProtectedPublishedAgent & {
   verifiedExternalHires: number;
   provenance: AgentVersionProvenance | null;
-}
+};
 
 export const HIRE_REQUEST_STATES = [
   "PENDING_CONTEXT",
@@ -447,7 +506,7 @@ export interface GoalRunJobSnapshot {
   coveredCapabilities: readonly string[];
   priceAtomic: string;
   manifestHash: string;
-  fullSubname: string;
+  fullSubname: string | null;
 }
 
 export interface McpSourceMetadataV1 {
@@ -519,7 +578,7 @@ export interface PublishedAgent {
   creatorParent: string | null;
   agentLabel: string | null;
   fullSubname: string | null;
-  canonicalState: "UNVERIFIED" | "CANONICAL" | "REFUSED";
+  canonicalState: "UNVERIFIED" | "CANONICAL" | "WALLET_AUTHORIZED" | "REFUSED";
   authorityOwner: string | null;
   publishedAt: string;
 }
@@ -584,7 +643,7 @@ export interface KernelJobAgentIdentity {
   proofPolicy: "verified-receipt-required";
   creatorParent: string | null;
   fullSubname: string | null;
-  canonicalState: "UNVERIFIED" | "CANONICAL" | "REFUSED" | null;
+  canonicalState: "UNVERIFIED" | "CANONICAL" | "WALLET_AUTHORIZED" | "REFUSED" | null;
   authorityOwner: string | null;
   authorityDelegate: string | null;
   authorityPolicyVersion: string | null;

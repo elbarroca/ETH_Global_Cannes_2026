@@ -614,6 +614,7 @@ export async function persistSuccessfulEffect(
   proofHash: string,
   options: {
     authorityCheckId?: string;
+    walletPublicationDecisionId?: string;
     now?: Date;
     sql?: DatabaseClient;
     requireA3Readback?: boolean;
@@ -626,10 +627,17 @@ export async function persistSuccessfulEffect(
   return sql.begin(async (transaction) => {
     const tx = transactionClient(transaction);
     if (!(await currentClaimHeld(tx, job, now))) return false;
-    if (!options.authorityCheckId || !/^[1-9][0-9]*$/.test(options.authorityCheckId)) {
-      throw new Error("WORKER_ENS_AUTHORITY_REQUIRED");
+    const authorityCheckId = options.authorityCheckId && /^[1-9][0-9]*$/.test(options.authorityCheckId)
+      ? options.authorityCheckId
+      : null;
+    const walletPublicationDecisionId = options.walletPublicationDecisionId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        .test(options.walletPublicationDecisionId)
+      ? options.walletPublicationDecisionId
+      : null;
+    if ((authorityCheckId !== null) === (walletPublicationDecisionId !== null)) {
+      throw new Error("WORKER_DELIVERY_AUTHORITY_REQUIRED");
     }
-    const authorityCheckId = options.authorityCheckId;
     if (options.requireA3Readback) {
       const journals = await tx<{ effect_id: string }[]>`
         SELECT effect_id
@@ -673,10 +681,12 @@ export async function persistSuccessfulEffect(
     }
     const receipts = await tx<{ id: string }[]>`
       INSERT INTO receipts (
-        job_id, effect_id, authority_check_id, verified, adapter_key,
+        job_id, effect_id, authority_check_id, wallet_publication_decision_id,
+        verified, adapter_key,
         proof_hash, result_hash, created_at
       ) VALUES (
         ${job.jobId}::uuid, ${job.effectId}, ${authorityCheckId}::bigint,
+        ${walletPublicationDecisionId}::uuid,
         true, ${job.adapterKey},
         ${proofHash}, ${resultHash}, ${now}
       )
@@ -693,7 +703,7 @@ async function persistRecoveredVerifiedEffectLocked(
   jobId: string,
   effectId: string,
   payload: { result: CanonicalValue; proofHash: string },
-  authorityCheckId: string,
+  authority: { authorityCheckId: string | null; walletPublicationDecisionId: string | null },
   now: Date,
 ): Promise<boolean> {
   const resultHash = domainHash("effect-result", payload.result);
@@ -707,10 +717,12 @@ async function persistRecoveredVerifiedEffectLocked(
   if (effects.length === 1) {
     const receipts = await tx<{ id: string }[]>`
       INSERT INTO receipts (
-        job_id, effect_id, authority_check_id, verified, adapter_key,
+        job_id, effect_id, authority_check_id, wallet_publication_decision_id,
+        verified, adapter_key,
         proof_hash, result_hash, created_at
       ) VALUES (
-        ${jobId}::uuid, ${effectId}, ${authorityCheckId}::bigint, true, 'protected-a3',
+        ${jobId}::uuid, ${effectId}, ${authority.authorityCheckId}::bigint,
+        ${authority.walletPublicationDecisionId}::uuid, true, 'protected-a3',
         ${payload.proofHash}, ${resultHash}, ${now}
       )
       ON CONFLICT (job_id) DO NOTHING
@@ -794,7 +806,12 @@ export async function inspectVerifiedA3Effect(
 
 export async function recoverVerifiedA3Effect(
   job: ClaimedJob,
-  options: { authorityCheckId?: string | null; now?: Date; sql?: DatabaseClient } = {},
+  options: {
+    authorityCheckId?: string | null;
+    walletPublicationDecisionId?: string | null;
+    now?: Date;
+    sql?: DatabaseClient;
+  } = {},
 ): Promise<A3JournalRecovery> {
   const sql = options.sql ?? getDb();
   const now = options.now ?? new Date();
@@ -824,8 +841,16 @@ export async function recoverVerifiedA3Effect(
         ),
       };
     }
-    if (!options.authorityCheckId || !/^[1-9][0-9]*$/.test(options.authorityCheckId)) {
-      throw new Error("WORKER_ENS_AUTHORITY_REQUIRED");
+    const authorityCheckId = options.authorityCheckId && /^[1-9][0-9]*$/.test(options.authorityCheckId)
+      ? options.authorityCheckId
+      : null;
+    const walletPublicationDecisionId = options.walletPublicationDecisionId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+        .test(options.walletPublicationDecisionId)
+      ? options.walletPublicationDecisionId
+      : null;
+    if ((authorityCheckId !== null) === (walletPublicationDecisionId !== null)) {
+      throw new Error("WORKER_DELIVERY_AUTHORITY_REQUIRED");
     }
     return {
       status: "succeeded",
@@ -834,7 +859,7 @@ export async function recoverVerifiedA3Effect(
         job.jobId,
         job.effectId,
         payload,
-        options.authorityCheckId,
+        { authorityCheckId, walletPublicationDecisionId },
         now,
       ),
     };

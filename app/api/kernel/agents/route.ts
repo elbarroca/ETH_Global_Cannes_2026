@@ -2,14 +2,13 @@ import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/src/auth/http";
 import { kernelErrorResponse, readBoundedKernelJson } from "@/src/kernel/http";
 import {
-  bindAgentName,
+  attachAgentWallet,
   createAgentDraft,
   listAgentLifecycle,
-  prepareAgentEnsWrite,
-  publishAgentVersion,
+  publishWalletAgentVersion,
 } from "@/src/kernel/lifecycle";
 import { parseAgentAction, parseAgentListFilters, parseIdempotencyKey } from "@/src/kernel/policy";
-import { createProductionEnsPublicationAuthority } from "@/src/kernel/publication-authority";
+import { domainHash } from "@/src/kernel/canonical";
 
 export const runtime = "nodejs";
 
@@ -53,26 +52,36 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
       return NextResponse.json({ action: action.action, version }, { status: 201 });
     }
-    if (action.action === "BIND_NAME") {
-      const version = await bindAgentName(
+    if (action.action === "ATTACH_AGENT_WALLET") {
+      const observedAt = new Date().toISOString();
+      const version = await attachAgentWallet(
         principal.userId,
         action.versionId,
-        action.binding,
-        { idempotencyKey },
+        {
+          idempotencyKey,
+          signal: request.signal,
+          provider: {
+            provisionAgentWallet: async ({ agentId, idempotencyKey: providerKey }, signal) => {
+              if (signal.aborted) throw new Error("KERNEL_WALLET_PROVIDER_ABORTED");
+              const { createAgentWallet } = await import("@/src/payments/circle-wallet");
+              const wallet = await createAgentWallet(agentId, providerKey);
+              if (signal.aborted) throw new Error("KERNEL_WALLET_PROVIDER_ABORTED");
+              const identity = { ...wallet, state: "LIVE" as const, observedAt };
+              return {
+                ...identity,
+                evidenceHash: domainHash("circle-agent-wallet-evidence", identity),
+              };
+            },
+          },
+        },
       );
       return NextResponse.json({ action: action.action, version });
     }
-    if (action.action === "PREPARE_ENS_WRITE") {
-      const prepared = await prepareAgentEnsWrite(
-        principal.userId,
-        action.versionId,
-        { idempotencyKey },
-      );
-      return NextResponse.json({ action: action.action, ...prepared });
-    }
-    const version = await publishAgentVersion(principal.userId, action.versionId, {
-      authority: createProductionEnsPublicationAuthority(),
+    const version = await publishWalletAgentVersion(principal.userId, action.versionId, {
       idempotencyKey,
+      releaseSha: /^[0-9a-f]{40}$/.test(process.env.VERCEL_GIT_COMMIT_SHA ?? "")
+        ? process.env.VERCEL_GIT_COMMIT_SHA
+        : "0".repeat(40),
     });
     return NextResponse.json({ action: action.action, version });
   } catch (error) {

@@ -8,12 +8,14 @@ import type {
 import {
   buildManifestV5,
   buildManifestV2,
+  isMcpBindingAllowlisted,
   isSupportedAgentSkill,
   isFoundingSkillId,
   parseRiskTiers,
   type SupportedAgentSkill,
 } from "./agent-catalog";
-import type { McpProviderId, RiskLane } from "./types";
+import { domainHash } from "./canonical";
+import type { AgentManifestV2, McpBindingV1, McpCapability, McpProviderId, RiskLane } from "./types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -62,7 +64,7 @@ function boundedMarkdown(value: unknown): string {
     /<\/?[a-z][^>]*>/i.test(markdown) ||
     /!\[[^\]]*\]\(/.test(markdown) ||
     /(?:javascript|data):/i.test(markdown) ||
-    /https?:\/\//i.test(markdown)
+    /https?:\/\//i.test(markdown) || /```|~~~|^\s*#!/m.test(markdown)
   ) {
     throw new KernelError(
       "KERNEL_INVALID_REQUEST",
@@ -73,12 +75,75 @@ function boundedMarkdown(value: unknown): string {
   return markdown;
 }
 
+const MCP_BINDING_ORDER = [
+  "mcp.coingecko.spot-price",
+  "mcp.coingecko.market-snapshot",
+  "mcp.the-graph.pinned-deployment-lookup",
+  "mcp.the-graph.liquidity-volume-snapshot",
+] as const;
+
+function parseCreatorMcpBindings(value: unknown): readonly McpBindingV1[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 4) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "mcp must contain at most 4 server bindings", 400);
+  }
+  const bindings = value.map((entry): McpBindingV1 => {
+    const input = objectRecord(entry);
+    rejectUnexpectedKeys(input, ["provider", "capability"]);
+    if (
+      (input.provider !== "coingecko" && input.provider !== "the-graph") ||
+      typeof input.capability !== "string"
+    ) {
+      throw new KernelError("KERNEL_INVALID_REQUEST", "Unsupported MCP binding", 400);
+    }
+    const binding: McpBindingV1 = {
+      schemaVersion: 1,
+      id: `mcp.${input.provider}.${input.capability}`,
+      provider: input.provider,
+      capability: input.capability as McpCapability,
+      access: "read-only",
+      timeoutMs: 8000,
+      maxResponseBytes: 32768,
+    };
+    if (!isMcpBindingAllowlisted(binding) || !MCP_BINDING_ORDER.includes(binding.id as typeof MCP_BINDING_ORDER[number])) {
+      throw new KernelError("KERNEL_INVALID_REQUEST", "Unsupported MCP binding", 400);
+    }
+    return binding;
+  });
+  const unique = new Map(bindings.map((binding) => [binding.id, binding]));
+  if (unique.size !== bindings.length) {
+    throw new KernelError("KERNEL_INVALID_REQUEST", "MCP bindings must be unique", 400);
+  }
+  return MCP_BINDING_ORDER.flatMap((id) => unique.get(id) ?? []);
+}
+
+function withCreatorMcp(manifest: AgentManifestV2, mcp: readonly McpBindingV1[]): AgentManifestV2 {
+  const updated = { ...manifest, mcp };
+  return {
+    ...updated,
+    reviewedConfigHash: domainHash("agent-config", {
+      adapterKey: updated.adapterKey,
+      capabilities: updated.capabilities,
+      connectorKey: updated.connectorKey,
+      endpoint: updated.endpoint,
+      ensBinding: updated.ensBinding,
+      ensBindingHash: updated.ensBindingHash,
+      mcp: updated.mcp,
+      nativeConnections: updated.nativeConnections,
+      payoutAddress: updated.payoutAddress,
+      priceAtomic: updated.priceAtomic,
+      proofPolicy: updated.proofPolicy,
+      skills: updated.skills,
+    }),
+  };
+}
+
 export function parseAgentInput(
   value: unknown,
   ownerWallet: string,
 ): { name: string; manifest: AgentManifest } {
   const input = objectRecord(value);
-  rejectUnexpectedKeys(input, ["name", "description", "instructions", "capabilities"]);
+  rejectUnexpectedKeys(input, ["name", "description", "instructions", "capabilities", "mcp"]);
   const name = boundedString(input.name, "name", 2, 80);
   const description = boundedString(input.description, "description", 10, 800);
   const instructions = boundedMarkdown(input.instructions);
@@ -91,15 +156,16 @@ export function parseAgentInput(
     }
     return entry;
   }))].sort();
+  const manifest = buildManifestV2({
+    name,
+    description,
+    instructions,
+    skills: capabilities,
+    ownerWallet,
+  });
   return {
     name,
-    manifest: buildManifestV2({
-      name,
-      description,
-      instructions,
-      skills: capabilities,
-      ownerWallet,
-    }),
+    manifest: withCreatorMcp(manifest, parseCreatorMcpBindings(input.mcp)),
   };
 }
 
@@ -150,9 +216,8 @@ export function parseEnsBinding(value: unknown): AgentEnsBinding {
 
 export type ParsedAgentAction =
   | { action: "CREATE_DRAFT"; agentId: string | null; manifest: AgentManifest }
-  | { action: "BIND_NAME"; versionId: string; binding: AgentEnsBinding }
-  | { action: "PREPARE_ENS_WRITE"; versionId: string }
-  | { action: "PUBLISH_VERSION"; versionId: string };
+  | { action: "ATTACH_AGENT_WALLET"; versionId: string }
+  | { action: "PUBLISH_WALLET_VERSION"; versionId: string };
 
 export function parseAgentAction(value: unknown, ownerWallet: string): ParsedAgentAction {
   const body = objectRecord(value);
@@ -166,7 +231,7 @@ export function parseAgentAction(value: unknown, ownerWallet: string): ParsedAge
     const catalogDraft = body.templateId !== undefined;
     rejectUnexpectedKeys(body, catalogDraft
       ? ["action", "agentId", "templateId", "name", "description", "riskTiers"]
-      : ["action", "agentId", "name", "description", "instructions", "capabilities"]);
+      : ["action", "agentId", "name", "description", "instructions", "capabilities", "mcp"]);
     const { manifest } = catalogDraft
       ? parseCatalogAgentInput({
           templateId: body.templateId,
@@ -179,24 +244,11 @@ export function parseAgentAction(value: unknown, ownerWallet: string): ParsedAge
           description: body.description,
           instructions: body.instructions,
           capabilities: body.capabilities,
+          mcp: body.mcp,
         }, ownerWallet);
     return { action: "CREATE_DRAFT", agentId: body.agentId ?? null, manifest };
   }
-  if (body.action === "BIND_NAME") {
-    rejectUnexpectedKeys(body, ["action", "versionId", "creatorParent", "agentLabel"]);
-    if (!isKernelUuid(body.versionId)) {
-      throw new KernelError("KERNEL_INVALID_REQUEST", "versionId must be a UUID", 400);
-    }
-    return {
-      action: "BIND_NAME",
-      versionId: body.versionId,
-      binding: parseEnsBinding({
-        creatorParent: body.creatorParent,
-        agentLabel: body.agentLabel,
-      }),
-    };
-  }
-  if (body.action === "PREPARE_ENS_WRITE" || body.action === "PUBLISH_VERSION") {
+  if (body.action === "ATTACH_AGENT_WALLET" || body.action === "PUBLISH_WALLET_VERSION") {
     rejectUnexpectedKeys(body, ["action", "versionId"]);
     if (!isKernelUuid(body.versionId)) {
       throw new KernelError("KERNEL_INVALID_REQUEST", "versionId must be a UUID", 400);

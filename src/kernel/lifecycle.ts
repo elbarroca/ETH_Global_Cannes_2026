@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { domainHash, type CanonicalValue } from "./canonical";
 import { bindManifestEns, deriveManifestHashes } from "./agent-catalog";
+import { agentWalletIdentityHash, validateAgentWalletIdentity } from "./agent-wallets";
 import { KernelError } from "./errors";
 import type { DatabaseClient } from "./service";
 import type { AgentListFilters } from "./policy";
@@ -13,6 +14,8 @@ import type {
   AgentLifecycleState,
   AgentLifecycleVersion,
   AgentManifest,
+  AgentWalletProvider,
+  AttachedAgentWallet,
   AgentVersionProvenance,
   ProtectedPublishedAgent,
   ProtectedPublishedAgentRead,
@@ -36,17 +39,31 @@ interface LifecycleRow {
   asset: "USDC_ATOMIC";
   proof_policy: "verified-receipt-required";
   lifecycle_state: AgentLifecycleState;
+  publication_mode: "ENS" | "WALLET" | null;
   creator_parent: string | null;
   agent_label: string | null;
   full_subname: string | null;
   write_plan_hash: string | null;
-  canonical_state: "UNVERIFIED" | "CANONICAL" | "REFUSED";
+  canonical_state: "UNVERIFIED" | "CANONICAL" | "WALLET_AUTHORIZED" | "REFUSED";
   authority_owner: string | null;
   authority_delegate: string | null;
   authority_policy_version: string | null;
   authority_refusal: string | null;
   authority_release_sha: string | null;
   publication_decision_id: string | null;
+  wallet_publication_decision_id: string | null;
+  wallet_receipt_hash: string | null;
+  wallet_identity_id: string | null;
+  wallet_provider: "circle" | null;
+  provider_wallet_id: string | null;
+  wallet_address: string | null;
+  wallet_network: "UNI-SEPOLIA" | null;
+  wallet_account_type: "SCA" | null;
+  wallet_state: "LIVE" | null;
+  wallet_evidence_hash: string | null;
+  wallet_identity_hash: string | null;
+  wallet_observed_at: Date | null;
+  wallet_attached_at: Date | null;
   published_at: Date | null;
 }
 
@@ -66,6 +83,7 @@ interface LifecycleReadRow extends LifecycleRow {
 }
 
 const PUBLICATION_AUTHORITY_TIMEOUT_MS = 5_000;
+const AGENT_WALLET_PROVIDER_TIMEOUT_MS = 5_000;
 const LIFECYCLE_ACTION_LEASE_SECONDS = 10;
 const LIFECYCLE_ACTION_RETRY_DELAY_MS = 100;
 const PUBLICATION_ACTION_WAIT_MS = 6_000;
@@ -76,7 +94,13 @@ const HASH = /^[0-9a-f]{64}$/;
 const WALLET = /^0x[0-9a-f]{40}$/;
 const ATOMIC = /^(0|[1-9][0-9]{0,77})$/;
 
-type LifecycleAction = "CREATE_DRAFT" | "BIND_NAME" | "PREPARE_ENS_WRITE" | "PUBLISH_VERSION";
+type LifecycleAction =
+  | "CREATE_DRAFT"
+  | "ATTACH_AGENT_WALLET"
+  | "BIND_NAME"
+  | "PREPARE_ENS_WRITE"
+  | "PUBLISH_VERSION"
+  | "PUBLISH_WALLET_VERSION";
 
 type LifecycleActionStatus = "PENDING" | "SUCCEEDED" | "DENIED" | "RETRYABLE";
 
@@ -146,6 +170,14 @@ function nullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
+function snapshotAuthorityState(
+  value: unknown,
+): AgentLifecycleVersion["authorityState"] {
+  if (value === "CANONICAL") return "CANONICAL_ENS";
+  if (value === "UNVERIFIED" || value === "WALLET_AUTHORIZED" || value === "REFUSED") return value;
+  throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+}
+
 const LIFECYCLE_VERSION_KEYS = [
   "agentId", "versionId", "version", "name", "description", "capabilities",
   "manifestHash", "promptHash", "configHash", "adapterKey", "ownerWallet",
@@ -165,13 +197,39 @@ const LIFECYCLE_VERSION_CURRENT_KEYS = [
   "riskTiers",
 ] as const;
 
+const LIFECYCLE_VERSION_WALLET_KEYS = [
+  ...LIFECYCLE_VERSION_CURRENT_KEYS,
+  "publicationMode", "authorityState", "walletPublicationDecisionId", "walletReceiptHash", "agentWallet",
+] as const;
+
+function parseAttachedAgentWallet(value: unknown): AttachedAgentWallet | null {
+  if (value === null) return null;
+  const row = object(value);
+  if (
+    !row || !exactKeys(row, [
+      "walletIdentityId", "provider", "walletId", "address", "network", "accountType",
+      "state", "evidenceHash", "identityHash", "observedAt", "attachedAt",
+    ]) || typeof row.walletIdentityId !== "string" || !UUID.test(row.walletIdentityId) ||
+    row.provider !== "circle" || typeof row.walletId !== "string" || !UUID.test(row.walletId) ||
+    typeof row.address !== "string" || !WALLET.test(row.address) || row.network !== "UNI-SEPOLIA" ||
+    row.accountType !== "SCA" || row.state !== "LIVE" || typeof row.evidenceHash !== "string" ||
+    !HASH.test(row.evidenceHash) || typeof row.identityHash !== "string" || !HASH.test(row.identityHash) ||
+    typeof row.observedAt !== "string" || Number.isNaN(new Date(row.observedAt).getTime()) ||
+    typeof row.attachedAt !== "string" || Number.isNaN(new Date(row.attachedAt).getTime())
+  ) {
+    throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+  }
+  return row as unknown as AttachedAgentWallet;
+}
+
 function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
   const row = object(value);
   const legacySnapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_KEYS);
   const v3Snapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_V3_KEYS);
   const currentSnapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_CURRENT_KEYS);
+  const walletSnapshot = !!row && exactKeys(row, LIFECYCLE_VERSION_WALLET_KEYS);
   if (
-    !row || (!legacySnapshot && !v3Snapshot && !currentSnapshot) ||
+    !row || (!legacySnapshot && !v3Snapshot && !currentSnapshot && !walletSnapshot) ||
     typeof row.agentId !== "string" || !UUID.test(row.agentId) ||
     typeof row.versionId !== "string" || !UUID.test(row.versionId) ||
     !Number.isInteger(row.version) || (row.version as number) < 1 ||
@@ -184,11 +242,11 @@ function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
     typeof row.ownerWallet !== "string" || !WALLET.test(row.ownerWallet) ||
     typeof row.priceAtomic !== "string" || !ATOMIC.test(row.priceAtomic) ||
     row.asset !== "USDC_ATOMIC" || row.proofPolicy !== "verified-receipt-required" ||
-    !["DRAFT", "NAME_BOUND", "WRITE_PREPARED", "PUBLISHED"].includes(String(row.lifecycleState)) ||
+    !["DRAFT", "WALLET_ATTACHED", "NAME_BOUND", "WRITE_PREPARED", "PUBLISHED"].includes(String(row.lifecycleState)) ||
     typeof row.hireable !== "boolean" || row.ownedByViewer !== true ||
     !nullableString(row.creatorParent) || !nullableString(row.agentLabel) ||
     !nullableString(row.fullSubname) || !nullableString(row.writePlanHash) ||
-    !["UNVERIFIED", "CANONICAL", "REFUSED"].includes(String(row.canonicalState)) ||
+    !["UNVERIFIED", "CANONICAL", "WALLET_AUTHORIZED", "REFUSED"].includes(String(row.canonicalState)) ||
     !nullableString(row.authorityOwner) || !nullableString(row.authorityDelegate) ||
     !nullableString(row.authorityPolicyVersion) || !nullableString(row.refusalReason) ||
     !nullableString(row.authorityReleaseSha) || !nullableString(row.publicationDecisionId) ||
@@ -206,12 +264,22 @@ function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
       skillSummary: null,
       mcpSummary: null,
       mcpAvailability: "NOT_REQUIRED",
+      publicationMode: row.lifecycleState === "PUBLISHED" ? "ENS" : null,
+      authorityState: snapshotAuthorityState(row.canonicalState),
+      walletPublicationDecisionId: null,
+      walletReceiptHash: null,
+      agentWallet: null,
     };
   }
   if (v3Snapshot) {
     return {
       ...(row as unknown as Omit<AgentLifecycleVersion, "riskTiers">),
       riskTiers: null,
+      publicationMode: row.lifecycleState === "PUBLISHED" ? "ENS" : null,
+      authorityState: snapshotAuthorityState(row.canonicalState),
+      walletPublicationDecisionId: null,
+      walletReceiptHash: null,
+      agentWallet: null,
     };
   }
   if (
@@ -229,7 +297,26 @@ function parseLifecycleVersionSnapshot(value: unknown): AgentLifecycleVersion {
   ) {
     throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
   }
-  return row as unknown as AgentLifecycleVersion;
+  if (!walletSnapshot) {
+    return {
+      ...(row as unknown as Omit<AgentLifecycleVersion,
+        "publicationMode" | "walletPublicationDecisionId" | "walletReceiptHash" | "agentWallet">),
+      publicationMode: row.lifecycleState === "PUBLISHED" ? "ENS" : null,
+      authorityState: snapshotAuthorityState(row.canonicalState),
+      walletPublicationDecisionId: null,
+      walletReceiptHash: null,
+      agentWallet: null,
+    };
+  }
+  if (
+    ![null, "ENS", "WALLET"].includes(row.publicationMode as null | string) ||
+    !["UNVERIFIED", "CANONICAL_ENS", "WALLET_AUTHORIZED", "REFUSED"].includes(String(row.authorityState)) ||
+    !nullableString(row.walletPublicationDecisionId) || !nullableString(row.walletReceiptHash)
+  ) {
+    throw new Error("KERNEL_LIFECYCLE_RESULT_INVALID");
+  }
+  const agentWallet = parseAttachedAgentWallet(row.agentWallet);
+  return { ...(row as unknown as AgentLifecycleVersion), agentWallet };
 }
 
 function parseWritePlanSnapshot(value: unknown): AgentEnsWritePlan {
@@ -430,13 +517,14 @@ async function publicationActionClaim(
   versionId: string,
   idempotencyKey: string,
   payloadHash: string,
+  action: "PUBLISH_VERSION" | "PUBLISH_WALLET_VERSION" = "PUBLISH_VERSION",
 ): Promise<LifecycleActionClaim> {
   const deadline = Date.now() + PUBLICATION_ACTION_WAIT_MS;
   while (true) {
     const claim = await sql.begin(async (transaction) => claimLifecycleAction(
       transaction as unknown as DatabaseClient,
       ownerUserId,
-      "PUBLISH_VERSION",
+      action,
       idempotencyKey,
       payloadHash,
       versionId,
@@ -471,6 +559,39 @@ function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVe
         capability: binding.capability,
       }))
     : null;
+  const walletFields = [
+    row.wallet_identity_id, row.wallet_provider, row.provider_wallet_id, row.wallet_address,
+    row.wallet_network, row.wallet_account_type, row.wallet_state, row.wallet_evidence_hash,
+    row.wallet_identity_hash, row.wallet_observed_at, row.wallet_attached_at,
+  ];
+  if (!walletFields.every((field) => field == null) && walletFields.some((field) => field == null)) {
+    throw new Error("KERNEL_AGENT_WALLET_READ_MODEL_INVALID");
+  }
+  const agentWallet: AttachedAgentWallet | null = row.wallet_identity_id && row.wallet_provider &&
+    row.provider_wallet_id && row.wallet_address && row.wallet_network && row.wallet_account_type &&
+    row.wallet_state && row.wallet_evidence_hash && row.wallet_identity_hash &&
+    row.wallet_observed_at && row.wallet_attached_at
+    ? {
+        walletIdentityId: row.wallet_identity_id,
+        provider: row.wallet_provider,
+        walletId: row.provider_wallet_id,
+        address: row.wallet_address,
+        network: row.wallet_network,
+        accountType: row.wallet_account_type,
+        state: row.wallet_state,
+        evidenceHash: row.wallet_evidence_hash,
+        identityHash: row.wallet_identity_hash,
+        observedAt: row.wallet_observed_at.toISOString(),
+        attachedAt: row.wallet_attached_at.toISOString(),
+      }
+    : null;
+  const publicationMode = row.publication_mode ?? null;
+  const hireable = row.lifecycle_state === "PUBLISHED" && (
+    (publicationMode === "ENS" && row.canonical_state === "CANONICAL" &&
+      row.publication_decision_id !== null && agentWallet === null) ||
+    (publicationMode === "WALLET" && row.canonical_state === "WALLET_AUTHORIZED" &&
+      row.wallet_publication_decision_id !== null && row.wallet_receipt_hash !== null && agentWallet !== null)
+  );
   return {
     agentId: row.agent_id,
     versionId: row.version_id,
@@ -487,20 +608,24 @@ function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVe
     asset: row.asset,
     proofPolicy: row.proof_policy,
     lifecycleState: row.lifecycle_state,
-    hireable: row.lifecycle_state === "PUBLISHED" && row.canonical_state === "CANONICAL" &&
-      row.publication_decision_id !== null,
+    publicationMode,
+    hireable,
     ownedByViewer: row.owner_user_id === viewerUserId,
     creatorParent: row.creator_parent,
     agentLabel: row.agent_label,
     fullSubname: row.full_subname,
     writePlanHash: row.write_plan_hash,
     canonicalState: row.canonical_state,
+    authorityState: row.canonical_state === "CANONICAL" ? "CANONICAL_ENS" : row.canonical_state,
     authorityOwner: row.authority_owner,
     authorityDelegate: row.authority_delegate,
     authorityPolicyVersion: row.authority_policy_version,
     refusalReason: row.authority_refusal,
     authorityReleaseSha: row.authority_release_sha,
     publicationDecisionId: row.publication_decision_id,
+    walletPublicationDecisionId: row.wallet_publication_decision_id ?? null,
+    walletReceiptHash: row.wallet_receipt_hash ?? null,
+    agentWallet,
     publishedAt: row.published_at?.toISOString() ?? null,
     manifestSchemaVersion: row.manifest.schemaVersion,
     riskTiers: row.manifest.schemaVersion === 4 || row.manifest.schemaVersion === 5
@@ -514,28 +639,64 @@ function mapLifecycle(row: LifecycleRow, viewerUserId: string): AgentLifecycleVe
 }
 
 function asPublished(value: AgentLifecycleVersion): ProtectedPublishedAgent {
-  if (
-    value.lifecycleState !== "PUBLISHED" || !value.hireable ||
-    value.canonicalState !== "CANONICAL" || !value.creatorParent || !value.agentLabel ||
-    !value.fullSubname || !value.writePlanHash || !value.authorityOwner ||
-    !value.authorityPolicyVersion || !value.authorityReleaseSha ||
-    !value.publicationDecisionId || !value.publishedAt
-  ) {
+  if (value.lifecycleState !== "PUBLISHED" || !value.hireable || !value.publishedAt) {
     throw new Error("KERNEL_PUBLISHED_READ_MODEL_INVARIANT");
   }
+  if (value.publicationMode === "ENS") {
+    if (
+      value.canonicalState !== "CANONICAL" || !value.creatorParent || !value.agentLabel ||
+      !value.fullSubname || !value.writePlanHash || !value.authorityOwner ||
+      !value.authorityPolicyVersion || !value.authorityReleaseSha ||
+      !value.publicationDecisionId || value.agentWallet || value.walletPublicationDecisionId ||
+      value.walletReceiptHash
+    ) throw new Error("KERNEL_PUBLISHED_READ_MODEL_INVARIANT");
+    return {
+      ...value,
+      lifecycleState: "PUBLISHED",
+      publicationMode: "ENS",
+      hireable: true,
+      canonicalState: "CANONICAL",
+      authorityState: "CANONICAL_ENS",
+      creatorParent: value.creatorParent,
+      agentLabel: value.agentLabel,
+      fullSubname: value.fullSubname,
+      writePlanHash: value.writePlanHash,
+      authorityOwner: value.authorityOwner,
+      authorityPolicyVersion: value.authorityPolicyVersion,
+      authorityReleaseSha: value.authorityReleaseSha,
+      publicationDecisionId: value.publicationDecisionId,
+      walletPublicationDecisionId: null,
+      walletReceiptHash: null,
+      agentWallet: null,
+      publishedAt: value.publishedAt,
+    };
+  }
+  if (
+    value.publicationMode !== "WALLET" || value.canonicalState !== "WALLET_AUTHORIZED" ||
+    value.creatorParent || value.agentLabel || value.fullSubname || value.writePlanHash ||
+    value.authorityOwner || value.authorityDelegate || value.authorityPolicyVersion ||
+    value.authorityReleaseSha || value.publicationDecisionId ||
+    !value.walletPublicationDecisionId || !value.walletReceiptHash || !value.agentWallet
+  ) throw new Error("KERNEL_PUBLISHED_READ_MODEL_INVARIANT");
   return {
     ...value,
     lifecycleState: "PUBLISHED",
+    publicationMode: "WALLET",
     hireable: true,
-    canonicalState: "CANONICAL",
-    creatorParent: value.creatorParent,
-    agentLabel: value.agentLabel,
-    fullSubname: value.fullSubname,
-    writePlanHash: value.writePlanHash,
-    authorityOwner: value.authorityOwner,
-    authorityPolicyVersion: value.authorityPolicyVersion,
-    authorityReleaseSha: value.authorityReleaseSha,
-    publicationDecisionId: value.publicationDecisionId,
+    canonicalState: "WALLET_AUTHORIZED",
+    authorityState: "WALLET_AUTHORIZED",
+    creatorParent: "",
+    agentLabel: "",
+    fullSubname: "",
+    writePlanHash: null,
+    authorityOwner: "",
+    authorityDelegate: null,
+    authorityPolicyVersion: "",
+    authorityReleaseSha: "",
+    publicationDecisionId: null,
+    walletPublicationDecisionId: value.walletPublicationDecisionId,
+    walletReceiptHash: value.walletReceiptHash,
+    agentWallet: value.agentWallet,
     publishedAt: value.publishedAt,
   };
 }
@@ -584,13 +745,23 @@ async function loadLifecycle(
       COALESCE(v.manifest->>'description', '') AS description,
       a.owner_user_id, v.owner_wallet, v.capabilities, v.manifest,
       v.manifest_hash, v.prompt_hash, v.config_hash, v.adapter_key,
-      v.price_atomic::text, v.asset, v.proof_policy, v.lifecycle_state,
+      v.price_atomic::text, v.asset, v.proof_policy, v.lifecycle_state, v.publication_mode,
       v.creator_parent, v.agent_label, v.full_subname, v.write_plan,
       v.write_plan_hash, v.canonical_state, v.authority_owner,
       v.authority_delegate, v.authority_policy_version, v.authority_refusal,
-      v.authority_release_sha, v.publication_decision_id, v.published_at
+      v.authority_release_sha, v.publication_decision_id,
+      v.wallet_publication_decision_id, wallet_decision.receipt_hash AS wallet_receipt_hash,
+      wallet.id::text AS wallet_identity_id, wallet.provider AS wallet_provider,
+      wallet.provider_wallet_id::text, wallet.address AS wallet_address,
+      wallet.network AS wallet_network, wallet.account_type AS wallet_account_type,
+      wallet.state AS wallet_state, wallet.evidence_hash AS wallet_evidence_hash,
+      wallet.identity_hash AS wallet_identity_hash, wallet.observed_at AS wallet_observed_at,
+      wallet.attached_at AS wallet_attached_at, v.published_at
     FROM agent_versions v
     JOIN kernel_agents a ON a.id = v.agent_id
+    LEFT JOIN agent_wallet_identities wallet ON wallet.id = v.agent_wallet_id
+    LEFT JOIN wallet_publication_decisions wallet_decision
+      ON wallet_decision.id = v.wallet_publication_decision_id
     WHERE v.id = ${versionId}::uuid AND a.owner_user_id = ${ownerUserId}
       AND v.lifecycle_state IS NOT NULL
     ${lock ? sql`FOR UPDATE OF v` : sql``}
@@ -734,6 +905,226 @@ export async function createAgentDraft(
     );
     return result;
   });
+}
+
+export async function attachAgentWallet(
+  ownerUserId: string,
+  versionId: string,
+  options: LifecycleMutationOptions & { provider?: AgentWalletProvider; signal?: AbortSignal } = {},
+): Promise<AgentLifecycleVersion> {
+  const sql = options.sql ?? getDb();
+  const now = options.now ?? new Date();
+  const idempotencyKey = lifecycleIdempotencyKey(options);
+  const payloadHash = lifecyclePayloadHash(ownerUserId, "ATTACH_AGENT_WALLET", { versionId });
+  await assertLifecycleOwner(sql, versionId, ownerUserId);
+  const claim = await sql.begin(async (transaction) => claimLifecycleAction(
+    transaction as unknown as DatabaseClient,
+    ownerUserId,
+    "ATTACH_AGENT_WALLET",
+    idempotencyKey,
+    payloadHash,
+    versionId,
+  )) as LifecycleActionClaim;
+  if (claim.kind === "TERMINAL") {
+    return parseLifecycleVersionSnapshot(storedResult(claim.row, "ATTACH_AGENT_WALLET"));
+  }
+  if (claim.kind !== "EXECUTE") {
+    throw new KernelError("KERNEL_CONFLICT", "Wallet attachment is already in progress", 409);
+  }
+  const current = await loadLifecycle(sql, versionId, ownerUserId);
+  if (current.lifecycle_state !== "DRAFT") {
+    await markLifecycleActionRetryable(sql, claim, "KERNEL_CONFLICT");
+    throw new KernelError("KERNEL_CONFLICT", "Agent version cannot attach another wallet", 409);
+  }
+  if (!options.provider) {
+    await markLifecycleActionRetryable(sql, claim, "KERNEL_WALLET_PROVIDER_REQUIRED");
+    throw new KernelError("KERNEL_CONFLICT", "Agent wallet provider is not configured", 503);
+  }
+  let identity;
+  try {
+    const controller = new AbortController();
+    const abort = (): void => controller.abort(options.signal?.reason ?? new Error("WALLET_PROVIDER_ABORTED"));
+    options.signal?.addEventListener("abort", abort, { once: true });
+    const timer = setTimeout(
+      () => controller.abort(new Error("WALLET_PROVIDER_TIMEOUT")),
+      AGENT_WALLET_PROVIDER_TIMEOUT_MS,
+    );
+    try {
+      identity = validateAgentWalletIdentity(
+        await options.provider.provisionAgentWallet({
+          agentId: current.agent_id,
+          idempotencyKey: claim.actionId,
+        }, controller.signal),
+        options.now ?? new Date(),
+      );
+    } finally {
+      clearTimeout(timer);
+      options.signal?.removeEventListener("abort", abort);
+    }
+  } catch {
+    await markLifecycleActionRetryable(sql, claim, "KERNEL_WALLET_PROVIDER_REFUSED");
+    throw new KernelError("KERNEL_CONFLICT", "Agent wallet provider refused the attachment", 503);
+  }
+  const identityHash = agentWalletIdentityHash(identity);
+  try {
+    return await sql.begin(async (transaction) => {
+      const tx = transaction as unknown as DatabaseClient;
+      const held = await tx<{ id: string }[]>`
+        SELECT id::text FROM agent_lifecycle_actions
+        WHERE id = ${claim.actionId}::uuid AND status = 'PENDING'
+          AND attempt = ${claim.attempt} AND lease_token = ${claim.leaseToken}::uuid
+          AND lease_expires_at > clock_timestamp()
+        FOR UPDATE
+      `;
+      if (!held[0]) throw new Error("KERNEL_LIFECYCLE_ACTION_CLAIM_LOST");
+      const locked = await loadLifecycle(tx, versionId, ownerUserId, true);
+      if (locked.lifecycle_state !== "DRAFT" || locked.wallet_identity_id) {
+        throw new KernelError("KERNEL_CONFLICT", "Agent version cannot attach another wallet", 409);
+      }
+      const wallets = await tx<{ id: string }[]>`
+        INSERT INTO agent_wallet_identities (
+          agent_id, provider, provider_wallet_id, address, network, account_type,
+          state, evidence_hash, identity_hash, observed_at, lifecycle_action_id
+        ) VALUES (
+          ${locked.agent_id}::uuid, ${identity.provider}, ${identity.walletId}::uuid,
+          ${identity.address}, ${identity.network}, ${identity.accountType}, ${identity.state},
+          ${identity.evidenceHash}, ${identityHash}, ${new Date(identity.observedAt)},
+          ${claim.actionId}::uuid
+        ) RETURNING id::text
+      `;
+      const wallet = wallets[0];
+      if (!wallet) throw new Error("KERNEL_AGENT_WALLET_ATTACH_FAILED");
+      await tx`
+        UPDATE agent_versions
+        SET lifecycle_state = 'WALLET_ATTACHED', agent_wallet_id = ${wallet.id}::uuid
+        WHERE id = ${versionId}::uuid AND lifecycle_state = 'DRAFT' AND published = false
+      `;
+      const updated = mapLifecycle(await loadLifecycle(tx, versionId, ownerUserId, true), ownerUserId);
+      const snapshot = successSnapshot("ATTACH_AGENT_WALLET", updated as unknown as CanonicalValue);
+      const resultHash = domainHash("agent-lifecycle-result", snapshot);
+      await appendLifecycleEvent(tx, versionId, "ATTACH_AGENT_WALLET", {
+        identityHash,
+        lifecycleActionId: claim.actionId,
+        resultHash,
+        walletIdentityId: wallet.id,
+      }, now, claim.actionId);
+      await completeLifecycleAction(tx, claim, versionId, snapshot);
+      return updated;
+    });
+  } catch (error) {
+    await markLifecycleActionRetryable(sql, claim, error instanceof KernelError ? error.code : "KERNEL_WALLET_ATTACH_RETRYABLE");
+    throw error;
+  }
+}
+
+export async function publishWalletAgentVersion(
+  ownerUserId: string,
+  versionId: string,
+  options: LifecycleMutationOptions & { releaseSha?: string } = {},
+): Promise<ProtectedPublishedAgent> {
+  const sql = options.sql ?? getDb();
+  const idempotencyKey = lifecycleIdempotencyKey(options);
+  const releaseSha = options.releaseSha ?? (process.env.NODE_ENV === "test" ? "0".repeat(40) : "");
+  if (!/^[0-9a-f]{40}$/.test(releaseSha)) {
+    throw new KernelError("KERNEL_CONFLICT", "Release identity is not configured", 503);
+  }
+  const payloadHash = lifecyclePayloadHash(ownerUserId, "PUBLISH_WALLET_VERSION", {
+    releaseSha,
+    versionId,
+  });
+  await assertLifecycleOwner(sql, versionId, ownerUserId);
+  const claim = await publicationActionClaim(
+    sql,
+    ownerUserId,
+    versionId,
+    idempotencyKey,
+    payloadHash,
+    "PUBLISH_WALLET_VERSION",
+  );
+  if (claim.kind === "TERMINAL") {
+    return asPublished(parseLifecycleVersionSnapshot(
+      storedResult(claim.row, "PUBLISH_WALLET_VERSION"),
+    ));
+  }
+  if (claim.kind !== "EXECUTE") {
+    throw new KernelError("KERNEL_CONFLICT", "Wallet publication is already in progress", 409);
+  }
+  try {
+    return await sql.begin(async (transaction) => {
+      const tx = transaction as unknown as DatabaseClient;
+      const held = await tx<{ id: string }[]>`
+        SELECT id::text FROM agent_lifecycle_actions
+        WHERE id = ${claim.actionId}::uuid AND status = 'PENDING'
+          AND attempt = ${claim.attempt} AND lease_token = ${claim.leaseToken}::uuid
+          AND lease_expires_at > clock_timestamp()
+        FOR UPDATE
+      `;
+      if (!held[0]) throw new Error("KERNEL_LIFECYCLE_ACTION_CLAIM_LOST");
+      const locked = await loadLifecycle(tx, versionId, ownerUserId, true);
+      if (locked.lifecycle_state !== "WALLET_ATTACHED" || !locked.wallet_identity_id) {
+        throw new KernelError("KERNEL_CONFLICT", "Attach the agent wallet before publication", 409);
+      }
+      const decisions = await tx<{ id: string; receipt_hash: string }[]>`
+        INSERT INTO wallet_publication_decisions (
+          agent_version_id, agent_wallet_id, publication_action_id, agent_version,
+          manifest_hash, capabilities, service, adapter_key, proof_policy,
+          price_atomic, asset, payout, creator_user_id, creator_wallet,
+          wallet_identity_hash, provider, provider_wallet_id, wallet_address,
+          network, account_type, wallet_state, release_sha, policy_version, decision
+        ) SELECT
+          v.id, wallet.id, ${claim.actionId}::uuid, v.version,
+          v.manifest_hash, v.capabilities, COALESCE(v.endpoint, v.adapter_key),
+          v.adapter_key, v.proof_policy, v.price_atomic, v.asset,
+          lower(COALESCE(v.payout_address, v.owner_wallet)), a.owner_user_id,
+          lower(v.owner_wallet), wallet.identity_hash, wallet.provider,
+          wallet.provider_wallet_id, wallet.address, wallet.network,
+          wallet.account_type, wallet.state, ${releaseSha},
+          'wallet-publication-v1', 'WALLET_AUTHORIZED'
+        FROM agent_versions v
+        JOIN kernel_agents a ON a.id = v.agent_id
+        JOIN agent_wallet_identities wallet ON wallet.id = v.agent_wallet_id
+        WHERE v.id = ${versionId}::uuid AND a.owner_user_id = ${ownerUserId}
+          AND v.lifecycle_state = 'WALLET_ATTACHED' AND NOT v.published
+        RETURNING id::text, receipt_hash
+      `;
+      const decision = decisions[0];
+      if (!decision) throw new Error("KERNEL_WALLET_PUBLICATION_DECISION_FAILED");
+      await tx`
+        UPDATE agent_versions
+        SET lifecycle_state = 'PUBLISHED', publication_mode = 'WALLET',
+            published = true, published_at = clock_timestamp(),
+            canonical_state = 'WALLET_AUTHORIZED', publication_decision_id = NULL,
+            wallet_publication_decision_id = ${decision.id}::uuid,
+            publication_action_id = ${claim.actionId}::uuid
+        WHERE id = ${versionId}::uuid AND lifecycle_state = 'WALLET_ATTACHED'
+          AND published = false
+      `;
+      const result = asPublished(mapLifecycle(
+        await loadLifecycle(tx, versionId, ownerUserId, true),
+        ownerUserId,
+      ));
+      const snapshot = successSnapshot("PUBLISH_WALLET_VERSION", result as unknown as CanonicalValue);
+      const resultHash = domainHash("agent-lifecycle-result", snapshot);
+      await appendLifecycleEvent(tx, versionId, "PUBLISH_WALLET_VERSION", {
+        lifecycleActionId: claim.actionId,
+        manifestHash: result.manifestHash,
+        policyVersion: "wallet-publication-v1",
+        receiptHash: decision.receipt_hash,
+        resultHash,
+        walletIdentityHash: result.agentWallet?.identityHash ?? "",
+        walletPublicationDecisionId: decision.id,
+      }, result.publishedAt ? new Date(result.publishedAt) : new Date(), claim.actionId);
+      await completeLifecycleAction(tx, claim, versionId, snapshot);
+      return result;
+    });
+  } catch (error) {
+    await markLifecycleActionRetryable(
+      sql,
+      claim,
+      error instanceof KernelError ? error.code : "KERNEL_WALLET_PUBLICATION_RETRYABLE",
+    );
+    throw error;
+  }
 }
 
 export async function bindAgentName(
@@ -1172,7 +1563,7 @@ export async function publishAgentVersion(
       };
       const rows = await tx<LifecycleRow[]>`
         UPDATE agent_versions v
-        SET lifecycle_state = 'PUBLISHED', published = true,
+        SET lifecycle_state = 'PUBLISHED', publication_mode = 'ENS', published = true,
             published_at = clock_timestamp(), canonical_state = 'CANONICAL',
             authority_owner = d.owner, authority_delegate = d.delegate,
             authority_policy_version = d.policy_version, authority_refusal = NULL,
@@ -1191,6 +1582,7 @@ export async function publishAgentVersion(
           ${locked.description}::text AS description, ${ownerUserId}::text AS owner_user_id,
           v.owner_wallet, v.capabilities, v.manifest, v.manifest_hash, v.prompt_hash, v.config_hash,
           v.adapter_key, v.price_atomic::text, v.asset, v.proof_policy, v.lifecycle_state,
+          v.publication_mode,
           v.creator_parent, v.agent_label, v.full_subname, v.write_plan_hash, v.canonical_state,
           v.authority_owner, v.authority_delegate, v.authority_policy_version,
           v.authority_refusal, v.authority_release_sha, v.publication_decision_id, v.published_at
@@ -1271,11 +1663,18 @@ export async function listAgentLifecycle(
       COALESCE(v.manifest->>'description', '') AS description,
       a.owner_user_id, v.owner_wallet, v.capabilities, v.manifest,
       v.manifest_hash, v.prompt_hash, v.config_hash, v.adapter_key,
-      v.price_atomic::text, v.asset, v.proof_policy, v.lifecycle_state,
+      v.price_atomic::text, v.asset, v.proof_policy, v.lifecycle_state, v.publication_mode,
       v.creator_parent, v.agent_label, v.full_subname, v.write_plan_hash,
       v.canonical_state, v.authority_owner, v.authority_delegate,
       v.authority_policy_version, v.authority_refusal, v.authority_release_sha,
-      v.publication_decision_id,
+      v.publication_decision_id, v.wallet_publication_decision_id,
+      wallet_decision.receipt_hash AS wallet_receipt_hash,
+      wallet.id::text AS wallet_identity_id, wallet.provider AS wallet_provider,
+      wallet.provider_wallet_id::text, wallet.address AS wallet_address,
+      wallet.network AS wallet_network, wallet.account_type AS wallet_account_type,
+      wallet.state AS wallet_state, wallet.evidence_hash AS wallet_evidence_hash,
+      wallet.identity_hash AS wallet_identity_hash, wallet.observed_at AS wallet_observed_at,
+      wallet.attached_at AS wallet_attached_at,
       v.published_at,
       COALESCE(hires.verified_external_hires, '0') AS verified_external_hires,
       provenance.protocol AS provenance_protocol,
@@ -1287,6 +1686,9 @@ export async function listAgentLifecycle(
       provenance.observed_at AS provenance_observed_at
     FROM agent_versions v
     JOIN kernel_agents a ON a.id = v.agent_id
+    LEFT JOIN agent_wallet_identities wallet ON wallet.id = v.agent_wallet_id
+    LEFT JOIN wallet_publication_decisions wallet_decision
+      ON wallet_decision.id = v.wallet_publication_decision_id
     LEFT JOIN agent_version_provenance provenance ON provenance.agent_version_id = v.id
     LEFT JOIN LATERAL (
       SELECT count(*)::text AS verified_external_hires
@@ -1301,7 +1703,7 @@ export async function listAgentLifecycle(
         AND receipt.verified = true
     ) hires ON true
     WHERE (
-      v.lifecycle_state = 'PUBLISHED' AND v.canonical_state = 'CANONICAL'
+      public.agent_version_is_hireable(v.id)
       AND (${filters.capability}::text IS NULL OR v.capabilities @> ARRAY[${filters.capability}]::text[])
       AND (${filters.skill}::text IS NULL OR v.manifest->'skills' @> jsonb_build_array(jsonb_build_object('id', ${filters.skill}::text)))
       AND (${filters.mcpProvider}::text IS NULL OR v.manifest->'mcp' @> jsonb_build_array(jsonb_build_object('provider', ${filters.mcpProvider}::text)))
@@ -1310,7 +1712,7 @@ export async function listAgentLifecycle(
         (v.published_at, v.id) < (${filters.cursor?.publishedAt ?? null}::timestamptz, ${filters.cursor?.versionId ?? null}::uuid))
     ) OR (
       ${filters.active} = false AND a.owner_user_id = ${viewerUserId}
-      AND v.lifecycle_state IN ('DRAFT', 'NAME_BOUND', 'WRITE_PREPARED')
+      AND v.lifecycle_state IN ('DRAFT', 'WALLET_ATTACHED', 'NAME_BOUND', 'WRITE_PREPARED')
     )
     ORDER BY
       CASE WHEN ${filters.active} THEN v.published_at END DESC,

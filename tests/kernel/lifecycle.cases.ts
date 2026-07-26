@@ -251,7 +251,7 @@ export async function runLifecycleCases(
         creatorParent: "creator.eth",
         agentLabel: "nested.research",
       }, CREATOR_WALLET),
-      /Invalid ENS creator parent or agent label/,
+      /Unsupported agent lifecycle action/,
     );
   });
 
