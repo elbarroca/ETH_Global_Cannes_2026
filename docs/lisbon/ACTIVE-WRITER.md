@@ -14,7 +14,7 @@ start_sha: 86150aebb9c3321a2e4fc57186dbcc8e08a3d9df
 control_sha: 86150aebb9c3321a2e4fc57186dbcc8e08a3d9df
 token: C0-NEON-WALLET-MIGRATE-20260726-01-86150AEB
 lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
-heartbeat_at: 2026-07-26T01:09:54Z
+heartbeat_at: 2026-07-26T01:13:20Z
 expires_at: 2026-07-26T01:39:54Z
 allowed_paths:
   - design-qa.md
@@ -24,15 +24,20 @@ started_at: 2026-07-26T01:09:54Z
 deadline: 2026-07-26T01:39:54Z
 expected_exit: exact two-migration Neon deployment with status and schema readback
 external_effect_authority: NEON-WALLET-AUTHORITY-MIGRATE-20260726-01 exact pending migrations 20260725230000 and 20260725240000 only; no reset seed provisioning credential change push deploy transaction or repeat
-external_effects_attempted: none
+external_effects_attempted: one authorized Neon migrate deploy through DIRECT_URL; exact two-migration effect succeeded and was reconciled without retry
 claim_changes: local visual QA terminal normalized to passed; no live or release claim
-completed_at: null
-exit_sha: null
-verification_evidence: preflight found 22 committed migrations and exactly 20260725230000 plus 20260725240000 pending; deployment and readback pending
-remaining_block: migration effect pending; all push deploy Circle Graph 0G hiring and submission effects remain separately unauthorized
-verdict: IN_PROGRESS
+completed_at: 2026-07-26T01:13:20Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - pooled and direct configuration matched one managed Neon endpoint database role and rotated credential; pooled host retained -pooler and migrations used the direct host
+  - preflight found 22 committed migrations and exactly 20260725230000 plus 20260725240000 pending
+  - one migrate deploy applied exactly those two migrations successfully
+  - post-status reported database schema up to date at 22 of 22
+  - direct and pooled schema readbacks confirmed wallet tables publication and receipt authority columns hireability function integrity triggers and nullable legacy ENS receipt authority
+remaining_block: all push deploy Circle Graph 0G live hiring and submission effects remain separately unauthorized
+verdict: PASS_TO_AUDIT; MANAGED_SCHEMA_READY; OTHER_LIVE_EFFECTS_BLOCKED
 lock_release: release only exact token C0-NEON-WALLET-MIGRATE-20260726-01-86150AEB after reconciliation commit
-status: active
+status: completed
 ```
 
 ```yaml
