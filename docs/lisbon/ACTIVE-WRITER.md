@@ -3,6 +3,44 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Payments Integrator /root/circle_wallet_error
+task_id: CIRCLE-WALLET-ERROR-R1
+task_instance_id: CIRCLE-WALLET-ERROR-R1:R1:D83F232
+generation: 1
+sprint: WALLET-AUTHORITY-PRODUCTION-REPAIR
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: d83f232acf31f0ed26d4e00dcf0eac96676a4554
+control_sha: d83f232acf31f0ed26d4e00dcf0eac96676a4554
+token: CIRCLE-WALLET-ERROR-R1-R1-D83F232-20260726T013000Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-26T01:44:30Z
+expires_at: 2026-07-26T02:15:00Z
+allowed_paths:
+  - src/payments/circle-wallet.ts
+  - tests/payments/agent-wallet.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-26T01:30:00Z
+deadline: 2026-07-26T02:15:00Z
+expected_exit: stable secret-safe Circle create-wallet provider errors for sequential Kernel mapping
+external_effect_authority: local code deterministic injected-fake tests requested checks and one atomic local commit only; no Circle call wallet creation funding signing transaction push deploy migration form spend or claim
+external_effects_attempted: none
+claim_changes: none; local error classification is not live Circle wallet or release proof
+completed_at: 2026-07-26T01:44:30Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - focused payments test 6 of 6 PASS
+  - scoped ESLint and full lint PASS with zero errors and 23 inherited warnings
+  - typecheck PASS
+  - secret scan PASS
+  - git diff check PASS
+remaining_block: Kernel mapping is a sequential C0 handoff; all Circle live calls wallet creation funding signing transactions push deploy migration forms spend and claims remain unauthorized
+verdict: PASS_TO_AUDIT; LOCAL_ONLY; LIVE_EFFECT_BLOCKED
+lock_release: release only exact token CIRCLE-WALLET-ERROR-R1-R1-D83F232-20260726T013000Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Kernel Integrator /root/creator_mcp_trigger_fix
 task_id: CREATOR-MCP-TRIGGER-FIX-R1
 task_instance_id: CREATOR-MCP-TRIGGER-FIX-R1:R1:466155F

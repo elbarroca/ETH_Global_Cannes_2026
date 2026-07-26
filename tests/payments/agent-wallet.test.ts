@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { createAgentWallet } from "../../src/payments/circle-wallet";
+import {
+  BadRequestError,
+  ForbiddenError,
+  HttpRequestError,
+  UnauthorizedError,
+} from "@circle-fin/developer-controlled-wallets";
+import {
+  CircleAgentWalletError,
+  createAgentWallet,
+  type CircleAgentWalletErrorReason,
+} from "../../src/payments/circle-wallet";
 
 type CircleWalletClient = NonNullable<Parameters<typeof createAgentWallet>[2]>;
 type CreateWalletResponse = Awaited<ReturnType<CircleWalletClient["createWallets"]>>;
@@ -24,6 +34,23 @@ interface MockWallet {
 
 function walletResponse(wallet: MockWallet): CreateWalletResponse {
   return { data: { wallets: [wallet] } } as CreateWalletResponse;
+}
+
+function failingClient(error: unknown): CircleWalletClient {
+  return {
+    async createWallets() {
+      throw error;
+    },
+  };
+}
+
+async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+  assert.fail("Expected promise to reject");
 }
 
 test("protected Circle agent wallets are strict and idempotent", async (t) => {
@@ -195,5 +222,124 @@ test("protected Circle agent wallets are strict and idempotent", async (t) => {
       },
     };
     await assert.rejects(createAgentWallet(AGENT_ONE, randomUUID(), empty), /invalid wallet count/);
+  });
+
+  await t.test("Circle response failures expose only stable safe fields", async () => {
+    const secret = "circle-api-key-entity-secret-ciphertext-wallet-set";
+    const url = `https://api.circle.example/${secret}`;
+    const cases: Array<{
+      sdkError: BadRequestError | UnauthorizedError | ForbiddenError;
+      reason: CircleAgentWalletErrorReason;
+      status: number;
+      providerCode: string;
+    }> = [
+      {
+        sdkError: new BadRequestError({
+          message: secret,
+          code: 156017,
+          url,
+          method: "POST",
+          status: 400,
+        }),
+        reason: "invalid_request",
+        status: 400,
+        providerCode: "156017",
+      },
+      {
+        sdkError: new UnauthorizedError({
+          message: secret,
+          code: 401,
+          url,
+          method: "POST",
+          status: 401,
+        }),
+        reason: "unauthorized",
+        status: 401,
+        providerCode: "401",
+      },
+      {
+        sdkError: new ForbiddenError({
+          message: secret,
+          code: 403,
+          url,
+          method: "POST",
+          status: 403,
+        }),
+        reason: "forbidden",
+        status: 403,
+        providerCode: "403",
+      },
+    ];
+
+    for (const expected of cases) {
+      const error = await rejectionOf(
+        createAgentWallet(AGENT_ONE, randomUUID(), failingClient(expected.sdkError)),
+      );
+      assert.ok(error instanceof CircleAgentWalletError);
+      assert.deepEqual(
+        {
+          name: error.name,
+          message: error.message,
+          reason: error.reason,
+          status: error.status,
+          providerCode: error.providerCode,
+        },
+        {
+          name: "CircleAgentWalletError",
+          message: "Circle agent wallet creation failed",
+          reason: expected.reason,
+          status: expected.status,
+          providerCode: expected.providerCode,
+        },
+      );
+      assert.equal("cause" in error, false);
+      assert.doesNotMatch(JSON.stringify(error), new RegExp(secret));
+      assert.doesNotMatch(String(error.stack), new RegExp(secret));
+    }
+  });
+
+  await t.test("Circle request and generic failures cannot disclose provider secrets", async () => {
+    const secret = "circle-api-key-entity-secret-ciphertext-wallet-set";
+    const requestError = new HttpRequestError({
+      message: secret,
+      code: "ECONNRESET",
+      url: `https://api.circle.example/${secret}`,
+      method: "POST",
+    });
+
+    const requestFailure = await rejectionOf(
+      createAgentWallet(AGENT_ONE, randomUUID(), failingClient(requestError)),
+    );
+    assert.ok(requestFailure instanceof CircleAgentWalletError);
+    assert.deepEqual(
+      {
+        reason: requestFailure.reason,
+        status: requestFailure.status,
+        providerCode: requestFailure.providerCode,
+      },
+      { reason: "provider_request", status: null, providerCode: "ECONNRESET" },
+    );
+
+    const genericFailure = await rejectionOf(
+      createAgentWallet(
+        AGENT_ONE,
+        randomUUID(),
+        failingClient(new Error(`${secret}: headers body API key entity secret`)),
+      ),
+    );
+    assert.ok(genericFailure instanceof CircleAgentWalletError);
+    assert.deepEqual(
+      {
+        reason: genericFailure.reason,
+        status: genericFailure.status,
+        providerCode: genericFailure.providerCode,
+      },
+      { reason: "provider_failure", status: null, providerCode: null },
+    );
+
+    const observable = JSON.stringify({ requestFailure, genericFailure });
+    assert.doesNotMatch(observable, new RegExp(secret));
+    assert.doesNotMatch(String(requestFailure.stack), new RegExp(secret));
+    assert.doesNotMatch(String(genericFailure.stack), new RegExp(secret));
   });
 });

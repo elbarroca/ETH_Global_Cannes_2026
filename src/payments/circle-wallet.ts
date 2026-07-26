@@ -1,4 +1,8 @@
-import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
+import {
+  HttpRequestError,
+  HttpResponseError,
+  initiateDeveloperControlledWalletsClient,
+} from "@circle-fin/developer-controlled-wallets";
 import { isAddress, type Address } from "viem";
 
 // Arc USDC is the chain's NATIVE currency — Circle's transfer API uses the
@@ -10,6 +14,18 @@ export const USDC_ARC = process.env.USDC_ARC_ADDRESS ?? "0x360000000000000000000
 const CIRCLE_BLOCKCHAIN = "ARC-TESTNET" as const;
 const CIRCLE_AGENT_BLOCKCHAIN = "UNI-SEPOLIA" as const;
 const CIRCLE_AGENT_ACCOUNT_TYPE = "SCA" as const;
+const CIRCLE_REQUEST_CODES = new Set([
+  "EAI_AGAIN",
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "ERR_NETWORK",
+  "ETIMEDOUT",
+  "UNKNOWN",
+]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -34,6 +50,55 @@ export interface AgentWalletIdentity {
   address: Address;
   network: typeof CIRCLE_AGENT_BLOCKCHAIN;
   accountType: typeof CIRCLE_AGENT_ACCOUNT_TYPE;
+}
+
+export type CircleAgentWalletErrorReason =
+  | "invalid_request"
+  | "unauthorized"
+  | "forbidden"
+  | "provider_response"
+  | "provider_request"
+  | "provider_failure";
+
+export class CircleAgentWalletError extends Error {
+  readonly name = "CircleAgentWalletError";
+
+  constructor(
+    readonly reason: CircleAgentWalletErrorReason,
+    readonly status: number | null,
+    readonly providerCode: string | null,
+  ) {
+    super("Circle agent wallet creation failed");
+  }
+}
+
+function safeCircleProviderCode(code: string | number): string | null {
+  if (typeof code === "number") {
+    return Number.isSafeInteger(code) && code >= 100 && code <= 999_999 ? String(code) : null;
+  }
+  return CIRCLE_REQUEST_CODES.has(code) ? code : null;
+}
+
+function classifyCircleWalletError(error: unknown): CircleAgentWalletError {
+  if (error instanceof HttpResponseError) {
+    const reason: CircleAgentWalletErrorReason =
+      error.status === 400
+        ? "invalid_request"
+        : error.status === 401
+          ? "unauthorized"
+          : error.status === 403
+            ? "forbidden"
+            : "provider_response";
+    return new CircleAgentWalletError(reason, error.status, safeCircleProviderCode(error.code));
+  }
+  if (error instanceof HttpRequestError) {
+    return new CircleAgentWalletError(
+      "provider_request",
+      null,
+      safeCircleProviderCode(error.code),
+    );
+  }
+  return new CircleAgentWalletError("provider_failure", null, null);
 }
 
 function getClient(): CircleClient {
@@ -85,14 +150,19 @@ export async function createAgentWallet(
   const walletSetId = getWalletSetId();
   if (!UUID.test(walletSetId)) throw new Error("CIRCLE_WALLET_SET_ID must be a UUID");
 
-  const response = await circle.createWallets({
-    walletSetId,
-    blockchains: [CIRCLE_AGENT_BLOCKCHAIN],
-    count: 1,
-    accountType: CIRCLE_AGENT_ACCOUNT_TYPE,
-    idempotencyKey,
-    metadata: [{ name: `AlphaDawg-Agent-${agentId}`, refId: agentId }],
-  });
+  let response: Awaited<ReturnType<CircleClient["createWallets"]>>;
+  try {
+    response = await circle.createWallets({
+      walletSetId,
+      blockchains: [CIRCLE_AGENT_BLOCKCHAIN],
+      count: 1,
+      accountType: CIRCLE_AGENT_ACCOUNT_TYPE,
+      idempotencyKey,
+      metadata: [{ name: `AlphaDawg-Agent-${agentId}`, refId: agentId }],
+    });
+  } catch (error) {
+    throw classifyCircleWalletError(error);
+  }
 
   const wallets = response.data?.wallets;
   if (wallets?.length !== 1) throw new Error("Circle agent wallet creation returned an invalid wallet count");
