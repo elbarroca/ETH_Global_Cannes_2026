@@ -9,6 +9,7 @@ import {
 } from "@/src/kernel/lifecycle";
 import { parseAgentAction, parseAgentListFilters, parseIdempotencyKey } from "@/src/kernel/policy";
 import { domainHash } from "@/src/kernel/canonical";
+import { walletProviderKernelError } from "@/src/kernel/errors";
 
 export const runtime = "nodejs";
 
@@ -63,8 +64,17 @@ export async function POST(request: Request): Promise<NextResponse> {
           provider: {
             provisionAgentWallet: async ({ agentId, idempotencyKey: providerKey }, signal) => {
               if (signal.aborted) throw new Error("KERNEL_WALLET_PROVIDER_ABORTED");
-              const { createAgentWallet } = await import("@/src/payments/circle-wallet");
-              const wallet = await createAgentWallet(agentId, providerKey);
+              const { CircleAgentWalletError, createAgentWallet } =
+                await import("@/src/payments/circle-wallet");
+              let wallet;
+              try {
+                wallet = await createAgentWallet(agentId, providerKey);
+              } catch (error) {
+                if (error instanceof CircleAgentWalletError) {
+                  throw walletProviderKernelError(error.reason);
+                }
+                throw error;
+              }
               if (signal.aborted) throw new Error("KERNEL_WALLET_PROVIDER_ABORTED");
               const identity = { ...wallet, state: "LIVE" as const, observedAt };
               return {

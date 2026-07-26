@@ -5,7 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { domainHash, type CanonicalValue } from "./canonical";
 import { bindManifestEns, deriveManifestHashes } from "./agent-catalog";
 import { agentWalletIdentityHash, validateAgentWalletIdentity } from "./agent-wallets";
-import { KernelError } from "./errors";
+import { KernelError, walletProviderKernelErrorFromCode } from "./errors";
 import type { DatabaseClient } from "./service";
 import type { AgentListFilters } from "./policy";
 import type {
@@ -928,6 +928,10 @@ export async function attachAgentWallet(
   if (claim.kind === "TERMINAL") {
     return parseLifecycleVersionSnapshot(storedResult(claim.row, "ATTACH_AGENT_WALLET"));
   }
+  if (claim.kind === "RETRYABLE") {
+    const providerError = walletProviderKernelErrorFromCode(claim.errorCode);
+    if (providerError) throw providerError;
+  }
   if (claim.kind !== "EXECUTE") {
     throw new KernelError("KERNEL_CONFLICT", "Wallet attachment is already in progress", 409);
   }
@@ -961,8 +965,16 @@ export async function attachAgentWallet(
       clearTimeout(timer);
       options.signal?.removeEventListener("abort", abort);
     }
-  } catch {
-    await markLifecycleActionRetryable(sql, claim, "KERNEL_WALLET_PROVIDER_REFUSED");
+  } catch (error) {
+    const providerError = error instanceof KernelError
+      ? walletProviderKernelErrorFromCode(error.code)
+      : null;
+    await markLifecycleActionRetryable(
+      sql,
+      claim,
+      providerError?.code ?? "KERNEL_WALLET_PROVIDER_REFUSED",
+    );
+    if (providerError) throw providerError;
     throw new KernelError("KERNEL_CONFLICT", "Agent wallet provider refused the attachment", 503);
   }
   const identityHash = agentWalletIdentityHash(identity);

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { domainHash } from "../../src/kernel/canonical";
-import { KernelError } from "../../src/kernel/errors";
+import {
+  KernelError,
+  walletProviderKernelError,
+  type WalletProviderErrorReason,
+} from "../../src/kernel/errors";
 import { createGoal, createGoalRun, parseGoalCreate } from "../../src/kernel/goals";
 import { createHireRequest } from "../../src/kernel/hire-requests";
 import {
@@ -44,6 +48,34 @@ class FakeWalletProvider implements AgentWalletProvider {
     }) as AgentWalletIdentity;
   }
 }
+
+test("wallet provider errors are stable and secret-safe", async () => {
+  const cases = [
+    ["invalid_request", "KERNEL_WALLET_PROVIDER_INVALID_REQUEST", 502,
+      "Circle rejected the wallet request. Verify Circle TEST wallet-set, UNI-SEPOLIA, and SCA configuration."],
+    ["unauthorized", "KERNEL_WALLET_PROVIDER_UNAUTHORIZED", 503,
+      "Circle authentication failed. Verify Circle TEST entity-secret and account configuration."],
+    ["forbidden", "KERNEL_WALLET_PROVIDER_FORBIDDEN", 503,
+      "Circle wallet creation is forbidden. Verify Circle TEST entity-secret and account configuration."],
+    ["provider_response", "KERNEL_WALLET_PROVIDER_RESPONSE", 502,
+      "Circle returned an unavailable wallet response. Retry after verifying Circle TEST service status."],
+    ["provider_request", "KERNEL_WALLET_PROVIDER_REQUEST", 503,
+      "Circle wallet provider could not be reached. Retry after verifying Circle TEST connectivity."],
+    ["provider_failure", "KERNEL_WALLET_PROVIDER_UNAVAILABLE", 503,
+      "Circle wallet provider is unavailable. Retry after verifying Circle TEST configuration."],
+  ] as const satisfies readonly [WalletProviderErrorReason, string, number, string][];
+
+  for (const [reason, code, status, message] of cases) {
+    const error = walletProviderKernelError(reason);
+    assert.equal(error.code, code);
+    assert.equal(error.status, status);
+    assert.equal(error.message, message);
+    assert.deepEqual(Object.keys(error).sort(), ["code", "name", "status"]);
+  }
+
+  assert.notEqual(cases[0][1], cases[4][1]);
+  assert.notEqual(cases[4][1], cases[5][1]);
+});
 
 test("creator draft persists server-expanded MCP bindings and rejects arbitrary IDs", async () => {
   const database = await startDisposableDatabase("creator-mcp-trigger");
@@ -157,6 +189,60 @@ test("wallet authority publishes without ENS and admits external hire and goal s
       }),
       (error: unknown) => error instanceof KernelError && error.status === 503,
     );
+
+    const providerFailures = [
+      ["invalid_request", "KERNEL_WALLET_PROVIDER_INVALID_REQUEST"],
+      ["unauthorized", "KERNEL_WALLET_PROVIDER_UNAUTHORIZED"],
+      ["forbidden", "KERNEL_WALLET_PROVIDER_FORBIDDEN"],
+      ["provider_response", "KERNEL_WALLET_PROVIDER_RESPONSE"],
+      ["provider_request", "KERNEL_WALLET_PROVIDER_REQUEST"],
+      ["provider_failure", "KERNEL_WALLET_PROVIDER_UNAVAILABLE"],
+    ] as const satisfies readonly [WalletProviderErrorReason, string][];
+    for (const [reason, code] of providerFailures) {
+      await assert.rejects(
+        attachAgentWallet(CREATOR_ID, draft.versionId, {
+          idempotencyKey: `wallet-error-${reason}`,
+          provider: new FakeWalletProvider(() => {
+            throw walletProviderKernelError(reason);
+          }),
+          sql: database.sql,
+        }),
+        (error: unknown) => error instanceof KernelError && error.code === code,
+      );
+    }
+    const rawSecret = "RAW_PROVIDER_SECRET_MUST_NOT_LEAK";
+    await assert.rejects(
+      attachAgentWallet(CREATOR_ID, draft.versionId, {
+        idempotencyKey: "wallet-error-unknown",
+        provider: new FakeWalletProvider(() => {
+          throw Object.assign(new Error(rawSecret), {
+            providerCode: "RAW_PROVIDER_CODE",
+            raw: { secret: rawSecret },
+          });
+        }),
+        sql: database.sql,
+      }),
+      (error: unknown) => error instanceof KernelError &&
+        error.code === "KERNEL_CONFLICT" &&
+        error.message === "Agent wallet provider refused the attachment" &&
+        !error.message.includes(rawSecret),
+    );
+    const retryable = await database.sql<{ idempotency_key: string; error_code: string }[]>`
+      SELECT idempotency_key, error_code
+      FROM agent_lifecycle_actions
+      WHERE action = 'ATTACH_AGENT_WALLET' AND status = 'RETRYABLE'
+        AND idempotency_key LIKE 'wallet-error-%'
+      ORDER BY idempotency_key
+    `;
+    assert.deepEqual([...retryable], [
+      { error_code: "KERNEL_WALLET_PROVIDER_FORBIDDEN", idempotency_key: "wallet-error-forbidden" },
+      { error_code: "KERNEL_WALLET_PROVIDER_UNAVAILABLE", idempotency_key: "wallet-error-provider_failure" },
+      { error_code: "KERNEL_WALLET_PROVIDER_REQUEST", idempotency_key: "wallet-error-provider_request" },
+      { error_code: "KERNEL_WALLET_PROVIDER_RESPONSE", idempotency_key: "wallet-error-provider_response" },
+      { error_code: "KERNEL_WALLET_PROVIDER_INVALID_REQUEST", idempotency_key: "wallet-error-invalid_request" },
+      { error_code: "KERNEL_WALLET_PROVIDER_UNAUTHORIZED", idempotency_key: "wallet-error-unauthorized" },
+      { error_code: "KERNEL_WALLET_PROVIDER_REFUSED", idempotency_key: "wallet-error-unknown" },
+    ].sort((left, right) => left.idempotency_key.localeCompare(right.idempotency_key)));
 
     for (const [key, mutate] of [
       ["wallet-bad-id-01", (identity: AgentWalletIdentity) => ({ ...identity, walletId: "not-a-uuid" })],

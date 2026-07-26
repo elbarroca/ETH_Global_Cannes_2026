@@ -3,6 +3,47 @@
 At most one record may have `status: active`.
 
 ```yaml
+owner: Kernel Integrator /root/circle_kernel_mapping
+task_id: CIRCLE-KERNEL-ERROR-MAP-R1
+task_instance_id: CIRCLE-KERNEL-ERROR-MAP-R1:R1:4B532B5
+generation: 1
+sprint: WALLET-AUTHORITY-PRODUCTION-REPAIR
+mode: sole_mutating_writer
+branch: Eth_global_lisbon_
+start_sha: 4b532b5e73f549e9dcaf98488c0c583030c8f652
+control_sha: 4b532b5e73f549e9dcaf98488c0c583030c8f652
+token: CIRCLE-KERNEL-ERROR-MAP-R1-R1-4B532B5-20260726T014900Z
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-26T01:53:15Z
+expires_at: 2026-07-26T02:30:00Z
+allowed_paths:
+  - src/kernel/errors.ts
+  - src/kernel/lifecycle.ts
+  - app/api/kernel/agents/route.ts
+  - tests/kernel/agent-wallets.test.ts
+  - tests/a5/auth-state-regression.test.ts
+  - docs/lisbon/ACTIVE-WRITER.md
+started_at: 2026-07-26T01:49:00Z
+deadline: 2026-07-26T02:30:00Z
+expected_exit: stable secret-safe Circle wallet-provider Kernel errors survive the retryable create action while unknown failures remain generic
+external_effect_authority: local code deterministic injected-fake tests requested checks and one atomic local commit only; no Circle call wallet creation funding signing transaction push deploy migration form spend or claim
+external_effects_attempted: none
+claim_changes: none; local error mapping is not live Circle wallet or release proof
+completed_at: 2026-07-26T01:53:15Z
+exit_sha: DERIVE_FROM_CONTAINING_COMMIT
+verification_evidence:
+  - focused wallet-authority test 3 of 3 PASS
+  - scoped ESLint PASS
+  - typecheck PASS
+  - secret scan PASS
+  - git diff check PASS
+remaining_block: exact-SHA independent audit; no Circle call wallet creation funding signing transaction push deploy migration form spend or claim was authorized or attempted
+verdict: PASS_TO_AUDIT; LOCAL_ONLY; LIVE_EFFECT_BLOCKED
+lock_release: release only exact token CIRCLE-KERNEL-ERROR-MAP-R1-R1-4B532B5-20260726T014900Z after the task-owned containing commit
+status: completed
+```
+
+```yaml
 owner: Payments Integrator /root/circle_wallet_error
 task_id: CIRCLE-WALLET-ERROR-R1
 task_instance_id: CIRCLE-WALLET-ERROR-R1:R1:D83F232
