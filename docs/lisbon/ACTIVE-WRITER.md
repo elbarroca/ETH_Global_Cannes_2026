@@ -5271,6 +5271,36 @@ status: complete
 Read-only probes/auditors may overlap but must not edit, install, format, commit, push, deploy, sign, transact, submit forms, or spend.
 
 ```yaml
+owner: C0 coordinator
+task_id: CIRCLE-WALLET-READONLY-DIAGNOSTIC-20260726-01
+task_instance_id: CIRCLE-WALLET-READONLY-DIAGNOSTIC-20260726-01:R1:7D77E6B
+generation: 1
+mode: sole_control_writer
+branch: Eth_global_lisbon_
+start_sha: 7d77e6bf39f5f96be860a3d48cb4848f540de292
+control_sha: 7d77e6bf39f5f96be860a3d48cb4848f540de292
+token: C0-CIRCLE-READONLY-20260726-01-7D77E6B
+lock_path: <git-common-dir>/alphadawg-lisbon-writer.lock
+heartbeat_at: 2026-07-26T01:34:38Z
+expires_at: 2026-07-26T02:04:38Z
+allowed_paths:
+  - docs/lisbon/ACTIVE-WRITER.md
+  - docs/lisbon/EXTERNAL-EFFECTS.md
+started_at: 2026-07-26T01:34:38Z
+expected_exit: identify the Circle wallet-attachment refusal using exactly two read-only calls
+external_effect_authority: CIRCLE-WALLET-READONLY-DIAGNOSTIC-20260726-01 only
+external_effects_allowed:
+  - one configured wallet-set read
+  - one exact agent-refId UNI-SEPOLIA wallet-list read
+external_effects_denied:
+  - wallet creation or mutation
+  - funding signing transaction or faucet
+  - secret output
+  - push or deploy
+status: active
+```
+
+```yaml
 owner: 0G Integrator /root/graph_a3_recovery
 task_id: GRAPH-A3-RECOVERY-R1
 task_instance_id: GRAPH-A3-RECOVERY-R1:R1:744EB96
